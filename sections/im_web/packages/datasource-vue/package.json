@@ -1,0 +1,13 @@
+{
+  "name": "@tsdaodao/datasource-vue",
+  "version": "1.0.0",
+  "private": true,
+  "main": "src/index.ts",
+  "dependencies": {
+    "vue": "^3.4.21",
+    "pinia": "^2.1.7",
+    "wukongimjssdk": "^1.2.11",
+    "howler": "^2.2.4",
+    "@tsdaodao/base-vue": "workspace:*"
+  }
+}

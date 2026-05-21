@@ -1,0 +1,27 @@
+{
+  "compilerOptions": {
+    "target": "ESNext",
+    "useDefineForClassFields": true,
+    "module": "ESNext",
+    "moduleResolution": "bundler",
+    "strict": true,
+    "jsx": "preserve",
+    "importHelpers": true,
+    "experimentalDecorators": true,
+    "emitDecoratorMetadata": true,
+    "resolveJsonModule": true,
+    "isolatedModules": true,
+    "esModuleInterop": true,
+    "lib": ["ESNext", "DOM", "DOM.Iterable"],
+    "skipLibCheck": true,
+    "baseUrl": ".",
+    "paths": {
+      "@tsdaodao/base-vue": ["./packages/base-vue/src"],
+      "@tsdaodao/datasource-vue": ["./packages/datasource-vue/src"],
+      "@tsdaodao/login-vue": ["./packages/login-vue/src"],
+      "@tsdaodao/contacts-vue": ["./packages/contacts-vue/src"]
+    }
+  },
+  "include": ["packages/*/src/**/*", "apps/*/src/**/*", "src/**/*"],
+  "exclude": ["node_modules", "**/dist"]
+}

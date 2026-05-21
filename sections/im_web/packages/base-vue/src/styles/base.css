@@ -1,0 +1,59 @@
+@import './variables.css';
+
+/* Global resets */
+* {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+}
+
+body {
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+  background-color: var(--bg-primary);
+  color: var(--text-main);
+  transition: background-color var(--transition-fast), color var(--transition-fast);
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+/* Arco Design resets as per Constitution */
+.arco-modal,
+.arco-drawer-content,
+.arco-popover-content,
+.arco-dropdown-list-wrapper,
+.arco-tooltip-content,
+.arco-card,
+.arco-input-wrapper,
+.arco-textarea-wrapper,
+.arco-btn {
+  box-shadow: none !important;
+  border: var(--border-hairline) !important;
+  border-radius: var(--radius-sm) !important;
+  transition: all var(--transition-fast) !important;
+}
+
+.arco-modal-header,
+.arco-modal-footer,
+.arco-drawer-header,
+.arco-drawer-footer {
+  border-color: var(--border-color) !important;
+}
+
+/* Base scrollbar reset */
+::-webkit-scrollbar {
+  width: 4px;
+  height: 4px;
+}
+
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+::-webkit-scrollbar-thumb {
+  background: var(--border-color);
+  border-radius: var(--radius-sm);
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: var(--text-muted);
+}

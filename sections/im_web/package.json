@@ -1,0 +1,16 @@
+{
+  "name": "tsdaodao-vue-monorepo",
+  "private": true,
+  "version": "1.0.0",
+  "scripts": {
+    "dev": "pnpm --filter chat dev",
+    "build": "pnpm --filter chat build",
+    "type-check": "pnpm -r exec vue-tsc --noEmit"
+  },
+  "devDependencies": {
+    "typescript": "^5.4.2",
+    "vite": "^5.2.2",
+    "@vitejs/plugin-vue": "^5.0.4",
+    "vue-tsc": "^2.0.6"
+  }
+}

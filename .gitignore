@@ -7,6 +7,7 @@ __pycache__/
 .claude
 .codex
 .vscode
+.agent
 
 # other models
 sections/im/
@@ -225,3 +226,46 @@ __marimo__/
 
 # Streamlit
 .streamlit/secrets.toml
+
+# ============================================================
+# Vue 3 / Vite / Node.js
+# ============================================================
+
+# Vue/Vite build output
+apps/chat/dist/
+apps/chat/dist-ssr/
+apps/chat/node_modules/
+packages/*/dist/
+packages/*/node_modules/
+
+# Vite
+.vite/
+vite.config.*.local
+
+# npm / pnpm
+node_modules/
+.pnpm-store/
+.npm
+.pnpm-debug.log
+
+# pnpm workspace lock (per-project, not root)
+# pnpm-lock.yaml              # 保留根目录 lockfile 若需要可提交
+
+# TypeScript cache / build
+*.tsbuildinfo
+
+# Vue component cache
+.vue日照/          # Vite component SFC cache on Windows
+
+# Environment files (never commit secrets)
+.env
+.env.local
+.env.*.local
+!.env.example
+
+# Editor directories and files
+.DS_Store
+Thumbs.db
+
+# Vitest / unit test output
+apps/chat/coverage/
