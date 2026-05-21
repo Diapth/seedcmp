@@ -75,3 +75,70 @@
 ### 交付物
 
 产品设计文档 + 技术文档 + 可运行 Demo + AI 协作开发记录 + 3 分钟 Demo 视频
+
+---
+
+## IM 基础设施（本地开发环境）
+
+### 已运行服务
+
+| 服务 | 说明 | 访问地址 | 端口 |
+|---|---|---|---|
+| **WuKongIM** | IM 通讯层 API | `http://127.0.0.1:5001` | 5001 |
+| | TCP 长连接网关 | `tcp://127.0.0.1:5100` | 5100 |
+| | WebSocket 网关 | `ws://127.0.0.1:5200` | 5200 |
+| | 管理后台 API | `http://127.0.0.1:5300` | 5300 |
+| **TangSengDaoDaoServer** | 业务层 API | `http://127.0.0.1:8090` | 8090 |
+| | gRPC Webhook | `127.0.0.1:6979` | 6979 |
+| | **WEB UI** | `http://127.0.0.1:82` | 82 |
+| **WuKongIM Admin** | **WEB UI** | `http://127.0.0.1:18080` | 18080 |
+| **MinIO** | 文件存储 API | `http://127.0.0.1:9000` | 9000 |
+| | Web 管理界面 | `http://127.0.0.1:9001` | 9001 |
+
+### 服务账号密码汇总
+
+| 服务 | 类型 | 地址 | 账号 | 密码 |
+|------|------|------|------|------|
+| **MySQL** | 数据库 | `127.0.0.1:3306` | `root` | 需 `sudo mysql` |
+| | 业务库 | `im` | `tsdd_user` | `tsdd_password` |
+| **Redis** | 缓存 | `127.0.0.1:6379` | — | — |
+| **MinIO** | API | `http://127.0.0.1:9000` | `minio` | `minio123` |
+| | 控制台 | `http://127.0.0.1:9001` | `minio` | `minio123` |
+| **WuKongIM** | 管理后台 API | `http://127.0.0.1:5300` | `admin` | `admin123` |
+| | Admin Web UI | `http://127.0.0.1:18080` | `admin` | `admin123` |
+| **TangSengDaoDao** | Web UI | `http://127.0.0.1:82` | 手机号登录 | — |
+| | 注册页 | `http://127.0.0.1:82/register.html` | — | — |
+| | API | `http://127.0.0.1:8090` | — | — |
+
+### 开发短信验证码
+
+所有短信验证码统一使用：**`123456`**
+
+### 已注册测试用户
+
+| 用户名 | 密码 | 手机号 | 名称 |
+|--------|------|--------|------|
+| `008613800138000` | `123456` | 13800138000 | 逐味魔 |
+| `008618337488675` | `123456` | 18337488675 | leng |
+| `008613733632709` | `123456` | 13733632709 | 123 |
+
+> 通过 Web UI 注册的新用户，如果登录提示"用户不存在"，请联系管理员修复 username 格式（需 `0086` + 手机号）。
+
+### 构建与启动
+
+```bash
+# 构建 WuKongIM
+cd sections/im/WuKongIM
+go build -o wukongim ./cmd/wukongim/
+./wukongim -config ./wukongim.conf
+
+# 构建 TangSengDaoDaoServer（等 WuKongIM 就绪后）
+cd sections/im/TangSengDaoDaoServer
+go build -o tsdd_server .
+./tsdd_server -config ./configs/tsdd.yaml
+
+# MinIO（如未启动）
+export MINIO_ROOT_USER=minio
+export MINIO_ROOT_PASSWORD=minio123
+cd /path/to/minio && ./minio server ./data --console-address ':9001'
+```
