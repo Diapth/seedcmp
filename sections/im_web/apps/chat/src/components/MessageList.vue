@@ -85,6 +85,31 @@ function handleRightClick(e: MouseEvent, msg: any) {
   showMenu.value = true;
 }
 
+const menuReactions = computed(() => {
+  if (!selectedMsg.value) return [];
+  const emojis = ['👍', '❤️', '😂', '😮', '😢', '🙏'];
+  return emojis.map(emoji => ({
+    emoji,
+    action: () => handleSendReaction(selectedMsg.value, emoji)
+  }));
+});
+
+function handleSendReaction(msg: any, emoji: string) {
+  if (!msg.reactions) {
+    msg.reactions = [];
+  }
+  const exist = msg.reactions.find((r: any) => r.emoji === emoji);
+  if (exist) {
+    exist.count++;
+  } else {
+    msg.reactions.push({
+      emoji,
+      count: 1,
+      users: [userStore.currentUser?.uid || '']
+    });
+  }
+}
+
 const menuItems = computed(() => {
   if (!selectedMsg.value) return [];
   const items = [];
@@ -123,6 +148,8 @@ const menuItems = computed(() => {
         }
       }
     });
+  }
+
   items.push({
     label: '回复',
     action: () => {
@@ -166,6 +193,12 @@ const menuItems = computed(() => {
             class="user-name-label"
           >
             {{ userStore.userCache[msg.fromUID]?.name || msg.fromUID }}
+          </div>
+
+          <!-- Quote / Reply Reference Box -->
+          <div v-if="msg.content?.reply" class="quote-reference-box" :class="{ 'is-me': isMe(msg) }">
+            <span class="quote-author">@{{ msg.content.reply.fromName || msg.content.reply.fromUID }}:</span>
+            <span class="quote-text">{{ msg.content.reply.content?.text || '[消息]' }}</span>
           </div>
 
           <TextCell 
@@ -223,6 +256,29 @@ const menuItems = computed(() => {
             v-else 
             :message="msg" 
           />
+
+          <!-- Reactions Bar -->
+          <div v-if="msg.reactions && msg.reactions.length > 0" class="reactions-bar">
+            <div 
+              v-for="reaction in msg.reactions" 
+              :key="reaction.emoji" 
+              class="reaction-badge"
+              @click="handleSendReaction(msg, reaction.emoji)"
+            >
+              <span class="reaction-emoji">{{ reaction.emoji }}</span>
+              <span class="reaction-count">{{ reaction.count }}</span>
+            </div>
+          </div>
+
+          <!-- Read status indicator for sent messages -->
+          <div v-if="isMe(msg) && msg.status === 'success'" class="read-status-wrapper">
+            <span v-if="channelType === 1" class="read-status" :class="{ 'is-read': msg.remoteExtra?.readed }">
+              {{ msg.remoteExtra?.readed ? '已读' : '未读' }}
+            </span>
+            <span v-else-if="channelType === 2" class="read-status" :class="{ 'is-read': (msg.remoteExtra?.readedCount || 0) > 0 }">
+              {{ msg.remoteExtra?.readedCount ? `${msg.remoteExtra.readedCount}人已读` : '未读' }}
+            </span>
+          </div>
         </div>
       </div>
     </div>
@@ -232,6 +288,7 @@ const menuItems = computed(() => {
       :x="menuX" 
       :y="menuY" 
       :items="menuItems" 
+      :reactions="menuReactions"
       @close="showMenu = false" 
     />
   </div>
@@ -290,5 +347,85 @@ const menuItems = computed(() => {
   width: 100%;
   display: flex;
   justify-content: center;
+}
+
+/* Quote Reference */
+.quote-reference-box {
+  background-color: var(--bg-secondary);
+  border-left: 2px solid var(--primary-color, #165dff);
+  padding: 4px 8px;
+  border-radius: 2px;
+  font-size: 11px;
+  max-width: 100%;
+  display: flex;
+  gap: 4px;
+  margin-bottom: 2px;
+}
+
+.quote-reference-box.is-me {
+  border-left: none;
+  border-right: 2px solid var(--primary-color, #165dff);
+}
+
+.quote-author {
+  font-weight: 500;
+  color: var(--text-secondary);
+}
+
+.quote-text {
+  color: var(--text-secondary);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* Reactions Bar */
+.reactions-bar {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  margin-top: 2px;
+}
+
+.reaction-badge {
+  display: flex;
+  align-items: center;
+  gap: 3px;
+  background-color: var(--bg-secondary);
+  border: var(--border-hairline);
+  padding: 2px 6px;
+  border-radius: var(--radius-sm);
+  font-size: 11px;
+  cursor: pointer;
+  user-select: none;
+  transition: transform 0.1s, background-color 0.2s;
+}
+
+.reaction-badge:hover {
+  background-color: var(--bg-hover);
+  transform: scale(1.05);
+}
+
+.reaction-emoji {
+  font-size: 12px;
+}
+
+.reaction-count {
+  color: var(--text-secondary);
+  font-weight: 500;
+}
+
+/* Read Status */
+.read-status-wrapper {
+  margin-top: 1px;
+}
+
+.read-status {
+  font-size: 10px;
+  color: var(--text-secondary);
+}
+
+.read-status.is-read {
+  color: var(--primary-color, #165dff);
 }
 </style>

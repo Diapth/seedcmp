@@ -15,6 +15,8 @@ export interface Message {
   isRevoked: boolean;
   revokeUID?: string;
   status: 'sending' | 'success' | 'fail';
+  reactions?: any[];
+  remoteExtra?: any;
 }
 
 export const useMessageStore = defineStore('message', () => {
