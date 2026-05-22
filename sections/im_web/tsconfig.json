@@ -19,6 +19,7 @@
       "@tsdaodao/base-vue": ["./packages/base-vue/src"],
       "@tsdaodao/datasource-vue": ["./packages/datasource-vue/src"],
       "@tsdaodao/login-vue": ["./packages/login-vue/src"],
+      "@tsdaodao/login-vue/*": ["./packages/login-vue/src/*"],
       "@tsdaodao/contacts-vue": ["./packages/contacts-vue/src"]
     }
   },

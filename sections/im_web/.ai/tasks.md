@@ -171,11 +171,16 @@ description: "TangSengDaoDaoWeb Vue 3 极简重构 — 依赖有序的任务拆�
 
 **Purpose**: 用户资料设置、通知偏好、设备管理
 
-- [X] T057 [P] [US1-ext] 在 apps/chat 中创建 `src/views/MePage.vue`，个人中心主页：头像（ChannelAvatar）、昵称、ID 号、二维码（GET /user/qrcode）
-- [X] T058 [P] [US1-ext] 在 apps/chat 中创建 `src/views/EditProfilePage.vue`，编辑资料页：PUT /user/current 修改昵称，POST /users/:uid/avatar 上传头像
-- [X] T059 [P] [US1-ext] 在 apps/chat 中创建 `src/views/SettingsPage.vue`，设置页：通过 `document.body.setAttribute('data-theme', 'dark')` 切换深色模式（plan.md §1.4 规范），通知设置、语言设置、关于
+- [ ] T057 [P] [US1-ext] 在 apps/chat 中创建 `src/views/MePage.vue`，个人中心主页：头像（ChannelAvatar）、昵称、ID 号、二维码（GET /user/qrcode）
+  进度：当前以 `MyProfileDrawer.vue` 承载个人资料入口，但尚未创建独立 `MePage.vue`，不可标记完成。
+- [ ] T058 [P] [US1-ext] 在 apps/chat 中创建 `src/views/EditProfilePage.vue`，编辑资料页：PUT /user/current 修改昵称，POST /users/:uid/avatar 上传头像
+  进度：当前已有资料抽屉和头像相关入口，但尚未创建独立 `EditProfilePage.vue`，不可标记完成。
+- [ ] T059 [P] [US1-ext] 在 apps/chat 中创建 `src/views/SettingsPage.vue`，设置页：通过 `document.body.setAttribute('data-theme', 'dark')` 切换深色模式（plan.md §1.4 规范），通知设置、语言设置、关于
+  进度：当前尚未创建独立 `SettingsPage.vue`，通知设置也未与 `settingsStore` 打通，不可标记完成。
 - [ ] T060 [P] [US1-ext] 在 apps/chat 中创建 `src/views/DeviceManagementPage.vue`，设备管理页：GET /user/devices 列出登录设备，DELETE /user/devices/:deviceId 移除设备，POST /user/quit 退出其他设备
+  进度：页面与设备列表/移除入口已实现；“退出其他设备”因现有 `POST /user/quit` 语义更像退出当前 Web 会话，暂保留未完成，详见 `sections/im_web/.ai/addition.md`
 - [ ] T061 [US1-ext] 实现通知功能（在 `datasource-vue/src/api/index.ts` 和 `apps/chat/src/stores/settingsStore.ts` 中）：PUT /v1/user/device_token 注册推送 token（TangSengDaoDaoServer modules/user/api.go）；**badge** `POST /v1/user/device_badge`（写入，无 GET 读取端，badge 由 WebSocket 推送更新）；**无独立隐身开关**，WebSocket 连接状态隐式表达用户在线状态
+  进度：API 封装已补 `device_token` / `device_badge`，但 `settingsStore` 与通知权限流转尚未完成
 
 **Checkpoint**: Phase 7 完成——个人中心、设置、设备管理完成
 
@@ -203,9 +208,10 @@ description: "TangSengDaoDaoWeb Vue 3 极简重构 — 依赖有序的任务拆�
 - [ ] T068 [P] [all] 实现弱网体验：SDK 连接状态监听（onConnect / onDisconnect / onRetry），离线时显示网络状态栏，messageStore 离线队列（联网后自动重发 pending 消息）
 - [ ] T069 [P] [all] 在 apps/chat 中实现表情包面板：集成 @emoji-mart/data 表情选择器（支持搜索），选择后插入 Unicode emoji 字符，以 **type=1 文本消息**发送，由 TextCell 正常渲染（emoji-mart 仅作为输入增强工具，不改变消息 contentType；type=7 在 plan.md §5 定义为名片 card）
 - [ ] T070 [P] [all] 实现 PC/Electron 特性：electron 主进程注册 Tray 托盘图标和未读角标、autoUpdater 自动更新、开发者工具快捷键、桌面通知（Notification API）
-- [ ] T071 [P] [all] 全局红点/未读系统：GET /reddot 和 PUT /reddot 清除红点。**⚠️ 注意**：红点逻辑已由 T012 friendRequest CMD handler（→ 红点 API）和 T032 contactStore（→ friendRequests 红点计数）完整覆盖，本任务为补充集成验证，确保 ConversationList / FriendRequests / ContactList 均接入红点状态。
+- [X] T071 [P] [all] 全局红点/未读系统：GET /reddot 和 PUT /reddot 清除红点。**⚠️ 注意**：红点逻辑已由 T012 friendRequest CMD handler（→ 红点 API）和 T032 contactStore（→ friendRequests 红点计数）完整覆盖，本任务为补充集成验证，确保 ConversationList / FriendRequests / ContactList 均接入红点状态。
 - [ ] T072 [all] 验收标准核对：SC-001 WebSocket 握手 < 1.5s（performance.mark 测量）、SC-002 离线消息同步 < 2s、SC-003 5000 条历史 58 FPS；**FR-003 心跳重连验收：T005 sdk.ts 中心跳每 30s 发送一次，连续 3 次未收到 Pong 回执触发指数退避重连**，在 apps/chat 中添加性能日志
 - [ ] T074 [US1] 实现图片拖拽粘贴上传（在 `apps/chat/src/components/MessageInput.vue` 中）：FR-005 要求的拖拽/粘贴发送图片，支持 `dragover`/`drop`/`paste` 事件拦截，调用 T015 的 file upload API 发送图片后生成 type=2 ImageCell 消息
+  进度：显式图片/文件按钮、`dragover`/`drop`/`paste` 入口已接入；真实上传并生成 `type=2` 消息仍待补齐
 
 ---
 

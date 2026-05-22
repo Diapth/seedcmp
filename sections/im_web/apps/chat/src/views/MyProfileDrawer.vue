@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { ref, computed, watch } from 'vue';
+import { useRouter } from 'vue-router';
 import { useUserStore, userApi } from '@tsdaodao/datasource-vue';
 import { ChannelAvatar } from '@tsdaodao/base-vue';
 import { Message } from '@arco-design/web-vue';
@@ -10,6 +11,7 @@ const props = defineProps<{
 
 const emit = defineEmits(['close']);
 
+const router = useRouter();
 const userStore = useUserStore();
 
 const newName = ref('');
@@ -73,6 +75,11 @@ async function selectPresetAvatar(url: string) {
   } catch (err) {
     console.error(err);
   }
+}
+
+function goToDevices() {
+  emit('close');
+  router.push('/chat/devices');
 }
 </script>
 
@@ -165,6 +172,10 @@ async function selectPresetAvatar(url: string) {
               <div class="toggle-thumb"></div>
             </div>
           </div>
+
+          <button class="secondary-btn" @click="goToDevices">
+            打开设备管理
+          </button>
         </div>
       </div>
     </div>
@@ -336,6 +347,17 @@ async function selectPresetAvatar(url: string) {
   transition: opacity 0.2s;
   width: 100%;
   margin-top: 4px;
+}
+
+.secondary-btn {
+  height: 36px;
+  background-color: var(--bg-secondary);
+  color: var(--text-primary);
+  border: var(--border-hairline);
+  border-radius: var(--radius-sm);
+  font-size: 13px;
+  font-weight: 500;
+  cursor: pointer;
 }
 
 .save-btn:hover {

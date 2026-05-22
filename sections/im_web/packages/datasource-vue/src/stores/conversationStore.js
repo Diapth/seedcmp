@@ -2,12 +2,14 @@ import { defineStore } from 'pinia';
 import { ref, computed } from 'vue';
 import { syncApi } from '../api';
 import { useChannelStore } from './channelStore';
+import { useUserStore } from './userStore';
 export const useConversationStore = defineStore('conversation', () => {
     const conversations = ref([]);
     const drafts = ref({});
     const unreadMap = ref({});
     const lastSyncVersion = ref(0);
     const channelStore = useChannelStore();
+    const userStore = useUserStore();
     const sortedConversations = computed(() => {
         return [...conversations.value].sort((a, b) => {
             if (a.top !== b.top) {
@@ -122,11 +124,12 @@ export const useConversationStore = defineStore('conversation', () => {
         const key = `${channelId}-${channelType}`;
         const conv = conversations.value.find(c => c.channel_id === channelId && c.channel_type === channelType);
         const info = await channelStore.getChannelInfo(channelId, channelType);
+        const isOwnMessage = message.isOwnMessage === true || message.fromUID === userStore.currentUser?.uid;
         if (conv) {
             conv.last_msg_seq = message.messageSeq || conv.last_msg_seq;
             conv.last_msg_time = message.timestamp || Math.floor(Date.now() / 1000);
             conv.last_message = message;
-            if (message.fromUID !== channelId && !message.isUnreadCleared) {
+            if (!isOwnMessage && !message.isUnreadCleared) {
                 conv.unread++;
                 unreadMap.value[key] = conv.unread;
             }
@@ -135,7 +138,7 @@ export const useConversationStore = defineStore('conversation', () => {
             conversations.value.push({
                 channel_id: channelId,
                 channel_type: channelType,
-                unread: 1,
+                unread: isOwnMessage ? 0 : 1,
                 last_msg_seq: message.messageSeq || 0,
                 last_msg_time: message.timestamp || Math.floor(Date.now() / 1000),
                 last_message: message,
@@ -145,7 +148,7 @@ export const useConversationStore = defineStore('conversation', () => {
                 name: info.name,
                 avatar: info.avatar
             });
-            unreadMap.value[key] = 1;
+            unreadMap.value[key] = isOwnMessage ? 0 : 1;
         }
     }
     async function deleteConversation(channelId, channelType) {

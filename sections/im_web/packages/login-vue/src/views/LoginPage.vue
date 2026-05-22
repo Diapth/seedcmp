@@ -7,18 +7,18 @@ import { Message } from '@arco-design/web-vue';
 const router = useRouter();
 const loginStore = useLoginStore();
 
-const phone = ref('008618337488675');
+const username = ref('18337488675');
 const password = ref('123456');
 const loading = ref(false);
 
 async function handleLogin() {
-  if (!phone.value || !password.value) {
-    Message.warning('请输入手机号 and 密码');
+  if (!username.value || !password.value) {
+    Message.warning('请输入手机号/用户名和密码');
     return;
   }
   loading.value = true;
   try {
-    await loginStore.loginWithPassword(phone.value, password.value);
+    await loginStore.loginWithPassword(username.value, password.value);
     Message.success('登录成功');
     router.push('/chat');
   } catch (err: any) {
@@ -40,11 +40,11 @@ async function handleLogin() {
 
       <div class="login-form">
         <div class="form-item">
-          <label class="form-label">手机号</label>
+          <label class="form-label">手机号/用户名</label>
           <input 
-            v-model="phone" 
+            v-model="username" 
             type="text" 
-            placeholder="请输入手机号" 
+            placeholder="请输入 11 位手机号或 0086 开头用户名" 
             class="form-input"
             :disabled="loading"
           />
@@ -73,6 +73,13 @@ async function handleLogin() {
       </div>
       
       <div class="login-footer">
+        <router-link
+          class="register-link"
+          to="/register"
+        >
+          注册账号
+        </router-link>
+        <span class="footer-separator">·</span>
         测试验证码/密码统一为 <span>123456</span>
       </div>
     </div>
@@ -186,5 +193,21 @@ async function handleLogin() {
 .login-footer span {
   font-weight: 600;
   color: var(--text-primary);
+}
+
+.register-link {
+  color: var(--primary-color, #165dff);
+  font-weight: 600;
+  text-decoration: none;
+}
+
+.register-link:hover {
+  text-decoration: underline;
+}
+
+.footer-separator {
+  margin: 0 8px;
+  color: var(--text-secondary) !important;
+  font-weight: 400 !important;
 }
 </style>

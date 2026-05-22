@@ -13,6 +13,11 @@ const routes = [
         component: LoginPage
     },
     {
+        path: '/register',
+        name: 'Register',
+        component: () => import('@tsdaodao/login-vue/views/RegisterPage.vue')
+    },
+    {
         path: '/chat',
         name: 'ChatLayout',
         component: () => import('../layouts/MainLayout.vue'),
@@ -53,6 +58,11 @@ const routes = [
                 path: 'group-members/:groupNo',
                 name: 'GroupMembers',
                 component: () => import('../views/GroupMemberList.vue')
+            },
+            {
+                path: 'devices',
+                name: 'DeviceManagement',
+                component: () => import('../views/DeviceManagementPage.vue')
             }
         ]
     }

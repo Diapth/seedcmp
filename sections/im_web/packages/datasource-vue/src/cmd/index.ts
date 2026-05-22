@@ -63,12 +63,15 @@ export function registerCMDListeners() {
 
       case 'friendRequest':
         userApi.getReddot('friendApply');
+        if (typeof window !== 'undefined') window.dispatchEvent(new CustomEvent('wksdk:friendRequest'));
         break;
 
       case 'friendAccept':
+        if (typeof window !== 'undefined') window.dispatchEvent(new CustomEvent('wksdk:friendAccept'));
         break;
 
       case 'friendDeleted':
+        if (typeof window !== 'undefined') window.dispatchEvent(new CustomEvent('wksdk:friendDeleted'));
         break;
 
       case 'memberUpdate':
@@ -107,6 +110,30 @@ export function registerCMDListeners() {
 
       default:
         console.warn(`[CMD] Unhandled command type: ${cmd}`);
+    }
+  });
+}
+
+export function registerMessageListeners() {
+  WKSDK.shared().chatManager.addMessageListener((message: Message) => {
+    if (!message?.channel) return;
+    if (message.header?.noPersist) return;
+
+    const messageStore = useMessageStore();
+    const conversationStore = useConversationStore();
+    const userStore = useUserStore();
+
+    const channelId = message.channel.channelID;
+    const channelType = message.channel.channelType;
+    const currentUid = userStore.currentUser?.uid || '';
+    const isOwnMessage = message.fromUID === currentUid;
+    const currentPath = typeof window !== 'undefined' ? window.location.pathname : '';
+    const isViewingChannel = currentPath.includes(`/chat/conversation/${channelId}/${channelType}`);
+
+    messageStore.addRealtimeMessage(channelId, channelType, message);
+
+    if (!isOwnMessage && isViewingChannel) {
+      conversationStore.clearUnread(channelId, channelType);
     }
   });
 }

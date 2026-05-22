@@ -18,7 +18,7 @@ export const useGroupStore = defineStore('group', () => {
   async function fetchMyGroups() {
     try {
       const res: any = await groupApi.getMyGroups();
-      const list = res.data || res || [];
+      const list = Array.isArray(res) ? res : [];
       list.forEach((g: Group) => {
         groups.value[g.group_no] = g;
       });
@@ -31,7 +31,7 @@ export const useGroupStore = defineStore('group', () => {
     if (groups.value[groupNo]) return groups.value[groupNo];
     try {
       const res: any = await groupApi.getGroupInfo(groupNo);
-      const g = res.data || res;
+      const g = res;
       if (g) {
         groups.value[groupNo] = g;
       }
@@ -45,7 +45,7 @@ export const useGroupStore = defineStore('group', () => {
   async function fetchGroupMembers(groupNo: string) {
     try {
       const res: any = await groupApi.getGroupMembers(groupNo, { page: 1, limit: 1000 });
-      const members = res.data || res || [];
+      const members = Array.isArray(res) ? res : (res?.list || []);
       groupMembers.value[groupNo] = members;
       return members;
     } catch (e) {

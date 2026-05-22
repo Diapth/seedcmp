@@ -2,6 +2,7 @@ import { defineStore } from 'pinia';
 import { ref, computed } from 'vue';
 import { syncApi } from '../api';
 import { useChannelStore } from './channelStore';
+import { useUserStore } from './userStore';
 
 export interface Conversation {
   channel_id: string;
@@ -24,6 +25,7 @@ export const useConversationStore = defineStore('conversation', () => {
   const lastSyncVersion = ref<number>(0);
 
   const channelStore = useChannelStore();
+  const userStore = useUserStore();
 
   const sortedConversations = computed(() => {
     return [...conversations.value].sort((a, b) => {
@@ -43,31 +45,54 @@ export const useConversationStore = defineStore('conversation', () => {
   async function syncConversations() {
     try {
       const res: any = await syncApi.syncConversations({ msg_count: 1 });
-      if (res && Array.isArray(res)) {
-        const list: Conversation[] = [];
-        for (const item of res) {
-          const key = `${item.channel_id}-${item.channel_type}`;
-          const info = await channelStore.getChannelInfo(item.channel_id, item.channel_type);
+      // 后端返回 { conversations: [...], users: [...], groups: [...] }
+      const rawList = res?.conversations || (Array.isArray(res) ? res : []);
 
-          list.push({
-            channel_id: item.channel_id,
-            channel_type: item.channel_type,
-            unread: item.unread || 0,
-            last_msg_seq: item.last_msg_seq || 0,
-            last_msg_time: item.last_msg_time || 0,
-            last_message: item.last_message,
-            top: info.top || 0,
-            mute: info.mute || 0,
-            draft: drafts.value[key] || '',
-            name: info.name,
-            avatar: info.avatar
+      // 预热 channel 缓存：先将 users/groups 写入 channelStore
+      if (res?.users?.length) {
+        for (const u of res.users) {
+          channelStore.updateChannelInfo(u.uid, 1, {
+            name: u.name,
+            avatar: u.avatar,
+            top: u.top || 0,
+            mute: u.mute || 0
           });
-
-          unreadMap.value[key] = item.unread || 0;
         }
-        conversations.value = list;
-        await syncExtra();
       }
+      if (res?.groups?.length) {
+        for (const g of res.groups) {
+          channelStore.updateChannelInfo(g.group_no, 2, {
+            name: g.name,
+            avatar: g.avatar,
+            top: g.top || 0,
+            mute: g.mute || 0
+          });
+        }
+      }
+
+      const list: Conversation[] = [];
+      for (const item of rawList) {
+        const key = `${item.channel_id}-${item.channel_type}`;
+        const info = await channelStore.getChannelInfo(item.channel_id, item.channel_type);
+
+        list.push({
+          channel_id: item.channel_id,
+          channel_type: item.channel_type,
+          unread: item.unread || 0,
+          last_msg_seq: item.last_msg_seq || 0,
+          last_msg_time: item.last_msg_time || 0,
+          last_message: item.last_message,
+          top: info.top || item.top || 0,
+          mute: info.mute || item.mute || 0,
+          draft: drafts.value[key] || '',
+          name: info.name,
+          avatar: info.avatar
+        });
+
+        unreadMap.value[key] = item.unread || 0;
+      }
+      conversations.value = list;
+      await syncExtra();
     } catch (e) {
       console.error('[ConversationStore] Failed to sync conversations', e);
     }
@@ -143,12 +168,13 @@ export const useConversationStore = defineStore('conversation', () => {
     const key = `${channelId}-${channelType}`;
     const conv = conversations.value.find(c => c.channel_id === channelId && c.channel_type === channelType);
     const info = await channelStore.getChannelInfo(channelId, channelType);
+    const isOwnMessage = message.isOwnMessage === true || message.fromUID === userStore.currentUser?.uid;
 
     if (conv) {
       conv.last_msg_seq = message.messageSeq || conv.last_msg_seq;
       conv.last_msg_time = message.timestamp || Math.floor(Date.now() / 1000);
       conv.last_message = message;
-      if (message.fromUID !== channelId && !message.isUnreadCleared) {
+      if (!isOwnMessage && !message.isUnreadCleared) {
         conv.unread++;
         unreadMap.value[key] = conv.unread;
       }
@@ -156,7 +182,7 @@ export const useConversationStore = defineStore('conversation', () => {
       conversations.value.push({
         channel_id: channelId,
         channel_type: channelType,
-        unread: 1,
+        unread: isOwnMessage ? 0 : 1,
         last_msg_seq: message.messageSeq || 0,
         last_msg_time: message.timestamp || Math.floor(Date.now() / 1000),
         last_message: message,
@@ -166,7 +192,7 @@ export const useConversationStore = defineStore('conversation', () => {
         name: info.name,
         avatar: info.avatar
       });
-      unreadMap.value[key] = 1;
+      unreadMap.value[key] = isOwnMessage ? 0 : 1;
     }
   }
 

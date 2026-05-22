@@ -5,9 +5,13 @@ export const authApi = {
     login(data) {
         return apiClient.post('user/login', data);
     },
+    // 手机号注册
+    register(data) {
+        return apiClient.post('user/register', data);
+    },
     // 获取短信验证码 (注册)
-    getRegisterSmsCode(phone) {
-        return apiClient.post('user/sms/registercode', { phone });
+    getRegisterSmsCode(data) {
+        return apiClient.post('user/sms/registercode', data);
     },
     // 获取短信验证码 (忘记密码)
     getForgetPwdSmsCode(phone) {
@@ -66,6 +70,18 @@ export const userApi = {
     // 清除红点未读
     deleteReddot(category) {
         return apiDelete(`user/reddot/${category}`);
+    },
+    // 注册推送 token
+    registerDeviceToken(data) {
+        return apiClient.post('user/device_token', data);
+    },
+    // 移除推送 token
+    unregisterDeviceToken() {
+        return apiDelete('user/device_token');
+    },
+    // 更新设备角标
+    updateDeviceBadge(badge) {
+        return apiClient.post('user/device_badge', { badge });
     }
 };
 // 3. 好友与联系人 API (Friend Relationship)
@@ -78,6 +94,14 @@ export const friendApi = {
     applyFriend(data) {
         return apiClient.post('friend/apply', data);
     },
+    // 获取好友申请列表
+    getFriendApplies(params) {
+        return apiClient.get('friend/apply', { params });
+    },
+    // 删除好友申请记录
+    deleteFriendApply(toUid) {
+        return apiDelete(`friend/apply/${toUid}`);
+    },
     // 同意好友申请
     approveFriend(token) {
         return apiClient.post('friend/sure', { token });
@@ -88,7 +112,7 @@ export const friendApi = {
     },
     // 删除好友
     deleteFriend(uid) {
-        return apiDelete(`friends/${uid}`);
+        return apiDelete(`friend/${uid}`);
     },
     // 搜索用户
     searchUser(keyword) {

@@ -13,22 +13,8 @@ const loading = ref(false);
 async function loadRequests() {
   loading.value = true;
   try {
-    // In our backend design, friend requests are incremental or syncable.
-    // For simplicity, we fallback to local mock array if empty, or query api.
-    // Let's populate some placeholder request details if none are loaded to show high-end parity.
-    if (contactStore.friendRequests.length === 0) {
-      contactStore.friendRequests = [
-        {
-          id: 'req-1',
-          uid: 'user-02',
-          name: '孙悟空',
-          avatar: '',
-          remark: '齐天大圣请求添加你为好友',
-          status: 0,
-          token: 'token-sms-1'
-        }
-      ];
-    }
+    await contactStore.fetchFriendRequests();
+    await contactStore.markFriendRequestsRead();
   } finally {
     loading.value = false;
   }
@@ -42,13 +28,11 @@ async function handleApprove(token: string) {
   try {
     await friendApi.approveFriend(token);
     Message.success('已同意好友申请');
-    // Update local status
-    const req = contactStore.friendRequests.find(r => r.token === token);
-    if (req) {
-      req.status = 1;
-    }
-    // Refresh contacts list
-    contactStore.syncContacts();
+    contactStore.markFriendRequestAccepted(token);
+    await Promise.all([
+      contactStore.syncContacts(),
+      contactStore.fetchFriendRequests()
+    ]);
   } catch (err: any) {
     Message.error(err.msg || '同意申请失败');
   }
@@ -72,7 +56,10 @@ function handleGoBack() {
     </div>
 
     <div class="requests-list">
-      <div v-if="contactStore.friendRequests.length === 0" class="empty-state">
+      <div v-if="loading || contactStore.isFriendRequestsLoading" class="empty-state">
+        <p>正在同步好友申请...</p>
+      </div>
+      <div v-else-if="contactStore.friendRequests.length === 0" class="empty-state">
         <p>暂无新的好友申请</p>
       </div>
       <div v-else class="list-wrapper">

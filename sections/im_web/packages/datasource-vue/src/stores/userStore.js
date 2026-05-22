@@ -20,6 +20,8 @@ export const useUserStore = defineStore('user', () => {
             short_no: loginInfo.value.short_no,
             sex: loginInfo.value.sex
         };
+        const sdkStore = useSdkStore();
+        sdkStore.initializeSDK(currentUser.value.uid, storedToken);
     }
     const isLoggedIn = computed(() => !!token.value);
     async function login(credentials) {

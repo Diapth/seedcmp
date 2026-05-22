@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { ref, computed, watch, onBeforeUnmount } from 'vue';
+import { Message as ArcoMessage } from '@arco-design/web-vue';
 import { useMessageStore, useConversationStore, useGroupStore, useUserStore } from '@tsdaodao/datasource-vue';
 import WKSDK, { CMDContent } from 'wukongimjssdk';
 
@@ -15,6 +16,9 @@ const userStore = useUserStore();
 
 const inputText = ref('');
 const textareaRef = ref<HTMLTextAreaElement | null>(null);
+const imageInputRef = ref<HTMLInputElement | null>(null);
+const fileInputRef = ref<HTMLInputElement | null>(null);
+const uploadHint = ref('');
 let typingTimeout: any = null;
 
 // Mention state
@@ -111,6 +115,65 @@ function selectMember(member: any) {
   textareaRef.value?.focus();
 }
 
+function openImagePicker() {
+  imageInputRef.value?.click();
+}
+
+function openFilePicker() {
+  fileInputRef.value?.click();
+}
+
+function insertMentionTrigger() {
+  inputText.value = `${inputText.value}${inputText.value && !inputText.value.endsWith(' ') ? ' ' : ''}@`;
+  textareaRef.value?.focus();
+}
+
+async function sendSelectedFile(file: File) {
+  if (!file) return;
+  try {
+    uploadHint.value = file.type.startsWith('image/') ? `正在发送图片: ${file.name}` : `正在发送文件: ${file.name}`;
+    if (file.type.startsWith('image/')) {
+      ArcoMessage.info('图片发送能力正在完善，当前先保留显式入口与文件检测');
+      return;
+    }
+    ArcoMessage.info('文件发送能力正在完善，当前先保留显式入口与文件检测');
+  } finally {
+    uploadHint.value = '';
+  }
+}
+
+async function handleImageChange(event: Event) {
+  const target = event.target as HTMLInputElement;
+  const file = target.files?.[0];
+  if (file) {
+    await sendSelectedFile(file);
+  }
+  target.value = '';
+}
+
+async function handleFileChange(event: Event) {
+  const target = event.target as HTMLInputElement;
+  const file = target.files?.[0];
+  if (file) {
+    await sendSelectedFile(file);
+  }
+  target.value = '';
+}
+
+async function handlePaste(event: ClipboardEvent) {
+  const file = Array.from(event.clipboardData?.files || [])[0];
+  if (!file) return;
+  event.preventDefault();
+  await sendSelectedFile(file);
+}
+
+async function handleDrop(event: DragEvent) {
+  const file = Array.from(event.dataTransfer?.files || [])[0];
+  if (!file) return;
+  event.preventDefault();
+  await sendSelectedFile(file);
+}
+
 async function handleSend() {
   const text = inputText.value.trim();
   if (!text) return;
@@ -158,6 +221,7 @@ async function handleSend() {
 }
 
 function handleKeyDown(e: KeyboardEvent) {
+  if (e.isComposing) return;
   if (e.key === 'Enter') {
     if (!e.ctrlKey && !e.shiftKey) {
       e.preventDefault();
@@ -199,16 +263,38 @@ onBeforeUnmount(() => {
     </div>
 
     <div class="input-actions">
-      <button class="action-btn" title="发送图片">
+      <button class="action-btn" title="选择图片" @click="openImagePicker">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" class="action-svg">
           <rect x="3" y="3" width="18" height="18" rx="2" ry="2" />
           <circle cx="8.5" cy="8.5" r="1.5" />
           <polyline points="21 15 16 10 5 21" />
         </svg>
       </button>
+      <button class="action-btn" title="选择文件" @click="openFilePicker">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" class="action-svg">
+          <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" />
+          <polyline points="14 2 14 8 20 8" />
+        </svg>
+      </button>
+      <button v-if="channelType === 2" class="action-btn" title="插入@成员" @click="insertMentionTrigger">
+        @
+      </button>
     </div>
 
     <div class="input-area-wrapper">
+      <input
+        ref="imageInputRef"
+        type="file"
+        accept="image/*"
+        class="hidden-input"
+        @change="handleImageChange"
+      />
+      <input
+        ref="fileInputRef"
+        type="file"
+        class="hidden-input"
+        @change="handleFileChange"
+      />
       <textarea
         ref="textareaRef"
         v-model="inputText"
@@ -216,17 +302,29 @@ onBeforeUnmount(() => {
         class="input-textarea"
         rows="3"
         @keydown="handleKeyDown"
+        @paste="handlePaste"
+        @drop="handleDrop"
+        @dragover.prevent
       ></textarea>
     </div>
 
     <div class="input-footer">
-      <div class="input-hint">输入自动同步草稿</div>
+      <div class="input-hint">
+        {{ uploadHint || '输入自动同步草稿，Enter 发送，Ctrl+Enter 换行' }}
+      </div>
       <button 
         class="send-btn" 
         :disabled="!inputText.trim()"
+        aria-label="发送消息"
+        title="发送消息"
         @click="handleSend"
       >
-        发送
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" class="send-btn-icon">
+          <path d="M22 2 11 13" />
+          <path d="m22 2-7 20-4-9-9-4 20-7Z" />
+        </svg>
+        <span class="send-btn-text">发送</span>
+        <span class="send-btn-shortcut">Enter</span>
       </button>
     </div>
   </div>
@@ -240,6 +338,7 @@ onBeforeUnmount(() => {
   border-top: var(--border-hairline);
   padding: 12px 16px;
   position: relative;
+  flex-shrink: 0;
 }
 
 /* Mention Popup */
@@ -342,6 +441,10 @@ onBeforeUnmount(() => {
   height: 20px;
 }
 
+.hidden-input {
+  display: none;
+}
+
 .input-area-wrapper {
   flex: 1;
 }
@@ -363,33 +466,62 @@ onBeforeUnmount(() => {
   display: flex;
   align-items: center;
   justify-content: space-between;
+  gap: 16px;
   margin-top: 8px;
 }
 
 .input-hint {
   font-size: 11px;
   color: var(--text-secondary);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .send-btn {
-  height: 28px;
-  padding: 0 16px;
+  min-width: 116px;
+  height: 36px;
+  padding: 0 14px;
   background-color: var(--primary-color, #165dff);
   color: #ffffff;
   border: none;
   border-radius: var(--radius-sm);
-  font-size: 12px;
-  font-weight: 500;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  font-size: 13px;
+  font-weight: 600;
   cursor: pointer;
-  transition: opacity 0.2s;
+  flex-shrink: 0;
+  transition: opacity 0.2s, transform 0.2s, background-color 0.2s;
 }
 
 .send-btn:hover {
   opacity: 0.9;
+  transform: translateY(-1px);
 }
 
 .send-btn:disabled {
   opacity: 0.5;
   cursor: not-allowed;
+  transform: none;
+}
+
+.send-btn-icon {
+  width: 15px;
+  height: 15px;
+  flex-shrink: 0;
+}
+
+.send-btn-text {
+  line-height: 1;
+}
+
+.send-btn-shortcut {
+  font-size: 10px;
+  line-height: 1;
+  opacity: 0.78;
+  padding-left: 2px;
 }
 </style>

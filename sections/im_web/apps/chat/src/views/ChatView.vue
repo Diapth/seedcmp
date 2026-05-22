@@ -53,7 +53,7 @@ watch([channelId, channelType], () => {
   loadChannelDetails();
 });
 
-watch(() => messageStore.messages[channelId.value]?.length, () => {
+watch(() => messageStore.messages[channelKey.value]?.length, () => {
   conversationStore.clearUnread(channelId.value, channelType.value);
 });
 

@@ -2,7 +2,7 @@ import { defineStore } from 'pinia';
 import { ref } from 'vue';
 import WKSDK, { ConnectStatus } from 'wukongimjssdk';
 import { apiClient } from '@tsdaodao/base-vue';
-import { registerCMDListeners } from '../cmd';
+import { registerCMDListeners, registerMessageListeners } from '../cmd';
 import { registerMessageContentTypes } from '../contentTypes';
 export const useSdkStore = defineStore('sdk', () => {
     const isConnected = ref(false);
@@ -12,6 +12,8 @@ export const useSdkStore = defineStore('sdk', () => {
     let missedPongs = 0;
     let reconnectAttempts = 0;
     let reconnectTimer = null;
+    let initializedUid = '';
+    let initializedToken = '';
     function stopHeartbeat() {
         if (heartbeatTimer) {
             clearInterval(heartbeatTimer);
@@ -53,11 +55,17 @@ export const useSdkStore = defineStore('sdk', () => {
     // Flag to avoid double registration
     let isRegistered = false;
     function initializeSDK(uid, token) {
+        if (initializedUid === uid && initializedToken === token && connectionStatus.value !== ConnectStatus.Disconnect) {
+            return;
+        }
         // Reset kickout state
         isKickedOut.value = false;
+        initializedUid = uid;
+        initializedToken = token;
         // Register listeners and content types once
         if (!isRegistered) {
             registerCMDListeners();
+            registerMessageListeners();
             registerMessageContentTypes();
             isRegistered = true;
         }
@@ -66,7 +74,7 @@ export const useSdkStore = defineStore('sdk', () => {
         // Connection address callback
         WKSDK.shared().config.provider.connectAddrCallback = async (cb) => {
             try {
-                const res = await apiClient.get(`/users/${uid}/im`);
+                const res = await apiClient.get(`users/${uid}/im`);
                 cb(res.ws_addr || 'ws://127.0.0.1:5200');
             }
             catch (err) {
@@ -116,6 +124,8 @@ export const useSdkStore = defineStore('sdk', () => {
         }
         WKSDK.shared().disconnect();
         isConnected.value = false;
+        initializedUid = '';
+        initializedToken = '';
     }
     return {
         isConnected,

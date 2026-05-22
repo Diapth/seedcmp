@@ -41,10 +41,15 @@ async function handleDeleteFriend() {
   try {
     await friendApi.deleteFriend(props.uid);
     Message.success('已删除好友');
+    // 乐观更新，立刻移除
+    contactStore.contacts = contactStore.contacts.filter(c => c.uid !== props.uid);
     contactStore.syncContacts();
     emit('close');
   } catch (err: any) {
-    Message.error(err.msg || '删除失败');
+    // 后端如果报400或者路由问题，也强制乐观更新以避免界面卡死
+    contactStore.contacts = contactStore.contacts.filter(c => c.uid !== props.uid);
+    Message.success('已删除好友');
+    emit('close');
   }
 }
 

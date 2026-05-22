@@ -36,9 +36,10 @@ const showMenu = ref(false);
 const menuX = ref(0);
 const menuY = ref(0);
 const selectedMsg = ref<any>(null);
+const channelKey = computed(() => `${props.channelId}-${props.channelType}`);
 
 const messages = computed(() => {
-  return messageStore.messages[props.channelId] || [];
+  return messageStore.messages[channelKey.value] || [];
 });
 
 function scrollToBottom(behavior: 'auto' | 'smooth' = 'auto') {
@@ -94,19 +95,11 @@ const menuReactions = computed(() => {
   }));
 });
 
-function handleSendReaction(msg: any, emoji: string) {
-  if (!msg.reactions) {
-    msg.reactions = [];
-  }
-  const exist = msg.reactions.find((r: any) => r.emoji === emoji);
-  if (exist) {
-    exist.count++;
-  } else {
-    msg.reactions.push({
-      emoji,
-      count: 1,
-      users: [userStore.currentUser?.uid || '']
-    });
+async function handleSendReaction(msg: any, emoji: string) {
+  try {
+    await messageStore.toggleReaction(props.channelId, props.channelType, msg, emoji);
+  } catch (err: any) {
+    Message.error(err.message || err.msg || '回应失败');
   }
 }
 
@@ -139,8 +132,8 @@ const menuItems = computed(() => {
           await messageStore.revokeMessage(
             props.channelId,
             props.channelType,
-            selectedMsg.value.messageID,
-            selectedMsg.value.clientMsgNo
+            selectedMsg.value.clientMsgNo,
+            selectedMsg.value.messageID
           );
           Message.success('已撤回消息');
         } catch (err: any) {

@@ -14,7 +14,7 @@ async function loadBlacklist() {
   loading.value = true;
   try {
     const res: any = await friendApi.getBlacklist();
-    blacklist.value = res.data || res || [];
+    blacklist.value = Array.isArray(res) ? res : (res?.list || []);
   } catch (err: any) {
     console.error(err);
   } finally {

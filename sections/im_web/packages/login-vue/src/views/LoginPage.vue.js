@@ -6,17 +6,17 @@ import { Message } from '@arco-design/web-vue';
 const { defineProps, defineSlots, defineEmits, defineExpose, defineModel, defineOptions, withDefaults, } = await import('vue');
 const router = useRouter();
 const loginStore = useLoginStore();
-const phone = ref('008618337488675');
+const username = ref('18337488675');
 const password = ref('123456');
 const loading = ref(false);
 async function handleLogin() {
-    if (!phone.value || !password.value) {
-        Message.warning('请输入手机号 and 密码');
+    if (!username.value || !password.value) {
+        Message.warning('请输入手机号/用户名和密码');
         return;
     }
     loading.value = true;
     try {
-        await loginStore.loginWithPassword(phone.value, password.value);
+        await loginStore.loginWithPassword(username.value, password.value);
         Message.success('登录成功');
         router.push('/chat');
     }
@@ -74,6 +74,14 @@ function __VLS_template() {
     __VLS_intrinsicElements.span;
     __VLS_intrinsicElements.span;
     __VLS_intrinsicElements.span;
+    __VLS_intrinsicElements.span;
+    __VLS_intrinsicElements.span;
+    __VLS_components.RouterLink;
+    __VLS_components.routerLink;
+    __VLS_components.RouterLink;
+    __VLS_components.routerLink;
+    // @ts-ignore
+    [RouterLink, RouterLink,];
     {
         const __VLS_0 = __VLS_intrinsicElements["div"];
         const __VLS_1 = __VLS_elementAsFunctionalComponent(__VLS_0);
@@ -129,8 +137,8 @@ function __VLS_template() {
                     {
                         const __VLS_40 = __VLS_intrinsicElements["input"];
                         const __VLS_41 = __VLS_elementAsFunctionalComponent(__VLS_40);
-                        const __VLS_42 = __VLS_41({ ...{}, value: ((__VLS_ctx.phone)), type: ("text"), placeholder: ("请输入手机号"), class: ("form-input"), disabled: ((__VLS_ctx.loading)), }, ...__VLS_functionalComponentArgsRest(__VLS_41));
-                        ({}({ ...{}, value: ((__VLS_ctx.phone)), type: ("text"), placeholder: ("请输入手机号"), class: ("form-input"), disabled: ((__VLS_ctx.loading)), }));
+                        const __VLS_42 = __VLS_41({ ...{}, value: ((__VLS_ctx.username)), type: ("text"), placeholder: ("请输入 11 位手机号或 0086 开头用户名"), class: ("form-input"), disabled: ((__VLS_ctx.loading)), }, ...__VLS_functionalComponentArgsRest(__VLS_41));
+                        ({}({ ...{}, value: ((__VLS_ctx.username)), type: ("text"), placeholder: ("请输入 11 位手机号或 0086 开头用户名"), class: ("form-input"), disabled: ((__VLS_ctx.loading)), }));
                         const __VLS_43 = __VLS_pickFunctionalComponentCtx(__VLS_40, __VLS_42);
                     }
                     (__VLS_33.slots).default;
@@ -180,7 +188,7 @@ function __VLS_template() {
                             const __VLS_70 = __VLS_pickFunctionalComponentCtx(__VLS_67, __VLS_69);
                         }
                         // @ts-ignore
-                        [phone, loading, phone, loading, loading, loading, password, handleLogin, loading, loading, handleLogin, loading,];
+                        [username, loading, username, loading, loading, loading, password, handleLogin, loading, loading, handleLogin, loading,];
                     }
                     else {
                         {
@@ -205,12 +213,30 @@ function __VLS_template() {
                 const __VLS_79 = __VLS_78({ ...{}, class: ("login-footer"), }, ...__VLS_functionalComponentArgsRest(__VLS_78));
                 ({}({ ...{}, class: ("login-footer"), }));
                 {
-                    const __VLS_82 = __VLS_intrinsicElements["span"];
-                    const __VLS_83 = __VLS_elementAsFunctionalComponent(__VLS_82);
-                    const __VLS_84 = __VLS_83({ ...{}, }, ...__VLS_functionalComponentArgsRest(__VLS_83));
-                    ({}({ ...{}, }));
+                    const __VLS_82 = {}.RouterLink;
+                    const __VLS_83 = __VLS_asFunctionalComponent(__VLS_82, new __VLS_82({ ...{}, class: ("register-link"), to: ("/register"), }));
+                    ({}.RouterLink);
+                    ({}.RouterLink);
+                    const __VLS_84 = __VLS_83({ ...{}, class: ("register-link"), to: ("/register"), }, ...__VLS_functionalComponentArgsRest(__VLS_83));
+                    ({}({ ...{}, class: ("register-link"), to: ("/register"), }));
                     (__VLS_85.slots).default;
                     const __VLS_85 = __VLS_pickFunctionalComponentCtx(__VLS_82, __VLS_84);
+                }
+                {
+                    const __VLS_87 = __VLS_intrinsicElements["span"];
+                    const __VLS_88 = __VLS_elementAsFunctionalComponent(__VLS_87);
+                    const __VLS_89 = __VLS_88({ ...{}, class: ("footer-separator"), }, ...__VLS_functionalComponentArgsRest(__VLS_88));
+                    ({}({ ...{}, class: ("footer-separator"), }));
+                    (__VLS_90.slots).default;
+                    const __VLS_90 = __VLS_pickFunctionalComponentCtx(__VLS_87, __VLS_89);
+                }
+                {
+                    const __VLS_92 = __VLS_intrinsicElements["span"];
+                    const __VLS_93 = __VLS_elementAsFunctionalComponent(__VLS_92);
+                    const __VLS_94 = __VLS_93({ ...{}, }, ...__VLS_functionalComponentArgsRest(__VLS_93));
+                    ({}({ ...{}, }));
+                    (__VLS_95.slots).default;
+                    const __VLS_95 = __VLS_pickFunctionalComponentCtx(__VLS_92, __VLS_94);
                 }
                 (__VLS_80.slots).default;
                 const __VLS_80 = __VLS_pickFunctionalComponentCtx(__VLS_77, __VLS_79);
@@ -236,6 +262,8 @@ function __VLS_template() {
         __VLS_styleScopedClasses["form-input"];
         __VLS_styleScopedClasses["login-btn"];
         __VLS_styleScopedClasses["login-footer"];
+        __VLS_styleScopedClasses["register-link"];
+        __VLS_styleScopedClasses["footer-separator"];
     }
     var __VLS_slots;
     return __VLS_slots;
@@ -243,7 +271,7 @@ function __VLS_template() {
 const __VLS_internalComponent = (await import('vue')).defineComponent({
     setup() {
         return {
-            phone: phone,
+            username: username,
             password: password,
             loading: loading,
             handleLogin: handleLogin,

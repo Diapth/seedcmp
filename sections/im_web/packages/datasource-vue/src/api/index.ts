@@ -6,9 +6,13 @@ export const authApi = {
   login(data: any) {
     return apiClient.post('user/login', data);
   },
+  // 手机号注册
+  register(data: any) {
+    return apiClient.post('user/register', data);
+  },
   // 获取短信验证码 (注册)
-  getRegisterSmsCode(phone: string) {
-    return apiClient.post('user/sms/registercode', { phone });
+  getRegisterSmsCode(data: { zone: string; phone: string }) {
+    return apiClient.post('user/sms/registercode', data);
   },
   // 获取短信验证码 (忘记密码)
   getForgetPwdSmsCode(phone: string) {
@@ -68,6 +72,18 @@ export const userApi = {
   // 清除红点未读
   deleteReddot(category: string) {
     return apiDelete(`user/reddot/${category}`);
+  },
+  // 注册推送 token
+  registerDeviceToken(data: { device_token: string; device_type: string; bundle_id?: string }) {
+    return apiClient.post('user/device_token', data);
+  },
+  // 移除推送 token
+  unregisterDeviceToken() {
+    return apiDelete('user/device_token');
+  },
+  // 更新设备角标
+  updateDeviceBadge(badge: number) {
+    return apiClient.post('user/device_badge', { badge });
   }
 };
 
@@ -81,6 +97,14 @@ export const friendApi = {
   applyFriend(data: { to_uid: string; remark: string; vercode?: string }) {
     return apiClient.post('friend/apply', data);
   },
+  // 获取好友申请列表
+  getFriendApplies(params: { page_index: number; page_size: number }) {
+    return apiClient.get('friend/apply', { params });
+  },
+  // 删除好友申请记录
+  deleteFriendApply(toUid: string) {
+    return apiDelete(`friend/apply/${toUid}`);
+  },
   // 同意好友申请
   approveFriend(token: string) {
     return apiClient.post('friend/sure', { token });
@@ -91,7 +115,7 @@ export const friendApi = {
   },
   // 删除好友
   deleteFriend(uid: string) {
-    return apiDelete(`friends/${uid}`);
+    return apiDelete(`friend/${uid}`);
   },
   // 搜索用户
   searchUser(keyword: string) {

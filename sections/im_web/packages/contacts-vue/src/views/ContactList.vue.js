@@ -8,6 +8,7 @@ const router = useRouter();
 const contactStore = useContactStore();
 onMounted(() => {
     contactStore.syncContacts();
+    contactStore.refreshFriendRequestUnreadCount();
 });
 function handleContactClick(uid) {
     router.push(`/chat/conversation/${uid}/1`);
@@ -86,16 +87,18 @@ function __VLS_template() {
     __VLS_intrinsicElements.line;
     __VLS_intrinsicElements.line;
     __VLS_intrinsicElements.line;
+    __VLS_intrinsicElements.span;
+    __VLS_intrinsicElements.span;
+    __VLS_intrinsicElements.span;
+    __VLS_intrinsicElements.span;
+    __VLS_intrinsicElements.span;
+    __VLS_intrinsicElements.span;
     __VLS_intrinsicElements.p;
     __VLS_intrinsicElements.p;
     __VLS_components.ChannelAvatar;
     __VLS_components.ChannelAvatar;
     // @ts-ignore
     [ChannelAvatar,];
-    __VLS_intrinsicElements.span;
-    __VLS_intrinsicElements.span;
-    __VLS_intrinsicElements.span;
-    __VLS_intrinsicElements.span;
     {
         const __VLS_0 = __VLS_intrinsicElements["div"];
         const __VLS_1 = __VLS_elementAsFunctionalComponent(__VLS_0);
@@ -165,135 +168,148 @@ function __VLS_template() {
                     (__VLS_49.slots).default;
                     const __VLS_49 = __VLS_pickFunctionalComponentCtx(__VLS_46, __VLS_48);
                 }
+                if (__VLS_ctx.contactStore.friendRequestUnreadCount > 0) {
+                    {
+                        const __VLS_51 = __VLS_intrinsicElements["span"];
+                        const __VLS_52 = __VLS_elementAsFunctionalComponent(__VLS_51);
+                        const __VLS_53 = __VLS_52({ ...{}, class: ("action-badge"), }, ...__VLS_functionalComponentArgsRest(__VLS_52));
+                        ({}({ ...{}, class: ("action-badge"), }));
+                        (__VLS_ctx.contactStore.friendRequestUnreadCount > 99 ? '99+' : __VLS_ctx.contactStore.friendRequestUnreadCount);
+                        (__VLS_54.slots).default;
+                        const __VLS_54 = __VLS_pickFunctionalComponentCtx(__VLS_51, __VLS_53);
+                    }
+                    // @ts-ignore
+                    [handleFriendRequests, contactStore, contactStore, contactStore,];
+                }
                 (__VLS_13.slots).default;
                 const __VLS_13 = __VLS_pickFunctionalComponentCtx(__VLS_10, __VLS_12);
                 let __VLS_14;
             }
             {
-                const __VLS_51 = __VLS_intrinsicElements["div"];
-                const __VLS_52 = __VLS_elementAsFunctionalComponent(__VLS_51);
-                const __VLS_53 = __VLS_52({ ...{ 'onClick': {}, }, class: ("action-item"), }, ...__VLS_functionalComponentArgsRest(__VLS_52));
+                const __VLS_56 = __VLS_intrinsicElements["div"];
+                const __VLS_57 = __VLS_elementAsFunctionalComponent(__VLS_56);
+                const __VLS_58 = __VLS_57({ ...{ 'onClick': {}, }, class: ("action-item"), }, ...__VLS_functionalComponentArgsRest(__VLS_57));
                 ({}({ ...{ 'onClick': {}, }, class: ("action-item"), }));
-                let __VLS_56 = { 'click': __VLS_pickEvent(__VLS_55['click'], {}.onClick) };
-                __VLS_56 = { click: (__VLS_ctx.handleAddFriend) };
+                let __VLS_61 = { 'click': __VLS_pickEvent(__VLS_60['click'], {}.onClick) };
+                __VLS_61 = { click: (__VLS_ctx.handleAddFriend) };
                 {
-                    const __VLS_57 = __VLS_intrinsicElements["div"];
-                    const __VLS_58 = __VLS_elementAsFunctionalComponent(__VLS_57);
-                    const __VLS_59 = __VLS_58({ ...{}, class: ("action-icon add-icon"), }, ...__VLS_functionalComponentArgsRest(__VLS_58));
+                    const __VLS_62 = __VLS_intrinsicElements["div"];
+                    const __VLS_63 = __VLS_elementAsFunctionalComponent(__VLS_62);
+                    const __VLS_64 = __VLS_63({ ...{}, class: ("action-icon add-icon"), }, ...__VLS_functionalComponentArgsRest(__VLS_63));
                     ({}({ ...{}, class: ("action-icon add-icon"), }));
                     {
-                        const __VLS_62 = __VLS_intrinsicElements["svg"];
-                        const __VLS_63 = __VLS_elementAsFunctionalComponent(__VLS_62);
-                        const __VLS_64 = __VLS_63({ ...{}, viewBox: ("0 0 24 24"), fill: ("none"), stroke: ("currentColor"), "stroke-width": ("2"), class: ("svg-icon"), }, ...__VLS_functionalComponentArgsRest(__VLS_63));
+                        const __VLS_67 = __VLS_intrinsicElements["svg"];
+                        const __VLS_68 = __VLS_elementAsFunctionalComponent(__VLS_67);
+                        const __VLS_69 = __VLS_68({ ...{}, viewBox: ("0 0 24 24"), fill: ("none"), stroke: ("currentColor"), "stroke-width": ("2"), class: ("svg-icon"), }, ...__VLS_functionalComponentArgsRest(__VLS_68));
                         ({}({ ...{}, viewBox: ("0 0 24 24"), fill: ("none"), stroke: ("currentColor"), "stroke-width": ("2"), class: ("svg-icon"), }));
                         {
-                            const __VLS_67 = __VLS_intrinsicElements["circle"];
-                            const __VLS_68 = __VLS_elementAsFunctionalComponent(__VLS_67);
-                            const __VLS_69 = __VLS_68({ ...{}, cx: ("11"), cy: ("11"), r: ("8"), }, ...__VLS_functionalComponentArgsRest(__VLS_68));
-                            ({}({ ...{}, cx: ("11"), cy: ("11"), r: ("8"), }));
-                            const __VLS_70 = __VLS_pickFunctionalComponentCtx(__VLS_67, __VLS_69);
-                        }
-                        {
-                            const __VLS_72 = __VLS_intrinsicElements["line"];
+                            const __VLS_72 = __VLS_intrinsicElements["circle"];
                             const __VLS_73 = __VLS_elementAsFunctionalComponent(__VLS_72);
-                            const __VLS_74 = __VLS_73({ ...{}, x1: ("21"), y1: ("21"), x2: ("16.65"), y2: ("16.65"), }, ...__VLS_functionalComponentArgsRest(__VLS_73));
-                            ({}({ ...{}, x1: ("21"), y1: ("21"), x2: ("16.65"), y2: ("16.65"), }));
+                            const __VLS_74 = __VLS_73({ ...{}, cx: ("11"), cy: ("11"), r: ("8"), }, ...__VLS_functionalComponentArgsRest(__VLS_73));
+                            ({}({ ...{}, cx: ("11"), cy: ("11"), r: ("8"), }));
                             const __VLS_75 = __VLS_pickFunctionalComponentCtx(__VLS_72, __VLS_74);
                         }
                         {
                             const __VLS_77 = __VLS_intrinsicElements["line"];
                             const __VLS_78 = __VLS_elementAsFunctionalComponent(__VLS_77);
-                            const __VLS_79 = __VLS_78({ ...{}, x1: ("11"), y1: ("8"), x2: ("11"), y2: ("14"), }, ...__VLS_functionalComponentArgsRest(__VLS_78));
-                            ({}({ ...{}, x1: ("11"), y1: ("8"), x2: ("11"), y2: ("14"), }));
+                            const __VLS_79 = __VLS_78({ ...{}, x1: ("21"), y1: ("21"), x2: ("16.65"), y2: ("16.65"), }, ...__VLS_functionalComponentArgsRest(__VLS_78));
+                            ({}({ ...{}, x1: ("21"), y1: ("21"), x2: ("16.65"), y2: ("16.65"), }));
                             const __VLS_80 = __VLS_pickFunctionalComponentCtx(__VLS_77, __VLS_79);
                         }
                         {
                             const __VLS_82 = __VLS_intrinsicElements["line"];
                             const __VLS_83 = __VLS_elementAsFunctionalComponent(__VLS_82);
-                            const __VLS_84 = __VLS_83({ ...{}, x1: ("8"), y1: ("11"), x2: ("14"), y2: ("11"), }, ...__VLS_functionalComponentArgsRest(__VLS_83));
-                            ({}({ ...{}, x1: ("8"), y1: ("11"), x2: ("14"), y2: ("11"), }));
+                            const __VLS_84 = __VLS_83({ ...{}, x1: ("11"), y1: ("8"), x2: ("11"), y2: ("14"), }, ...__VLS_functionalComponentArgsRest(__VLS_83));
+                            ({}({ ...{}, x1: ("11"), y1: ("8"), x2: ("11"), y2: ("14"), }));
                             const __VLS_85 = __VLS_pickFunctionalComponentCtx(__VLS_82, __VLS_84);
                         }
-                        (__VLS_65.slots).default;
-                        const __VLS_65 = __VLS_pickFunctionalComponentCtx(__VLS_62, __VLS_64);
+                        {
+                            const __VLS_87 = __VLS_intrinsicElements["line"];
+                            const __VLS_88 = __VLS_elementAsFunctionalComponent(__VLS_87);
+                            const __VLS_89 = __VLS_88({ ...{}, x1: ("8"), y1: ("11"), x2: ("14"), y2: ("11"), }, ...__VLS_functionalComponentArgsRest(__VLS_88));
+                            ({}({ ...{}, x1: ("8"), y1: ("11"), x2: ("14"), y2: ("11"), }));
+                            const __VLS_90 = __VLS_pickFunctionalComponentCtx(__VLS_87, __VLS_89);
+                        }
+                        (__VLS_70.slots).default;
+                        const __VLS_70 = __VLS_pickFunctionalComponentCtx(__VLS_67, __VLS_69);
                     }
-                    (__VLS_60.slots).default;
-                    const __VLS_60 = __VLS_pickFunctionalComponentCtx(__VLS_57, __VLS_59);
+                    (__VLS_65.slots).default;
+                    const __VLS_65 = __VLS_pickFunctionalComponentCtx(__VLS_62, __VLS_64);
                 }
                 {
-                    const __VLS_87 = __VLS_intrinsicElements["div"];
-                    const __VLS_88 = __VLS_elementAsFunctionalComponent(__VLS_87);
-                    const __VLS_89 = __VLS_88({ ...{}, class: ("action-label"), }, ...__VLS_functionalComponentArgsRest(__VLS_88));
+                    const __VLS_92 = __VLS_intrinsicElements["div"];
+                    const __VLS_93 = __VLS_elementAsFunctionalComponent(__VLS_92);
+                    const __VLS_94 = __VLS_93({ ...{}, class: ("action-label"), }, ...__VLS_functionalComponentArgsRest(__VLS_93));
                     ({}({ ...{}, class: ("action-label"), }));
-                    (__VLS_90.slots).default;
-                    const __VLS_90 = __VLS_pickFunctionalComponentCtx(__VLS_87, __VLS_89);
+                    (__VLS_95.slots).default;
+                    const __VLS_95 = __VLS_pickFunctionalComponentCtx(__VLS_92, __VLS_94);
                 }
-                (__VLS_54.slots).default;
-                const __VLS_54 = __VLS_pickFunctionalComponentCtx(__VLS_51, __VLS_53);
-                let __VLS_55;
+                (__VLS_59.slots).default;
+                const __VLS_59 = __VLS_pickFunctionalComponentCtx(__VLS_56, __VLS_58);
+                let __VLS_60;
             }
             (__VLS_8.slots).default;
             const __VLS_8 = __VLS_pickFunctionalComponentCtx(__VLS_5, __VLS_7);
         }
         {
-            const __VLS_92 = __VLS_intrinsicElements["div"];
-            const __VLS_93 = __VLS_elementAsFunctionalComponent(__VLS_92);
-            const __VLS_94 = __VLS_93({ ...{}, class: ("grouped-list-wrapper"), }, ...__VLS_functionalComponentArgsRest(__VLS_93));
+            const __VLS_97 = __VLS_intrinsicElements["div"];
+            const __VLS_98 = __VLS_elementAsFunctionalComponent(__VLS_97);
+            const __VLS_99 = __VLS_98({ ...{}, class: ("grouped-list-wrapper"), }, ...__VLS_functionalComponentArgsRest(__VLS_98));
             ({}({ ...{}, class: ("grouped-list-wrapper"), }));
             if (__VLS_ctx.contactStore.groupedContacts.length === 0) {
                 {
-                    const __VLS_97 = __VLS_intrinsicElements["div"];
-                    const __VLS_98 = __VLS_elementAsFunctionalComponent(__VLS_97);
-                    const __VLS_99 = __VLS_98({ ...{}, class: ("empty-contacts"), }, ...__VLS_functionalComponentArgsRest(__VLS_98));
+                    const __VLS_102 = __VLS_intrinsicElements["div"];
+                    const __VLS_103 = __VLS_elementAsFunctionalComponent(__VLS_102);
+                    const __VLS_104 = __VLS_103({ ...{}, class: ("empty-contacts"), }, ...__VLS_functionalComponentArgsRest(__VLS_103));
                     ({}({ ...{}, class: ("empty-contacts"), }));
                     {
-                        const __VLS_102 = __VLS_intrinsicElements["p"];
-                        const __VLS_103 = __VLS_elementAsFunctionalComponent(__VLS_102);
-                        const __VLS_104 = __VLS_103({ ...{}, }, ...__VLS_functionalComponentArgsRest(__VLS_103));
+                        const __VLS_107 = __VLS_intrinsicElements["p"];
+                        const __VLS_108 = __VLS_elementAsFunctionalComponent(__VLS_107);
+                        const __VLS_109 = __VLS_108({ ...{}, }, ...__VLS_functionalComponentArgsRest(__VLS_108));
                         ({}({ ...{}, }));
-                        (__VLS_105.slots).default;
-                        const __VLS_105 = __VLS_pickFunctionalComponentCtx(__VLS_102, __VLS_104);
+                        (__VLS_110.slots).default;
+                        const __VLS_110 = __VLS_pickFunctionalComponentCtx(__VLS_107, __VLS_109);
                     }
-                    (__VLS_100.slots).default;
-                    const __VLS_100 = __VLS_pickFunctionalComponentCtx(__VLS_97, __VLS_99);
+                    (__VLS_105.slots).default;
+                    const __VLS_105 = __VLS_pickFunctionalComponentCtx(__VLS_102, __VLS_104);
                 }
                 // @ts-ignore
-                [handleFriendRequests, handleAddFriend, contactStore,];
+                [handleAddFriend, contactStore,];
             }
             else {
                 {
-                    const __VLS_107 = __VLS_intrinsicElements["div"];
-                    const __VLS_108 = __VLS_elementAsFunctionalComponent(__VLS_107);
-                    const __VLS_109 = __VLS_108({ ...{}, class: ("groups-scroller"), }, ...__VLS_functionalComponentArgsRest(__VLS_108));
+                    const __VLS_112 = __VLS_intrinsicElements["div"];
+                    const __VLS_113 = __VLS_elementAsFunctionalComponent(__VLS_112);
+                    const __VLS_114 = __VLS_113({ ...{}, class: ("groups-scroller"), }, ...__VLS_functionalComponentArgsRest(__VLS_113));
                     ({}({ ...{}, class: ("groups-scroller"), }));
                     for (const [group] of __VLS_getVForSourceType((__VLS_ctx.contactStore.groupedContacts))) {
                         {
-                            const __VLS_112 = __VLS_intrinsicElements["div"];
-                            const __VLS_113 = __VLS_elementAsFunctionalComponent(__VLS_112);
-                            const __VLS_114 = __VLS_113({ ...{}, key: ((group.initial)), id: ((`letter-${group.initial}`)), class: ("contact-group"), }, ...__VLS_functionalComponentArgsRest(__VLS_113));
+                            const __VLS_117 = __VLS_intrinsicElements["div"];
+                            const __VLS_118 = __VLS_elementAsFunctionalComponent(__VLS_117);
+                            const __VLS_119 = __VLS_118({ ...{}, key: ((group.initial)), id: ((`letter-${group.initial}`)), class: ("contact-group"), }, ...__VLS_functionalComponentArgsRest(__VLS_118));
                             ({}({ ...{}, key: ((group.initial)), id: ((`letter-${group.initial}`)), class: ("contact-group"), }));
-                            {
-                                const __VLS_117 = __VLS_intrinsicElements["div"];
-                                const __VLS_118 = __VLS_elementAsFunctionalComponent(__VLS_117);
-                                const __VLS_119 = __VLS_118({ ...{}, class: ("group-title"), }, ...__VLS_functionalComponentArgsRest(__VLS_118));
-                                ({}({ ...{}, class: ("group-title"), }));
-                                (group.initial);
-                                (__VLS_120.slots).default;
-                                const __VLS_120 = __VLS_pickFunctionalComponentCtx(__VLS_117, __VLS_119);
-                            }
                             {
                                 const __VLS_122 = __VLS_intrinsicElements["div"];
                                 const __VLS_123 = __VLS_elementAsFunctionalComponent(__VLS_122);
-                                const __VLS_124 = __VLS_123({ ...{}, class: ("group-items"), }, ...__VLS_functionalComponentArgsRest(__VLS_123));
+                                const __VLS_124 = __VLS_123({ ...{}, class: ("group-title"), }, ...__VLS_functionalComponentArgsRest(__VLS_123));
+                                ({}({ ...{}, class: ("group-title"), }));
+                                (group.initial);
+                                (__VLS_125.slots).default;
+                                const __VLS_125 = __VLS_pickFunctionalComponentCtx(__VLS_122, __VLS_124);
+                            }
+                            {
+                                const __VLS_127 = __VLS_intrinsicElements["div"];
+                                const __VLS_128 = __VLS_elementAsFunctionalComponent(__VLS_127);
+                                const __VLS_129 = __VLS_128({ ...{}, class: ("group-items"), }, ...__VLS_functionalComponentArgsRest(__VLS_128));
                                 ({}({ ...{}, class: ("group-items"), }));
                                 for (const [friend] of __VLS_getVForSourceType((group.list))) {
                                     {
-                                        const __VLS_127 = __VLS_intrinsicElements["div"];
-                                        const __VLS_128 = __VLS_elementAsFunctionalComponent(__VLS_127);
-                                        const __VLS_129 = __VLS_128({ ...{ 'onClick': {}, }, key: ((friend.uid)), class: ("friend-item"), }, ...__VLS_functionalComponentArgsRest(__VLS_128));
+                                        const __VLS_132 = __VLS_intrinsicElements["div"];
+                                        const __VLS_133 = __VLS_elementAsFunctionalComponent(__VLS_132);
+                                        const __VLS_134 = __VLS_133({ ...{ 'onClick': {}, }, key: ((friend.uid)), class: ("friend-item"), }, ...__VLS_functionalComponentArgsRest(__VLS_133));
                                         ({}({ ...{ 'onClick': {}, }, key: ((friend.uid)), class: ("friend-item"), }));
-                                        let __VLS_132 = { 'click': __VLS_pickEvent(__VLS_131['click'], {}.onClick) };
-                                        __VLS_132 = { click: $event => {
+                                        let __VLS_137 = { 'click': __VLS_pickEvent(__VLS_136['click'], {}.onClick) };
+                                        __VLS_137 = { click: $event => {
                                                 if (!(!((__VLS_ctx.contactStore.groupedContacts.length === 0))))
                                                     return;
                                                 __VLS_ctx.handleContactClick(friend.uid);
@@ -302,74 +318,74 @@ function __VLS_template() {
                                             }
                                         };
                                         {
-                                            const __VLS_133 = {}.ChannelAvatar;
-                                            const __VLS_134 = __VLS_asFunctionalComponent(__VLS_133, new __VLS_133({ ...{}, avatar: ((friend.avatar)), name: ((friend.remark || friend.name)), size: ((36)), }));
+                                            const __VLS_138 = {}.ChannelAvatar;
+                                            const __VLS_139 = __VLS_asFunctionalComponent(__VLS_138, new __VLS_138({ ...{}, avatar: ((friend.avatar)), name: ((friend.remark || friend.name)), size: ((36)), }));
                                             ({}.ChannelAvatar);
-                                            const __VLS_135 = __VLS_134({ ...{}, avatar: ((friend.avatar)), name: ((friend.remark || friend.name)), size: ((36)), }, ...__VLS_functionalComponentArgsRest(__VLS_134));
+                                            const __VLS_140 = __VLS_139({ ...{}, avatar: ((friend.avatar)), name: ((friend.remark || friend.name)), size: ((36)), }, ...__VLS_functionalComponentArgsRest(__VLS_139));
                                             ({}({ ...{}, avatar: ((friend.avatar)), name: ((friend.remark || friend.name)), size: ((36)), }));
-                                            const __VLS_136 = __VLS_pickFunctionalComponentCtx(__VLS_133, __VLS_135);
+                                            const __VLS_141 = __VLS_pickFunctionalComponentCtx(__VLS_138, __VLS_140);
                                         }
                                         {
-                                            const __VLS_138 = __VLS_intrinsicElements["div"];
-                                            const __VLS_139 = __VLS_elementAsFunctionalComponent(__VLS_138);
-                                            const __VLS_140 = __VLS_139({ ...{}, class: ("friend-info"), }, ...__VLS_functionalComponentArgsRest(__VLS_139));
+                                            const __VLS_143 = __VLS_intrinsicElements["div"];
+                                            const __VLS_144 = __VLS_elementAsFunctionalComponent(__VLS_143);
+                                            const __VLS_145 = __VLS_144({ ...{}, class: ("friend-info"), }, ...__VLS_functionalComponentArgsRest(__VLS_144));
                                             ({}({ ...{}, class: ("friend-info"), }));
                                             {
-                                                const __VLS_143 = __VLS_intrinsicElements["span"];
-                                                const __VLS_144 = __VLS_elementAsFunctionalComponent(__VLS_143);
-                                                const __VLS_145 = __VLS_144({ ...{}, class: ("friend-name"), }, ...__VLS_functionalComponentArgsRest(__VLS_144));
+                                                const __VLS_148 = __VLS_intrinsicElements["span"];
+                                                const __VLS_149 = __VLS_elementAsFunctionalComponent(__VLS_148);
+                                                const __VLS_150 = __VLS_149({ ...{}, class: ("friend-name"), }, ...__VLS_functionalComponentArgsRest(__VLS_149));
                                                 ({}({ ...{}, class: ("friend-name"), }));
                                                 (friend.remark || friend.name);
-                                                (__VLS_146.slots).default;
-                                                const __VLS_146 = __VLS_pickFunctionalComponentCtx(__VLS_143, __VLS_145);
+                                                (__VLS_151.slots).default;
+                                                const __VLS_151 = __VLS_pickFunctionalComponentCtx(__VLS_148, __VLS_150);
                                             }
                                             if (friend.remark) {
                                                 {
-                                                    const __VLS_148 = __VLS_intrinsicElements["span"];
-                                                    const __VLS_149 = __VLS_elementAsFunctionalComponent(__VLS_148);
-                                                    const __VLS_150 = __VLS_149({ ...{}, class: ("friend-alias"), }, ...__VLS_functionalComponentArgsRest(__VLS_149));
+                                                    const __VLS_153 = __VLS_intrinsicElements["span"];
+                                                    const __VLS_154 = __VLS_elementAsFunctionalComponent(__VLS_153);
+                                                    const __VLS_155 = __VLS_154({ ...{}, class: ("friend-alias"), }, ...__VLS_functionalComponentArgsRest(__VLS_154));
                                                     ({}({ ...{}, class: ("friend-alias"), }));
                                                     (friend.name);
-                                                    (__VLS_151.slots).default;
-                                                    const __VLS_151 = __VLS_pickFunctionalComponentCtx(__VLS_148, __VLS_150);
+                                                    (__VLS_156.slots).default;
+                                                    const __VLS_156 = __VLS_pickFunctionalComponentCtx(__VLS_153, __VLS_155);
                                                 }
                                             }
-                                            (__VLS_141.slots).default;
-                                            const __VLS_141 = __VLS_pickFunctionalComponentCtx(__VLS_138, __VLS_140);
+                                            (__VLS_146.slots).default;
+                                            const __VLS_146 = __VLS_pickFunctionalComponentCtx(__VLS_143, __VLS_145);
                                         }
-                                        (__VLS_130.slots).default;
-                                        const __VLS_130 = __VLS_pickFunctionalComponentCtx(__VLS_127, __VLS_129);
-                                        let __VLS_131;
+                                        (__VLS_135.slots).default;
+                                        const __VLS_135 = __VLS_pickFunctionalComponentCtx(__VLS_132, __VLS_134);
+                                        let __VLS_136;
                                     }
                                 }
-                                (__VLS_125.slots).default;
-                                const __VLS_125 = __VLS_pickFunctionalComponentCtx(__VLS_122, __VLS_124);
+                                (__VLS_130.slots).default;
+                                const __VLS_130 = __VLS_pickFunctionalComponentCtx(__VLS_127, __VLS_129);
                             }
-                            (__VLS_115.slots).default;
-                            const __VLS_115 = __VLS_pickFunctionalComponentCtx(__VLS_112, __VLS_114);
+                            (__VLS_120.slots).default;
+                            const __VLS_120 = __VLS_pickFunctionalComponentCtx(__VLS_117, __VLS_119);
                         }
                     }
-                    (__VLS_110.slots).default;
-                    const __VLS_110 = __VLS_pickFunctionalComponentCtx(__VLS_107, __VLS_109);
+                    (__VLS_115.slots).default;
+                    const __VLS_115 = __VLS_pickFunctionalComponentCtx(__VLS_112, __VLS_114);
                 }
             }
-            (__VLS_95.slots).default;
-            const __VLS_95 = __VLS_pickFunctionalComponentCtx(__VLS_92, __VLS_94);
+            (__VLS_100.slots).default;
+            const __VLS_100 = __VLS_pickFunctionalComponentCtx(__VLS_97, __VLS_99);
         }
         if (__VLS_ctx.contactStore.groupedContacts.length > 0) {
             {
-                const __VLS_153 = __VLS_intrinsicElements["div"];
-                const __VLS_154 = __VLS_elementAsFunctionalComponent(__VLS_153);
-                const __VLS_155 = __VLS_154({ ...{}, class: ("letter-quick-bar"), }, ...__VLS_functionalComponentArgsRest(__VLS_154));
+                const __VLS_158 = __VLS_intrinsicElements["div"];
+                const __VLS_159 = __VLS_elementAsFunctionalComponent(__VLS_158);
+                const __VLS_160 = __VLS_159({ ...{}, class: ("letter-quick-bar"), }, ...__VLS_functionalComponentArgsRest(__VLS_159));
                 ({}({ ...{}, class: ("letter-quick-bar"), }));
                 for (const [group] of __VLS_getVForSourceType((__VLS_ctx.contactStore.groupedContacts))) {
                     {
-                        const __VLS_158 = __VLS_intrinsicElements["div"];
-                        const __VLS_159 = __VLS_elementAsFunctionalComponent(__VLS_158);
-                        const __VLS_160 = __VLS_159({ ...{ 'onClick': {}, }, key: (('quick-' + group.initial)), class: ("quick-letter"), }, ...__VLS_functionalComponentArgsRest(__VLS_159));
+                        const __VLS_163 = __VLS_intrinsicElements["div"];
+                        const __VLS_164 = __VLS_elementAsFunctionalComponent(__VLS_163);
+                        const __VLS_165 = __VLS_164({ ...{ 'onClick': {}, }, key: (('quick-' + group.initial)), class: ("quick-letter"), }, ...__VLS_functionalComponentArgsRest(__VLS_164));
                         ({}({ ...{ 'onClick': {}, }, key: (('quick-' + group.initial)), class: ("quick-letter"), }));
-                        let __VLS_163 = { 'click': __VLS_pickEvent(__VLS_162['click'], {}.onClick) };
-                        __VLS_163 = { click: $event => {
+                        let __VLS_168 = { 'click': __VLS_pickEvent(__VLS_167['click'], {}.onClick) };
+                        __VLS_168 = { click: $event => {
                                 if (!((__VLS_ctx.contactStore.groupedContacts.length > 0)))
                                     return;
                                 __VLS_ctx.scrollToLetter(group.initial);
@@ -378,13 +394,13 @@ function __VLS_template() {
                             }
                         };
                         (group.initial);
-                        (__VLS_161.slots).default;
-                        const __VLS_161 = __VLS_pickFunctionalComponentCtx(__VLS_158, __VLS_160);
-                        let __VLS_162;
+                        (__VLS_166.slots).default;
+                        const __VLS_166 = __VLS_pickFunctionalComponentCtx(__VLS_163, __VLS_165);
+                        let __VLS_167;
                     }
                 }
-                (__VLS_156.slots).default;
-                const __VLS_156 = __VLS_pickFunctionalComponentCtx(__VLS_153, __VLS_155);
+                (__VLS_161.slots).default;
+                const __VLS_161 = __VLS_pickFunctionalComponentCtx(__VLS_158, __VLS_160);
             }
         }
         (__VLS_3.slots).default;
@@ -398,6 +414,7 @@ function __VLS_template() {
         __VLS_styleScopedClasses["requests-icon"];
         __VLS_styleScopedClasses["svg-icon"];
         __VLS_styleScopedClasses["action-label"];
+        __VLS_styleScopedClasses["action-badge"];
         __VLS_styleScopedClasses["action-item"];
         __VLS_styleScopedClasses["action-icon"];
         __VLS_styleScopedClasses["add-icon"];

@@ -9,6 +9,7 @@ const contactStore = useContactStore();
 
 onMounted(() => {
   contactStore.syncContacts();
+  contactStore.refreshFriendRequestUnreadCount();
 });
 
 function handleContactClick(uid: string) {
@@ -44,6 +45,12 @@ function scrollToLetter(letter: string) {
           </svg>
         </div>
         <div class="action-label">新的朋友</div>
+        <span
+          v-if="contactStore.friendRequestUnreadCount > 0"
+          class="action-badge"
+        >
+          {{ contactStore.friendRequestUnreadCount > 99 ? '99+' : contactStore.friendRequestUnreadCount }}
+        </span>
       </div>
       
       <div class="action-item" @click="handleAddFriend">
@@ -163,6 +170,21 @@ function scrollToLetter(letter: string) {
   font-size: 13px;
   font-weight: 500;
   color: var(--text-primary);
+}
+
+.action-badge {
+  margin-left: auto;
+  min-width: 18px;
+  height: 18px;
+  padding: 0 6px;
+  border-radius: 9px;
+  background-color: #ff4d4f;
+  color: #ffffff;
+  font-size: 11px;
+  font-weight: 600;
+  display: flex;
+  align-items: center;
+  justify-content: center;
 }
 
 .grouped-list-wrapper {
