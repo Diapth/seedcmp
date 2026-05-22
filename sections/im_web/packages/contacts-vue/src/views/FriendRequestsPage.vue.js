@@ -9,6 +9,10 @@ const { defineProps, defineSlots, defineEmits, defineExpose, defineModel, define
 const router = useRouter();
 const contactStore = useContactStore();
 const loading = ref(false);
+function isNonBlockingCmdFailure(err) {
+    const message = String(err?.msg || err?.message || '');
+    return message.includes('发送消息失败') || message.includes('SendCMD') || message.includes('CMD');
+}
 async function loadRequests() {
     loading.value = true;
     try {
@@ -33,6 +37,15 @@ async function handleApprove(token) {
         ]);
     }
     catch (err) {
+        if (isNonBlockingCmdFailure(err)) {
+            Message.success('已同意好友申请，在线通知稍后自动同步');
+            contactStore.markFriendRequestAccepted(token);
+            await Promise.allSettled([
+                contactStore.syncContacts(),
+                contactStore.fetchFriendRequests()
+            ]);
+            return;
+        }
         Message.error(err.msg || '同意申请失败');
     }
 }

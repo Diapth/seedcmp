@@ -53,6 +53,14 @@ function formatDeviceFlag(flag: number) {
   return '移动端';
 }
 
+function getDeviceKind(device: any) {
+  const source = `${device.device_name || ''} ${device.device_model || ''}`.toLowerCase();
+  if (/web|browser|chrome|edge|firefox|safari|desktop|pc|mac|windows|linux/.test(source)) {
+    return 'Web';
+  }
+  return formatDeviceFlag(Number(device.device_flag || 0));
+}
+
 onMounted(() => {
   loadDevices();
 });
@@ -75,7 +83,7 @@ onMounted(() => {
         <div class="device-meta">
           <div class="device-name">{{ device.device_name || '未命名设备' }}</div>
           <div class="device-desc">
-            {{ device.device_model || '未知型号' }} · {{ formatDeviceFlag(device.device_flag) }}
+            {{ device.device_model || '未知型号' }} · {{ getDeviceKind(device) }}
           </div>
         </div>
         <button class="plain-btn" @click="removeDevice(device.device_id || device.id)">移除</button>

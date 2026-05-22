@@ -10,6 +10,7 @@ export const useContactStore = defineStore('contact', () => {
     const version = ref(0);
     const friendRequestUnreadCount = ref(0);
     const isFriendRequestsLoading = ref(false);
+    let contactSyncRequestId = 0;
     function getUnreadStorageKey() {
         const uid = StorageService.get('uid') || '';
         return uid ? `${uid}-friend-applys-unread-count` : 'friend-applys-unread-count';
@@ -25,6 +26,7 @@ export const useContactStore = defineStore('contact', () => {
     }
     // Sync friends incrementally
     async function syncContacts() {
+        const requestId = ++contactSyncRequestId;
         try {
             const res = await friendApi.syncFriends({
                 version: version.value,
@@ -33,6 +35,11 @@ export const useContactStore = defineStore('contact', () => {
             });
             // friend/sync 返回直接数组
             const list = Array.isArray(res) ? res : (res?.friends || []);
+            if (requestId !== contactSyncRequestId)
+                return;
+            if (list.length === 0) {
+                return;
+            }
             contacts.value = list.filter((f) => f.is_deleted !== 1 && f.follow === 1);
             const lastItem = list[list.length - 1];
             if (lastItem?.version) {

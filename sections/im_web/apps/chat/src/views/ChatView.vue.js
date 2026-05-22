@@ -44,7 +44,7 @@ watch([channelId, channelType], () => {
     loadChannelDetails();
 });
 watch(() => messageStore.messages[channelKey.value]?.length, () => {
-    conversationStore.clearUnread(channelId.value, channelType.value);
+    void conversationStore.clearUnread(channelId.value, channelType.value);
 });
 function handleHeaderClick() {
     if (channelType.value === 1) {

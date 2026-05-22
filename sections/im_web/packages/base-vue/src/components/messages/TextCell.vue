@@ -32,7 +32,9 @@ const displayText = computed(() => {
 }
 
 .bubble {
-  max-width: 60%;
+  display: inline-block;
+  width: fit-content;
+  max-width: min(520px, 100%);
   padding: 10px 14px;
   border-radius: var(--radius-sm);
   font-size: 14px;

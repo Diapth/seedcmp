@@ -54,6 +54,13 @@ function formatDeviceFlag(flag) {
         return 'Web';
     return '移动端';
 }
+function getDeviceKind(device) {
+    const source = `${device.device_name || ''} ${device.device_model || ''}`.toLowerCase();
+    if (/web|browser|chrome|edge|firefox|safari|desktop|pc|mac|windows|linux/.test(source)) {
+        return 'Web';
+    }
+    return formatDeviceFlag(Number(device.device_flag || 0));
+}
 onMounted(() => {
     loadDevices();
 });
@@ -197,7 +204,7 @@ function __VLS_template() {
                                 const __VLS_59 = __VLS_58({ ...{}, class: ("device-desc"), }, ...__VLS_functionalComponentArgsRest(__VLS_58));
                                 ({}({ ...{}, class: ("device-desc"), }));
                                 (device.device_model || '未知型号');
-                                (__VLS_ctx.formatDeviceFlag(device.device_flag));
+                                (__VLS_ctx.getDeviceKind(device));
                                 (__VLS_60.slots).default;
                                 const __VLS_60 = __VLS_pickFunctionalComponentCtx(__VLS_57, __VLS_59);
                             }
@@ -217,7 +224,7 @@ function __VLS_template() {
                                         return;
                                     __VLS_ctx.removeDevice(device.device_id || device.id);
                                     // @ts-ignore
-                                    [devices, formatDeviceFlag, removeDevice,];
+                                    [devices, getDeviceKind, removeDevice,];
                                 }
                             };
                             (__VLS_65.slots).default;
@@ -262,7 +269,7 @@ const __VLS_internalComponent = (await import('vue')).defineComponent({
             removeDevice: removeDevice,
             quitCurrentSession: quitCurrentSession,
             goBack: goBack,
-            formatDeviceFlag: formatDeviceFlag,
+            getDeviceKind: getDeviceKind,
         };
     },
     emits: {},

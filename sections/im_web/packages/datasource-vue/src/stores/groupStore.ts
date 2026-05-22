@@ -1,5 +1,5 @@
 import { defineStore } from 'pinia';
-import { ref } from 'vue';
+import { ref, computed } from 'vue';
 import { groupApi } from '../api';
 
 export interface Group {
@@ -15,12 +15,32 @@ export const useGroupStore = defineStore('group', () => {
   const groups = ref<{ [key: string]: Group }>({});
   const groupMembers = ref<{ [key: string]: any[] }>({});
 
+  function normalizeGroup(input: any): Group | null {
+    const groupNo = String(input.group_no || input.groupNo || input.channel_id || '');
+    if (!groupNo) return null;
+
+    return {
+      ...input,
+      group_no: groupNo,
+      name: input.remark || input.name || '群聊',
+      avatar: input.logo || input.avatar || '',
+      owner: input.owner || input.owner_uid || '',
+      status: Number(input.status || 0),
+      mute: Number(input.mute || 0),
+      top: Number(input.top || input.stick || 0),
+      save: Number(input.save || 0)
+    };
+  }
+
   async function fetchMyGroups() {
     try {
       const res: any = await groupApi.getMyGroups();
-      const list = Array.isArray(res) ? res : [];
-      list.forEach((g: Group) => {
-        groups.value[g.group_no] = g;
+      const list = Array.isArray(res) ? res : (res?.list || res?.groups || []);
+      list.forEach((item: any) => {
+        const group = normalizeGroup(item);
+        if (group) {
+          groups.value[group.group_no] = group;
+        }
       });
     } catch (e) {
       console.error(e);
@@ -31,7 +51,7 @@ export const useGroupStore = defineStore('group', () => {
     if (groups.value[groupNo]) return groups.value[groupNo];
     try {
       const res: any = await groupApi.getGroupInfo(groupNo);
-      const g = res;
+      const g = normalizeGroup(res);
       if (g) {
         groups.value[groupNo] = g;
       }
@@ -54,9 +74,19 @@ export const useGroupStore = defineStore('group', () => {
     }
   }
 
+  const savedGroups = computed(() => {
+    return Object.values(groups.value).sort((a, b) => {
+      if (Number(a.top || 0) !== Number(b.top || 0)) {
+        return Number(b.top || 0) - Number(a.top || 0);
+      }
+      return (a.name || '').localeCompare(b.name || '');
+    });
+  });
+
   return {
     groups,
     groupMembers,
+    savedGroups,
     fetchMyGroups,
     getGroupInfo,
     fetchGroupMembers

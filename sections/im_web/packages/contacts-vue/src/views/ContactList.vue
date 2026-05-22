@@ -2,14 +2,17 @@
 import { onMounted } from 'vue';
 import { useRouter } from 'vue-router';
 import { useContactStore } from '../stores/contactStore';
+import { useGroupStore } from '@tsdaodao/datasource-vue';
 import { ChannelAvatar } from '@tsdaodao/base-vue';
 
 const router = useRouter();
 const contactStore = useContactStore();
+const groupStore = useGroupStore();
 
 onMounted(() => {
   contactStore.syncContacts();
   contactStore.refreshFriendRequestUnreadCount();
+  groupStore.fetchMyGroups();
 });
 
 function handleContactClick(uid: string) {
@@ -20,8 +23,19 @@ function handleAddFriend() {
   router.push('/chat/add-friend');
 }
 
+function handleGroupClick(groupNo: string) {
+  router.push(`/chat/conversation/${groupNo}/2`);
+}
+
 function handleFriendRequests() {
   router.push('/chat/friend-requests');
+}
+
+function scrollToGroupList() {
+  const el = document.getElementById('saved-groups-section');
+  if (el) {
+    el.scrollIntoView({ behavior: 'smooth', block: 'start' });
+  }
 }
 
 function scrollToLetter(letter: string) {
@@ -64,10 +78,51 @@ function scrollToLetter(letter: string) {
         </div>
         <div class="action-label">添加好友</div>
       </div>
+
+      <div class="action-item" @click="scrollToGroupList">
+        <div class="action-icon group-icon">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" class="svg-icon">
+            <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2" />
+            <circle cx="9" cy="7" r="4" />
+            <path d="M23 21v-2a4 4 0 0 0-3-3.87" />
+            <path d="M16 3.13a4 4 0 0 1 0 7.75" />
+          </svg>
+        </div>
+        <div class="action-label">群聊</div>
+        <span v-if="groupStore.savedGroups.length > 0" class="action-count">
+          {{ groupStore.savedGroups.length }}
+        </span>
+      </div>
     </div>
 
     <div class="grouped-list-wrapper">
-      <div v-if="contactStore.groupedContacts.length === 0" class="empty-contacts">
+      <div
+        v-if="groupStore.savedGroups.length > 0"
+        id="saved-groups-section"
+        class="saved-groups-section"
+      >
+        <div class="group-title">群聊</div>
+        <div class="group-items">
+          <div
+            v-for="group in groupStore.savedGroups"
+            :key="group.group_no"
+            class="friend-item"
+            @click="handleGroupClick(group.group_no)"
+          >
+            <ChannelAvatar
+              :avatar="group.avatar"
+              :name="group.name"
+              :is-group="true"
+              :size="36"
+            />
+            <div class="friend-info">
+              <span class="friend-name">{{ group.name }}</span>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div v-if="contactStore.groupedContacts.length === 0 && groupStore.savedGroups.length === 0" class="empty-contacts">
         <p>通讯录暂无好友</p>
       </div>
 
@@ -161,6 +216,10 @@ function scrollToLetter(letter: string) {
   background-color: #52c41a;
 }
 
+.group-icon {
+  background-color: #722ed1;
+}
+
 .svg-icon {
   width: 18px;
   height: 18px;
@@ -187,6 +246,22 @@ function scrollToLetter(letter: string) {
   justify-content: center;
 }
 
+.action-count {
+  margin-left: auto;
+  min-width: 18px;
+  height: 18px;
+  padding: 0 6px;
+  border-radius: 9px;
+  background-color: var(--bg-secondary);
+  color: var(--text-secondary);
+  border: var(--border-hairline);
+  font-size: 11px;
+  font-weight: 600;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
 .grouped-list-wrapper {
   flex: 1;
   overflow-y: auto;
@@ -201,6 +276,11 @@ function scrollToLetter(letter: string) {
 
 .groups-scroller {
   padding-bottom: 24px;
+}
+
+.saved-groups-section {
+  display: flex;
+  flex-direction: column;
 }
 
 .contact-group {

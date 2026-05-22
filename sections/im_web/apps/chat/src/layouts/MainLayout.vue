@@ -36,6 +36,7 @@ function handleKickoutRelogin() {
   kickoutStore.resetKickout();
   router.push('/login');
 }
+
 </script>
 
 <template>

@@ -10,40 +10,15 @@ export const useSdkStore = defineStore('sdk', () => {
   const isKickedOut = ref(false);
   const connectionStatus = ref<ConnectStatus>(ConnectStatus.Disconnect);
 
-  let heartbeatTimer: any = null;
-  let missedPongs = 0;
   let reconnectAttempts = 0;
   let reconnectTimer: any = null;
   let initializedUid = '';
   let initializedToken = '';
 
-  function stopHeartbeat() {
-    if (heartbeatTimer) {
-      clearInterval(heartbeatTimer);
-      heartbeatTimer = null;
-    }
-  }
-
-  function startHeartbeat() {
-    stopHeartbeat();
-    missedPongs = 0;
-    heartbeatTimer = setInterval(() => {
-      if (connectionStatus.value === ConnectStatus.Connected) {
-        missedPongs++;
-        if (missedPongs >= 3) {
-          console.warn('[SDK] Heartbeat: 3 missed Pongs. Reconnecting...');
-          handleDisconnectAndReconnect();
-        } else {
-          // Send ping
-          WKSDK.shared().connectManager.sendPing();
-        }
-      }
-    }, 30000);
-  }
-
   function handleDisconnectAndReconnect() {
-    stopHeartbeat();
-    WKSDK.shared().disconnect();
+    if (connectionStatus.value === ConnectStatus.Connected) {
+      return;
+    }
     isConnected.value = false;
 
     if (isKickedOut.value) return;
@@ -103,11 +78,9 @@ export const useSdkStore = defineStore('sdk', () => {
           clearTimeout(reconnectTimer);
           reconnectTimer = null;
         }
-        startHeartbeat();
         console.log('[SDK] Connected successfully.');
       } else {
         isConnected.value = false;
-        stopHeartbeat();
 
         if (status === ConnectStatus.ConnectKick || reasonCode === 2) {
           isKickedOut.value = true;
@@ -120,17 +93,11 @@ export const useSdkStore = defineStore('sdk', () => {
       }
     });
 
-    // Reset missed pongs on incoming messages to signify an active link
-    WKSDK.shared().chatManager.addMessageListener(() => {
-      missedPongs = 0;
-    });
-
     // Initial connect
     WKSDK.shared().connect();
   }
 
   function disconnect() {
-    stopHeartbeat();
     if (reconnectTimer) {
       clearTimeout(reconnectTimer);
       reconnectTimer = null;

@@ -158,14 +158,17 @@ async function handleRegister() {
 .form-row {
   display: flex;
   gap: 12px;
+  width: 100%;
+  align-items: flex-end;
 }
 
 .zone-item {
-  flex: 0 0 100px;
+  flex: 0 0 96px;
 }
 
 .phone-item {
-  flex: 1;
+  flex: 1 1 auto;
+  min-width: 0;
 }
 
 .form-item {
@@ -181,6 +184,8 @@ async function handleRegister() {
 }
 
 .form-input {
+  box-sizing: border-box;
+  width: 100%;
   height: 40px;
   padding: 0 12px;
   border: var(--border-hairline);
@@ -192,6 +197,7 @@ async function handleRegister() {
 .code-row {
   display: flex;
   gap: 8px;
+  width: 100%;
 }
 
 .code-btn,
@@ -203,10 +209,12 @@ async function handleRegister() {
 }
 
 .code-btn {
+  box-sizing: border-box;
   padding: 0 14px;
   white-space: nowrap;
   background: var(--bg-secondary);
   color: var(--text-primary);
+  flex: 0 0 auto;
 }
 
 .register-btn {
@@ -219,5 +227,22 @@ async function handleRegister() {
   margin-top: 18px;
   text-align: center;
   font-size: 13px;
+}
+
+@media (max-width: 460px) {
+  .register-card {
+    padding: 28px 20px;
+    margin: 0 16px;
+  }
+
+  .form-row,
+  .code-row {
+    flex-wrap: wrap;
+  }
+
+  .zone-item,
+  .phone-item {
+    flex: 1 1 100%;
+  }
 }
 </style>

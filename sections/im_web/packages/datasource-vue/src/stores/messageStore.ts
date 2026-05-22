@@ -78,6 +78,30 @@ export const useMessageStore = defineStore('message', () => {
     return normalized;
   }
 
+  function isConversationDigestMessage(msg: Message) {
+    if (!msg || msg.isRevoked) return false;
+    const type = Number(msg.content?.type || 0);
+    return ![99, 1000].includes(type);
+  }
+
+  function getLatestConversationDigestMessage(list: Message[]) {
+    return [...list].reverse().find(isConversationDigestMessage);
+  }
+
+  async function ensureConversationFromMessages(channelId: string, channelType: number) {
+    const list = messages.value[`${channelId}-${channelType}`] || [];
+    const lastMessage = getLatestConversationDigestMessage(list);
+    if (!lastMessage) return;
+    await conversationStore.ensureConversation(channelId, channelType, {
+      messageSeq: lastMessage.messageSeq,
+      timestamp: lastMessage.timestamp,
+      fromUID: lastMessage.fromUID,
+      payload: lastMessage.content,
+      isOwnMessage: lastMessage.fromUID === userStore.currentUser?.uid,
+      isUnreadCleared: true
+    });
+  }
+
   async function syncMessages(channelId: string, channelType: number) {
     const key = `${channelId}-${channelType}`;
     const list = messages.value[key] || [];
@@ -118,6 +142,7 @@ export const useMessageStore = defineStore('message', () => {
         synced.forEach(m => mergedMap.set(m.clientMsgNo, m));
 
         messages.value[key] = Array.from(mergedMap.values()).sort((a, b) => a.messageSeq - b.messageSeq);
+        await ensureConversationFromMessages(channelId, channelType);
       }
     } catch (e) {
       console.error(`[MessageStore] Failed to sync messages for channel ${key}`, e);
@@ -139,13 +164,15 @@ export const useMessageStore = defineStore('message', () => {
 
     messages.value[key].sort((a, b) => a.messageSeq - b.messageSeq || a.timestamp - b.timestamp);
 
-    conversationStore.addOrUpdateConversation(channelId, channelType, {
-      messageSeq: msg.messageSeq,
-      timestamp: msg.timestamp,
-      fromUID: msg.fromUID,
-      payload: msg.content,
-      isOwnMessage: msg.fromUID === userStore.currentUser?.uid
-    });
+    if (isConversationDigestMessage(msg)) {
+      conversationStore.addOrUpdateConversation(channelId, channelType, {
+        messageSeq: msg.messageSeq,
+        timestamp: msg.timestamp,
+        fromUID: msg.fromUID,
+        payload: msg.content,
+        isOwnMessage: msg.fromUID === userStore.currentUser?.uid
+      });
+    }
   }
 
   function normalizeContent(content: any) {
@@ -180,6 +207,30 @@ export const useMessageStore = defineStore('message', () => {
       remoteExtra: rawMessage.remoteExtra
     };
     addMessage(channelId, channelType, normalized);
+  }
+
+  function updateMessageStatus(clientMsgNo: string, patch: Partial<Message>) {
+    if (!clientMsgNo) return;
+
+    for (const key of Object.keys(messages.value)) {
+      const list = messages.value[key] || [];
+      const idx = list.findIndex(m => m.clientMsgNo === clientMsgNo);
+      if (idx === -1) continue;
+
+      const next = { ...list[idx], ...patch };
+      list[idx] = next;
+
+      const [channelId, channelType] = key.split('-');
+      conversationStore.addOrUpdateConversation(channelId, Number(channelType), {
+        messageSeq: next.messageSeq,
+        timestamp: next.timestamp,
+        fromUID: next.fromUID,
+        payload: next.content,
+        isOwnMessage: next.fromUID === userStore.currentUser?.uid,
+        isUnreadCleared: true
+      });
+      return;
+    }
   }
 
   async function revokeMessage(channelId: string, channelType: number, clientMsgNo: string, messageId: string) {
@@ -276,29 +327,7 @@ export const useMessageStore = defineStore('message', () => {
       reply?: any 
     }
   ) {
-    const clientMsgNo = Math.random().toString(36).substring(7);
-    const fromUID = userStore.currentUser?.uid || '';
-
-    const content = {
-      type: 1, // Text message
-      text: text,
-      mention: options?.mention,
-      reply: options?.reply
-    };
-
-    const tempMsg: Message = {
-      messageID: '',
-      messageSeq: 0,
-      clientMsgNo,
-      fromUID,
-      timestamp: Math.floor(Date.now() / 1000),
-      content,
-      isRevoked: false,
-      status: 'sending'
-    };
-
-    addMessage(channelId, channelType, tempMsg);
-
+    let sentMessage: WKMessage | undefined;
     try {
       const channel = WKSDK.shared().newChannel(channelId, channelType);
       const textMsg = WKSDK.shared().newMessageText(text);
@@ -311,14 +340,14 @@ export const useMessageStore = defineStore('message', () => {
 
       const res = await WKSDK.shared().chatManager.send(textMsg, channel);
       if (res) {
-        tempMsg.status = 'success';
-        tempMsg.messageID = res.messageID || '';
-        tempMsg.messageSeq = res.messageSeq || 0;
-        addMessage(channelId, channelType, tempMsg);
+        sentMessage = res;
+        addRealtimeMessage(channelId, channelType, res);
       }
     } catch (err) {
-      tempMsg.status = 'fail';
-      addMessage(channelId, channelType, tempMsg);
+      if (sentMessage) {
+        sentMessage.status = 2;
+        addRealtimeMessage(channelId, channelType, sentMessage);
+      }
       throw err;
     }
   }
@@ -342,6 +371,7 @@ export const useMessageStore = defineStore('message', () => {
     setTyping,
     sendMessage,
     addRealtimeMessage,
+    updateMessageStatus,
     setReplyTarget
   };
 });

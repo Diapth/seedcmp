@@ -3,6 +3,23 @@ import { ref, computed } from 'vue';
 import { authApi, userApi } from '../api';
 import { StorageService } from '@tsdaodao/base-vue';
 import { useSdkStore } from './sdk';
+const DEVICE_TEXT_MAX_LENGTH = 100;
+const DEVICE_ID_MAX_LENGTH = 40;
+function limitDeviceField(value, maxLength) {
+    return String(value || '').trim().slice(0, maxLength);
+}
+function sanitizeLoginCredentials(credentials) {
+    const next = { ...credentials };
+    if (next.device) {
+        next.device = {
+            ...next.device,
+            device_id: limitDeviceField(next.device.device_id, DEVICE_ID_MAX_LENGTH),
+            device_name: limitDeviceField(next.device.device_name || 'Web Browser', DEVICE_TEXT_MAX_LENGTH),
+            device_model: limitDeviceField(next.device.device_model || 'Web Browser', DEVICE_TEXT_MAX_LENGTH)
+        };
+    }
+    return next;
+}
 export const useUserStore = defineStore('user', () => {
     const currentUser = ref(null);
     const token = ref(null);
@@ -25,7 +42,7 @@ export const useUserStore = defineStore('user', () => {
     }
     const isLoggedIn = computed(() => !!token.value);
     async function login(credentials) {
-        const res = await authApi.login(credentials);
+        const res = await authApi.login(sanitizeLoginCredentials(credentials));
         if (res && res.token) {
             token.value = res.token;
             loginInfo.value = res;

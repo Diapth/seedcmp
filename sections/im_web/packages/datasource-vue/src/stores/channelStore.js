@@ -15,10 +15,11 @@ export const useChannelStore = defineStore('channel', () => {
                 channels.value[key] = {
                     channel_id: channelId,
                     channel_type: channelType,
-                    name: res.name || '',
-                    avatar: res.avatar || '',
-                    mute: res.mute || 0,
-                    top: res.top || 0,
+                    // 后端返回字段: name, mute(0/1), stick(=top), logo(=avatar), remark
+                    name: (res.remark && res.remark !== '') ? res.remark : (res.name || ''),
+                    avatar: res.logo || res.avatar || '',
+                    mute: res.mute === 1 ? 1 : 0,
+                    top: res.stick === 1 ? 1 : (res.top === 1 ? 1 : 0),
                     save: res.save || 0,
                     notice: res.notice || '',
                     ...res

@@ -1,9 +1,11 @@
-import WKSDK, { Message } from 'wukongimjssdk';
+import WKSDK, { Message, SendackPacket } from 'wukongimjssdk';
 import { useMessageStore } from '../stores/messageStore';
 import { useChannelStore } from '../stores/channelStore';
 import { useConversationStore } from '../stores/conversationStore';
 import { useUserStore } from '../stores/userStore';
 import { userApi } from '../api';
+
+const pendingClientMsgNoBySeq = new Map<number, string>();
 
 export function registerCMDListeners() {
   WKSDK.shared().chatManager.addCMDListener((msg: Message) => {
@@ -130,10 +132,27 @@ export function registerMessageListeners() {
     const currentPath = typeof window !== 'undefined' ? window.location.pathname : '';
     const isViewingChannel = currentPath.includes(`/chat/conversation/${channelId}/${channelType}`);
 
+    if (message.clientSeq && message.clientMsgNo) {
+      pendingClientMsgNoBySeq.set(message.clientSeq, message.clientMsgNo);
+    }
+
     messageStore.addRealtimeMessage(channelId, channelType, message);
 
     if (!isOwnMessage && isViewingChannel) {
       conversationStore.clearUnread(channelId, channelType);
     }
+  });
+
+  WKSDK.shared().chatManager.addMessageStatusListener((ack: SendackPacket) => {
+    const clientMsgNo = pendingClientMsgNoBySeq.get(ack.clientSeq);
+    if (!clientMsgNo) return;
+    pendingClientMsgNoBySeq.delete(ack.clientSeq);
+
+    const messageStore = useMessageStore();
+    messageStore.updateMessageStatus(clientMsgNo, {
+      messageID: String(ack.messageID || ''),
+      messageSeq: ack.messageSeq || 0,
+      status: ack.reasonCode === 1 ? 'success' : 'fail'
+    });
   });
 }

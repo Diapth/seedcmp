@@ -12,6 +12,26 @@ export interface User {
   [key: string]: any;
 }
 
+const DEVICE_TEXT_MAX_LENGTH = 100;
+const DEVICE_ID_MAX_LENGTH = 40;
+
+function limitDeviceField(value: unknown, maxLength: number) {
+  return String(value || '').trim().slice(0, maxLength);
+}
+
+function sanitizeLoginCredentials(credentials: any) {
+  const next = { ...credentials };
+  if (next.device) {
+    next.device = {
+      ...next.device,
+      device_id: limitDeviceField(next.device.device_id, DEVICE_ID_MAX_LENGTH),
+      device_name: limitDeviceField(next.device.device_name || 'Web Browser', DEVICE_TEXT_MAX_LENGTH),
+      device_model: limitDeviceField(next.device.device_model || 'Web Browser', DEVICE_TEXT_MAX_LENGTH)
+    };
+  }
+  return next;
+}
+
 export const useUserStore = defineStore('user', () => {
   const currentUser = ref<User | null>(null);
   const token = ref<string | null>(null);
@@ -38,7 +58,7 @@ export const useUserStore = defineStore('user', () => {
   const isLoggedIn = computed(() => !!token.value);
 
   async function login(credentials: any) {
-    const res: any = await authApi.login(credentials);
+    const res: any = await authApi.login(sanitizeLoginCredentials(credentials));
     if (res && res.token) {
       token.value = res.token;
       loginInfo.value = res;

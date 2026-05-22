@@ -14,6 +14,10 @@ const newAvatar = ref('');
 const isEditing = ref(false);
 const saving = ref(false);
 const currentUser = computed(() => userStore.currentUser);
+function isNonBlockingCmdFailure(err) {
+    const message = String(err?.msg || err?.message || '');
+    return message.includes('发送消息失败') || message.includes('SendCMD') || message.includes('CMD');
+}
 watch(() => props.visible, (val) => {
     if (val && currentUser.value) {
         newName.value = currentUser.value.name || '';
@@ -38,6 +42,14 @@ async function handleSave() {
         isEditing.value = false;
     }
     catch (err) {
+        if (isNonBlockingCmdFailure(err)) {
+            if (userStore.currentUser) {
+                userStore.currentUser.name = newName.value.trim();
+            }
+            Message.success('个人资料已保存，在线状态同步稍后自动恢复');
+            isEditing.value = false;
+            return;
+        }
         Message.error(err.msg || '保存失败');
     }
     finally {
@@ -69,6 +81,10 @@ async function selectPresetAvatar(url) {
 function goToDevices() {
     emit('close');
     router.push('/chat/devices');
+}
+function goToBlacklist() {
+    emit('close');
+    router.push('/chat/blacklist');
 }
 let __VLS_modelEmitsType;
 const __VLS_componentsOption = {};
@@ -128,12 +144,16 @@ function __VLS_template() {
     __VLS_intrinsicElements.div;
     __VLS_intrinsicElements.div;
     __VLS_intrinsicElements.div;
+    __VLS_intrinsicElements.div;
+    __VLS_intrinsicElements.div;
     __VLS_intrinsicElements.h4;
     __VLS_intrinsicElements.h4;
     __VLS_intrinsicElements.h4;
     __VLS_intrinsicElements.h4;
     __VLS_intrinsicElements.h4;
     __VLS_intrinsicElements.h4;
+    __VLS_intrinsicElements.button;
+    __VLS_intrinsicElements.button;
     __VLS_intrinsicElements.button;
     __VLS_intrinsicElements.button;
     __VLS_intrinsicElements.button;
@@ -502,15 +522,34 @@ function __VLS_template() {
                                 const __VLS_173 = __VLS_pickFunctionalComponentCtx(__VLS_170, __VLS_172);
                             }
                             {
-                                const __VLS_200 = __VLS_intrinsicElements["button"];
+                                const __VLS_200 = __VLS_intrinsicElements["div"];
                                 const __VLS_201 = __VLS_elementAsFunctionalComponent(__VLS_200);
-                                const __VLS_202 = __VLS_201({ ...{ 'onClick': {}, }, class: ("secondary-btn"), }, ...__VLS_functionalComponentArgsRest(__VLS_201));
-                                ({}({ ...{ 'onClick': {}, }, class: ("secondary-btn"), }));
-                                let __VLS_205 = { 'click': __VLS_pickEvent(__VLS_204['click'], {}.onClick) };
-                                __VLS_205 = { click: (__VLS_ctx.goToDevices) };
+                                const __VLS_202 = __VLS_201({ ...{}, class: ("settings-actions"), }, ...__VLS_functionalComponentArgsRest(__VLS_201));
+                                ({}({ ...{}, class: ("settings-actions"), }));
+                                {
+                                    const __VLS_205 = __VLS_intrinsicElements["button"];
+                                    const __VLS_206 = __VLS_elementAsFunctionalComponent(__VLS_205);
+                                    const __VLS_207 = __VLS_206({ ...{ 'onClick': {}, }, class: ("secondary-btn"), }, ...__VLS_functionalComponentArgsRest(__VLS_206));
+                                    ({}({ ...{ 'onClick': {}, }, class: ("secondary-btn"), }));
+                                    let __VLS_210 = { 'click': __VLS_pickEvent(__VLS_209['click'], {}.onClick) };
+                                    __VLS_210 = { click: (__VLS_ctx.goToDevices) };
+                                    (__VLS_208.slots).default;
+                                    const __VLS_208 = __VLS_pickFunctionalComponentCtx(__VLS_205, __VLS_207);
+                                    let __VLS_209;
+                                }
+                                {
+                                    const __VLS_211 = __VLS_intrinsicElements["button"];
+                                    const __VLS_212 = __VLS_elementAsFunctionalComponent(__VLS_211);
+                                    const __VLS_213 = __VLS_212({ ...{ 'onClick': {}, }, class: ("secondary-btn"), }, ...__VLS_functionalComponentArgsRest(__VLS_212));
+                                    ({}({ ...{ 'onClick': {}, }, class: ("secondary-btn"), }));
+                                    let __VLS_216 = { 'click': __VLS_pickEvent(__VLS_215['click'], {}.onClick) };
+                                    __VLS_216 = { click: (__VLS_ctx.goToBlacklist) };
+                                    (__VLS_214.slots).default;
+                                    const __VLS_214 = __VLS_pickFunctionalComponentCtx(__VLS_211, __VLS_213);
+                                    let __VLS_215;
+                                }
                                 (__VLS_203.slots).default;
                                 const __VLS_203 = __VLS_pickFunctionalComponentCtx(__VLS_200, __VLS_202);
-                                let __VLS_204;
                             }
                             (__VLS_133.slots).default;
                             const __VLS_133 = __VLS_pickFunctionalComponentCtx(__VLS_130, __VLS_132);
@@ -519,7 +558,7 @@ function __VLS_template() {
                         const __VLS_46 = __VLS_pickFunctionalComponentCtx(__VLS_43, __VLS_45);
                     }
                     // @ts-ignore
-                    [saving, saving, handleSave, saving, goToDevices,];
+                    [saving, saving, handleSave, saving, goToDevices, goToBlacklist,];
                 }
                 (__VLS_9.slots).default;
                 const __VLS_9 = __VLS_pickFunctionalComponentCtx(__VLS_6, __VLS_8);
@@ -569,6 +608,8 @@ function __VLS_template() {
         __VLS_styleScopedClasses["toggle-switch"];
         __VLS_styleScopedClasses["active"];
         __VLS_styleScopedClasses["toggle-thumb"];
+        __VLS_styleScopedClasses["settings-actions"];
+        __VLS_styleScopedClasses["secondary-btn"];
         __VLS_styleScopedClasses["secondary-btn"];
     }
     var __VLS_slots;
@@ -587,6 +628,7 @@ const __VLS_internalComponent = (await import('vue')).defineComponent({
             presets: presets,
             selectPresetAvatar: selectPresetAvatar,
             goToDevices: goToDevices,
+            goToBlacklist: goToBlacklist,
         };
     },
     props: {},

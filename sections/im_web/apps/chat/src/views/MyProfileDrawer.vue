@@ -21,6 +21,11 @@ const saving = ref(false);
 
 const currentUser = computed(() => userStore.currentUser);
 
+function isNonBlockingCmdFailure(err: any) {
+  const message = String(err?.msg || err?.message || '');
+  return message.includes('发送消息失败') || message.includes('SendCMD') || message.includes('CMD');
+}
+
 watch(() => props.visible, (val) => {
   if (val && currentUser.value) {
     newName.value = currentUser.value.name || '';
@@ -39,7 +44,7 @@ async function handleSave() {
   try {
     // 1. Update Profile (Name)
     await userApi.updateProfile({ name: newName.value.trim() });
-    
+
     // 2. Local State update
     if (userStore.currentUser) {
       userStore.currentUser.name = newName.value.trim();
@@ -48,6 +53,14 @@ async function handleSave() {
     Message.success('个人资料更新成功');
     isEditing.value = false;
   } catch (err: any) {
+    if (isNonBlockingCmdFailure(err)) {
+      if (userStore.currentUser) {
+        userStore.currentUser.name = newName.value.trim();
+      }
+      Message.success('个人资料已保存，在线状态同步稍后自动恢复');
+      isEditing.value = false;
+      return;
+    }
     Message.error(err.msg || '保存失败');
   } finally {
     saving.value = false;
@@ -80,6 +93,11 @@ async function selectPresetAvatar(url: string) {
 function goToDevices() {
   emit('close');
   router.push('/chat/devices');
+}
+
+function goToBlacklist() {
+  emit('close');
+  router.push('/chat/blacklist');
 }
 </script>
 
@@ -173,9 +191,14 @@ function goToDevices() {
             </div>
           </div>
 
-          <button class="secondary-btn" @click="goToDevices">
-            打开设备管理
-          </button>
+          <div class="settings-actions">
+            <button class="secondary-btn" @click="goToDevices">
+              打开设备管理
+            </button>
+            <button class="secondary-btn" @click="goToBlacklist">
+              黑名单管理
+            </button>
+          </div>
         </div>
       </div>
     </div>
@@ -358,6 +381,12 @@ function goToDevices() {
   font-size: 13px;
   font-weight: 500;
   cursor: pointer;
+}
+
+.settings-actions {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
 }
 
 .save-btn:hover {

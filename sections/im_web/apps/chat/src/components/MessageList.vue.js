@@ -19,6 +19,18 @@ const channelKey = computed(() => `${props.channelId}-${props.channelType}`);
 const messages = computed(() => {
     return messageStore.messages[channelKey.value] || [];
 });
+const supportedMessageTypes = new Set([1, 2, 3, 4, 5, 6, 7, 8, 11, 12, 13, 1000]);
+function isRenderableMessage(msg) {
+    if (!msg)
+        return false;
+    if (msg.isRevoked)
+        return true;
+    const type = Number(msg.content?.type || 0);
+    return supportedMessageTypes.has(type);
+}
+const renderableMessages = computed(() => {
+    return messages.value.filter(isRenderableMessage);
+});
 function scrollToBottom(behavior = 'auto') {
     nextTick(() => {
         if (scrollContainer.value) {
@@ -43,7 +55,7 @@ watch(messages, (newMsgs) => {
 function shouldShowTime(msg, index) {
     if (index === 0)
         return true;
-    const prevMsg = messages.value[index - 1];
+    const prevMsg = renderableMessages.value[index - 1];
     return (msg.timestamp - prevMsg.timestamp) > 300;
 }
 function isMe(msg) {
@@ -146,26 +158,18 @@ function __VLS_template() {
     __VLS_intrinsicElements.div;
     __VLS_intrinsicElements.div;
     __VLS_intrinsicElements.div;
-    __VLS_intrinsicElements.div;
-    __VLS_intrinsicElements.div;
     __VLS_components.TimeCell;
     __VLS_components.TimeCell;
     // @ts-ignore
     [TimeCell,];
     __VLS_components.SystemCell;
     __VLS_components.SystemCell;
-    __VLS_components.SystemCell;
-    __VLS_components.SystemCell;
     // @ts-ignore
-    [SystemCell, SystemCell,];
+    [SystemCell,];
     __VLS_components.ChannelAvatar;
     __VLS_components.ChannelAvatar;
     // @ts-ignore
     [ChannelAvatar,];
-    __VLS_intrinsicElements.span;
-    __VLS_intrinsicElements.span;
-    __VLS_intrinsicElements.span;
-    __VLS_intrinsicElements.span;
     __VLS_intrinsicElements.span;
     __VLS_intrinsicElements.span;
     __VLS_intrinsicElements.span;
@@ -225,7 +229,7 @@ function __VLS_template() {
         ({}({ ...{}, ref: ("scrollContainer"), class: ("message-list"), }));
         // @ts-ignore
         (__VLS_ctx.scrollContainer);
-        for (const [msg, idx] of __VLS_getVForSourceType((__VLS_ctx.messages))) {
+        for (const [msg, idx] of __VLS_getVForSourceType((__VLS_ctx.renderableMessages))) {
             {
                 const __VLS_5 = __VLS_intrinsicElements["div"];
                 const __VLS_6 = __VLS_elementAsFunctionalComponent(__VLS_5);
@@ -241,7 +245,7 @@ function __VLS_template() {
                         const __VLS_13 = __VLS_pickFunctionalComponentCtx(__VLS_10, __VLS_12);
                     }
                     // @ts-ignore
-                    [scrollContainer, messages, shouldShowTime,];
+                    [scrollContainer, renderableMessages, shouldShowTime,];
                 }
                 if (msg.content?.type === 1000 || msg.isRevoked) {
                     {
@@ -463,30 +467,20 @@ function __VLS_template() {
                                 // @ts-ignore
                                 [isMe, isMe, isMe,];
                             }
-                            else {
-                                {
-                                    const __VLS_111 = {}.SystemCell;
-                                    const __VLS_112 = __VLS_asFunctionalComponent(__VLS_111, new __VLS_111({ ...{}, message: ((msg)), }));
-                                    ({}.SystemCell);
-                                    const __VLS_113 = __VLS_112({ ...{}, message: ((msg)), }, ...__VLS_functionalComponentArgsRest(__VLS_112));
-                                    ({}({ ...{}, message: ((msg)), }));
-                                    const __VLS_114 = __VLS_pickFunctionalComponentCtx(__VLS_111, __VLS_113);
-                                }
-                            }
                             if (msg.reactions && msg.reactions.length > 0) {
                                 {
-                                    const __VLS_116 = __VLS_intrinsicElements["div"];
-                                    const __VLS_117 = __VLS_elementAsFunctionalComponent(__VLS_116);
-                                    const __VLS_118 = __VLS_117({ ...{}, class: ("reactions-bar"), }, ...__VLS_functionalComponentArgsRest(__VLS_117));
+                                    const __VLS_111 = __VLS_intrinsicElements["div"];
+                                    const __VLS_112 = __VLS_elementAsFunctionalComponent(__VLS_111);
+                                    const __VLS_113 = __VLS_112({ ...{}, class: ("reactions-bar"), }, ...__VLS_functionalComponentArgsRest(__VLS_112));
                                     ({}({ ...{}, class: ("reactions-bar"), }));
                                     for (const [reaction] of __VLS_getVForSourceType((msg.reactions))) {
                                         {
-                                            const __VLS_121 = __VLS_intrinsicElements["div"];
-                                            const __VLS_122 = __VLS_elementAsFunctionalComponent(__VLS_121);
-                                            const __VLS_123 = __VLS_122({ ...{ 'onClick': {}, }, key: ((reaction.emoji)), class: ("reaction-badge"), }, ...__VLS_functionalComponentArgsRest(__VLS_122));
+                                            const __VLS_116 = __VLS_intrinsicElements["div"];
+                                            const __VLS_117 = __VLS_elementAsFunctionalComponent(__VLS_116);
+                                            const __VLS_118 = __VLS_117({ ...{ 'onClick': {}, }, key: ((reaction.emoji)), class: ("reaction-badge"), }, ...__VLS_functionalComponentArgsRest(__VLS_117));
                                             ({}({ ...{ 'onClick': {}, }, key: ((reaction.emoji)), class: ("reaction-badge"), }));
-                                            let __VLS_126 = { 'click': __VLS_pickEvent(__VLS_125['click'], {}.onClick) };
-                                            __VLS_126 = { click: $event => {
+                                            let __VLS_121 = { 'click': __VLS_pickEvent(__VLS_120['click'], {}.onClick) };
+                                            __VLS_121 = { click: $event => {
                                                     if (!(!((msg.content?.type === 1000 || msg.isRevoked))))
                                                         return;
                                                     if (!((msg.reactions && msg.reactions.length > 0)))
@@ -497,70 +491,30 @@ function __VLS_template() {
                                                 }
                                             };
                                             {
-                                                const __VLS_127 = __VLS_intrinsicElements["span"];
-                                                const __VLS_128 = __VLS_elementAsFunctionalComponent(__VLS_127);
-                                                const __VLS_129 = __VLS_128({ ...{}, class: ("reaction-emoji"), }, ...__VLS_functionalComponentArgsRest(__VLS_128));
+                                                const __VLS_122 = __VLS_intrinsicElements["span"];
+                                                const __VLS_123 = __VLS_elementAsFunctionalComponent(__VLS_122);
+                                                const __VLS_124 = __VLS_123({ ...{}, class: ("reaction-emoji"), }, ...__VLS_functionalComponentArgsRest(__VLS_123));
                                                 ({}({ ...{}, class: ("reaction-emoji"), }));
                                                 (reaction.emoji);
+                                                (__VLS_125.slots).default;
+                                                const __VLS_125 = __VLS_pickFunctionalComponentCtx(__VLS_122, __VLS_124);
+                                            }
+                                            {
+                                                const __VLS_127 = __VLS_intrinsicElements["span"];
+                                                const __VLS_128 = __VLS_elementAsFunctionalComponent(__VLS_127);
+                                                const __VLS_129 = __VLS_128({ ...{}, class: ("reaction-count"), }, ...__VLS_functionalComponentArgsRest(__VLS_128));
+                                                ({}({ ...{}, class: ("reaction-count"), }));
+                                                (reaction.count);
                                                 (__VLS_130.slots).default;
                                                 const __VLS_130 = __VLS_pickFunctionalComponentCtx(__VLS_127, __VLS_129);
                                             }
-                                            {
-                                                const __VLS_132 = __VLS_intrinsicElements["span"];
-                                                const __VLS_133 = __VLS_elementAsFunctionalComponent(__VLS_132);
-                                                const __VLS_134 = __VLS_133({ ...{}, class: ("reaction-count"), }, ...__VLS_functionalComponentArgsRest(__VLS_133));
-                                                ({}({ ...{}, class: ("reaction-count"), }));
-                                                (reaction.count);
-                                                (__VLS_135.slots).default;
-                                                const __VLS_135 = __VLS_pickFunctionalComponentCtx(__VLS_132, __VLS_134);
-                                            }
-                                            (__VLS_124.slots).default;
-                                            const __VLS_124 = __VLS_pickFunctionalComponentCtx(__VLS_121, __VLS_123);
-                                            let __VLS_125;
+                                            (__VLS_119.slots).default;
+                                            const __VLS_119 = __VLS_pickFunctionalComponentCtx(__VLS_116, __VLS_118);
+                                            let __VLS_120;
                                         }
                                     }
-                                    (__VLS_119.slots).default;
-                                    const __VLS_119 = __VLS_pickFunctionalComponentCtx(__VLS_116, __VLS_118);
-                                }
-                            }
-                            if (__VLS_ctx.isMe(msg) && msg.status === 'success') {
-                                {
-                                    const __VLS_137 = __VLS_intrinsicElements["div"];
-                                    const __VLS_138 = __VLS_elementAsFunctionalComponent(__VLS_137);
-                                    const __VLS_139 = __VLS_138({ ...{}, class: ("read-status-wrapper"), }, ...__VLS_functionalComponentArgsRest(__VLS_138));
-                                    ({}({ ...{}, class: ("read-status-wrapper"), }));
-                                    if (__VLS_ctx.channelType === 1) {
-                                        {
-                                            const __VLS_142 = __VLS_intrinsicElements["span"];
-                                            const __VLS_143 = __VLS_elementAsFunctionalComponent(__VLS_142);
-                                            const __VLS_144 = __VLS_143({ ...{}, class: ("read-status"), }, ...__VLS_functionalComponentArgsRest(__VLS_143));
-                                            ({}({ ...{}, class: ("read-status"), }));
-                                            ({ 'is-read': msg.remoteExtra?.readed });
-                                            __VLS_styleScopedClasses = ({ 'is-read': msg.remoteExtra?.readed });
-                                            (msg.remoteExtra?.readed ? '已读' : '未读');
-                                            (__VLS_145.slots).default;
-                                            const __VLS_145 = __VLS_pickFunctionalComponentCtx(__VLS_142, __VLS_144);
-                                        }
-                                        // @ts-ignore
-                                        [isMe, channelType,];
-                                    }
-                                    else if (__VLS_ctx.channelType === 2) {
-                                        {
-                                            const __VLS_147 = __VLS_intrinsicElements["span"];
-                                            const __VLS_148 = __VLS_elementAsFunctionalComponent(__VLS_147);
-                                            const __VLS_149 = __VLS_148({ ...{}, class: ("read-status"), }, ...__VLS_functionalComponentArgsRest(__VLS_148));
-                                            ({}({ ...{}, class: ("read-status"), }));
-                                            ({ 'is-read': (msg.remoteExtra?.readedCount || 0) > 0 });
-                                            __VLS_styleScopedClasses = ({ 'is-read': (msg.remoteExtra?.readedCount || 0) > 0 });
-                                            (msg.remoteExtra?.readedCount ? `${msg.remoteExtra.readedCount}人已读` : '未读');
-                                            (__VLS_150.slots).default;
-                                            const __VLS_150 = __VLS_pickFunctionalComponentCtx(__VLS_147, __VLS_149);
-                                        }
-                                        // @ts-ignore
-                                        [channelType,];
-                                    }
-                                    (__VLS_140.slots).default;
-                                    const __VLS_140 = __VLS_pickFunctionalComponentCtx(__VLS_137, __VLS_139);
+                                    (__VLS_114.slots).default;
+                                    const __VLS_114 = __VLS_pickFunctionalComponentCtx(__VLS_111, __VLS_113);
                                 }
                             }
                             (__VLS_39.slots).default;
@@ -577,13 +531,13 @@ function __VLS_template() {
         }
         if (__VLS_ctx.showMenu && __VLS_ctx.menuItems.length > 0) {
             {
-                const __VLS_152 = {}.ContextMenu;
-                const __VLS_153 = __VLS_asFunctionalComponent(__VLS_152, new __VLS_152({ ...{ 'onClose': {}, }, x: ((__VLS_ctx.menuX)), y: ((__VLS_ctx.menuY)), items: ((__VLS_ctx.menuItems)), reactions: ((__VLS_ctx.menuReactions)), }));
+                const __VLS_132 = {}.ContextMenu;
+                const __VLS_133 = __VLS_asFunctionalComponent(__VLS_132, new __VLS_132({ ...{ 'onClose': {}, }, x: ((__VLS_ctx.menuX)), y: ((__VLS_ctx.menuY)), items: ((__VLS_ctx.menuItems)), reactions: ((__VLS_ctx.menuReactions)), }));
                 ({}.ContextMenu);
-                const __VLS_154 = __VLS_153({ ...{ 'onClose': {}, }, x: ((__VLS_ctx.menuX)), y: ((__VLS_ctx.menuY)), items: ((__VLS_ctx.menuItems)), reactions: ((__VLS_ctx.menuReactions)), }, ...__VLS_functionalComponentArgsRest(__VLS_153));
+                const __VLS_134 = __VLS_133({ ...{ 'onClose': {}, }, x: ((__VLS_ctx.menuX)), y: ((__VLS_ctx.menuY)), items: ((__VLS_ctx.menuItems)), reactions: ((__VLS_ctx.menuReactions)), }, ...__VLS_functionalComponentArgsRest(__VLS_133));
                 ({}({ ...{ 'onClose': {}, }, x: ((__VLS_ctx.menuX)), y: ((__VLS_ctx.menuY)), items: ((__VLS_ctx.menuItems)), reactions: ((__VLS_ctx.menuReactions)), }));
-                let __VLS_157 = { 'close': __VLS_pickEvent(__VLS_156['close'], {}.onClose) };
-                __VLS_157 = { close: $event => {
+                let __VLS_137 = { 'close': __VLS_pickEvent(__VLS_136['close'], {}.onClose) };
+                __VLS_137 = { close: $event => {
                         if (!((__VLS_ctx.showMenu && __VLS_ctx.menuItems.length > 0)))
                             return;
                         __VLS_ctx.showMenu = false;
@@ -591,8 +545,8 @@ function __VLS_template() {
                         [showMenu, menuItems, menuX, menuY, menuItems, menuReactions, menuX, menuY, menuItems, menuReactions, menuX, menuY, menuItems, menuReactions, showMenu,];
                     }
                 };
-                const __VLS_155 = __VLS_pickFunctionalComponentCtx(__VLS_152, __VLS_154);
-                let __VLS_156;
+                const __VLS_135 = __VLS_pickFunctionalComponentCtx(__VLS_132, __VLS_134);
+                let __VLS_136;
             }
         }
         (__VLS_3.slots).default;
@@ -613,9 +567,6 @@ function __VLS_template() {
         __VLS_styleScopedClasses["reaction-badge"];
         __VLS_styleScopedClasses["reaction-emoji"];
         __VLS_styleScopedClasses["reaction-count"];
-        __VLS_styleScopedClasses["read-status-wrapper"];
-        __VLS_styleScopedClasses["read-status"];
-        __VLS_styleScopedClasses["read-status"];
     }
     var __VLS_slots;
     return __VLS_slots;
@@ -642,7 +593,7 @@ const __VLS_internalComponent = (await import('vue')).defineComponent({
             showMenu: showMenu,
             menuX: menuX,
             menuY: menuY,
-            messages: messages,
+            renderableMessages: renderableMessages,
             shouldShowTime: shouldShowTime,
             isMe: isMe,
             handleRightClick: handleRightClick,

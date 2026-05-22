@@ -42,6 +42,19 @@ const messages = computed(() => {
   return messageStore.messages[channelKey.value] || [];
 });
 
+const supportedMessageTypes = new Set([1, 2, 3, 4, 5, 6, 7, 8, 11, 12, 13, 1000]);
+
+function isRenderableMessage(msg: any): boolean {
+  if (!msg) return false;
+  if (msg.isRevoked) return true;
+  const type = Number(msg.content?.type || 0);
+  return supportedMessageTypes.has(type);
+}
+
+const renderableMessages = computed(() => {
+  return messages.value.filter(isRenderableMessage);
+});
+
 function scrollToBottom(behavior: 'auto' | 'smooth' = 'auto') {
   nextTick(() => {
     if (scrollContainer.value) {
@@ -70,7 +83,7 @@ watch(messages, (newMsgs) => {
 
 function shouldShowTime(msg: any, index: number): boolean {
   if (index === 0) return true;
-  const prevMsg = messages.value[index - 1];
+  const prevMsg = renderableMessages.value[index - 1];
   return (msg.timestamp - prevMsg.timestamp) > 300;
 }
 
@@ -156,7 +169,7 @@ const menuItems = computed(() => {
 
 <template>
   <div ref="scrollContainer" class="message-list">
-    <div v-for="(msg, idx) in messages" :key="msg.clientMsgNo || msg.messageID" class="message-row-wrapper">
+    <div v-for="(msg, idx) in renderableMessages" :key="msg.clientMsgNo || msg.messageID" class="message-row-wrapper">
       <TimeCell v-if="shouldShowTime(msg, idx)" :timestamp="msg.timestamp" />
 
       <div 
@@ -245,11 +258,6 @@ const menuItems = computed(() => {
             :message="msg" 
             :is-me="isMe(msg)" 
           />
-          <SystemCell 
-            v-else 
-            :message="msg" 
-          />
-
           <!-- Reactions Bar -->
           <div v-if="msg.reactions && msg.reactions.length > 0" class="reactions-bar">
             <div 
@@ -263,15 +271,6 @@ const menuItems = computed(() => {
             </div>
           </div>
 
-          <!-- Read status indicator for sent messages -->
-          <div v-if="isMe(msg) && msg.status === 'success'" class="read-status-wrapper">
-            <span v-if="channelType === 1" class="read-status" :class="{ 'is-read': msg.remoteExtra?.readed }">
-              {{ msg.remoteExtra?.readed ? '已读' : '未读' }}
-            </span>
-            <span v-else-if="channelType === 2" class="read-status" :class="{ 'is-read': (msg.remoteExtra?.readedCount || 0) > 0 }">
-              {{ msg.remoteExtra?.readedCount ? `${msg.remoteExtra.readedCount}人已读` : '未读' }}
-            </span>
-          </div>
         </div>
       </div>
     </div>
@@ -408,17 +407,4 @@ const menuItems = computed(() => {
   font-weight: 500;
 }
 
-/* Read Status */
-.read-status-wrapper {
-  margin-top: 1px;
-}
-
-.read-status {
-  font-size: 10px;
-  color: var(--text-secondary);
-}
-
-.read-status.is-read {
-  color: var(--primary-color, #165dff);
-}
 </style>
