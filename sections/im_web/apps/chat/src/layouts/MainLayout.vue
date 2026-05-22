@@ -7,9 +7,11 @@ import { useKickoutStore } from '@tsdaodao/datasource-vue';
 import { KickoutOverlay, ChannelAvatar } from '@tsdaodao/base-vue';
 import ConversationList from '../views/ConversationList.vue';
 import { ContactList } from '@tsdaodao/contacts-vue';
+import SearchResultList from '../components/SearchResultList.vue';
 
 // Placeholders for contacts view
 const activeTab = ref<'chats' | 'contacts'>('chats');
+const searchQuery = ref('');
 
 const router = useRouter();
 const userStore = useUserStore();
@@ -59,6 +61,25 @@ function handleKickoutRelogin() {
         </button>
       </div>
 
+      <!-- Search Input -->
+      <div class="sidebar-search">
+        <div class="search-input-wrapper">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" class="search-icon">
+            <circle cx="11" cy="11" r="8" />
+            <line x1="21" y1="21" x2="16.65" y2="16.65" />
+          </svg>
+          <input 
+            v-model="searchQuery" 
+            type="text" 
+            placeholder="搜索会话/联系人/聊天记录..." 
+            class="search-input"
+          />
+          <button v-if="searchQuery" class="clear-search-btn" @click="searchQuery = ''">
+            ✕
+          </button>
+        </div>
+      </div>
+
       <!-- Tab Switcher -->
       <div class="tab-switcher">
         <button 
@@ -79,8 +100,11 @@ function handleKickoutRelogin() {
 
       <!-- List container -->
       <div class="sidebar-content">
-        <ConversationList v-if="activeTab === 'chats'" />
-        <ContactList v-else />
+        <SearchResultList v-if="searchQuery" :query="searchQuery" @select="searchQuery = ''" />
+        <template v-else>
+          <ConversationList v-if="activeTab === 'chats'" />
+          <ContactList v-else />
+        </template>
       </div>
     </div>
 
@@ -226,5 +250,67 @@ function handleKickoutRelogin() {
   padding: 16px;
   background-color: var(--bg-secondary);
   font-size: 12px;
+}
+
+/* Sidebar Search Styling */
+.sidebar-search {
+  padding: 10px 16px;
+  background-color: var(--bg-primary);
+  border-bottom: var(--border-hairline);
+}
+
+.search-input-wrapper {
+  position: relative;
+  display: flex;
+  align-items: center;
+  width: 100%;
+}
+
+.search-icon {
+  position: absolute;
+  left: 10px;
+  width: 14px;
+  height: 14px;
+  color: var(--text-secondary);
+  pointer-events: none;
+  opacity: 0.6;
+}
+
+.search-input {
+  width: 100%;
+  height: 32px;
+  padding: 0 32px 0 32px;
+  background-color: var(--bg-secondary);
+  border: var(--border-hairline);
+  border-radius: var(--radius-sm);
+  font-size: 12.5px;
+  color: var(--text-primary);
+  outline: none;
+  transition: border-color 0.2s, background-color 0.2s;
+}
+
+.search-input:focus {
+  border-color: var(--primary-color, #165dff);
+  background-color: var(--bg-primary);
+}
+
+.clear-search-btn {
+  position: absolute;
+  right: 10px;
+  background: none;
+  border: none;
+  color: var(--text-secondary);
+  cursor: pointer;
+  padding: 2px;
+  font-size: 11px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 50%;
+}
+
+.clear-search-btn:hover {
+  background-color: var(--bg-hover);
+  color: var(--text-primary);
 }
 </style>
