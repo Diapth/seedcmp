@@ -8,10 +8,12 @@ import { KickoutOverlay, ChannelAvatar } from '@tsdaodao/base-vue';
 import ConversationList from '../views/ConversationList.vue';
 import { ContactList } from '@tsdaodao/contacts-vue';
 import SearchResultList from '../components/SearchResultList.vue';
+import MyProfileDrawer from '../views/MyProfileDrawer.vue';
 
 // Placeholders for contacts view
 const activeTab = ref<'chats' | 'contacts'>('chats');
 const searchQuery = ref('');
+const showMyProfileDrawer = ref(false);
 
 const router = useRouter();
 const userStore = useUserStore();
@@ -42,7 +44,7 @@ function handleKickoutRelogin() {
     <div class="sidebar">
       <!-- Profile & Top Bar -->
       <div class="sidebar-header">
-        <div class="user-profile">
+        <div class="user-profile" @click="showMyProfileDrawer = true">
           <ChannelAvatar 
             :name="userStore.currentUser?.name" 
             :size="36" 
@@ -115,6 +117,9 @@ function handleKickoutRelogin() {
 
     <!-- Kickout Overlay -->
     <KickoutOverlay :visible="kickoutStore.isKickedOut" @relogin="handleKickoutRelogin" />
+
+    <!-- My Profile & Settings Drawer -->
+    <MyProfileDrawer :visible="showMyProfileDrawer" @close="showMyProfileDrawer = false" />
   </div>
 </template>
 
@@ -152,6 +157,14 @@ function handleKickoutRelogin() {
   align-items: center;
   gap: 10px;
   overflow: hidden;
+  cursor: pointer;
+  padding: 4px;
+  border-radius: var(--radius-sm);
+  transition: background-color 0.2s;
+}
+
+.user-profile:hover {
+  background-color: var(--bg-hover);
 }
 
 .user-info {
