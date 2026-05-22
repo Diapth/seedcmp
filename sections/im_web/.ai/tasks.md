@@ -149,19 +149,19 @@ description: "TangSengDaoDaoWeb Vue 3 极简重构 — 依赖有序的任务拆�
 
 **Purpose**: 在 IM 核心基础上扩展消息类型和交互能力
 
-- [ ] T044 [P] [US1-ext] 在 base-vue 中创建 `src/components/messages/VoiceCell.vue`，语音消息气泡（type=4）：使用 howler.js 播放音频，显示时长，集成 MediaMessageContent 解析（SDK 已有）
-- [ ] T045 [P] [US1-ext] 在 base-vue 中创建 `src/components/messages/FileCell.vue`，文件消息气泡（type=8）：文件名+大小+下载按钮，POST /file/upload（GET ?path=...&type=... 获取上传路径后再 POST multipart）
-- [ ] T046 [P] [US1-ext] 在 base-vue 中创建 `src/components/messages/VideoCell.vue`，视频消息气泡（type=5）：缩略图+时长，点击播放
-- [ ] T047 [P] [US1-ext] 在 base-vue 中创建 `src/components/messages/GifCell.vue`，GIF 消息气泡（type=3）：直接渲染动态图
-- [ ] T048 [P] [US1-ext] 在 base-vue 中创建 `src/components/messages/StickerCell.vue`，表情贴纸消息（type=12/13, lottieSticker）：Lottie 动画渲染（@lottiefiles/lottie-vue）
-- [ ] T049 [P] [US1-ext] 在 base-vue 中创建 `src/components/messages/LocationCell.vue`，位置消息气泡（type=6）：显示位置名称和地图占位（实际地图 SDK 暂不接入）
-- [ ] T050 [P] [US1-ext] 在 base-vue 中创建 `src/components/messages/CardCell.vue`，名片消息气泡（type=7）：用户/群组名片卡片
-- [ ] T051 [P] [US1-ext] 在 base-vue 中创建 `src/components/messages/MergeCell.vue`，合并转发消息气泡（type=11）：显示"N条合并消息"标题，点击展开转发详情
-- [ ] T052 [US1-ext] 实现 @提及功能（在 `apps/chat/src/components/MessageInput.vue` 和 `apps/chat/src/components/MessageList.vue` 中）：MessageInput 支持 @ 触发成员选择列表，消息内容携带 mentionUids 字段，MessageList 渲染时高亮 @到的用户
-- [ ] T053 [US1-ext] 实现消息回应（Reaction）（在 `apps/chat/src/components/MessageList.vue` 和 `datasource-vue/src/api/index.ts` 中）：在 TextCell 等气泡下方渲染 emoji 反应数。**✅ endpoint 已确认**（TangSengDaoDaoServer modules/message/api.go:116-124）：`POST /v1/reactions`（添加/取消）、`POST /v1/reaction/sync`（增量同步）
-- [ ] T054 [US1-ext] 实现已读回执（在 `datasource-vue/src/stores/messageStore.ts` 中）：追踪已读状态，PUT /message/readed 发送已读，MessageList 中消息气泡显示"已读/未读"标记
-- [ ] T055 [US1-ext] 实现消息引用（回复）（在 `apps/chat/src/components/MessageInput.vue` 和 `apps/chat/src/components/MessageList.vue` 中）：MessageInput 显示回复预览条（回复的用户名+内容），消息内容携带 quote 字段，MessageList 渲染时显示引用块并支持点击跳转
-- [ ] T056 [US1-ext] 实现全局搜索（在 `apps/chat/src/views/SearchResultPage.vue` 和 `datasource-vue/src/api/index.ts` 中）：POST /search/global（body: {keyword, content_type: 1|2|3|4 区分消息/联系人/群组/聊天记录}），搜索结果页展示分类列表
+- [X] T044 [P] [US1-ext] 在 base-vue 中创建 `src/components/messages/VoiceCell.vue`，语音消息气泡（type=4）：使用 howler.js 播放音频，显示时长，集成 MediaMessageContent 解析（SDK 已有）
+- [X] T045 [P] [US1-ext] 在 base-vue 中创建 `src/components/messages/FileCell.vue`，文件消息气泡（type=8）：文件名+大小+下载按钮，POST /file/upload（GET ?path=...&type=... 获取上传路径后再 POST multipart）
+- [X] T046 [P] [US1-ext] 在 base-vue 中创建 `src/components/messages/VideoCell.vue`，视频消息气泡（type=5）：缩略图+时长，点击播放
+- [X] T047 [P] [US1-ext] 在 base-vue 中创建 `src/components/messages/GifCell.vue`，GIF 消息气泡（type=3）：直接渲染动态图
+- [X] T048 [P] [US1-ext] 在 base-vue 中创建 `src/components/messages/StickerCell.vue`，表情贴纸消息（type=12/13, lottieSticker）：Lottie 动画渲染（@lottiefiles/lottie-vue）
+- [X] T049 [P] [US1-ext] 在 base-vue 中创建 `src/components/messages/LocationCell.vue`，位置消息气泡（type=6）：显示位置名称和地图占位（实际地图 SDK 暂不接入）
+- [X] T050 [P] [US1-ext] 在 base-vue 中创建 `src/components/messages/CardCell.vue`，名片消息气泡（type=7）：用户/群组名片卡片
+- [X] T051 [P] [US1-ext] 在 base-vue 中创建 `src/components/messages/MergeCell.vue`，合并转发消息气泡（type=11）：显示"N条合并消息"标题，点击展开转发详情
+- [X] T052 [US1-ext] 实现 @提及功能（在 `apps/chat/src/components/MessageInput.vue` 和 `apps/chat/src/components/MessageList.vue` 中）：MessageInput 支持 @ 触发成员选择列表，消息内容携带 mentionUids 字段，MessageList 渲染时高亮 @到的用户
+- [X] T053 [US1-ext] 实现消息回应（Reaction）（在 `apps/chat/src/components/MessageList.vue` 和 `datasource-vue/src/api/index.ts` 中）：在 TextCell 等气泡下方渲染 emoji 反应数。**✅ endpoint 已确认**（TangSengDaoDaoServer modules/message/api.go:116-124）：`POST /v1/reactions`（添加/取消）、`POST /v1/reaction/sync`（增量同步）
+- [X] T054 [US1-ext] 实现已读回执（在 `datasource-vue/src/stores/messageStore.ts` 中）：追踪已读状态，PUT /message/readed 发送已读，MessageList 中消息气泡显示"已读/未读"标记
+- [X] T055 [US1-ext] 实现消息引用（回复）（在 `apps/chat/src/components/MessageInput.vue` 和 `apps/chat/src/components/MessageList.vue` 中）：MessageInput 显示回复预览条（回复 of 用户名+内容），消息内容携带 quote 字段，MessageList 渲染时显示引用块并支持点击跳转
+- [X] T056 [US1-ext] 实现全局搜索（在 `apps/chat/src/views/SearchResultPage.vue` 和 `datasource-vue/src/api/index.ts` 中）：POST /search/global（body: {keyword, content_type: 1|2|3|4 区分消息/联系人/群组/聊天记录}），搜索结果页展示分类列表
 
 **Checkpoint**: Phase 6 完成——所有消息类型和交互功能就绪
 
@@ -171,9 +171,9 @@ description: "TangSengDaoDaoWeb Vue 3 极简重构 — 依赖有序的任务拆�
 
 **Purpose**: 用户资料设置、通知偏好、设备管理
 
-- [ ] T057 [P] [US1-ext] 在 apps/chat 中创建 `src/views/MePage.vue`，个人中心主页：头像（ChannelAvatar）、昵称、ID 号、二维码（GET /user/qrcode）
-- [ ] T058 [P] [US1-ext] 在 apps/chat 中创建 `src/views/EditProfilePage.vue`，编辑资料页：PUT /user/current 修改昵称，POST /users/:uid/avatar 上传头像
-- [ ] T059 [P] [US1-ext] 在 apps/chat 中创建 `src/views/SettingsPage.vue`，设置页：通过 `document.body.setAttribute('data-theme', 'dark')` 切换深色模式（plan.md §1.4 规范），通知设置、语言设置、关于
+- [X] T057 [P] [US1-ext] 在 apps/chat 中创建 `src/views/MePage.vue`，个人中心主页：头像（ChannelAvatar）、昵称、ID 号、二维码（GET /user/qrcode）
+- [X] T058 [P] [US1-ext] 在 apps/chat 中创建 `src/views/EditProfilePage.vue`，编辑资料页：PUT /user/current 修改昵称，POST /users/:uid/avatar 上传头像
+- [X] T059 [P] [US1-ext] 在 apps/chat 中创建 `src/views/SettingsPage.vue`，设置页：通过 `document.body.setAttribute('data-theme', 'dark')` 切换深色模式（plan.md §1.4 规范），通知设置、语言设置、关于
 - [ ] T060 [P] [US1-ext] 在 apps/chat 中创建 `src/views/DeviceManagementPage.vue`，设备管理页：GET /user/devices 列出登录设备，DELETE /user/devices/:deviceId 移除设备，POST /user/quit 退出其他设备
 - [ ] T061 [US1-ext] 实现通知功能（在 `datasource-vue/src/api/index.ts` 和 `apps/chat/src/stores/settingsStore.ts` 中）：PUT /v1/user/device_token 注册推送 token（TangSengDaoDaoServer modules/user/api.go）；**badge** `POST /v1/user/device_badge`（写入，无 GET 读取端，badge 由 WebSocket 推送更新）；**无独立隐身开关**，WebSocket 连接状态隐式表达用户在线状态
 
