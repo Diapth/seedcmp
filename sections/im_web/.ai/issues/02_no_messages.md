@@ -78,3 +78,68 @@ corepack pnpm -r exec vue-tsc --noEmit
 有聊天消息的气泡了，但是没有具体内容
 
 ![](imgs/02_1.png)
+
+## 再次根因分析
+
+这次链路已经比上一次更靠后：消息气泡能出现，说明历史/实时消息已经进入 `messageStore`，`MessageList` 也识别到了 `msg.content.type === 1` 并渲染了 `TextCell`。
+
+真正的问题在文本字段名：
+
+- WKSDK 的 `MessageText.encodeJSON()` 返回的是：
+  ```ts
+  { content: this.text || '' }
+  ```
+- WKSDK 的 `MessageText.decodeJSON()` 也是从 `content["content"]` 读取文本。
+- 但当前 Vue 组件 `TextCell.vue`、搜索和回复预览都读取 `msg.content.text`。
+
+所以消息内容实际类似：
+
+```ts
+{ type: 1, content: "hello" }
+```
+
+但 UI 读取的是：
+
+```ts
+msg.content.text
+```
+
+结果就是“气泡有了，但文字为空”。
+
+## 再次修复记录（2026-05-22）
+
+已在 `packages/datasource-vue/src/stores/messageStore.ts` 和同名 `.js` 里统一修复：
+
+1. 新增 `normalizeMessageContent()`。
+2. 历史消息 `normalizeSyncedPayload()` 和实时消息 `normalizeContent()` 都会调用它。
+3. 当文本消息满足 `type === 1`，且只有 `content` 字段没有 `text` 字段时，自动补齐：
+   ```ts
+   normalized.text = normalized.content;
+   ```
+
+这样不需要每个 UI 组件分别兼容 `content/text` 两套字段，进入 store 后统一变成 UI 可读的结构：
+
+```ts
+{ type: 1, content: "hello", text: "hello" }
+```
+
+## 再次测试结果
+
+已运行并通过：
+
+```bash
+node sections/im_web/.ai/checks/verify-no-messages-issues.mjs
+# no-messages issue checks passed
+```
+
+```bash
+corepack pnpm -r exec vue-tsc --noEmit
+# exit 0
+```
+
+```bash
+./node_modules/.bin/vue-tsc --noEmit && ./node_modules/.bin/vite build apps/chat
+# exit 0
+```
+
+备注：Vite 构建仍有 CJS API deprecation 提示和 chunk size warning，但构建通过。
