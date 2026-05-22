@@ -3,7 +3,7 @@ import { StorageService } from './StorageService';
 import { eventBus } from './EventBus';
 
 export const apiClient = axios.create({
-  baseURL: 'http://127.0.0.1:8090/v1/',
+  baseURL: 'http://100.79.157.76:8090/v1/',
   timeout: 10000,
 });
 

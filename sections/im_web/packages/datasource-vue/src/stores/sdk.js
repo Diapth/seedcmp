@@ -51,11 +51,11 @@ export const useSdkStore = defineStore('sdk', () => {
         WKSDK.shared().config.provider.connectAddrCallback = async (cb) => {
             try {
                 const res = await apiClient.get(`users/${uid}/im`);
-                cb(res.ws_addr || 'ws://127.0.0.1:5200');
+                cb(res.ws_addr || 'ws://100.79.157.76:5200');
             }
             catch (err) {
                 console.error('[SDK] Failed to get connect address, falling back', err);
-                cb('ws://127.0.0.1:5200');
+                cb('ws://100.79.157.76:5200');
             }
         };
         // Connection status listener
