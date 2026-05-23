@@ -30,6 +30,7 @@ export interface Reaction {
 export const useMessageStore = defineStore('message', () => {
   const messages = ref<Record<string, Message[]>>({});
   const typingState = ref<Record<string, { timer: any; isTyping: boolean }>>({});
+  const resetVersion = ref(0);
 
   const conversationStore = useConversationStore();
   const userStore = useUserStore();
@@ -104,6 +105,7 @@ export const useMessageStore = defineStore('message', () => {
   }
 
   async function syncMessages(channelId: string, channelType: number) {
+    const version = resetVersion.value;
     const key = `${channelId}-${channelType}`;
     const list = messages.value[key] || [];
     const startSeq = list.length > 0 ? list[list.length - 1].messageSeq : 0;
@@ -118,6 +120,7 @@ export const useMessageStore = defineStore('message', () => {
         pull_mode: 1
       });
 
+      if (version !== resetVersion.value) return;
       if (res && Array.isArray(res.messages)) {
         const synced: Message[] = res.messages.filter((item: any) => item.is_deleted !== 1).map((item: any) => {
           const remoteExtra = normalizeRemoteExtra(item.message_extra);
@@ -237,6 +240,7 @@ export const useMessageStore = defineStore('message', () => {
   }
 
   async function revokeMessage(channelId: string, channelType: number, clientMsgNo: string, messageId: string) {
+    const version = resetVersion.value;
     try {
       await syncApi.revokeMessage({
         channel_id: channelId,
@@ -245,6 +249,7 @@ export const useMessageStore = defineStore('message', () => {
         client_msg_no: clientMsgNo
       });
 
+      if (version !== resetVersion.value) return;
       handleMessageRevoked(channelId, channelType, clientMsgNo);
     } catch (e) {
       console.error('[MessageStore] Failed to revoke message', e);
@@ -296,6 +301,7 @@ export const useMessageStore = defineStore('message', () => {
       throw new Error('Message ID is required to update reactions.');
     }
 
+    const version = resetVersion.value;
     await syncApi.addReaction({
       channel_id: channelId,
       channel_type: channelType,
@@ -303,6 +309,7 @@ export const useMessageStore = defineStore('message', () => {
       emoji
     });
 
+    if (version !== resetVersion.value) return;
     applyReactionToggle(msg, emoji, userStore.currentUser?.uid || '');
   }
 
@@ -331,6 +338,7 @@ export const useMessageStore = defineStore('message', () => {
     }
   ) {
     let sentMessage: WKMessage | undefined;
+    const version = resetVersion.value;
     try {
       const channel = WKSDK.shared().newChannel(channelId, channelType);
       const textMsg = WKSDK.shared().newMessageText(text);
@@ -342,6 +350,7 @@ export const useMessageStore = defineStore('message', () => {
       }
 
       const res = await WKSDK.shared().chatManager.send(textMsg, channel);
+      if (version !== resetVersion.value) return;
       if (res) {
         sentMessage = res;
         addRealtimeMessage(channelId, channelType, res);
@@ -361,6 +370,18 @@ export const useMessageStore = defineStore('message', () => {
     replyTarget.value = msg;
   }
 
+  function reset() {
+    resetVersion.value++;
+    messages.value = {};
+    for (const key of Object.keys(typingState.value)) {
+      if (typingState.value[key]?.timer) {
+        clearTimeout(typingState.value[key].timer);
+      }
+    }
+    typingState.value = {};
+    replyTarget.value = null;
+  }
+
   return {
     messages,
     typingState,
@@ -375,6 +396,7 @@ export const useMessageStore = defineStore('message', () => {
     sendMessage,
     addRealtimeMessage,
     updateMessageStatus,
-    setReplyTarget
+    setReplyTarget,
+    reset
   };
 });

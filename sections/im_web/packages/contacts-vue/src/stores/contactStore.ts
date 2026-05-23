@@ -21,6 +21,9 @@ export const useContactStore = defineStore('contact', () => {
   const friendRequestUnreadCount = ref(0);
   const isFriendRequestsLoading = ref(false);
   let contactSyncRequestId = 0;
+  let friendRequestRequestId = 0;
+  let unreadCountRequestId = 0;
+  let blacklistRequestId = 0;
 
   function getUnreadStorageKey() {
     const uid = StorageService.get('uid') || '';
@@ -64,12 +67,14 @@ export const useContactStore = defineStore('contact', () => {
   }
 
   async function fetchFriendRequests() {
+    const requestId = ++friendRequestRequestId;
     isFriendRequestsLoading.value = true;
     try {
       const res: any = await friendApi.getFriendApplies({
         page_index: 1,
         page_size: 999
       });
+      if (requestId !== friendRequestRequestId) return [];
       // 后端返回直接数组或 { list: [...] } 结构
       const list = Array.isArray(res) ? res : (res?.list || []);
       friendRequests.value = list.map((item: any) => ({
@@ -88,13 +93,17 @@ export const useContactStore = defineStore('contact', () => {
       console.error('Failed to fetch friend requests', e);
       return [];
     } finally {
-      isFriendRequestsLoading.value = false;
+      if (requestId === friendRequestRequestId) {
+        isFriendRequestsLoading.value = false;
+      }
     }
   }
 
   async function refreshFriendRequestUnreadCount() {
+    const requestId = ++unreadCountRequestId;
     try {
       const res: any = await userApi.getReddot('friendApply');
+      if (requestId !== unreadCountRequestId) return;
       setFriendRequestUnreadCount(res?.count || 0);
     } catch (e) {
       console.error('Failed to refresh friend request unread count', e);
@@ -119,8 +128,10 @@ export const useContactStore = defineStore('contact', () => {
 
   // Get blacklists
   async function fetchBlacklist() {
+    const requestId = ++blacklistRequestId;
     try {
       const res: any = await friendApi.getBlacklist();
+      if (requestId !== blacklistRequestId) return;
       // friend/blacklists 返回直接数组
       blacklist.value = Array.isArray(res) ? res : (res?.list || []);
     } catch (e) {
@@ -192,6 +203,21 @@ export const useContactStore = defineStore('contact', () => {
       fetchFriendRequests();
       refreshFriendRequestUnreadCount();
     });
+    window.addEventListener('tsdaodao:logout', () => {
+      reset();
+    });
+  }
+
+  function reset() {
+    contactSyncRequestId++;
+    friendRequestRequestId++;
+    unreadCountRequestId++;
+    blacklistRequestId++;
+    contacts.value = [];
+    friendRequests.value = [];
+    blacklist.value = [];
+    version.value = 0;
+    friendRequestUnreadCount.value = 0;
   }
 
   return {
@@ -206,6 +232,7 @@ export const useContactStore = defineStore('contact', () => {
     refreshFriendRequestUnreadCount,
     markFriendRequestsRead,
     markFriendRequestAccepted,
-    groupedContacts
+    groupedContacts,
+    reset
   };
 });

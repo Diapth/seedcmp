@@ -2,6 +2,8 @@
 import { ref, onMounted, computed } from 'vue';
 import { useGroupStore } from '@tsdaodao/datasource-vue';
 import { useUserStore } from '@tsdaodao/datasource-vue';
+import { useConversationStore } from '@tsdaodao/datasource-vue';
+import { getMyGroupRole } from '@tsdaodao/datasource-vue';
 import { groupApi } from '@tsdaodao/datasource-vue';
 import ChannelAvatar from './ChannelAvatar.vue';
 import { Message } from '@arco-design/web-vue';
@@ -15,9 +17,11 @@ const emit = defineEmits(['close', 'members-click']);
 
 const groupStore = useGroupStore();
 const userStore = useUserStore();
+const conversationStore = useConversationStore();
 
 const groupInfo = computed(() => groupStore.groups[props.groupNo]);
 const members = computed(() => groupStore.groupMembers[props.groupNo] || []);
+const avatarInputRef = ref<HTMLInputElement | null>(null);
 
 const editingName = ref(false);
 const newName = ref('');
@@ -25,7 +29,20 @@ const editingNotice = ref(false);
 const newNotice = ref('');
 
 const isOwner = computed(() => {
-  return groupInfo.value?.owner === userStore.currentUser?.uid;
+  return getMyGroupRole(groupInfo.value, userStore.currentUser?.uid) === 1;
+});
+
+const canManageGroup = computed(() => {
+  return getMyGroupRole(groupInfo.value, userStore.currentUser?.uid) >= 1;
+});
+
+const roleSummary = computed(() => {
+  return members.value.reduce((acc: Record<string, number>, member: any) => {
+    if (Number(member.role || 0) === 1) acc.owner += 1;
+    else if (Number(member.role || 0) === 2) acc.admin += 1;
+    else acc.member += 1;
+    return acc;
+  }, { owner: 0, admin: 0, member: 0 });
 });
 
 onMounted(async () => {
@@ -41,6 +58,7 @@ async function saveGroupName() {
     await groupApi.updateGroupInfo(props.groupNo, { name: newName.value });
     Message.success('群名修改成功');
     if (groupInfo.value) groupInfo.value.name = newName.value;
+    conversationStore.ensureGroupConversations();
     editingName.value = false;
   } catch (err: any) {
     Message.error(err.msg || '修改失败');
@@ -58,10 +76,58 @@ async function saveGroupNotice() {
   }
 }
 
+function openAvatarPicker() {
+  if (!isOwner.value) return;
+  avatarInputRef.value?.click();
+}
+
+async function handleAvatarChange(event: Event) {
+  const target = event.target as HTMLInputElement;
+  const file = target.files?.[0];
+  if (!file) return;
+
+  const formData = new FormData();
+  formData.append('file', file);
+  try {
+    await groupApi.uploadAvatar(props.groupNo, formData);
+    Message.success('群头像已更新');
+    await groupStore.getGroupInfo(props.groupNo);
+  } catch (err: any) {
+    Message.error(err.msg || '头像上传失败');
+  } finally {
+    target.value = '';
+  }
+}
+
+async function togglePin() {
+  await conversationStore.togglePin(props.groupNo, 2, Number(groupInfo.value?.top || 0) !== 1);
+  if (groupInfo.value) groupInfo.value.top = Number(groupInfo.value.top || 0) === 1 ? 0 : 1;
+}
+
+async function toggleMute() {
+  await conversationStore.toggleMute(props.groupNo, 2, Number(groupInfo.value?.mute || 0) !== 1);
+  if (groupInfo.value) groupInfo.value.mute = Number(groupInfo.value.mute || 0) === 1 ? 0 : 1;
+}
+
+async function inviteMembersPrompt() {
+  const raw = window.prompt('输入要邀请的用户 UID，多个 UID 用英文逗号分隔');
+  const membersToInvite = raw?.split(',').map(item => item.trim()).filter(Boolean) || [];
+  if (membersToInvite.length === 0) return;
+
+  try {
+    await groupApi.inviteMembers(props.groupNo, membersToInvite);
+    Message.success('邀请已发送');
+    await groupStore.fetchGroupMembers(props.groupNo);
+  } catch (err: any) {
+    Message.error(err.msg || '邀请失败');
+  }
+}
+
 async function handleDisband() {
   try {
     await groupApi.disbandGroup(props.groupNo);
     Message.success('群组已解散');
+    await conversationStore.deleteConversation(props.groupNo, 2);
     emit('close');
   } catch (err: any) {
     Message.error(err.msg || '操作失败');
@@ -72,6 +138,7 @@ async function handleExit() {
   try {
     await groupApi.exitGroup(props.groupNo);
     Message.success('已退出群聊');
+    await conversationStore.deleteConversation(props.groupNo, 2);
     emit('close');
   } catch (err: any) {
     Message.error(err.msg || '操作失败');
@@ -101,6 +168,14 @@ async function handleExit() {
             :is-group="true" 
             :size="64" 
           />
+          <input
+            ref="avatarInputRef"
+            type="file"
+            accept="image/*"
+            class="hidden-input"
+            @change="handleAvatarChange"
+          />
+          <button v-if="isOwner" class="avatar-btn" @click="openAvatarPicker">更换头像</button>
           
           <div class="info-fields">
             <!-- Group Name -->
@@ -108,7 +183,7 @@ async function handleExit() {
               <span class="field-label">群名称</span>
               <div v-if="!editingName" class="field-value-row">
                 <span class="field-value">{{ groupInfo?.name }}</span>
-                <button v-if="isOwner" class="edit-btn" @click="editingName = true; newName = groupInfo?.name || ''">
+                <button v-if="canManageGroup" class="edit-btn" @click="editingName = true; newName = groupInfo?.name || ''">
                   修改
                 </button>
               </div>
@@ -123,7 +198,7 @@ async function handleExit() {
               <span class="field-label">群公告</span>
               <div v-if="!editingNotice" class="field-value-row">
                 <span class="field-value empty-notice">{{ groupInfo?.notice || '未设置群公告' }}</span>
-                <button v-if="isOwner" class="edit-btn" @click="editingNotice = true; newNotice = groupInfo?.notice || ''">
+                <button v-if="canManageGroup" class="edit-btn" @click="editingNotice = true; newNotice = groupInfo?.notice || ''">
                   修改
                 </button>
               </div>
@@ -141,12 +216,30 @@ async function handleExit() {
             <span>群成员 ({{ members.length }}人)</span>
             <button class="view-all-btn">查看全部</button>
           </div>
+          <div class="role-summary">
+            <span>群主 {{ roleSummary.owner }}</span>
+            <span>管理员 {{ roleSummary.admin }}</span>
+            <span>成员 {{ roleSummary.member }}</span>
+          </div>
           <div class="members-grid">
             <div v-for="m in members.slice(0, 8)" :key="m.uid" class="member-item">
               <ChannelAvatar :avatar="m.avatar" :name="m.name" :size="32" />
-              <span class="member-name">{{ m.name }}</span>
+              <span class="member-name">{{ m.display_name || m.name }}</span>
+              <span v-if="m.role_label !== '成员'" class="member-role">{{ m.role_label }}</span>
             </div>
           </div>
+        </div>
+
+        <div class="quick-actions">
+          <button class="secondary-action-btn" @click="togglePin">
+            {{ Number(groupInfo?.top || 0) === 1 ? '取消置顶' : '置顶群聊' }}
+          </button>
+          <button class="secondary-action-btn" @click="toggleMute">
+            {{ Number(groupInfo?.mute || 0) === 1 ? '关闭免打扰' : '消息免打扰' }}
+          </button>
+          <button class="secondary-action-btn" @click="inviteMembersPrompt">
+            邀请成员
+          </button>
         </div>
 
         <!-- Group Actions -->
@@ -230,6 +323,21 @@ async function handleExit() {
   gap: 16px;
   border-bottom: var(--border-hairline);
   padding-bottom: 24px;
+}
+
+.hidden-input {
+  display: none;
+}
+
+.avatar-btn {
+  height: 28px;
+  padding: 0 10px;
+  background-color: var(--bg-secondary);
+  color: var(--text-primary);
+  border: var(--border-hairline);
+  border-radius: var(--radius-sm);
+  font-size: 12px;
+  cursor: pointer;
 }
 
 .info-fields {
@@ -354,6 +462,14 @@ async function handleExit() {
   gap: 12px;
 }
 
+.role-summary {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+  font-size: 11px;
+  color: var(--text-secondary);
+}
+
 .member-item {
   display: flex;
   flex-direction: column;
@@ -369,6 +485,29 @@ async function handleExit() {
   text-overflow: ellipsis;
   width: 100%;
   text-align: center;
+}
+
+.member-role {
+  font-size: 10px;
+  color: var(--primary-color, #165dff);
+}
+
+.quick-actions {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+  border-bottom: var(--border-hairline);
+  padding-bottom: 24px;
+}
+
+.secondary-action-btn {
+  height: 34px;
+  background-color: var(--bg-secondary);
+  color: var(--text-primary);
+  border: var(--border-hairline);
+  border-radius: var(--radius-sm);
+  font-size: 12px;
+  cursor: pointer;
 }
 
 .danger-zone {

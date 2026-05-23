@@ -35,6 +35,7 @@ onMounted(async () => {
   if (conversationStore.conversations.length === 0) {
     loading.value = true;
     try {
+      await conversationStore.syncGroupConversations();
       await conversationStore.syncConversations();
     } catch (e) {
       console.error(e);
@@ -92,6 +93,30 @@ async function handleDeleteConversation() {
 }
 
 const contextMenuItems = [
+  {
+    label: '置顶 / 取消置顶',
+    action: () => {
+      if (!selectedConversation.value) return;
+      void conversationStore.togglePin(
+        selectedConversation.value.channel_id,
+        selectedConversation.value.channel_type,
+        Number(selectedConversation.value.top || 0) !== 1
+      );
+      selectedConversation.value = null;
+    }
+  },
+  {
+    label: '免打扰 / 取消免打扰',
+    action: () => {
+      if (!selectedConversation.value) return;
+      void conversationStore.toggleMute(
+        selectedConversation.value.channel_id,
+        selectedConversation.value.channel_type,
+        Number(selectedConversation.value.mute || 0) !== 1
+      );
+      selectedConversation.value = null;
+    }
+  },
   {
     label: '删除会话',
     danger: true,
@@ -266,6 +291,7 @@ function getDigest(conv: any): string {
             
             <div class="item-status">
               <span v-if="conv.top === 1" class="pin-dot" title="已置顶"></span>
+              <span v-if="conv.mute === 1" class="mute-dot" title="免打扰"></span>
               <span v-if="getUnreadCount(conv) > 0" class="unread-badge">
                 {{ getUnreadCount(conv) > 99 ? '99+' : getUnreadCount(conv) }}
               </span>
@@ -394,6 +420,14 @@ function getDigest(conv: any): string {
   height: 6px;
   background-color: var(--text-secondary);
   border-radius: 50%;
+}
+
+.mute-dot {
+  width: 6px;
+  height: 6px;
+  background-color: #86909c;
+  border-radius: 50%;
+  opacity: 0.7;
 }
 
 .unread-badge {

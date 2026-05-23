@@ -48,7 +48,10 @@ const filteredGroupMembers = computed(() => {
   const query = mentionQuery.value.toLowerCase();
   if (!query) return currentGroupMembers.value;
   return currentGroupMembers.value.filter(m => 
+    (m.display_name || '').toLowerCase().includes(query) ||
+    (m.name || '').toLowerCase().includes(query) ||
     (m.member_name || '').toLowerCase().includes(query) ||
+    (m.uid || '').toLowerCase().includes(query) ||
     (m.member_uid || '').toLowerCase().includes(query)
   );
 });
@@ -104,7 +107,7 @@ function selectMember(member: any) {
   const lastAtIdx = textBeforeCaret.lastIndexOf('@');
 
   if (lastAtIdx !== -1) {
-    const name = member.member_name || member.member_uid;
+    const name = member.display_name || member.member_name || member.name || member.member_uid;
     const newText = textBeforeCaret.substring(0, lastAtIdx) + `@${name} ` + textAfterCaret;
     inputText.value = newText;
     if (!mentionedUids.value.includes(member.member_uid)) {
@@ -189,8 +192,8 @@ async function handleSend() {
       options.mention = { all: true, uids: [] };
     } else if (mentionedUids.value.length > 0) {
       const activeMentions = mentionedUids.value.filter(uid => {
-        const member = currentGroupMembers.value.find(m => m.member_uid === uid);
-        const name = member?.member_name || uid;
+        const member = currentGroupMembers.value.find(m => m.member_uid === uid || m.uid === uid);
+        const name = member?.display_name || member?.member_name || member?.name || uid;
         return text.includes(`@${name}`);
       });
       if (activeMentions.length > 0) {
@@ -245,7 +248,8 @@ onBeforeUnmount(() => {
         class="mention-item"
         @click="selectMember(member)"
       >
-        <span class="mention-name">{{ member.member_name || member.member_uid }}</span>
+        <span class="mention-name">{{ member.display_name || member.member_name || member.name || member.member_uid }}</span>
+        <span v-if="member.role_label !== '成员'" class="mention-role">{{ member.role_label }}</span>
       </div>
     </div>
 
@@ -363,10 +367,26 @@ onBeforeUnmount(() => {
   font-size: 13px;
   color: var(--text-primary);
   transition: background-color 0.2s;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
 }
 
 .mention-item:hover {
   background-color: var(--bg-hover);
+}
+
+.mention-name {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.mention-role {
+  color: var(--text-secondary);
+  font-size: 11px;
+  flex-shrink: 0;
 }
 
 /* Reply Preview Bar */

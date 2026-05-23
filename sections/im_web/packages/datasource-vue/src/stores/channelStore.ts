@@ -17,14 +17,27 @@ export interface ChannelInfo {
 export const useChannelStore = defineStore('channel', () => {
   const channels = ref<Record<string, ChannelInfo>>({});
   const members = ref<Record<string, any[]>>({});
+  const resetVersion = ref(0);
 
   // Get channel detail, with caching
   async function getChannelInfo(channelId: string, channelType: number): Promise<ChannelInfo> {
     const key = `${channelId}-${channelType}`;
     if (channels.value[key]) return channels.value[key];
+    const version = resetVersion.value;
 
     try {
       const res: any = await commonApi.getChannelInfo(channelId, channelType);
+      if (version !== resetVersion.value) {
+        return {
+          channel_id: channelId,
+          channel_type: channelType,
+          name: channelType === 1 ? '用户' : '群聊',
+          avatar: '',
+          mute: 0,
+          top: 0,
+          save: 0
+        };
+      }
       if (res) {
         channels.value[key] = {
           channel_id: channelId,
@@ -79,8 +92,10 @@ export const useChannelStore = defineStore('channel', () => {
 
   // Get group members
   async function fetchGroupMembers(groupNo: string) {
+    const version = resetVersion.value;
     try {
       const res: any = await groupApi.getGroupMembers(groupNo, { page: 1, limit: 1000 });
+      if (version !== resetVersion.value) return;
       if (res && res.list) {
         members.value[groupNo] = res.list;
       }
@@ -89,11 +104,18 @@ export const useChannelStore = defineStore('channel', () => {
     }
   }
 
+  function reset() {
+    resetVersion.value++;
+    channels.value = {};
+    members.value = {};
+  }
+
   return {
     channels,
     members,
     getChannelInfo,
     updateChannelInfo,
-    fetchGroupMembers
+    fetchGroupMembers,
+    reset
   };
 });

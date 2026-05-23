@@ -1,9 +1,10 @@
 import { defineStore } from 'pinia';
 import { ref, computed } from 'vue';
-import { syncApi } from '../api';
+import { groupApi, syncApi } from '../api';
 import { useChannelStore } from './channelStore';
 import { useGroupStore } from './groupStore';
 import { useUserStore } from './userStore';
+import { buildConversationFromGroup } from './groupChatUtils';
 
 export interface Conversation {
   channel_id: string;
@@ -27,6 +28,7 @@ export const useConversationStore = defineStore('conversation', () => {
   const lastSyncVersion = ref<number>(0);
   const manuallyDeletedConversationKeys = ref<Record<string, true>>({});
   const draftSyncTimers = ref<Record<string, ReturnType<typeof setTimeout>>>({});
+  const resetVersion = ref(0);
 
   const channelStore = useChannelStore();
   const groupStore = useGroupStore();
@@ -219,8 +221,10 @@ export const useConversationStore = defineStore('conversation', () => {
   }
 
   async function syncConversations() {
+    const version = resetVersion.value;
     try {
       const res: any = await syncApi.syncConversations({ msg_count: 1 });
+      if (version !== resetVersion.value) return;
       // 后端返回 { conversations: [...], users: [...], groups: [...] }
       const rawList = res?.conversations || (Array.isArray(res) ? res : []);
 
@@ -252,6 +256,7 @@ export const useConversationStore = defineStore('conversation', () => {
         const channelType = Number(item.channel_type);
         const key = getConversationKey(channelId, channelType);
         const info = await channelStore.getChannelInfo(channelId, channelType);
+        if (version !== resetVersion.value) return;
         const effectiveUnread = getEffectiveUnread(item, key);
 
         upsertConversation(normalizeConversationInput({ ...item, unread: effectiveUnread }, info));
@@ -259,14 +264,42 @@ export const useConversationStore = defineStore('conversation', () => {
         unreadMap.value[key] = effectiveUnread;
       }
       await syncExtra();
+      if (version !== resetVersion.value) return;
+      ensureGroupConversations();
     } catch (e) {
       console.error('[ConversationStore] Failed to sync conversations', e);
     }
   }
 
+  function ensureGroupConversations() {
+    for (const group of Object.values(groupStore.groups)) {
+      const key = getConversationKey(group.group_no, 2);
+      if (manuallyDeletedConversationKeys.value[key] || findConversation(group.group_no, 2)) {
+        continue;
+      }
+      channelStore.updateChannelInfo(group.group_no, 2, {
+        name: group.name,
+        avatar: group.avatar,
+        top: group.top || 0,
+        mute: group.mute || 0,
+        notice: group.notice || ''
+      });
+      upsertConversation(buildConversationFromGroup(group));
+    }
+  }
+
+  async function syncGroupConversations() {
+    const version = resetVersion.value;
+    await groupStore.fetchMyGroups();
+    if (version !== resetVersion.value) return;
+    ensureGroupConversations();
+  }
+
   async function syncExtra() {
+    const version = resetVersion.value;
     try {
       const res: any = await syncApi.syncConversationExtra({ version: lastSyncVersion.value });
+      if (version !== resetVersion.value) return;
       if (res && Array.isArray(res)) {
         for (const item of res) {
           const channelId = String(item.channel_id);
@@ -327,9 +360,32 @@ export const useConversationStore = defineStore('conversation', () => {
       conv.top = top;
     }
     try {
-      await syncApi.updateConversationExtra(channelId, channelType, { top });
+      if (channelType === 2) {
+        await groupApi.updateSetting(channelId, { top });
+      } else {
+        await syncApi.updateConversationExtra(channelId, channelType, { top });
+      }
     } catch (e) {
       warnRemoteCommandFailure('update conversation extra', e);
+    }
+  }
+
+  async function toggleMute(channelId: string, channelType: number, muteOn: boolean) {
+    channelId = String(channelId);
+    channelType = Number(channelType);
+    const mute = muteOn ? 1 : 0;
+    const conv = findConversation(channelId, channelType);
+    if (conv) {
+      conv.mute = mute;
+    }
+    try {
+      if (channelType === 2) {
+        await groupApi.updateSetting(channelId, { mute });
+      } else {
+        await syncApi.updateConversationExtra(channelId, channelType, { mute });
+      }
+    } catch (e) {
+      warnRemoteCommandFailure('update mute setting', e);
     }
   }
 
@@ -351,6 +407,7 @@ export const useConversationStore = defineStore('conversation', () => {
   }
 
   async function addOrUpdateConversation(channelId: string, channelType: number, message: any) {
+    const version = resetVersion.value;
     channelId = String(channelId);
     channelType = Number(channelType);
     const key = getConversationKey(channelId, channelType);
@@ -358,6 +415,7 @@ export const useConversationStore = defineStore('conversation', () => {
 
     const conv = findConversation(channelId, channelType);
     const info = await channelStore.getChannelInfo(channelId, channelType);
+    if (version !== resetVersion.value) return;
     const isOwnMessage = message.isOwnMessage === true || message.fromUID === userStore.currentUser?.uid;
     const isDigest = isConversationDigestSource(message);
     const normalizedMsg = normalizeLastMessage({ last_message: message });
@@ -400,6 +458,7 @@ export const useConversationStore = defineStore('conversation', () => {
   }
 
   async function ensureConversation(channelId: string, channelType: number, message?: any) {
+    const version = resetVersion.value;
     channelId = String(channelId);
     channelType = Number(channelType);
     const key = getConversationKey(channelId, channelType);
@@ -421,6 +480,7 @@ export const useConversationStore = defineStore('conversation', () => {
     }
 
     const info = await channelStore.getChannelInfo(channelId, channelType);
+    if (version !== resetVersion.value) return undefined;
     const next: Conversation = {
       channel_id: channelId,
       channel_type: channelType,
@@ -454,6 +514,20 @@ export const useConversationStore = defineStore('conversation', () => {
     }
   }
 
+  function reset() {
+    resetVersion.value++;
+    conversations.value = [];
+    drafts.value = {};
+    unreadMap.value = {};
+    clearedUnreadSeqs.value = {};
+    lastSyncVersion.value = 0;
+    manuallyDeletedConversationKeys.value = {};
+    for (const key of Object.keys(draftSyncTimers.value)) {
+      clearTimeout(draftSyncTimers.value[key]);
+    }
+    draftSyncTimers.value = {};
+  }
+
   return {
     conversations,
     drafts,
@@ -463,12 +537,16 @@ export const useConversationStore = defineStore('conversation', () => {
     totalUnreadCount,
     uniqueConversations,
     syncConversations,
+    syncGroupConversations,
+    ensureGroupConversations,
     syncExtra,
     updateDraft,
     togglePin,
+    toggleMute,
     clearUnread,
     addOrUpdateConversation,
     ensureConversation,
-    deleteConversation
+    deleteConversation,
+    reset
   };
 });

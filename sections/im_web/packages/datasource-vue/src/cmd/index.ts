@@ -3,6 +3,7 @@ import { useMessageStore } from '../stores/messageStore';
 import { useChannelStore } from '../stores/channelStore';
 import { useConversationStore } from '../stores/conversationStore';
 import { useUserStore } from '../stores/userStore';
+import { useGroupStore } from '../stores/groupStore';
 import { userApi } from '../api';
 
 const pendingClientMsgNoBySeq = new Map<number, string>();
@@ -22,6 +23,7 @@ export function registerCMDListeners() {
     const channelStore = useChannelStore();
     const conversationStore = useConversationStore();
     const userStore = useUserStore();
+    const groupStore = useGroupStore();
 
     switch (cmd) {
       case 'channelUpdate':
@@ -29,6 +31,10 @@ export function registerCMDListeners() {
           const key = `${channel.channelID}-${channel.channelType}`;
           delete channelStore.channels[key];
           channelStore.getChannelInfo(channel.channelID, channel.channelType);
+          if (channel.channelType === 2) {
+            delete groupStore.groups[channel.channelID];
+            groupStore.getGroupInfo(channel.channelID);
+          }
         }
         break;
 
@@ -43,6 +49,8 @@ export function registerCMDListeners() {
           const key = `${channel.channelID}-${channel.channelType}`;
           delete channelStore.channels[key];
           channelStore.getChannelInfo(channel.channelID, channel.channelType);
+          delete groupStore.groups[channel.channelID];
+          groupStore.getGroupInfo(channel.channelID);
         }
         break;
 
@@ -79,6 +87,7 @@ export function registerCMDListeners() {
       case 'memberUpdate':
         if (channel && channel.channelType === 2) {
           channelStore.fetchGroupMembers(channel.channelID);
+          groupStore.fetchGroupMembers(channel.channelID);
         }
         break;
 

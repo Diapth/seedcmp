@@ -6,6 +6,11 @@ const props = defineProps<{
     fromUID: string;
     content?: {
       text?: string;
+      mention?: { all?: boolean; uids?: string[] };
+    };
+    payload?: {
+      text?: string;
+      mention?: { all?: boolean; uids?: string[] };
     };
     [key: string]: any;
   };
@@ -15,12 +20,24 @@ const props = defineProps<{
 const displayText = computed(() => {
   return props.message.content?.text || props.message.payload?.text || '';
 });
+
+const mentionUids = computed(() => {
+  const mention = props.message.content?.mention || props.message.payload?.mention;
+  return mention?.uids || [];
+});
+
+const mentionAll = computed(() => {
+  const mention = props.message.content?.mention || props.message.payload?.mention;
+  return mention?.all === true;
+});
 </script>
 
 <template>
   <div class="text-cell" :class="{ 'is-me': isMe }">
     <div class="bubble">
       {{ displayText }}
+      <span v-if="mentionAll" class="mention-chip">@所有人</span>
+      <span v-else-if="mentionUids.length > 0" class="mention-chip">@{{ mentionUids.length }}人</span>
     </div>
   </div>
 </template>
@@ -54,5 +71,22 @@ const displayText = computed(() => {
   background-color: var(--primary-color, #165dff);
   color: #ffffff;
   border: none;
+}
+
+.mention-chip {
+  display: inline-flex;
+  margin-left: 6px;
+  padding: 1px 5px;
+  border-radius: var(--radius-sm);
+  background-color: rgba(22, 93, 255, 0.12);
+  color: var(--primary-color, #165dff);
+  font-size: 11px;
+  font-weight: 600;
+  vertical-align: baseline;
+}
+
+.text-cell.is-me .mention-chip {
+  background-color: rgba(255, 255, 255, 0.18);
+  color: #ffffff;
 }
 </style>

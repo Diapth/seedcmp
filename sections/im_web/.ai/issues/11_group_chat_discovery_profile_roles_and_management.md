@@ -1,6 +1,6 @@
 # [ISSUE-11] 群聊会话可发现性、资料栏、角色权限与管理能力缺失
 
-**状态**：Open
+**状态**：Resolved
 **创建时间**：2026-05-23
 **标签**：bug / feature / group-chat / ux
 
@@ -226,16 +226,27 @@ syncApi.updateConversationExtra(...)
 
 ## 修复记录
 
-暂无。
+2026-05-23：
+
+1. 新增群聊资料与成员归一化工具，统一 `group_no/avatar/owner/role/mute/top` 和成员 `uid/member_uid/display_name/role_label/is_mute` 等字段，避免前端各处重复猜测后端字段。
+2. 会话同步后会基于 `/group/my` 自动补齐已加入群聊的会话入口；没有最近消息的群会显示“你已加入群聊 xxx”的系统占位，解决历史群聊不易发现的问题。
+3. 群设置抽屉补充群头像上传、群名 / 公告编辑、置顶、免打扰、邀请成员、角色统计、退出群聊、解散群聊等入口，并按群主 / 管理员权限展示可管理操作。
+4. 群成员列表补充成员搜索、角色标识、禁言状态、设为 / 取消管理员、禁言 / 解禁、移出成员，并通过角色工具限制管理员只能管理普通成员，群主可管理管理员和普通成员。
+5. 群聊 `@` 成员选择兼容归一化后的成员字段，选择面板展示角色；文本消息渲染展示 `@所有人` 或 `@N人` 标记。
+6. 系统消息组件补充常见群事件文案兜底，包括创建群、邀请入群、移出成员、退出群、更新群资料和解散群。
 
 ---
 
 ## 测试结果
 
-暂无。
+2026-05-23：
+
+1. `./node_modules/.bin/tsc packages/datasource-vue/tests/groupChatUtils.test.ts --module NodeNext --moduleResolution NodeNext --target ES2022 --skipLibCheck --esModuleInterop --allowSyntheticDefaultImports --outDir /tmp/seedcmp-im-tests && node /tmp/seedcmp-im-tests/tests/groupChatUtils.test.js`：通过。
+2. `./node_modules/.bin/vue-tsc --noEmit`：通过。
+3. `./node_modules/.bin/vite build`：通过；保留既有 Vite CJS API deprecation 和 chunk size warning。
 
 ---
 
 ## 关闭备注
 
-待修复。
+已完成本 issue 的 P0 / 核心前端闭环。群昵称、完整已读回执、真实文件上传、群内全文搜索、邀请确认 / 二维码等 P1/P2 能力仍建议拆分后续 issue 继续实现。

@@ -9,6 +9,7 @@ function read(relativePath) {
 }
 
 const groupStore = read('packages/datasource-vue/src/stores/groupStore.ts');
+const groupChatUtils = read('packages/datasource-vue/src/stores/groupChatUtils.ts');
 const conversationStore = read('packages/datasource-vue/src/stores/conversationStore.ts');
 const messageStore = read('packages/datasource-vue/src/stores/messageStore.ts');
 const cmdListeners = read('packages/datasource-vue/src/cmd/index.ts');
@@ -30,7 +31,7 @@ assert.match(
 );
 
 assert.match(
-  groupStore,
+  groupChatUtils,
   /save:\s*Number\([^)]*\)\s*\|\|\s*1/,
   'normalized joined groups should default to save=1 so contacts show newly joined groups'
 );

@@ -3,6 +3,10 @@ import { ref, computed } from 'vue';
 import { authApi, userApi } from '../api';
 import { StorageService } from '@tsdaodao/base-vue';
 import { useSdkStore } from './sdk';
+import { useChannelStore } from './channelStore';
+import { useGroupStore } from './groupStore';
+import { useConversationStore } from './conversationStore';
+import { useMessageStore } from './messageStore';
 
 export interface User {
   uid: string;
@@ -93,6 +97,18 @@ export const useUserStore = defineStore('user', () => {
     token.value = null;
     loginInfo.value = null;
     currentUser.value = null;
+    userCache.value = {};
+
+    // Reset sibling stores to clear account state and cache
+    useChannelStore().reset();
+    useGroupStore().reset();
+    useConversationStore().reset();
+    useMessageStore().reset();
+
+    // Trigger logout event globally so contacts store can catch and reset
+    if (typeof window !== 'undefined') {
+      window.dispatchEvent(new CustomEvent('tsdaodao:logout'));
+    }
 
     // Disconnect SDK
     const sdkStore = useSdkStore();

@@ -1,7 +1,13 @@
 <script setup lang="ts">
 import { ref, onMounted, computed } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
-import { useGroupStore } from '@tsdaodao/datasource-vue';
+import {
+  canAppointGroupAdmin,
+  canManageGroupMember,
+  canRemoveGroupAdmin,
+  getMyGroupRole,
+  useGroupStore
+} from '@tsdaodao/datasource-vue';
 import { useUserStore } from '@tsdaodao/datasource-vue';
 import { groupApi } from '@tsdaodao/datasource-vue';
 import { ChannelAvatar } from '@tsdaodao/base-vue';
@@ -16,9 +22,28 @@ const groupNo = computed(() => route.params.groupNo as string);
 
 const groupInfo = computed(() => groupStore.groups[groupNo.value]);
 const members = computed(() => groupStore.groupMembers[groupNo.value] || []);
+const memberKeyword = ref('');
+
+const filteredMembers = computed(() => {
+  const keyword = memberKeyword.value.trim().toLowerCase();
+  if (!keyword) return members.value;
+  return members.value.filter((member: any) => {
+    return [
+      member.display_name,
+      member.name,
+      member.member_name,
+      member.uid,
+      member.member_uid
+    ].some(value => String(value || '').toLowerCase().includes(keyword));
+  });
+});
 
 const isOwner = computed(() => {
-  return groupInfo.value?.owner === userStore.currentUser?.uid;
+  return getMyGroupRole(groupInfo.value, userStore.currentUser?.uid) === 1;
+});
+
+const canManage = computed(() => {
+  return getMyGroupRole(groupInfo.value, userStore.currentUser?.uid) >= 1;
 });
 
 onMounted(async () => {
@@ -32,6 +57,26 @@ async function handleRemoveMember(uid: string) {
   try {
     await groupApi.removeMembers(groupNo.value, [uid]);
     Message.success('已移出该成员');
+    await groupStore.fetchGroupMembers(groupNo.value);
+  } catch (err: any) {
+    Message.error(err.msg || '操作失败');
+  }
+}
+
+async function handleAppointManager(uid: string) {
+  try {
+    await groupApi.appointManager(groupNo.value, [uid]);
+    Message.success('已设为管理员');
+    await groupStore.fetchGroupMembers(groupNo.value);
+  } catch (err: any) {
+    Message.error(err.msg || '操作失败');
+  }
+}
+
+async function handleRemoveManager(uid: string) {
+  try {
+    await groupApi.removeManager(groupNo.value, [uid]);
+    Message.success('已取消管理员');
     await groupStore.fetchGroupMembers(groupNo.value);
   } catch (err: any) {
     Message.error(err.msg || '操作失败');
@@ -67,19 +112,45 @@ function handleGoBack() {
     </div>
 
     <div class="page-content">
+      <div class="member-search">
+        <input
+          v-model="memberKeyword"
+          type="text"
+          class="member-search-input"
+          placeholder="搜索成员昵称或 UID"
+        />
+      </div>
+
       <div class="members-list">
-        <div v-for="m in members" :key="m.uid" class="member-row">
+        <div v-for="m in filteredMembers" :key="m.uid" class="member-row">
           <ChannelAvatar :avatar="m.avatar" :name="m.name" :size="36" />
           <div class="member-body">
-            <span class="member-name">{{ m.name }}</span>
-            <span v-if="m.uid === groupInfo?.owner" class="role-badge owner">群主</span>
-            <span v-else-if="m.role === 1 || m.role === 'admin'" class="role-badge admin">管理员</span>
+            <span class="member-name">{{ m.display_name || m.name }}</span>
+            <span v-if="Number(m.role || 0) === 1" class="role-badge owner">群主</span>
+            <span v-else-if="Number(m.role || 0) === 2" class="role-badge admin">管理员</span>
+            <span v-if="m.is_mute === 1" class="role-badge muted">禁言中</span>
           </div>
 
           <div class="member-actions">
+            <button
+              v-if="canAppointGroupAdmin(groupInfo, m)"
+              class="action-btn"
+              @click="handleAppointManager(m.uid)"
+            >
+              设管理员
+            </button>
+
+            <button
+              v-if="canRemoveGroupAdmin(groupInfo, m)"
+              class="action-btn"
+              @click="handleRemoveManager(m.uid)"
+            >
+              取消管理员
+            </button>
+
             <!-- Mute buttons -->
             <button 
-              v-if="isOwner && m.uid !== groupInfo?.owner" 
+              v-if="canManage && canManageGroupMember(groupInfo, m)" 
               class="action-btn"
               :class="{ muted: m.is_mute === 1 }"
               @click="handleMuteMember(m.uid, m.is_mute === 1 ? 0 : 1)"
@@ -89,7 +160,7 @@ function handleGoBack() {
 
             <!-- Kick button -->
             <button 
-              v-if="isOwner && m.uid !== groupInfo?.owner" 
+              v-if="canManage && canManageGroupMember(groupInfo, m)" 
               class="action-btn kick-btn"
               @click="handleRemoveMember(m.uid)"
             >
@@ -154,6 +225,24 @@ function handleGoBack() {
   overflow-y: auto;
 }
 
+.member-search {
+  padding: 12px 16px;
+  border-bottom: var(--border-hairline);
+  background-color: var(--bg-primary);
+}
+
+.member-search-input {
+  width: 100%;
+  height: 34px;
+  padding: 0 10px;
+  background-color: var(--bg-secondary);
+  border: var(--border-hairline);
+  border-radius: var(--radius-sm);
+  color: var(--text-primary);
+  outline: none;
+  font-size: 13px;
+}
+
 .members-list {
   display: flex;
   flex-direction: column;
@@ -196,6 +285,11 @@ function handleGoBack() {
 .role-badge.admin {
   background-color: #69c0ff30;
   color: #096dd9;
+}
+
+.role-badge.muted {
+  background-color: #ff4d4f15;
+  color: #ff4d4f;
 }
 
 .member-actions {

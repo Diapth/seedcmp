@@ -37,9 +37,9 @@ assertContains(
 );
 
 assertContains(
-  'AddFriendPage existing friend guard',
+  'AddFriendPage existing friend guard using getFriendSearchState',
   addFriendPage,
-  /userData\.follow\s*===\s*1/
+  /getFriendSearchState/
 );
 
 assertContains(

@@ -24,10 +24,9 @@ const groupStore = useGroupStore();
 
 onMounted(async () => {
   if (userStore.isLoggedIn && userStore.currentUser) {
-    await Promise.all([
-      conversationStore.syncConversations(),
-      groupStore.fetchMyGroups()
-    ]);
+    await groupStore.fetchMyGroups();
+    await conversationStore.syncConversations();
+    conversationStore.ensureGroupConversations();
   }
 });
 
