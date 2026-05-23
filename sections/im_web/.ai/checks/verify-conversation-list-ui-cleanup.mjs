@@ -21,10 +21,9 @@ function assertNotContains(name, content, pattern) {
 
 const mainLayout = read('apps/chat/src/layouts/MainLayout.vue');
 const conversationList = read('apps/chat/src/views/ConversationList.vue');
+const conversationPresentation = read('apps/chat/src/utils/conversationPresentation.ts');
 const messageStore = read('packages/datasource-vue/src/stores/messageStore.ts');
-const messageStoreJs = read('packages/datasource-vue/src/stores/messageStore.js');
 const conversationStore = read('packages/datasource-vue/src/stores/conversationStore.ts');
-const conversationStoreJs = read('packages/datasource-vue/src/stores/conversationStore.js');
 
 assertNotContains(
   'MainLayout sidebar group creation entry',
@@ -51,27 +50,27 @@ assertContains(
 );
 
 assertContains(
-  'ConversationList prefixes group digests with sender name',
+  'ConversationList builds structured group digests with sender name',
   conversationList,
-  /function formatGroupDigest\([\s\S]*Number\(conv\.channel_type\) !== 2[\s\S]*getSenderName\(lastMessage\)[\s\S]*`\$\{senderName\}：\$\{digest\}`/
+  /buildDigestPresentation\([\s\S]*senderName: getSenderName\(lastMessage\)[\s\S]*text: String\(text\)/
 );
 
 assertContains(
-  'ConversationList prefixes group file digests with sender name',
+  'ConversationList prefixes group file digests through structured presentation',
   conversationList,
-  /type === 8[\s\S]*return formatGroupDigest\(conv, lastMessage, `\$\{prefix\} \$\{text\}`\)/
+  /type === 8[\s\S]*buildDigestPresentation\([\s\S]*text: `\$\{prefix\} \$\{text\}`/
+);
+
+assertContains(
+  'Conversation presentation keeps mention, sender, and message as separate pieces',
+  conversationPresentation,
+  /mentionReminder: options\.mentionReminder \|\| ''[\s\S]*senderName: options\.senderName \|\| ''[\s\S]*text: options\.text/
 );
 
 assertContains(
   'messageStore selects latest non-system message for conversation digest',
   messageStore,
   /function isConversationDigestMessage\(msg: Message\)[\s\S]*!\[99, 1000\]\.includes\(type\)[\s\S]*function getLatestConversationDigestMessage\([\s\S]*\.reverse\(\)\.find\(isConversationDigestMessage\)/
-);
-
-assertContains(
-  'messageStore JS selects latest non-system message for conversation digest',
-  messageStoreJs,
-  /function isConversationDigestMessage\(msg\)[\s\S]*!\[99, 1000\]\.includes\(type\)[\s\S]*function getLatestConversationDigestMessage\([\s\S]*\.reverse\(\)\.find\(isConversationDigestMessage\)/
 );
 
 assertContains(
@@ -83,12 +82,6 @@ assertContains(
 assertContains(
   'conversationStore prefers non-system recents for last message',
   conversationStore,
-  /function getLastMessageSource\([\s\S]*find\(isConversationDigestSource\)[\s\S]*item\.recents\?\.\[0\]/
-);
-
-assertContains(
-  'conversationStore JS prefers non-system recents for last message',
-  conversationStoreJs,
   /function getLastMessageSource\([\s\S]*find\(isConversationDigestSource\)[\s\S]*item\.recents\?\.\[0\]/
 );
 

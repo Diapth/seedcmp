@@ -4,6 +4,7 @@ import { useRouter, useRoute } from 'vue-router';
 import { useConversationStore } from '@tsdaodao/datasource-vue';
 import { useUserStore } from '@tsdaodao/datasource-vue';
 import { ChannelAvatar, ContextMenu, SkeletonScreen } from '@tsdaodao/base-vue';
+import { buildDigestPresentation, formatConversationTime } from '../utils/conversationPresentation';
 
 const router = useRouter();
 const route = useRoute();
@@ -124,17 +125,6 @@ const contextMenuItems = [
   }
 ];
 
-function formatTime(timestamp: number): string {
-  if (!timestamp) return '';
-  const date = new Date(timestamp * 1000);
-  const now = new Date();
-  
-  if (date.toDateString() === now.toDateString()) {
-    return date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
-  }
-  return date.toLocaleDateString([], { month: 'short', day: 'numeric' });
-}
-
 function parseDigestContent(content: any): any {
   if (typeof content !== 'string') {
     return content;
@@ -193,6 +183,28 @@ function getSenderName(lastMessage: any): string {
     '用户';
 }
 
+function isSystemDigest(lastMessage: any): boolean {
+  if (!lastMessage) return false;
+  const payload = parseDigestContent(lastMessage.payload ?? lastMessage.content ?? lastMessage.contentObj);
+  const type = Number(payload?.type || lastMessage.type || lastMessage.content_type || lastMessage.contentType || 0);
+  return [99, 1000].includes(type);
+}
+
+function getMentionPayload(lastMessage: any): any {
+  if (!lastMessage) return undefined;
+  const payload = parseDigestContent(lastMessage.payload ?? lastMessage.content ?? lastMessage.contentObj);
+  return payload?.mention || lastMessage.mention || lastMessage.content?.mention || lastMessage.payload?.mention;
+}
+
+function getMentionReminder(lastMessage: any): string {
+  const mention = getMentionPayload(lastMessage);
+  if (!mention) return '';
+  if (mention.all === true) return '[有人@我]';
+  const currentUid = String(userStore.currentUser?.uid || '');
+  const uids = Array.isArray(mention.uids) ? mention.uids.map((uid: any) => String(uid)) : [];
+  return currentUid && uids.includes(currentUid) ? '[有人@我]' : '';
+}
+
 async function syncGroupDigestSenders() {
   const uids = conversationStore.sortedConversations
     .filter(conv => Number(conv.channel_type) === 2)
@@ -204,20 +216,14 @@ async function syncGroupDigestSenders() {
   }
 }
 
-function formatGroupDigest(conv: any, lastMessage: any, digest: string): string {
-  if (Number(conv.channel_type) !== 2 || !lastMessage) {
-    return digest;
-  }
-  const senderName = getSenderName(lastMessage);
-  if (!senderName || digest.startsWith(`${senderName}：`)) {
-    return digest;
-  }
-  return `${senderName}：${digest}`;
-}
-
-function getDigest(conv: any): string {
+function getDigestPresentation(conv: any) {
   if (conv.draft) {
-    return `[草稿] ${conv.draft}`;
+    return buildDigestPresentation({
+      channelType: conv.channel_type,
+      isSystem: false,
+      senderName: '',
+      text: `[草稿] ${conv.draft}`
+    });
   }
   const lastMessage = getConversationLastMessage(conv);
   if (lastMessage) {
@@ -230,17 +236,46 @@ function getDigest(conv: any): string {
     if (text) {
       const prefix = digestFallbackByType[type];
       if (type === 8 && !String(text).startsWith('[文件]')) {
-        return formatGroupDigest(conv, lastMessage, `${prefix} ${text}`);
+        return buildDigestPresentation({
+          channelType: conv.channel_type,
+          isSystem: isSystemDigest(lastMessage),
+          senderName: getSenderName(lastMessage),
+          mentionReminder: getMentionReminder(lastMessage),
+          text: `${prefix} ${text}`
+        });
       }
       if ((type === 6 || type === 7) && prefix && !String(text).startsWith(prefix)) {
-        return formatGroupDigest(conv, lastMessage, `${prefix} ${text}`);
+        return buildDigestPresentation({
+          channelType: conv.channel_type,
+          isSystem: isSystemDigest(lastMessage),
+          senderName: getSenderName(lastMessage),
+          mentionReminder: getMentionReminder(lastMessage),
+          text: `${prefix} ${text}`
+        });
       }
-      return formatGroupDigest(conv, lastMessage, String(text));
+      return buildDigestPresentation({
+        channelType: conv.channel_type,
+        isSystem: isSystemDigest(lastMessage),
+        senderName: getSenderName(lastMessage),
+        mentionReminder: getMentionReminder(lastMessage),
+        text: String(text)
+      });
     }
 
-    return formatGroupDigest(conv, lastMessage, digestFallbackByType[type] || '[未知类型]');
+    return buildDigestPresentation({
+      channelType: conv.channel_type,
+      isSystem: isSystemDigest(lastMessage),
+      senderName: getSenderName(lastMessage),
+      mentionReminder: getMentionReminder(lastMessage),
+      text: digestFallbackByType[type] || '[未知类型]'
+    });
   }
-  return '暂无消息';
+  return buildDigestPresentation({
+    channelType: conv.channel_type,
+    isSystem: false,
+    senderName: '',
+    text: '暂无消息'
+  });
 }
 </script>
 
@@ -278,7 +313,7 @@ function getDigest(conv: any): string {
         <div class="item-body">
           <div class="item-header">
             <span class="item-name">{{ conv.name }}</span>
-            <span class="item-time">{{ formatTime(conv.last_msg_time) }}</span>
+            <span class="item-time">{{ formatConversationTime(conv.last_msg_time) }}</span>
           </div>
           
           <div class="item-footer">
@@ -286,12 +321,26 @@ function getDigest(conv: any): string {
               class="item-digest" 
               :class="{ 'item-draft': !!conv.draft }"
             >
-              {{ getDigest(conv) }}
+              <span v-if="getDigestPresentation(conv).mentionReminder" class="mention-prefix">
+                {{ getDigestPresentation(conv).mentionReminder }}
+              </span>
+              <span v-if="getDigestPresentation(conv).senderName" class="digest-sender">
+                {{ getDigestPresentation(conv).senderName }}：
+              </span>
+              <span class="digest-text">{{ getDigestPresentation(conv).text }}</span>
             </span>
             
             <div class="item-status">
-              <span v-if="conv.top === 1" class="pin-dot" title="已置顶"></span>
-              <span v-if="conv.mute === 1" class="mute-dot" title="免打扰"></span>
+              <span v-if="conv.top === 1" class="status-icon pin-icon" title="已置顶">
+                <svg viewBox="0 0 24 24" aria-hidden="true">
+                  <path d="M14 3l7 7-2 2-1.5-1.5-4.5 4.5v4l-1 1-3.5-3.5-4 4-1.5-1.5 4-4L3 11.5l1-1h4L12.5 6 11 4.5 14 3z" />
+                </svg>
+              </span>
+              <span v-if="conv.mute === 1" class="status-icon mute-icon" title="免打扰">
+                <svg viewBox="0 0 24 24" aria-hidden="true">
+                  <path d="M4 4.8L5.2 3.6 20.4 18.8 19.2 20l-2.5-2.5H8.8L5 21.2V8.8L4 4.8zM7 8.4v7.6l1.1-1.1h5.2L7 8.4zM9.6 5h6.9A2.5 2.5 0 0 1 19 7.5v7.1l-2-2V7.5a.5.5 0 0 0-.5-.5h-4.9l-2-2z" />
+                </svg>
+              </span>
               <span v-if="getUnreadCount(conv) > 0" class="unread-badge">
                 {{ getUnreadCount(conv) > 99 ? '99+' : getUnreadCount(conv) }}
               </span>
@@ -415,19 +464,40 @@ function getDigest(conv: any): string {
   flex-shrink: 0;
 }
 
-.pin-dot {
-  width: 6px;
-  height: 6px;
-  background-color: var(--text-secondary);
-  border-radius: 50%;
+.status-icon {
+  width: 12px;
+  height: 12px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
 }
 
-.mute-dot {
-  width: 6px;
-  height: 6px;
-  background-color: #86909c;
-  border-radius: 50%;
-  opacity: 0.7;
+.status-icon svg {
+  width: 12px;
+  height: 12px;
+  fill: currentColor;
+}
+
+.pin-icon {
+  color: #f59e0b;
+}
+
+.mute-icon {
+  color: #60a5fa;
+}
+
+.mention-prefix {
+  color: #e11d48;
+  font-weight: 600;
+  margin-right: 4px;
+}
+
+.digest-sender {
+  color: var(--text-secondary);
+}
+
+.digest-text {
+  color: var(--text-secondary);
 }
 
 .unread-badge {

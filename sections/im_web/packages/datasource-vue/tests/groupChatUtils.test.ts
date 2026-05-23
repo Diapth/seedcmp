@@ -60,4 +60,30 @@ assertEqual(conv.mute, 1);
 assertEqual(conv.top, 1);
 assertEqual(conv.last_message.content.text, '你已加入群聊 Seed 群');
 
+const historicalGroup = normalizeGroup({
+  group_no: 'g2',
+  name: '历史群',
+  updated_at_time: 1700000000,
+});
+const historicalConv = buildConversationFromGroup(historicalGroup!);
+assertEqual(historicalConv.last_msg_time, 1700000000);
+assertEqual(historicalConv.last_message.timestamp, 1700000000);
+
+const undatedGroup = normalizeGroup({
+  group_no: 'g3',
+  name: '无历史群',
+});
+const undatedConv = buildConversationFromGroup(undatedGroup!);
+assertEqual(undatedConv.last_msg_time, 0);
+assertEqual(undatedConv.last_message.timestamp, 0);
+
+const createdAtGroup = normalizeGroup({
+  group_no: 'g4',
+  name: '系统消息群',
+  created_at_time: 1700000123,
+});
+const createdAtConv = buildConversationFromGroup(createdAtGroup!);
+assertEqual(createdAtConv.last_msg_time, 1700000123);
+assertEqual(createdAtConv.last_message.timestamp, 1700000123);
+
 console.log('groupChatUtils.test.ts passed');

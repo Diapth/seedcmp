@@ -38,6 +38,22 @@ tests.push({
   }
 });
 
+tests.push({
+  name: 'Unit Test: conversationPresentation.test.ts',
+  command: 'npx tsc apps/chat/tests/conversationPresentation.test.ts --module NodeNext --moduleResolution NodeNext --target ES2022 --skipLibCheck --esModuleInterop --allowSyntheticDefaultImports --outDir ./scratch/seedcmp-im-tests && node ./scratch/seedcmp-im-tests/tests/conversationPresentation.test.js',
+  cwd: imWebDir,
+  cleanup: () => {
+    const outDir = join(imWebDir, 'scratch', 'seedcmp-im-tests');
+    if (existsSync(outDir)) {
+      try {
+        rmSync(outDir, { recursive: true, force: true });
+      } catch (e) {
+        // ignore
+      }
+    }
+  }
+});
+
 let passedCount = 0;
 let failedCount = 0;
 

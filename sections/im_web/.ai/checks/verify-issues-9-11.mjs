@@ -38,6 +38,21 @@ const tests = [
     }
   },
   {
+    name: '[ISSUE-15] conversationPresentation Unit Tests (TypeScript compilation & execution)',
+    command: 'npx tsc apps/chat/tests/conversationPresentation.test.ts --module NodeNext --moduleResolution NodeNext --target ES2022 --skipLibCheck --esModuleInterop --allowSyntheticDefaultImports --outDir ./scratch/seedcmp-im-tests && node ./scratch/seedcmp-im-tests/tests/conversationPresentation.test.js',
+    cwd: imWebDir,
+    cleanup: () => {
+      const outDir = join(imWebDir, 'scratch', 'seedcmp-im-tests');
+      if (existsSync(outDir)) {
+        try {
+          rmSync(outDir, { recursive: true, force: true });
+        } catch (e) {
+          // ignore cleanup errors
+        }
+      }
+    }
+  },
+  {
     name: '[ISSUE-12] CMD Group Store Synchronization Checks',
     command: 'node verify-issue-12-cmd-group-store-sync.mjs',
     cwd: checksDir

@@ -90,9 +90,13 @@ export const useMessageStore = defineStore('message', () => {
     return [...list].reverse().find(isConversationDigestMessage);
   }
 
+  function getLatestConversationMessage(list: Message[]) {
+    return getLatestConversationDigestMessage(list) || [...list].reverse().find(msg => msg && !msg.isRevoked);
+  }
+
   async function ensureConversationFromMessages(channelId: string, channelType: number) {
     const list = messages.value[`${channelId}-${channelType}`] || [];
-    const lastMessage = getLatestConversationDigestMessage(list);
+    const lastMessage = getLatestConversationMessage(list);
     if (!lastMessage) return;
     await conversationStore.ensureConversation(channelId, channelType, {
       messageSeq: lastMessage.messageSeq,

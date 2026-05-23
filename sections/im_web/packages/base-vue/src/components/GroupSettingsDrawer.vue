@@ -1,10 +1,10 @@
 <script setup lang="ts">
-import { ref, onMounted, computed } from 'vue';
+import { ref, onMounted, computed, watch } from 'vue';
 import { useGroupStore } from '@tsdaodao/datasource-vue';
 import { useUserStore } from '@tsdaodao/datasource-vue';
 import { useConversationStore } from '@tsdaodao/datasource-vue';
 import { getMyGroupRole } from '@tsdaodao/datasource-vue';
-import { groupApi } from '@tsdaodao/datasource-vue';
+import { friendApi, groupApi } from '@tsdaodao/datasource-vue';
 import ChannelAvatar from './ChannelAvatar.vue';
 import { Message } from '@arco-design/web-vue';
 
@@ -27,13 +27,32 @@ const editingName = ref(false);
 const newName = ref('');
 const editingNotice = ref(false);
 const newNotice = ref('');
+const showInviteModal = ref(false);
+const inviteKeyword = ref('');
+const inviteSearchResult = ref<any | null>(null);
+const selectedInviteUsers = ref<any[]>([]);
+const inviteSearching = ref(false);
+
+const currentMember = computed(() => {
+  const uid = String(userStore.currentUser?.uid || '');
+  if (!uid) return null;
+  return members.value.find((member: any) => String(member.uid || member.member_uid || '') === uid) || null;
+});
+
+const currentMemberRole = computed(() => Number(currentMember.value?.role || 0));
+
+const isCurrentUserOwner = computed(() => {
+  const uid = String(userStore.currentUser?.uid || '');
+  const owner = String(groupInfo.value?.owner || groupInfo.value?.creator || '');
+  return (!!uid && !!owner && uid === owner) || currentMemberRole.value === 1;
+});
 
 const isOwner = computed(() => {
-  return getMyGroupRole(groupInfo.value, userStore.currentUser?.uid) === 1;
+  return isCurrentUserOwner.value || getMyGroupRole(groupInfo.value, userStore.currentUser?.uid) === 1;
 });
 
 const canManageGroup = computed(() => {
-  return getMyGroupRole(groupInfo.value, userStore.currentUser?.uid) >= 1;
+  return isOwner.value || currentMemberRole.value === 2 || getMyGroupRole(groupInfo.value, userStore.currentUser?.uid) >= 1;
 });
 
 const roleSummary = computed(() => {
@@ -47,10 +66,28 @@ const roleSummary = computed(() => {
 
 onMounted(async () => {
   if (props.groupNo) {
-    await groupStore.getGroupInfo(props.groupNo);
-    await groupStore.fetchGroupMembers(props.groupNo);
+    await loadGroupDetails();
   }
 });
+
+watch(
+  () => props.visible,
+  async visible => {
+    if (visible && props.groupNo) {
+      await loadGroupDetails();
+    }
+  }
+);
+
+async function loadGroupDetails() {
+  await groupStore.getGroupInfo(props.groupNo);
+  await groupStore.fetchGroupMembers(props.groupNo);
+}
+
+async function refreshGroupDetails() {
+  delete groupStore.groups[props.groupNo];
+  await groupStore.getGroupInfo(props.groupNo);
+}
 
 async function saveGroupName() {
   if (!newName.value.trim()) return;
@@ -58,6 +95,7 @@ async function saveGroupName() {
     await groupApi.updateGroupInfo(props.groupNo, { name: newName.value });
     Message.success('群名修改成功');
     if (groupInfo.value) groupInfo.value.name = newName.value;
+    await refreshGroupDetails();
     conversationStore.ensureGroupConversations();
     editingName.value = false;
   } catch (err: any) {
@@ -70,6 +108,7 @@ async function saveGroupNotice() {
     await groupApi.updateGroupInfo(props.groupNo, { notice: newNotice.value });
     Message.success('公告修改成功');
     if (groupInfo.value) groupInfo.value.notice = newNotice.value;
+    await refreshGroupDetails();
     editingNotice.value = false;
   } catch (err: any) {
     Message.error(err.msg || '修改失败');
@@ -91,7 +130,7 @@ async function handleAvatarChange(event: Event) {
   try {
     await groupApi.uploadAvatar(props.groupNo, formData);
     Message.success('群头像已更新');
-    await groupStore.getGroupInfo(props.groupNo);
+    await refreshGroupDetails();
   } catch (err: any) {
     Message.error(err.msg || '头像上传失败');
   } finally {
@@ -109,15 +148,70 @@ async function toggleMute() {
   if (groupInfo.value) groupInfo.value.mute = Number(groupInfo.value.mute || 0) === 1 ? 0 : 1;
 }
 
-async function inviteMembersPrompt() {
-  const raw = window.prompt('输入要邀请的用户 UID，多个 UID 用英文逗号分隔');
-  const membersToInvite = raw?.split(',').map(item => item.trim()).filter(Boolean) || [];
+function openInviteModal() {
+  inviteKeyword.value = '';
+  inviteSearchResult.value = null;
+  selectedInviteUsers.value = [];
+  showInviteModal.value = true;
+}
+
+async function searchInviteUser() {
+  const keyword = inviteKeyword.value.trim();
+  if (!keyword) {
+    Message.warning('请输入用户 UID、手机号或短编号');
+    return;
+  }
+  inviteSearching.value = true;
+  try {
+    const res: any = await friendApi.searchUser(keyword);
+    const user = res?.data || res?.user || res;
+    if (!user || res?.exist === 0) {
+      inviteSearchResult.value = null;
+      Message.warning('未找到该用户');
+      return;
+    }
+    inviteSearchResult.value = user;
+  } catch (err: any) {
+    Message.error(err.msg || '搜索失败');
+  } finally {
+    inviteSearching.value = false;
+  }
+}
+
+function addInviteUser(user: any) {
+  const uid = String(user?.uid || '');
+  if (!uid) return;
+  if (members.value.some((member: any) => String(member.uid || member.member_uid) === uid)) {
+    Message.warning('该用户已在群内');
+    return;
+  }
+  if (selectedInviteUsers.value.some(item => String(item.uid) === uid)) {
+    Message.warning('该用户已添加');
+    return;
+  }
+  selectedInviteUsers.value.push(user);
+  inviteKeyword.value = '';
+  inviteSearchResult.value = null;
+}
+
+function removeInviteUser(uid: string) {
+  selectedInviteUsers.value = selectedInviteUsers.value.filter(user => String(user.uid) !== String(uid));
+}
+
+async function submitInviteMembers() {
+  const manualUids = inviteKeyword.value.split(',').map(item => item.trim()).filter(Boolean);
+  const selectedUids = selectedInviteUsers.value.map(user => String(user.uid)).filter(Boolean);
+  const membersToInvite = [...new Set([...selectedUids, ...manualUids])];
   if (membersToInvite.length === 0) return;
 
   try {
     await groupApi.inviteMembers(props.groupNo, membersToInvite);
     Message.success('邀请已发送');
     await groupStore.fetchGroupMembers(props.groupNo);
+    showInviteModal.value = false;
+    inviteKeyword.value = '';
+    inviteSearchResult.value = null;
+    selectedInviteUsers.value = [];
   } catch (err: any) {
     Message.error(err.msg || '邀请失败');
   }
@@ -162,12 +256,15 @@ async function handleExit() {
       <div class="drawer-body">
         <!-- Group Avatar & Metadata -->
         <div class="group-profile-section">
-          <ChannelAvatar 
-            :avatar="groupInfo?.avatar" 
-            :name="groupInfo?.name" 
-            :is-group="true" 
-            :size="64" 
-          />
+          <div class="avatar-wrap">
+            <ChannelAvatar
+              :avatar="groupInfo?.avatar"
+              :name="groupInfo?.name"
+              :is-group="true"
+              :size="64"
+            />
+            <button v-if="isOwner" class="avatar-edit-overlay" @click="openAvatarPicker">编辑</button>
+          </div>
           <input
             ref="avatarInputRef"
             type="file"
@@ -231,13 +328,19 @@ async function handleExit() {
         </div>
 
         <div class="quick-actions">
-          <button class="secondary-action-btn" @click="togglePin">
+          <button class="secondary-action-btn icon-action-btn" @click="togglePin">
+            <span class="action-icon pin-action-icon" aria-hidden="true">
+              <svg viewBox="0 0 24 24"><path d="M14 3l7 7-2 2-1.5-1.5-4.5 4.5v4l-1 1-3.5-3.5-4 4-1.5-1.5 4-4L3 11.5l1-1h4L12.5 6 11 4.5 14 3z" /></svg>
+            </span>
             {{ Number(groupInfo?.top || 0) === 1 ? '取消置顶' : '置顶群聊' }}
           </button>
-          <button class="secondary-action-btn" @click="toggleMute">
+          <button class="secondary-action-btn icon-action-btn" @click="toggleMute">
+            <span class="action-icon mute-action-icon" aria-hidden="true">
+              <svg viewBox="0 0 24 24"><path d="M4 4.8L5.2 3.6 20.4 18.8 19.2 20l-2.5-2.5H8.8L5 21.2V8.8L4 4.8zM7 8.4v7.6l1.1-1.1h5.2L7 8.4zM9.6 5h6.9A2.5 2.5 0 0 1 19 7.5v7.1l-2-2V7.5a.5.5 0 0 0-.5-.5h-4.9l-2-2z" /></svg>
+            </span>
             {{ Number(groupInfo?.mute || 0) === 1 ? '关闭免打扰' : '消息免打扰' }}
           </button>
-          <button class="secondary-action-btn" @click="inviteMembersPrompt">
+          <button class="secondary-action-btn" @click="openInviteModal">
             邀请成员
           </button>
         </div>
@@ -250,6 +353,43 @@ async function handleExit() {
           <button v-else class="action-btn exit-btn" @click="handleExit">
             退出群聊
           </button>
+        </div>
+      </div>
+    </div>
+    <div v-if="showInviteModal" class="modal-mask">
+      <div class="invite-modal" @click.stop>
+        <div class="invite-title">邀请成员</div>
+        <div class="invite-desc">搜索用户后添加到邀请列表，也可以输入多个 UID 后直接确认</div>
+        <div class="invite-search-row">
+          <input
+            v-model="inviteKeyword"
+            class="invite-input"
+            type="text"
+            placeholder="输入 UID、手机号或短编号"
+            @keydown.enter.prevent="searchInviteUser"
+          />
+          <button class="modal-btn secondary" :disabled="inviteSearching" @click="searchInviteUser">
+            {{ inviteSearching ? '搜索中' : '搜索' }}
+          </button>
+        </div>
+        <div v-if="inviteSearchResult" class="invite-result">
+          <ChannelAvatar :avatar="inviteSearchResult.avatar" :name="inviteSearchResult.name || inviteSearchResult.uid" :size="32" />
+          <span class="invite-result-name">{{ inviteSearchResult.name || inviteSearchResult.uid }}</span>
+          <button class="small-link-btn" @click="addInviteUser(inviteSearchResult)">添加</button>
+        </div>
+        <div v-if="selectedInviteUsers.length > 0" class="selected-users">
+          <span
+            v-for="user in selectedInviteUsers"
+            :key="user.uid"
+            class="selected-user-chip"
+          >
+            {{ user.name || user.uid }}
+            <button @click="removeInviteUser(user.uid)">×</button>
+          </span>
+        </div>
+        <div class="invite-actions">
+          <button class="modal-btn secondary" @click="showInviteModal = false">取消</button>
+          <button class="modal-btn primary" @click="submitInviteMembers">确认邀请</button>
         </div>
       </div>
     </div>
@@ -323,6 +463,28 @@ async function handleExit() {
   gap: 16px;
   border-bottom: var(--border-hairline);
   padding-bottom: 24px;
+}
+
+.avatar-wrap {
+  position: relative;
+}
+
+.group-profile-section :deep(.channel-avatar) {
+  position: relative;
+}
+
+.avatar-edit-overlay {
+  position: absolute;
+  inset: 0;
+  border-radius: 50%;
+  background: rgba(0, 0, 0, 0.34);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #fff;
+  font-size: 12px;
+  border: none;
+  cursor: pointer;
 }
 
 .hidden-input {
@@ -510,6 +672,26 @@ async function handleExit() {
   cursor: pointer;
 }
 
+.icon-action-btn {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  justify-content: center;
+}
+
+.action-icon {
+  width: 14px;
+  height: 14px;
+  display: inline-flex;
+  color: var(--text-secondary);
+}
+
+.action-icon svg {
+  width: 100%;
+  height: 100%;
+  fill: currentColor;
+}
+
 .danger-zone {
   display: flex;
   flex-direction: column;
@@ -536,5 +718,126 @@ async function handleExit() {
   background-color: var(--bg-secondary);
   color: var(--text-primary);
   border: var(--border-hairline);
+}
+
+.modal-mask {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.36);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 2100;
+}
+
+.invite-modal {
+  width: 420px;
+  background: var(--bg-primary);
+  border-radius: 8px;
+  padding: 20px;
+  box-shadow: 0 16px 48px rgba(0, 0, 0, 0.18);
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.invite-title {
+  font-size: 16px;
+  font-weight: 600;
+  color: var(--text-primary);
+}
+
+.invite-desc {
+  font-size: 12px;
+  color: var(--text-secondary);
+}
+
+.invite-search-row {
+  display: flex;
+  gap: 10px;
+}
+
+.invite-input {
+  width: 100%;
+  height: 34px;
+  border: var(--border-hairline);
+  border-radius: var(--radius-sm);
+  background: var(--bg-secondary);
+  color: var(--text-primary);
+  padding: 0 10px;
+  outline: none;
+}
+
+.invite-result {
+  height: 44px;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 6px 8px;
+  border: var(--border-hairline);
+  border-radius: var(--radius-sm);
+}
+
+.invite-result-name {
+  flex: 1;
+  font-size: 13px;
+  color: var(--text-primary);
+}
+
+.small-link-btn {
+  border: none;
+  background: none;
+  color: var(--primary-color, #165dff);
+  cursor: pointer;
+}
+
+.selected-users {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.selected-user-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  height: 26px;
+  padding: 0 8px;
+  background: var(--bg-secondary);
+  border: var(--border-hairline);
+  border-radius: var(--radius-sm);
+  font-size: 12px;
+}
+
+.selected-user-chip button {
+  border: none;
+  background: none;
+  color: var(--text-secondary);
+  cursor: pointer;
+}
+
+.invite-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 10px;
+}
+
+.modal-btn {
+  height: 34px;
+  min-width: 84px;
+  border-radius: var(--radius-sm);
+  border: none;
+  cursor: pointer;
+}
+
+.modal-btn.secondary {
+  background: var(--bg-secondary);
+  color: var(--text-primary);
+  border: var(--border-hairline);
+}
+
+.modal-btn.primary {
+  background: var(--primary-color, #165dff);
+  color: #fff;
 }
 </style>

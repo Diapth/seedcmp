@@ -472,7 +472,7 @@ export const useConversationStore = defineStore('conversation', () => {
       if (message) {
         conv.last_msg_seq = message.messageSeq || conv.last_msg_seq;
         conv.last_msg_time = message.timestamp || conv.last_msg_time || Math.floor(Date.now() / 1000);
-        if (isDigest) {
+        if (isDigest || !conv.last_message) {
           conv.last_message = normalizedMsg;
         }
       }

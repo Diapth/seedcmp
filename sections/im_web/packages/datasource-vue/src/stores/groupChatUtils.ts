@@ -119,18 +119,19 @@ export function canRemoveGroupAdmin(group: any, member: any): boolean {
   return getMyGroupRole(group) === GROUP_ROLE_OWNER && Number(member?.role || 0) === GROUP_ROLE_ADMIN;
 }
 
-export function buildConversationFromGroup(group: NormalizedGroup, now = Math.floor(Date.now() / 1000)) {
+export function buildConversationFromGroup(group: NormalizedGroup) {
+  const lastMessageTime = Number(group.last_msg_time || group.lastMsgTime || group.updated_at_time || group.updatedAtTime || group.updated_at || group.updatedAt || group.created_at_time || group.createdAtTime || 0) || 0;
   return {
     channel_id: group.group_no,
     channel_type: 2,
     unread: 0,
     last_msg_seq: 0,
-    last_msg_time: Number(group.updated_at_time || group.updatedAtTime || 0) || now,
+    last_msg_time: lastMessageTime,
     last_message: {
       payload: { type: 1000, text: `你已加入群聊 ${group.name}` },
       content: { type: 1000, text: `你已加入群聊 ${group.name}` },
       messageSeq: 0,
-      timestamp: Number(group.updated_at_time || group.updatedAtTime || 0) || now,
+      timestamp: lastMessageTime,
       fromUID: '',
     },
     top: Number(group.top || 0),
