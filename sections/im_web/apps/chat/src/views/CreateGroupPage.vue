@@ -2,12 +2,13 @@
 import { ref, onMounted } from 'vue';
 import { useRouter } from 'vue-router';
 import { useContactStore } from '@tsdaodao/contacts-vue';
-import { groupApi } from '@tsdaodao/datasource-vue';
+import { groupApi, useGroupStore } from '@tsdaodao/datasource-vue';
 import { ChannelAvatar } from '@tsdaodao/base-vue';
 import { Message } from '@arco-design/web-vue';
 
 const router = useRouter();
 const contactStore = useContactStore();
+const groupStore = useGroupStore();
 
 const groupName = ref('');
 const selectedUids = ref<string[]>([]);
@@ -46,6 +47,7 @@ async function handleCreate() {
     
     const groupNo = res.data?.group_no || res.group_no;
     if (groupNo) {
+      groupStore.upsertGroup(res.data || res);
       Message.success('群组创建成功');
       router.push(`/chat/conversation/${groupNo}/2`);
     } else {

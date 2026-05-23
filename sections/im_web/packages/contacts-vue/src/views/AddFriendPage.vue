@@ -1,15 +1,20 @@
 <script setup lang="ts">
 import { ref } from 'vue';
 import { useRouter } from 'vue-router';
-import { friendApi } from '@tsdaodao/datasource-vue';
+import { friendApi, useUserStore } from '@tsdaodao/datasource-vue';
 import { ChannelAvatar } from '@tsdaodao/base-vue';
 import { Message } from '@arco-design/web-vue';
+import { useContactStore } from '../stores/contactStore';
+import { getFriendSearchState, type FriendSearchState } from '../utils/friendSearchState';
 
 const router = useRouter();
+const contactStore = useContactStore();
+const userStore = useUserStore();
 
 const keyword = ref('');
 const searching = ref(false);
 const result = ref<any>(null);
+const searchState = ref<FriendSearchState | null>(null);
 const applying = ref(false);
 const remarkText = ref('我是...');
 
@@ -17,16 +22,23 @@ async function handleSearch() {
   if (!keyword.value.trim()) return;
   searching.value = true;
   result.value = null;
+  searchState.value = null;
   
   try {
+    await contactStore.syncContacts();
     const res: any = await friendApi.searchUser(keyword.value);
     if (res && res.exist === 1 && res.data) {
       const userData = res.data;
-      if (userData.follow === 1) {
-        Message.info('该用户已是你的好友');
-        router.push(`/chat/conversation/${userData.uid}/1`);
+      const state = getFriendSearchState(userData, {
+        currentUid: userStore.currentUser?.uid,
+        contacts: contactStore.contacts
+      });
+      if (state.type !== 'can_apply') {
+        searchState.value = state;
+        result.value = userData;
         return;
       }
+      searchState.value = state;
       result.value = userData;
     } else {
       Message.error('用户不存在');
@@ -39,7 +51,7 @@ async function handleSearch() {
 }
 
 async function handleApply() {
-  if (!result.value) return;
+  if (!result.value || searchState.value?.type !== 'can_apply') return;
   applying.value = true;
   
   try {
@@ -64,6 +76,11 @@ async function handleApply() {
 
 function handleGoBack() {
   router.push('/chat');
+}
+
+function handleOpenConversation() {
+  if (!result.value || searchState.value?.type !== 'friend') return;
+  router.push(`/chat/conversation/${result.value.uid}/1`);
 }
 </script>
 
@@ -113,7 +130,16 @@ function handleGoBack() {
           </div>
         </div>
 
-        <div class="apply-form">
+        <div v-if="searchState?.type === 'self'" class="state-panel">
+          <span class="state-text">{{ searchState.message }}</span>
+        </div>
+
+        <div v-else-if="searchState?.type === 'friend'" class="state-panel">
+          <span class="state-text">{{ searchState.message }}</span>
+          <button class="open-chat-btn" @click="handleOpenConversation">进入会话</button>
+        </div>
+
+        <div v-else class="apply-form">
           <label class="form-label">验证消息</label>
           <input 
             v-model="remarkText" 
@@ -235,6 +261,38 @@ function handleGoBack() {
   display: flex;
   flex-direction: column;
   gap: 20px;
+}
+
+.state-panel {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 12px;
+  background-color: var(--bg-primary);
+  border: var(--border-hairline);
+  border-radius: var(--radius-sm);
+}
+
+.state-text {
+  font-size: 13px;
+  color: var(--text-secondary);
+}
+
+.open-chat-btn {
+  height: 32px;
+  padding: 0 14px;
+  background-color: var(--primary-color, #165dff);
+  color: #ffffff;
+  border: none;
+  border-radius: var(--radius-sm);
+  font-size: 13px;
+  cursor: pointer;
+  flex-shrink: 0;
+}
+
+.open-chat-btn:hover {
+  opacity: 0.9;
 }
 
 .user-row {

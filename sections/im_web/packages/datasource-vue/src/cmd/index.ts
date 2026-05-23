@@ -136,7 +136,9 @@ export function registerMessageListeners() {
       pendingClientMsgNoBySeq.set(message.clientSeq, message.clientMsgNo);
     }
 
-    messageStore.addRealtimeMessage(channelId, channelType, message);
+    messageStore.addRealtimeMessage(channelId, channelType, message, {
+      isUnreadCleared: !isOwnMessage && isViewingChannel
+    });
 
     if (!isOwnMessage && isViewingChannel) {
       conversationStore.clearUnread(channelId, channelType);

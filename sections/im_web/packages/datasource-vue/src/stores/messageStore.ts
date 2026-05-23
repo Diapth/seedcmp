@@ -17,6 +17,7 @@ export interface Message {
   status: 'sending' | 'success' | 'fail';
   reactions?: any[];
   remoteExtra?: any;
+  isUnreadCleared?: boolean;
 }
 
 export interface Reaction {
@@ -170,7 +171,8 @@ export const useMessageStore = defineStore('message', () => {
         timestamp: msg.timestamp,
         fromUID: msg.fromUID,
         payload: msg.content,
-        isOwnMessage: msg.fromUID === userStore.currentUser?.uid
+        isOwnMessage: msg.fromUID === userStore.currentUser?.uid,
+        isUnreadCleared: msg.isUnreadCleared === true
       });
     }
   }
@@ -192,7 +194,7 @@ export const useMessageStore = defineStore('message', () => {
     return normalizeMessageContent(content);
   }
 
-  function addRealtimeMessage(channelId: string, channelType: number, rawMessage: WKMessage) {
+  function addRealtimeMessage(channelId: string, channelType: number, rawMessage: WKMessage, options?: { isUnreadCleared?: boolean }) {
     const normalized: Message = {
       messageID: rawMessage.messageID,
       messageSeq: rawMessage.messageSeq,
@@ -204,7 +206,8 @@ export const useMessageStore = defineStore('message', () => {
       revokeUID: rawMessage.remoteExtra?.revoker,
       status: rawMessage.status === 2 ? 'fail' : (rawMessage.status === 0 ? 'sending' : 'success'),
       reactions: rawMessage.reactions || [],
-      remoteExtra: rawMessage.remoteExtra
+      remoteExtra: rawMessage.remoteExtra,
+      isUnreadCleared: options?.isUnreadCleared === true
     };
     addMessage(channelId, channelType, normalized);
   }

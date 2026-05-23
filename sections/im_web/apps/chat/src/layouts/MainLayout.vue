@@ -4,6 +4,7 @@ import { useRouter } from 'vue-router';
 import { useUserStore } from '@tsdaodao/datasource-vue';
 import { useConversationStore } from '@tsdaodao/datasource-vue';
 import { useKickoutStore } from '@tsdaodao/datasource-vue';
+import { useGroupStore } from '@tsdaodao/datasource-vue';
 import { KickoutOverlay, ChannelAvatar } from '@tsdaodao/base-vue';
 import ConversationList from '../views/ConversationList.vue';
 import { ContactList } from '@tsdaodao/contacts-vue';
@@ -19,11 +20,14 @@ const router = useRouter();
 const userStore = useUserStore();
 const conversationStore = useConversationStore();
 const kickoutStore = useKickoutStore();
+const groupStore = useGroupStore();
 
 onMounted(async () => {
   if (userStore.isLoggedIn && userStore.currentUser) {
-    // Sync conversations on startup
-    await conversationStore.syncConversations();
+    await Promise.all([
+      conversationStore.syncConversations(),
+      groupStore.fetchMyGroups()
+    ]);
   }
 });
 

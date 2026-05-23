@@ -2,6 +2,7 @@ import { defineStore } from 'pinia';
 import { ref, computed } from 'vue';
 import { syncApi } from '../api';
 import { useChannelStore } from './channelStore';
+import { useGroupStore } from './groupStore';
 import { useUserStore } from './userStore';
 
 export interface Conversation {
@@ -22,11 +23,13 @@ export const useConversationStore = defineStore('conversation', () => {
   const conversations = ref<Conversation[]>([]);
   const drafts = ref<Record<string, string>>({});
   const unreadMap = ref<Record<string, number>>({});
+  const clearedUnreadSeqs = ref<Record<string, number>>({});
   const lastSyncVersion = ref<number>(0);
   const manuallyDeletedConversationKeys = ref<Record<string, true>>({});
   const draftSyncTimers = ref<Record<string, ReturnType<typeof setTimeout>>>({});
 
   const channelStore = useChannelStore();
+  const groupStore = useGroupStore();
   const userStore = useUserStore();
 
   function getConversationKey(channelId: string, channelType: number) {
@@ -183,6 +186,17 @@ export const useConversationStore = defineStore('conversation', () => {
     console.warn(`[ConversationStore] Remote ${action} command failed; local state was kept`, e);
   }
 
+  function getEffectiveUnread(item: any, key: string) {
+    const unread = Number(item.unread || 0);
+    const clearedSeq = Number(clearedUnreadSeqs.value[key] || 0);
+    const itemSeq = Number(item.last_msg_seq || item.message_seq || item.last_message?.message_seq || item.last_message?.messageSeq || 0);
+
+    if (clearedSeq > 0 && itemSeq > 0 && itemSeq <= clearedSeq) {
+      return 0;
+    }
+    return unread;
+  }
+
   function upsertConversation(next: Conversation) {
     next = {
       ...next,
@@ -229,6 +243,7 @@ export const useConversationStore = defineStore('conversation', () => {
             top: g.top || g.stick || 0,
             mute: g.mute || 0
           });
+          groupStore.upsertGroup(g);
         }
       }
 
@@ -237,10 +252,11 @@ export const useConversationStore = defineStore('conversation', () => {
         const channelType = Number(item.channel_type);
         const key = getConversationKey(channelId, channelType);
         const info = await channelStore.getChannelInfo(channelId, channelType);
+        const effectiveUnread = getEffectiveUnread(item, key);
 
-        upsertConversation(normalizeConversationInput(item, info));
+        upsertConversation(normalizeConversationInput({ ...item, unread: effectiveUnread }, info));
 
-        unreadMap.value[key] = Number(item.unread || 0);
+        unreadMap.value[key] = effectiveUnread;
       }
       await syncExtra();
     } catch (e) {
@@ -325,6 +341,7 @@ export const useConversationStore = defineStore('conversation', () => {
     const conv = findConversation(channelId, channelType);
     if (conv) {
       conv.unread = 0;
+      clearedUnreadSeqs.value[key] = Math.max(Number(clearedUnreadSeqs.value[key] || 0), Number(conv.last_msg_seq || 0));
     }
     try {
       await syncApi.clearUnread(channelId, channelType);
@@ -344,6 +361,11 @@ export const useConversationStore = defineStore('conversation', () => {
     const isOwnMessage = message.isOwnMessage === true || message.fromUID === userStore.currentUser?.uid;
     const isDigest = isConversationDigestSource(message);
     const normalizedMsg = normalizeLastMessage({ last_message: message });
+    const messageSeq = Number(message.messageSeq || 0);
+
+    if (message.isUnreadCleared && isDigest) {
+      clearedUnreadSeqs.value[key] = Math.max(Number(clearedUnreadSeqs.value[key] || 0), messageSeq);
+    }
 
     if (conv) {
       conv.last_msg_seq = message.messageSeq || conv.last_msg_seq;
@@ -351,7 +373,10 @@ export const useConversationStore = defineStore('conversation', () => {
       if (isDigest) {
         conv.last_message = normalizedMsg;
       }
-      if (!isOwnMessage && !message.isUnreadCleared && isDigest) {
+      if (message.isUnreadCleared && isDigest) {
+        conv.unread = 0;
+        unreadMap.value[key] = 0;
+      } else if (!isOwnMessage && isDigest) {
         conv.unread++;
         unreadMap.value[key] = conv.unread;
       }
@@ -433,6 +458,7 @@ export const useConversationStore = defineStore('conversation', () => {
     conversations,
     drafts,
     unreadMap,
+    clearedUnreadSeqs,
     sortedConversations,
     totalUnreadCount,
     uniqueConversations,

@@ -23,6 +23,10 @@ function handleAddFriend() {
   router.push('/chat/add-friend');
 }
 
+function handleCreateGroup() {
+  router.push('/chat/create-group');
+}
+
 function handleGroupClick(groupNo: string) {
   router.push(`/chat/conversation/${groupNo}/2`);
 }
@@ -77,6 +81,18 @@ function scrollToLetter(letter: string) {
           </svg>
         </div>
         <div class="action-label">添加好友</div>
+      </div>
+
+      <div class="action-item" @click="handleCreateGroup">
+        <div class="action-icon create-group-icon">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" class="svg-icon">
+            <path d="M17 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2" />
+            <circle cx="9.5" cy="7" r="4" />
+            <line x1="19" y1="8" x2="19" y2="14" />
+            <line x1="22" y1="11" x2="16" y2="11" />
+          </svg>
+        </div>
+        <div class="action-label">发起群聊</div>
       </div>
 
       <div class="action-item" @click="scrollToGroupList">
@@ -214,6 +230,10 @@ function scrollToLetter(letter: string) {
 
 .add-icon {
   background-color: #52c41a;
+}
+
+.create-group-icon {
+  background-color: #fa8c16;
 }
 
 .group-icon {

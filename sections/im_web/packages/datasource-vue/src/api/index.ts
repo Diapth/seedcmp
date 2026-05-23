@@ -220,9 +220,16 @@ export const syncApi = {
   syncConversationExtra(data: { version: number }) {
     return apiClient.post('conversation/extra/sync', data);
   },
-  // 更新最近会话扩展属性 (草稿置顶等)
-  updateConversationExtra(channelId: string, channelType: number, data: { draft?: string; browse_to?: number; keep_message_seq?: number; keep_offset_y?: number; top?: number }) {
-    return apiClient.post(`conversations/${channelId}/${channelType}/extra`, data);
+  // 更新最近会话扩展属性 (草稿置顶等，后端为 POST 方法)
+  updateConversationExtra(
+    channelIdOrData: string | { channel_id: string; channel_type: number; browse_to?: number; keep_message_seq?: number; keep_offset_y?: number; draft?: string; top?: number },
+    channelType?: number,
+    data?: { draft?: string; browse_to?: number; keep_message_seq?: number; keep_offset_y?: number; top?: number }
+  ) {
+    if (typeof channelIdOrData === 'object') {
+      return apiClient.post(`conversations/${channelIdOrData.channel_id}/${channelIdOrData.channel_type}/extra`, channelIdOrData);
+    }
+    return apiClient.post(`conversations/${channelIdOrData}/${channelType}/extra`, data || {});
   },
   // 删除最近会话
   deleteConversation(channelId: string, channelType: number) {
@@ -243,10 +250,6 @@ export const syncApi = {
   // 清除未读计数 (typo 拼写 coversation 保持一致，与后端路由匹配)
   clearUnread(channelId: string, channelType: number) {
     return apiClient.put('coversation/clearUnread', { channel_id: channelId, channel_type: channelType });
-  },
-  // 更新最近会话扩展信息 (后端为 POST 方法)
-  updateConversationExtra(data: { channel_id: string; channel_type: number; browse_to?: number; keep_message_seq?: number; keep_offset_y?: number; draft?: string }) {
-    return apiClient.post(`conversations/${data.channel_id}/${data.channel_type}/extra`, data);
   },
   // 消息回应/表态
   addReaction(data: { channel_id: string; channel_type: number; message_id: string; emoji: string }) {

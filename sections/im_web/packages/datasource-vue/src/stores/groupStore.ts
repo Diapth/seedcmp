@@ -28,8 +28,19 @@ export const useGroupStore = defineStore('group', () => {
       status: Number(input.status || 0),
       mute: Number(input.mute || 0),
       top: Number(input.top || input.stick || 0),
-      save: Number(input.save || 0)
+      save: Number(input.save || input.saved || 0) || 1
     };
+  }
+
+  function upsertGroup(input: any) {
+    const group = normalizeGroup(input);
+    if (!group) return null;
+
+    groups.value[group.group_no] = {
+      ...(groups.value[group.group_no] || {}),
+      ...group
+    };
+    return groups.value[group.group_no];
   }
 
   async function fetchMyGroups() {
@@ -37,10 +48,7 @@ export const useGroupStore = defineStore('group', () => {
       const res: any = await groupApi.getMyGroups();
       const list = Array.isArray(res) ? res : (res?.list || res?.groups || []);
       list.forEach((item: any) => {
-        const group = normalizeGroup(item);
-        if (group) {
-          groups.value[group.group_no] = group;
-        }
+        upsertGroup(item);
       });
     } catch (e) {
       console.error(e);
@@ -51,11 +59,7 @@ export const useGroupStore = defineStore('group', () => {
     if (groups.value[groupNo]) return groups.value[groupNo];
     try {
       const res: any = await groupApi.getGroupInfo(groupNo);
-      const g = normalizeGroup(res);
-      if (g) {
-        groups.value[groupNo] = g;
-      }
-      return g;
+      return upsertGroup(res);
     } catch (e) {
       console.error(e);
       return null;
@@ -87,6 +91,7 @@ export const useGroupStore = defineStore('group', () => {
     groups,
     groupMembers,
     savedGroups,
+    upsertGroup,
     fetchMyGroups,
     getGroupInfo,
     fetchGroupMembers
