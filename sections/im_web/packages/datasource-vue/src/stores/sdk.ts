@@ -4,6 +4,7 @@ import WKSDK, { ConnectStatus } from 'wukongimjssdk';
 import { apiClient } from '@tsdaodao/base-vue';
 import { registerCMDListeners, registerMessageListeners } from '../cmd';
 import { registerMessageContentTypes } from '../contentTypes';
+import { resolveWebsocketConnectAddr } from './sdkAddress';
 
 export const useSdkStore = defineStore('sdk', () => {
   const isConnected = ref(false);
@@ -61,10 +62,10 @@ export const useSdkStore = defineStore('sdk', () => {
     WKSDK.shared().config.provider.connectAddrCallback = async (cb) => {
       try {
         const res: any = await apiClient.get(`users/${uid}/im`);
-        cb(res.ws_addr || 'ws://100.79.157.76:5200');
+        cb(resolveWebsocketConnectAddr(res?.ws_addr));
       } catch (err) {
         console.error('[SDK] Failed to get connect address, falling back', err);
-        cb('ws://100.79.157.76:5200');
+        cb(resolveWebsocketConnectAddr(''));
       }
     };
 

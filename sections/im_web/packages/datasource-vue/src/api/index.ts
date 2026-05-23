@@ -240,9 +240,13 @@ export const syncApi = {
   markReaded(data: { channel_id: string; channel_type: number; message_ids: string[] }) {
     return apiClient.post('message/readed', data);
   },
-  // 清除未读计数 (typo 拼写 coversation 保持一致)
+  // 清除未读计数 (typo 拼写 coversation 保持一致，与后端路由匹配)
   clearUnread(channelId: string, channelType: number) {
     return apiClient.put('coversation/clearUnread', { channel_id: channelId, channel_type: channelType });
+  },
+  // 更新最近会话扩展信息 (后端为 POST 方法)
+  updateConversationExtra(data: { channel_id: string; channel_type: number; browse_to?: number; keep_message_seq?: number; keep_offset_y?: number; draft?: string }) {
+    return apiClient.post(`conversations/${data.channel_id}/${data.channel_type}/extra`, data);
   },
   // 消息回应/表态
   addReaction(data: { channel_id: string; channel_type: number; message_id: string; emoji: string }) {
