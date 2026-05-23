@@ -76,6 +76,14 @@ export const useConversationStore = defineStore('conversation', () => {
     return raw && ![99, 1000].includes(getMessageType(raw));
   }
 
+  function isGroupJoinPlaceholder(conv?: Conversation) {
+    if (!conv || Number(conv.channel_type) !== 2) return false;
+    const type = getMessageType(conv.last_message || {});
+    const payload = normalizeMessagePayload(conv.last_message || {});
+    const text = String(payload?.text || payload?.content || '');
+    return [99, 1000].includes(type) && text.includes('你已加入群聊');
+  }
+
   function getLastMessageSource(item: any) {
     const recents = Array.isArray(item.recents) ? item.recents : [];
     const messages = Array.isArray(item.messages) ? item.messages : [];
@@ -103,6 +111,37 @@ export const useConversationStore = defineStore('conversation', () => {
       timestamp: raw.timestamp || item.timestamp || item.last_msg_time || 0,
       fromUID: raw.fromUID || raw.from_uid || raw.from || ''
     };
+  }
+
+  function normalizeSyncedMessage(item: any) {
+    return {
+      ...item,
+      payload: normalizeMessagePayload(item),
+      content: normalizeMessagePayload(item),
+      messageSeq: item.messageSeq || item.message_seq || 0,
+      timestamp: item.timestamp || 0,
+      fromUID: item.fromUID || item.from_uid || item.from || ''
+    };
+  }
+
+  function getLatestConversationMessageFromHistory(list: any[]) {
+    const normalized = list
+      .filter(item => item && item.is_deleted !== 1 && item.is_revoked !== 1 && item.revoke !== 1)
+      .map(normalizeSyncedMessage);
+    return [...normalized].reverse().find(isConversationDigestSource) || [...normalized].reverse()[0];
+  }
+
+  async function ensureConversationFromSyncedMessages(channelId: string, channelType: number, list: any[]) {
+    const lastMessage = getLatestConversationMessageFromHistory(list);
+    if (!lastMessage) return;
+    await ensureConversation(channelId, channelType, {
+      messageSeq: lastMessage.messageSeq,
+      timestamp: lastMessage.timestamp,
+      fromUID: lastMessage.fromUID,
+      payload: lastMessage.content,
+      isOwnMessage: lastMessage.fromUID === userStore.currentUser?.uid,
+      isUnreadCleared: true
+    });
   }
 
   function normalizeConversationInput(item: any, info: any): Conversation {
@@ -288,11 +327,37 @@ export const useConversationStore = defineStore('conversation', () => {
     }
   }
 
+  async function prefetchMissingGroupConversationSummaries() {
+    const groups = Object.values(groupStore.groups);
+    await Promise.all(groups.map(async (group) => {
+      const conv = findConversation(group.group_no, 2);
+      if (conv && !isGroupJoinPlaceholder(conv)) return;
+
+      try {
+        const res: any = await syncApi.syncMessages({
+          channel_id: group.group_no,
+          channel_type: 2,
+          limit: 30,
+          start_message_seq: 0,
+          end_message_seq: 0,
+          pull_mode: 1
+        });
+        const list = Array.isArray(res?.messages) ? res.messages : [];
+        if (!conv || isGroupJoinPlaceholder(conv)) {
+          await ensureConversationFromSyncedMessages(group.group_no, 2, list);
+        }
+      } catch (e) {
+        console.warn(`[ConversationStore] Failed to prefetch group summary for ${group.group_no}`, e);
+      }
+    }));
+  }
+
   async function syncGroupConversations() {
     const version = resetVersion.value;
     await groupStore.fetchMyGroups();
     if (version !== resetVersion.value) return;
     ensureGroupConversations();
+    await prefetchMissingGroupConversationSummaries();
   }
 
   async function syncExtra() {

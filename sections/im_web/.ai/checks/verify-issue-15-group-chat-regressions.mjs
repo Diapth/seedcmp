@@ -24,6 +24,7 @@ const conversationList = read('apps/chat/src/views/ConversationList.vue');
 const conversationPresentation = read('apps/chat/src/utils/conversationPresentation.ts');
 const groupSettingsDrawer = read('packages/base-vue/src/components/GroupSettingsDrawer.vue');
 const messageStore = read('packages/datasource-vue/src/stores/messageStore.ts');
+const conversationStore = read('packages/datasource-vue/src/stores/conversationStore.ts');
 
 assertContains(
   'group placeholder conversations prefer historical last message time and preserve missing timestamps as zero',
@@ -161,6 +162,18 @@ assertContains(
   'message store can fall back to latest system message when no normal history exists',
   messageStore,
   /getLatestConversationMessage\([\s\S]*getLatestConversationDigestMessage\(list\) \|\|/
+);
+
+assertContains(
+  'conversation store prefetches group message summaries when conversation sync omits group conversations',
+  conversationStore,
+  /prefetchMissingGroupConversationSummaries[\s\S]*syncApi\.syncMessages[\s\S]*ensureConversationFromSyncedMessages/
+);
+
+assertContains(
+  'conversation store only keeps group join placeholders when no history messages exist',
+  conversationStore,
+  /isGroupJoinPlaceholder[\s\S]*prefetchMissingGroupConversationSummaries[\s\S]*!conv \|\| isGroupJoinPlaceholder\(conv\)/
 );
 
 console.log('issue 15 group chat regression checks passed');

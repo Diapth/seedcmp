@@ -237,6 +237,38 @@
    - `apps/chat/tests/conversationPresentation.test.ts` 覆盖会话时间格式化和结构化摘要行为。
    - `packages/datasource-vue/tests/groupChatUtils.test.ts` 增加系统消息 `created_at_time` 参与群会话时间的回归用例。
 
+### 2026-05-23 真实环境追查补充
+
+用户反馈“所有群聊只有点进去之后才能在会话条中看到最后一条消息，不然全是系统提示”。真实 API 排查结果：
+
+1. `POST /v1/conversation/sync` 当前只返回单聊会话，没有返回任何 `channel_type = 2` 的群聊会话。
+2. `GET /v1/group/my` 能返回用户加入的群列表，但不包含最后一条历史消息摘要。
+3. `POST /v1/message/channel/sync` 对这些群能拉到真实历史消息，例如：
+   - `TestGroup1` 最后一条普通消息为 `Hello Group!`。
+   - `1231313131` 最后一条普通消息为 `shiashia`。
+   - `你好` 最后一条普通消息为 `@123`。
+
+已完成补充修复：
+
+1. `sections/im_web/packages/datasource-vue/src/stores/conversationStore.ts`
+   - 新增 `prefetchMissingGroupConversationSummaries()`。
+   - 当 `conversation/sync` 没有返回群聊摘要，且本地会话仍是“你已加入群聊”占位时，首屏主动调用 `message/channel/sync` 拉取该群最近历史消息。
+   - 优先选择最后一条非系统消息作为会话摘要和排序时间；如果群确实没有任何历史消息，才保留“你已加入群聊”系统占位。
+
+2. `sections/im_web/.ai/checks/verify-issue-15-group-chat-regressions.mjs`
+   - 增加检查，确保会话 store 会为缺失群摘要的群预取历史消息，并且仅在无历史消息时保留入群占位。
+
+3. 真实前后端可视化验证
+   - 使用 `18337488675 / 123456` 登录本地最新前端并连接真实后端。
+   - 未点击任何群聊前，会话列表已经展示真实群消息摘要：
+     - `你好`：`leng_test_updated： @123`
+     - `TestGroup`：`leng_test_updated： 你好`
+     - `1231313131`：`leng_test_updated： shiashia`
+     - `TestGroup1`：`leng_test_updated： Hello Group!`
+   - 没有历史消息的群仍显示“你已加入群聊”，符合预期。
+
+![真实环境首屏群聊历史摘要预取成功](./imgs/real_15_06_group_summary_prefetch.png)
+
 ---
 
 ## 测试结果
