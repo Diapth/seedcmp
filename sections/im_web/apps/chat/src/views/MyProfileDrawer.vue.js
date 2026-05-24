@@ -13,7 +13,20 @@ const newName = ref('');
 const newAvatar = ref('');
 const isEditing = ref(false);
 const saving = ref(false);
+const notificationEnabled = ref(false);
+const notificationPermissionState = ref('unsupported');
+const notificationSaving = ref(false);
 const currentUser = computed(() => userStore.currentUser);
+const personalQrPayload = computed(() => {
+    if (!currentUser.value)
+        return '';
+    return JSON.stringify({
+        type: 'user',
+        uid: currentUser.value.uid,
+        name: currentUser.value.name,
+        short_no: currentUser.value.short_no || ''
+    });
+});
 function isNonBlockingCmdFailure(err) {
     const message = String(err?.msg || err?.message || '');
     return message.includes('发送消息失败') || message.includes('SendCMD') || message.includes('CMD');
@@ -23,8 +36,18 @@ watch(() => props.visible, (val) => {
         newName.value = currentUser.value.name || '';
         newAvatar.value = currentUser.value.avatar || '';
         isEditing.value = false;
+        syncNotificationPermission();
     }
 });
+function syncNotificationPermission() {
+    if (typeof Notification === 'undefined') {
+        notificationPermissionState.value = 'unsupported';
+        notificationEnabled.value = false;
+        return;
+    }
+    notificationPermissionState.value = Notification.permission;
+    notificationEnabled.value = Notification.permission === 'granted';
+}
 async function handleSave() {
     if (!newName.value.trim()) {
         Message.error('昵称不能为空');
@@ -32,12 +55,7 @@ async function handleSave() {
     }
     saving.value = true;
     try {
-        // 1. Update Profile (Name)
-        await userApi.updateProfile({ name: newName.value.trim() });
-        // 2. Local State update
-        if (userStore.currentUser) {
-            userStore.currentUser.name = newName.value.trim();
-        }
+        await userStore.updateProfile({ name: newName.value.trim() });
         Message.success('个人资料更新成功');
         isEditing.value = false;
     }
@@ -68,14 +86,51 @@ const presets = [
 async function selectPresetAvatar(url) {
     try {
         newAvatar.value = url;
-        // Update local state directly for mock / demonstration
-        if (userStore.currentUser) {
-            userStore.currentUser.avatar = url;
-        }
+        await userStore.updateAvatar(url);
         Message.success('头像设置成功');
     }
     catch (err) {
         console.error(err);
+        Message.error('头像设置失败');
+    }
+}
+async function toggleNotifications() {
+    notificationSaving.value = true;
+    try {
+        if (typeof Notification === 'undefined') {
+            notificationPermissionState.value = 'unsupported';
+            Message.warning('当前浏览器不支持桌面通知');
+            return;
+        }
+        let permission = Notification.permission;
+        if (permission === 'default') {
+            permission = await Notification.requestPermission();
+        }
+        notificationPermissionState.value = permission;
+        if (permission !== 'granted') {
+            notificationEnabled.value = false;
+            await userApi.unregisterDeviceToken().catch(() => undefined);
+            Message.warning(permission === 'denied' ? '浏览器已拒绝通知权限' : '通知权限未开启');
+            return;
+        }
+        notificationEnabled.value = !notificationEnabled.value;
+        if (notificationEnabled.value) {
+            await userApi.registerDeviceToken({
+                device_token: `web-${currentUser.value?.uid || 'anonymous'}`,
+                device_type: 'web'
+            });
+            Message.success('通知已开启');
+        }
+        else {
+            await userApi.unregisterDeviceToken();
+            Message.success('通知已关闭');
+        }
+    }
+    catch (err) {
+        Message.error(err.msg || '通知设置失败');
+    }
+    finally {
+        notificationSaving.value = false;
     }
 }
 function goToDevices() {
@@ -146,12 +201,22 @@ function __VLS_template() {
     __VLS_intrinsicElements.div;
     __VLS_intrinsicElements.div;
     __VLS_intrinsicElements.div;
+    __VLS_intrinsicElements.div;
+    __VLS_intrinsicElements.div;
+    __VLS_intrinsicElements.div;
+    __VLS_intrinsicElements.div;
+    __VLS_intrinsicElements.div;
+    __VLS_intrinsicElements.div;
     __VLS_intrinsicElements.h4;
     __VLS_intrinsicElements.h4;
     __VLS_intrinsicElements.h4;
     __VLS_intrinsicElements.h4;
     __VLS_intrinsicElements.h4;
     __VLS_intrinsicElements.h4;
+    __VLS_intrinsicElements.h4;
+    __VLS_intrinsicElements.h4;
+    __VLS_intrinsicElements.button;
+    __VLS_intrinsicElements.button;
     __VLS_intrinsicElements.button;
     __VLS_intrinsicElements.button;
     __VLS_intrinsicElements.button;
@@ -174,6 +239,8 @@ function __VLS_template() {
     __VLS_intrinsicElements.label;
     __VLS_intrinsicElements.input;
     __VLS_intrinsicElements.img;
+    __VLS_intrinsicElements.span;
+    __VLS_intrinsicElements.span;
     __VLS_intrinsicElements.span;
     __VLS_intrinsicElements.span;
     __VLS_intrinsicElements.span;
@@ -430,49 +497,55 @@ function __VLS_template() {
                             {
                                 const __VLS_140 = __VLS_intrinsicElements["div"];
                                 const __VLS_141 = __VLS_elementAsFunctionalComponent(__VLS_140);
-                                const __VLS_142 = __VLS_141({ ...{}, class: ("pref-item"), }, ...__VLS_functionalComponentArgsRest(__VLS_141));
-                                ({}({ ...{}, class: ("pref-item"), }));
+                                const __VLS_142 = __VLS_141({ ...{}, class: ("qr-box"), title: ((__VLS_ctx.personalQrPayload)), }, ...__VLS_functionalComponentArgsRest(__VLS_141));
+                                ({}({ ...{}, class: ("qr-box"), title: ((__VLS_ctx.personalQrPayload)), }));
                                 {
                                     const __VLS_145 = __VLS_intrinsicElements["div"];
                                     const __VLS_146 = __VLS_elementAsFunctionalComponent(__VLS_145);
-                                    const __VLS_147 = __VLS_146({ ...{}, class: ("pref-info"), }, ...__VLS_functionalComponentArgsRest(__VLS_146));
-                                    ({}({ ...{}, class: ("pref-info"), }));
-                                    {
-                                        const __VLS_150 = __VLS_intrinsicElements["span"];
-                                        const __VLS_151 = __VLS_elementAsFunctionalComponent(__VLS_150);
-                                        const __VLS_152 = __VLS_151({ ...{}, class: ("pref-title"), }, ...__VLS_functionalComponentArgsRest(__VLS_151));
-                                        ({}({ ...{}, class: ("pref-title"), }));
-                                        (__VLS_153.slots).default;
-                                        const __VLS_153 = __VLS_pickFunctionalComponentCtx(__VLS_150, __VLS_152);
-                                    }
-                                    {
-                                        const __VLS_155 = __VLS_intrinsicElements["span"];
-                                        const __VLS_156 = __VLS_elementAsFunctionalComponent(__VLS_155);
-                                        const __VLS_157 = __VLS_156({ ...{}, class: ("pref-desc"), }, ...__VLS_functionalComponentArgsRest(__VLS_156));
-                                        ({}({ ...{}, class: ("pref-desc"), }));
-                                        (__VLS_158.slots).default;
-                                        const __VLS_158 = __VLS_pickFunctionalComponentCtx(__VLS_155, __VLS_157);
+                                    const __VLS_147 = __VLS_146({ ...{}, class: ("qr-grid"), "aria-label": ("个人二维码"), }, ...__VLS_functionalComponentArgsRest(__VLS_146));
+                                    ({}({ ...{}, class: ("qr-grid"), "aria-label": ("个人二维码"), }));
+                                    for (const [idx] of __VLS_getVForSourceType((49))) {
+                                        {
+                                            const __VLS_150 = __VLS_intrinsicElements["span"];
+                                            const __VLS_151 = __VLS_elementAsFunctionalComponent(__VLS_150);
+                                            const __VLS_152 = __VLS_151({ ...{}, key: ((idx)), class: (({ dark: __VLS_ctx.personalQrPayload.charCodeAt(idx % __VLS_ctx.personalQrPayload.length || 0) % 2 === 0 })), }, ...__VLS_functionalComponentArgsRest(__VLS_151));
+                                            ({}({ ...{}, key: ((idx)), class: (({ dark: __VLS_ctx.personalQrPayload.charCodeAt(idx % __VLS_ctx.personalQrPayload.length || 0) % 2 === 0 })), }));
+                                            __VLS_styleScopedClasses = ({ dark: personalQrPayload.charCodeAt(idx % personalQrPayload.length || 0) % 2 === 0 });
+                                            const __VLS_153 = __VLS_pickFunctionalComponentCtx(__VLS_150, __VLS_152);
+                                        }
+                                        // @ts-ignore
+                                        [saving, saving, handleSave, saving, personalQrPayload, personalQrPayload, personalQrPayload, personalQrPayload, personalQrPayload, personalQrPayload,];
                                     }
                                     (__VLS_148.slots).default;
                                     const __VLS_148 = __VLS_pickFunctionalComponentCtx(__VLS_145, __VLS_147);
                                 }
                                 {
-                                    const __VLS_160 = __VLS_intrinsicElements["div"];
-                                    const __VLS_161 = __VLS_elementAsFunctionalComponent(__VLS_160);
-                                    const __VLS_162 = __VLS_161({ ...{}, class: ("toggle-switch active"), }, ...__VLS_functionalComponentArgsRest(__VLS_161));
-                                    ({}({ ...{}, class: ("toggle-switch active"), }));
-                                    {
-                                        const __VLS_165 = __VLS_intrinsicElements["div"];
-                                        const __VLS_166 = __VLS_elementAsFunctionalComponent(__VLS_165);
-                                        const __VLS_167 = __VLS_166({ ...{}, class: ("toggle-thumb"), }, ...__VLS_functionalComponentArgsRest(__VLS_166));
-                                        ({}({ ...{}, class: ("toggle-thumb"), }));
-                                        const __VLS_168 = __VLS_pickFunctionalComponentCtx(__VLS_165, __VLS_167);
-                                    }
-                                    (__VLS_163.slots).default;
-                                    const __VLS_163 = __VLS_pickFunctionalComponentCtx(__VLS_160, __VLS_162);
+                                    const __VLS_155 = __VLS_intrinsicElements["div"];
+                                    const __VLS_156 = __VLS_elementAsFunctionalComponent(__VLS_155);
+                                    const __VLS_157 = __VLS_156({ ...{}, class: ("qr-meta"), }, ...__VLS_functionalComponentArgsRest(__VLS_156));
+                                    ({}({ ...{}, class: ("qr-meta"), }));
+                                    (__VLS_ctx.currentUser.short_no || __VLS_ctx.currentUser.uid);
+                                    (__VLS_158.slots).default;
+                                    const __VLS_158 = __VLS_pickFunctionalComponentCtx(__VLS_155, __VLS_157);
                                 }
                                 (__VLS_143.slots).default;
                                 const __VLS_143 = __VLS_pickFunctionalComponentCtx(__VLS_140, __VLS_142);
+                            }
+                            (__VLS_133.slots).default;
+                            const __VLS_133 = __VLS_pickFunctionalComponentCtx(__VLS_130, __VLS_132);
+                        }
+                        {
+                            const __VLS_160 = __VLS_intrinsicElements["div"];
+                            const __VLS_161 = __VLS_elementAsFunctionalComponent(__VLS_160);
+                            const __VLS_162 = __VLS_161({ ...{}, class: ("form-section"), }, ...__VLS_functionalComponentArgsRest(__VLS_161));
+                            ({}({ ...{}, class: ("form-section"), }));
+                            {
+                                const __VLS_165 = __VLS_intrinsicElements["h4"];
+                                const __VLS_166 = __VLS_elementAsFunctionalComponent(__VLS_165);
+                                const __VLS_167 = __VLS_166({ ...{}, class: ("section-title"), }, ...__VLS_functionalComponentArgsRest(__VLS_166));
+                                ({}({ ...{}, class: ("section-title"), }));
+                                (__VLS_168.slots).default;
+                                const __VLS_168 = __VLS_pickFunctionalComponentCtx(__VLS_165, __VLS_167);
                             }
                             {
                                 const __VLS_170 = __VLS_intrinsicElements["div"];
@@ -497,6 +570,7 @@ function __VLS_template() {
                                         const __VLS_186 = __VLS_elementAsFunctionalComponent(__VLS_185);
                                         const __VLS_187 = __VLS_186({ ...{}, class: ("pref-desc"), }, ...__VLS_functionalComponentArgsRest(__VLS_186));
                                         ({}({ ...{}, class: ("pref-desc"), }));
+                                        (__VLS_ctx.notificationPermissionState === 'unsupported' ? '当前浏览器不支持通知' : __VLS_ctx.notificationPermissionState === 'denied' ? '浏览器已拒绝通知权限' : '收到新消息时显示桌面提醒');
                                         (__VLS_188.slots).default;
                                         const __VLS_188 = __VLS_pickFunctionalComponentCtx(__VLS_185, __VLS_187);
                                     }
@@ -504,61 +578,113 @@ function __VLS_template() {
                                     const __VLS_178 = __VLS_pickFunctionalComponentCtx(__VLS_175, __VLS_177);
                                 }
                                 {
-                                    const __VLS_190 = __VLS_intrinsicElements["div"];
+                                    const __VLS_190 = __VLS_intrinsicElements["button"];
                                     const __VLS_191 = __VLS_elementAsFunctionalComponent(__VLS_190);
-                                    const __VLS_192 = __VLS_191({ ...{}, class: ("toggle-switch active"), }, ...__VLS_functionalComponentArgsRest(__VLS_191));
-                                    ({}({ ...{}, class: ("toggle-switch active"), }));
+                                    const __VLS_192 = __VLS_191({ ...{ 'onClick': {}, }, class: ("toggle-switch"), disabled: ((__VLS_ctx.notificationSaving || __VLS_ctx.notificationPermissionState === 'unsupported')), }, ...__VLS_functionalComponentArgsRest(__VLS_191));
+                                    ({}({ ...{ 'onClick': {}, }, class: ("toggle-switch"), disabled: ((__VLS_ctx.notificationSaving || __VLS_ctx.notificationPermissionState === 'unsupported')), }));
+                                    ({ active: __VLS_ctx.notificationEnabled });
+                                    __VLS_styleScopedClasses = ({ active: notificationEnabled });
+                                    let __VLS_195 = { 'click': __VLS_pickEvent(__VLS_194['click'], {}.onClick) };
+                                    __VLS_195 = { click: (__VLS_ctx.toggleNotifications) };
                                     {
-                                        const __VLS_195 = __VLS_intrinsicElements["div"];
-                                        const __VLS_196 = __VLS_elementAsFunctionalComponent(__VLS_195);
-                                        const __VLS_197 = __VLS_196({ ...{}, class: ("toggle-thumb"), }, ...__VLS_functionalComponentArgsRest(__VLS_196));
+                                        const __VLS_196 = __VLS_intrinsicElements["div"];
+                                        const __VLS_197 = __VLS_elementAsFunctionalComponent(__VLS_196);
+                                        const __VLS_198 = __VLS_197({ ...{}, class: ("toggle-thumb"), }, ...__VLS_functionalComponentArgsRest(__VLS_197));
                                         ({}({ ...{}, class: ("toggle-thumb"), }));
-                                        const __VLS_198 = __VLS_pickFunctionalComponentCtx(__VLS_195, __VLS_197);
+                                        const __VLS_199 = __VLS_pickFunctionalComponentCtx(__VLS_196, __VLS_198);
                                     }
                                     (__VLS_193.slots).default;
                                     const __VLS_193 = __VLS_pickFunctionalComponentCtx(__VLS_190, __VLS_192);
+                                    let __VLS_194;
                                 }
                                 (__VLS_173.slots).default;
                                 const __VLS_173 = __VLS_pickFunctionalComponentCtx(__VLS_170, __VLS_172);
                             }
                             {
-                                const __VLS_200 = __VLS_intrinsicElements["div"];
-                                const __VLS_201 = __VLS_elementAsFunctionalComponent(__VLS_200);
-                                const __VLS_202 = __VLS_201({ ...{}, class: ("settings-actions"), }, ...__VLS_functionalComponentArgsRest(__VLS_201));
+                                const __VLS_201 = __VLS_intrinsicElements["div"];
+                                const __VLS_202 = __VLS_elementAsFunctionalComponent(__VLS_201);
+                                const __VLS_203 = __VLS_202({ ...{}, class: ("pref-item"), }, ...__VLS_functionalComponentArgsRest(__VLS_202));
+                                ({}({ ...{}, class: ("pref-item"), }));
+                                {
+                                    const __VLS_206 = __VLS_intrinsicElements["div"];
+                                    const __VLS_207 = __VLS_elementAsFunctionalComponent(__VLS_206);
+                                    const __VLS_208 = __VLS_207({ ...{}, class: ("pref-info"), }, ...__VLS_functionalComponentArgsRest(__VLS_207));
+                                    ({}({ ...{}, class: ("pref-info"), }));
+                                    {
+                                        const __VLS_211 = __VLS_intrinsicElements["span"];
+                                        const __VLS_212 = __VLS_elementAsFunctionalComponent(__VLS_211);
+                                        const __VLS_213 = __VLS_212({ ...{}, class: ("pref-title"), }, ...__VLS_functionalComponentArgsRest(__VLS_212));
+                                        ({}({ ...{}, class: ("pref-title"), }));
+                                        (__VLS_214.slots).default;
+                                        const __VLS_214 = __VLS_pickFunctionalComponentCtx(__VLS_211, __VLS_213);
+                                    }
+                                    {
+                                        const __VLS_216 = __VLS_intrinsicElements["span"];
+                                        const __VLS_217 = __VLS_elementAsFunctionalComponent(__VLS_216);
+                                        const __VLS_218 = __VLS_217({ ...{}, class: ("pref-desc"), }, ...__VLS_functionalComponentArgsRest(__VLS_217));
+                                        ({}({ ...{}, class: ("pref-desc"), }));
+                                        (__VLS_219.slots).default;
+                                        const __VLS_219 = __VLS_pickFunctionalComponentCtx(__VLS_216, __VLS_218);
+                                    }
+                                    (__VLS_209.slots).default;
+                                    const __VLS_209 = __VLS_pickFunctionalComponentCtx(__VLS_206, __VLS_208);
+                                }
+                                {
+                                    const __VLS_221 = __VLS_intrinsicElements["div"];
+                                    const __VLS_222 = __VLS_elementAsFunctionalComponent(__VLS_221);
+                                    const __VLS_223 = __VLS_222({ ...{}, class: ("toggle-switch active"), }, ...__VLS_functionalComponentArgsRest(__VLS_222));
+                                    ({}({ ...{}, class: ("toggle-switch active"), }));
+                                    {
+                                        const __VLS_226 = __VLS_intrinsicElements["div"];
+                                        const __VLS_227 = __VLS_elementAsFunctionalComponent(__VLS_226);
+                                        const __VLS_228 = __VLS_227({ ...{}, class: ("toggle-thumb"), }, ...__VLS_functionalComponentArgsRest(__VLS_227));
+                                        ({}({ ...{}, class: ("toggle-thumb"), }));
+                                        const __VLS_229 = __VLS_pickFunctionalComponentCtx(__VLS_226, __VLS_228);
+                                    }
+                                    (__VLS_224.slots).default;
+                                    const __VLS_224 = __VLS_pickFunctionalComponentCtx(__VLS_221, __VLS_223);
+                                }
+                                (__VLS_204.slots).default;
+                                const __VLS_204 = __VLS_pickFunctionalComponentCtx(__VLS_201, __VLS_203);
+                            }
+                            {
+                                const __VLS_231 = __VLS_intrinsicElements["div"];
+                                const __VLS_232 = __VLS_elementAsFunctionalComponent(__VLS_231);
+                                const __VLS_233 = __VLS_232({ ...{}, class: ("settings-actions"), }, ...__VLS_functionalComponentArgsRest(__VLS_232));
                                 ({}({ ...{}, class: ("settings-actions"), }));
                                 {
-                                    const __VLS_205 = __VLS_intrinsicElements["button"];
-                                    const __VLS_206 = __VLS_elementAsFunctionalComponent(__VLS_205);
-                                    const __VLS_207 = __VLS_206({ ...{ 'onClick': {}, }, class: ("secondary-btn"), }, ...__VLS_functionalComponentArgsRest(__VLS_206));
+                                    const __VLS_236 = __VLS_intrinsicElements["button"];
+                                    const __VLS_237 = __VLS_elementAsFunctionalComponent(__VLS_236);
+                                    const __VLS_238 = __VLS_237({ ...{ 'onClick': {}, }, class: ("secondary-btn"), }, ...__VLS_functionalComponentArgsRest(__VLS_237));
                                     ({}({ ...{ 'onClick': {}, }, class: ("secondary-btn"), }));
-                                    let __VLS_210 = { 'click': __VLS_pickEvent(__VLS_209['click'], {}.onClick) };
-                                    __VLS_210 = { click: (__VLS_ctx.goToDevices) };
-                                    (__VLS_208.slots).default;
-                                    const __VLS_208 = __VLS_pickFunctionalComponentCtx(__VLS_205, __VLS_207);
-                                    let __VLS_209;
+                                    let __VLS_241 = { 'click': __VLS_pickEvent(__VLS_240['click'], {}.onClick) };
+                                    __VLS_241 = { click: (__VLS_ctx.goToDevices) };
+                                    (__VLS_239.slots).default;
+                                    const __VLS_239 = __VLS_pickFunctionalComponentCtx(__VLS_236, __VLS_238);
+                                    let __VLS_240;
                                 }
                                 {
-                                    const __VLS_211 = __VLS_intrinsicElements["button"];
-                                    const __VLS_212 = __VLS_elementAsFunctionalComponent(__VLS_211);
-                                    const __VLS_213 = __VLS_212({ ...{ 'onClick': {}, }, class: ("secondary-btn"), }, ...__VLS_functionalComponentArgsRest(__VLS_212));
+                                    const __VLS_242 = __VLS_intrinsicElements["button"];
+                                    const __VLS_243 = __VLS_elementAsFunctionalComponent(__VLS_242);
+                                    const __VLS_244 = __VLS_243({ ...{ 'onClick': {}, }, class: ("secondary-btn"), }, ...__VLS_functionalComponentArgsRest(__VLS_243));
                                     ({}({ ...{ 'onClick': {}, }, class: ("secondary-btn"), }));
-                                    let __VLS_216 = { 'click': __VLS_pickEvent(__VLS_215['click'], {}.onClick) };
-                                    __VLS_216 = { click: (__VLS_ctx.goToBlacklist) };
-                                    (__VLS_214.slots).default;
-                                    const __VLS_214 = __VLS_pickFunctionalComponentCtx(__VLS_211, __VLS_213);
-                                    let __VLS_215;
+                                    let __VLS_247 = { 'click': __VLS_pickEvent(__VLS_246['click'], {}.onClick) };
+                                    __VLS_247 = { click: (__VLS_ctx.goToBlacklist) };
+                                    (__VLS_245.slots).default;
+                                    const __VLS_245 = __VLS_pickFunctionalComponentCtx(__VLS_242, __VLS_244);
+                                    let __VLS_246;
                                 }
-                                (__VLS_203.slots).default;
-                                const __VLS_203 = __VLS_pickFunctionalComponentCtx(__VLS_200, __VLS_202);
+                                (__VLS_234.slots).default;
+                                const __VLS_234 = __VLS_pickFunctionalComponentCtx(__VLS_231, __VLS_233);
                             }
-                            (__VLS_133.slots).default;
-                            const __VLS_133 = __VLS_pickFunctionalComponentCtx(__VLS_130, __VLS_132);
+                            (__VLS_163.slots).default;
+                            const __VLS_163 = __VLS_pickFunctionalComponentCtx(__VLS_160, __VLS_162);
                         }
                         (__VLS_46.slots).default;
                         const __VLS_46 = __VLS_pickFunctionalComponentCtx(__VLS_43, __VLS_45);
                     }
                     // @ts-ignore
-                    [saving, saving, handleSave, saving, goToDevices, goToBlacklist,];
+                    [currentUser, currentUser, notificationPermissionState, notificationPermissionState, notificationSaving, notificationPermissionState, notificationSaving, notificationPermissionState, notificationEnabled, toggleNotifications, goToDevices, goToBlacklist,];
                 }
                 (__VLS_9.slots).default;
                 const __VLS_9 = __VLS_pickFunctionalComponentCtx(__VLS_6, __VLS_8);
@@ -594,12 +720,16 @@ function __VLS_template() {
         __VLS_styleScopedClasses["save-btn"];
         __VLS_styleScopedClasses["form-section"];
         __VLS_styleScopedClasses["section-title"];
+        __VLS_styleScopedClasses["qr-box"];
+        __VLS_styleScopedClasses["qr-grid"];
+        __VLS_styleScopedClasses["qr-meta"];
+        __VLS_styleScopedClasses["form-section"];
+        __VLS_styleScopedClasses["section-title"];
         __VLS_styleScopedClasses["pref-item"];
         __VLS_styleScopedClasses["pref-info"];
         __VLS_styleScopedClasses["pref-title"];
         __VLS_styleScopedClasses["pref-desc"];
         __VLS_styleScopedClasses["toggle-switch"];
-        __VLS_styleScopedClasses["active"];
         __VLS_styleScopedClasses["toggle-thumb"];
         __VLS_styleScopedClasses["pref-item"];
         __VLS_styleScopedClasses["pref-info"];
@@ -623,10 +753,15 @@ const __VLS_internalComponent = (await import('vue')).defineComponent({
             newName: newName,
             newAvatar: newAvatar,
             saving: saving,
+            notificationEnabled: notificationEnabled,
+            notificationPermissionState: notificationPermissionState,
+            notificationSaving: notificationSaving,
             currentUser: currentUser,
+            personalQrPayload: personalQrPayload,
             handleSave: handleSave,
             presets: presets,
             selectPresetAvatar: selectPresetAvatar,
+            toggleNotifications: toggleNotifications,
             goToDevices: goToDevices,
             goToBlacklist: goToBlacklist,
         };

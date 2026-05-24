@@ -1,10 +1,11 @@
 <script setup lang="ts">
 import { ref, onMounted } from 'vue';
 import { useRouter } from 'vue-router';
-import { authApi } from '@tsdaodao/datasource-vue';
+import { authApi, useUserStore } from '@tsdaodao/datasource-vue';
 import { Message } from '@arco-design/web-vue';
 
 const router = useRouter();
+const userStore = useUserStore();
 const devices = ref<any[]>([]);
 const loading = ref(false);
 const quittingSession = ref(false);
@@ -35,7 +36,9 @@ async function quitCurrentSession() {
   quittingSession.value = true;
   try {
     await authApi.quit();
+    await userStore.logout(true);
     Message.success('当前 Web 会话已退出');
+    router.replace('/login');
   } catch (err: any) {
     Message.error(err.msg || '退出当前会话失败');
   } finally {

@@ -172,20 +172,28 @@
 
 ### Tests for User Story 4
 
-- [ ] T061 [P] [US4] Add profile and device management tests in `sections/im_web/apps/chat/tests/accountSettings.test.ts`
-- [ ] T062 [P] [US4] Add QR login state tests in `sections/im_web/apps/chat/tests/qrLogin.test.ts`
-- [ ] T063 [US4] Add Playwright account and QR login smoke flow in `sections/im_web/apps/chat/tests-e2e/smoke-uc6-account-settings.spec.ts`
+- [X] T061 [P] [US4] Add profile and device management tests in `sections/im_web/apps/chat/tests/accountSettings.test.ts`
+- [X] T062 [P] [US4] Add QR login state tests in `sections/im_web/apps/chat/tests/qrLogin.test.ts`
+- [X] T063 [US4] Add Playwright account and QR login smoke flow in `sections/im_web/apps/chat/tests-e2e/smoke-uc6-account-settings.spec.ts`
 
 ### Implementation for User Story 4
 
-- [ ] T064 [US4] Complete profile view/edit, avatar update, and personal QR state in `sections/im_web/apps/chat/src/views/MyProfileDrawer.vue` and `sections/im_web/packages/datasource-vue/src/stores/userStore.ts`
-- [ ] T065 [US4] Complete device list, device removal, and logout state handling in `sections/im_web/apps/chat/src/views/DeviceManagementPage.vue`
-- [ ] T066 [US4] Complete QR login waiting, scanned, confirmed, expired, rejected, and failed states in `sections/im_web/packages/login-vue/src/views/LoginPage.vue` and `sections/im_web/packages/login-vue/src/stores/loginStore.ts`
-- [ ] T067 [US4] Complete notification preference and unavailable browser permission states in `sections/im_web/apps/chat/src/views/MyProfileDrawer.vue`
-- [ ] T068 [US4] Run `pnpm type-check`, `pnpm build`, `pnpm test:unit`, and the US4 Playwright smoke from `sections/im_web/package.json` and record evidence in `sections/im_web/.ai/V2.0/tasks.md`
-- [ ] T069 [US4] Complete US4 code review against the checklist in `sections/im_web/.ai/V2.0/plan.md`
+- [X] T064 [US4] Complete profile view/edit, avatar update, and personal QR state in `sections/im_web/apps/chat/src/views/MyProfileDrawer.vue` and `sections/im_web/packages/datasource-vue/src/stores/userStore.ts`
+- [X] T065 [US4] Complete device list, device removal, and logout state handling in `sections/im_web/apps/chat/src/views/DeviceManagementPage.vue`
+- [X] T066 [US4] Complete QR login waiting, scanned, confirmed, expired, rejected, and failed states in `sections/im_web/packages/login-vue/src/views/LoginPage.vue` and `sections/im_web/packages/login-vue/src/stores/loginStore.ts`
+- [X] T067 [US4] Complete notification preference and unavailable browser permission states in `sections/im_web/apps/chat/src/views/MyProfileDrawer.vue`
+- [X] T068 [US4] Run `pnpm type-check`, `pnpm build`, `pnpm test:unit`, and the US4 Playwright smoke from `sections/im_web/package.json` and record evidence in `sections/im_web/.ai/V2.0/tasks.md`
+- [X] T069 [US4] Complete US4 code review against the checklist in `sections/im_web/.ai/V2.0/plan.md`
 
 **Checkpoint**: US4 is independently functional and testable.
+
+**2026-05-24 US4 Close Evidence**
+
+- T061-T062: Added `accountSettings.test.ts` and `qrLogin.test.ts` covering profile/device contracts, personal QR and notification states, device logout cleanup, and QR login waiting/scanned/confirmed/expired/rejected/failed state normalization.
+- T063 smoke: `cd sections/im_web/apps/chat && pnpm exec playwright test tests-e2e/smoke-uc6-account-settings.spec.ts --project=chromium` exit 0, 1 passed. The smoke verifies QR login surfaces, password login, profile drawer, personal QR, notification state copy, device management navigation, and current-session exit affordance.
+- T064-T067: `userStore.ts` now owns profile/avatar updates and login-result application. `MyProfileDrawer.vue` exposes profile edit, preset avatar update, personal QR state, and browser notification preference/unavailable states backed by device-token APIs. `DeviceManagementPage.vue` clears local session state and redirects after current-session exit. `loginStore.ts` and `LoginPage.vue` expose QR login UUID creation, polling, terminal states, and confirmed auth-code login handling.
+- Verification: `cd sections/im_web && pnpm type-check` exit 0; `cd sections/im_web && pnpm test:unit` exit 0, 19 files / 49 tests passed; `cd sections/im_web && pnpm build` exit 0 with existing large chunk warning.
+- Code review: local review against the plan checklist found no blocking US4 issues. Account state changes stay in datasource/login stores, unsupported notification permission is visible instead of silently ignored, device logout clears local state after remote quit, and QR login terminal states are explicit. Residual non-blocking risk: live QR scan confirmation still depends on a mobile/backend pairing flow in the test environment.
 
 ---
 

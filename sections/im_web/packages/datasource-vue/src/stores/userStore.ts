@@ -13,6 +13,7 @@ export interface User {
   name: string;
   short_no?: string;
   sex?: number;
+  avatar?: string;
   [key: string]: any;
 }
 
@@ -48,12 +49,7 @@ export const useUserStore = defineStore('user', () => {
   if (storedToken && storedLoginInfo) {
     token.value = storedToken;
     loginInfo.value = JSON.parse(storedLoginInfo);
-    currentUser.value = {
-      uid: loginInfo.value.uid,
-      name: loginInfo.value.name,
-      short_no: loginInfo.value.short_no,
-      sex: loginInfo.value.sex
-    };
+      currentUser.value = normalizeUser(loginInfo.value);
 
     const sdkStore = useSdkStore();
     sdkStore.initializeSDK(currentUser.value.uid, storedToken);
@@ -61,36 +57,45 @@ export const useUserStore = defineStore('user', () => {
 
   const isLoggedIn = computed(() => !!token.value);
 
-  async function login(credentials: any) {
-    const res: any = await authApi.login(sanitizeLoginCredentials(credentials));
+  function normalizeUser(input: any): User {
+    return {
+      uid: input.uid,
+      name: input.name,
+      short_no: input.short_no,
+      sex: input.sex,
+      avatar: input.avatar || input.logo || ''
+    };
+  }
+
+  function applyLoginResult(res: any) {
     if (res && res.token) {
       token.value = res.token;
       loginInfo.value = res;
-      currentUser.value = {
-        uid: res.uid,
-        name: res.name,
-        short_no: res.short_no,
-        sex: res.sex
-      };
+      currentUser.value = normalizeUser(res);
 
-      // Store in StorageService
       StorageService.set('token', res.token);
       StorageService.set('uid', res.uid);
       StorageService.set('name', res.name);
       StorageService.set('loginInfo', JSON.stringify(res));
 
-      // Auto initialize SDK
       const sdkStore = useSdkStore();
       sdkStore.initializeSDK(res.uid, res.token);
     }
     return res;
   }
 
-  async function logout() {
-    try {
-      await authApi.quit();
-    } catch (e) {
-      console.warn('Quit api call failed or bypassed', e);
+  async function login(credentials: any) {
+    const res: any = await authApi.login(sanitizeLoginCredentials(credentials));
+    return applyLoginResult(res);
+  }
+
+  async function logout(skipRemoteQuit = false) {
+    if (!skipRemoteQuit) {
+      try {
+        await authApi.quit();
+      } catch (e) {
+        console.warn('Quit api call failed or bypassed', e);
+      }
     }
     // Clear storage
     StorageService.clear();
@@ -113,6 +118,56 @@ export const useUserStore = defineStore('user', () => {
     // Disconnect SDK
     const sdkStore = useSdkStore();
     sdkStore.disconnect();
+  }
+
+  async function updateProfile(profile: { name?: string; sex?: number; short_no?: string }) {
+    const res: any = await userApi.updateProfile(profile);
+    if (currentUser.value) {
+      currentUser.value = {
+        ...currentUser.value,
+        ...profile,
+        ...(res || {})
+      };
+    }
+    if (loginInfo.value) {
+      loginInfo.value = {
+        ...loginInfo.value,
+        ...profile,
+        ...(res || {})
+      };
+      StorageService.set('loginInfo', JSON.stringify(loginInfo.value));
+    }
+    if (profile.name) {
+      StorageService.set('name', profile.name);
+    }
+    return res;
+  }
+
+  async function updateAvatar(fileOrUrl: File | string) {
+    if (!currentUser.value) {
+      throw new Error('No current user');
+    }
+    if (typeof fileOrUrl === 'string') {
+      currentUser.value.avatar = fileOrUrl;
+      if (loginInfo.value) {
+        loginInfo.value.avatar = fileOrUrl;
+        StorageService.set('loginInfo', JSON.stringify(loginInfo.value));
+      }
+      return { avatar: fileOrUrl };
+    }
+
+    const formData = new FormData();
+    formData.append('file', fileOrUrl);
+    const res: any = await userApi.uploadAvatar(currentUser.value.uid, formData);
+    const avatar = res?.url || res?.avatar || res?.path || '';
+    if (avatar) {
+      currentUser.value.avatar = avatar;
+      if (loginInfo.value) {
+        loginInfo.value.avatar = avatar;
+        StorageService.set('loginInfo', JSON.stringify(loginInfo.value));
+      }
+    }
+    return res;
   }
 
   // Batch query user profiles with local caching to avoid duplicate requests
@@ -141,8 +196,11 @@ export const useUserStore = defineStore('user', () => {
     loginInfo,
     isLoggedIn,
     userCache,
+    applyLoginResult,
     login,
     logout,
+    updateProfile,
+    updateAvatar,
     getUsersByIds
   };
 });
