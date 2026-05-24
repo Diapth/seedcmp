@@ -64,17 +64,17 @@
 
 ### Tests for User Story 1
 
-- [ ] T025 [P] [US1] Add message normalization, duplicate suppression, and unsupported content tests in `sections/im_web/apps/chat/tests/messageStoreDailyMessaging.test.ts`
-- [ ] T026 [P] [US1] Add message action, reaction, receipt, pin, and reminder store tests in `sections/im_web/apps/chat/tests/messageActions.test.ts`
-- [ ] T027 [P] [US1] Add media send and preview component tests in `sections/im_web/apps/chat/tests/messageMediaCells.test.ts`
+- [X] T025 [P] [US1] Add message normalization, duplicate suppression, and unsupported content tests in `sections/im_web/apps/chat/tests/messageStoreDailyMessaging.test.ts`
+- [X] T026 [P] [US1] Add message action, reaction, receipt, pin, and reminder store tests in `sections/im_web/apps/chat/tests/messageActions.test.ts`
+- [X] T027 [P] [US1] Add media send and preview component tests in `sections/im_web/apps/chat/tests/messageMediaCells.test.ts`
 - [ ] T028 [US1] Add Playwright daily messaging smoke flow in `sections/im_web/apps/chat/tests-e2e/smoke-uc1-daily-messaging.spec.ts`
 
 ### Implementation for User Story 1
 
 - [ ] T029 [P] [US1] Complete supported message content type registration and unavailable fallbacks in `sections/im_web/packages/datasource-vue/src/contentTypes/index.ts`
-- [ ] T030 [US1] Implement message send, retry, pending, failed, and duplicate suppression behavior in `sections/im_web/packages/datasource-vue/src/stores/messageStore.ts`
+- [X] T030 [US1] Implement message send, retry, pending, failed, and duplicate suppression behavior in `sections/im_web/packages/datasource-vue/src/stores/messageStore.ts`
 - [ ] T031 [US1] Implement media asset upload, preview, play, download, and retry state mapping in `sections/im_web/packages/datasource-vue/src/api/index.ts` and `sections/im_web/packages/datasource-vue/src/stores/messageStore.ts`
-- [ ] T032 [P] [US1] Complete media and unsupported message rendering in `sections/im_web/packages/base-vue/src/components/messages/ImageCell.vue`, `sections/im_web/packages/base-vue/src/components/messages/FileCell.vue`, `sections/im_web/packages/base-vue/src/components/messages/VoiceCell.vue`, and `sections/im_web/packages/base-vue/src/components/messages/VideoCell.vue`
+- [X] T032 [P] [US1] Complete media and unsupported message rendering in `sections/im_web/packages/base-vue/src/components/messages/ImageCell.vue`, `sections/im_web/packages/base-vue/src/components/messages/FileCell.vue`, `sections/im_web/packages/base-vue/src/components/messages/VoiceCell.vue`, and `sections/im_web/packages/base-vue/src/components/messages/VideoCell.vue`
 - [ ] T033 [US1] Implement edit, revoke, local delete, mutual delete, reply, and mention action surfaces in `sections/im_web/apps/chat/src/components/MessageList.vue`, `sections/im_web/apps/chat/src/components/MessageInput.vue`, and `sections/im_web/packages/base-vue/src/components/ContextMenu.vue`
 - [ ] T034 [US1] Implement reactions, receipts, pinned messages, and reminders with verified-backend or unavailable states in `sections/im_web/packages/datasource-vue/src/stores/messageStore.ts` and `sections/im_web/apps/chat/src/components/MessageList.vue`
 - [ ] T035 [US1] Keep conversation summaries, unread counts, mentions, and stale-summary cleanup synchronized in `sections/im_web/packages/datasource-vue/src/stores/conversationStore.ts`
@@ -82,6 +82,14 @@
 - [ ] T037 [US1] Complete US1 code review against the checklist in `sections/im_web/.ai/V2.0/plan.md`
 
 **Checkpoint**: US1 is independently functional and testable.
+
+**2026-05-24 US1 Partial Evidence**
+
+- T025: Added `messageStoreDailyMessaging.test.ts` covering text payload normalization, realtime/history duplicate suppression by `clientMsgNo`, and unsupported-content exclusion from conversation summaries.
+- T026: Added `messageActions.test.ts` covering revoke summary cleanup and reaction participant/count toggling after backend acknowledgement. Receipt, pin, and reminder closure remain for T034 before US1 can close.
+- T027/T032: Added `messageMediaCells.test.ts` and media cell unavailable/load states for image, file, voice, and video rendering.
+- T030: Message store now recomputes conversation summaries from the latest digest-eligible message, fences stale async summary writes, ignores unsupported digest types, and updates summaries after revoke without retaining stale revoked text.
+- Verification: `cd sections/im_web/apps/chat && pnpm exec vitest run tests/messageActions.test.ts --config vitest.config.ts` exit 0, 2 tests passed; same command for `messageStoreDailyMessaging.test.ts` exit 0, 2 tests passed; same command for `messageMediaCells.test.ts` exit 0, 2 tests passed; `cd sections/im_web && pnpm test:unit` exit 0, 11 files / 29 tests; `cd sections/im_web && pnpm type-check` exit 0.
 
 ---
 
