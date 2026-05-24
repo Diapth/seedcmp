@@ -292,3 +292,29 @@ export const commonApi = {
     return apiClient.post('search/global', data);
   }
 };
+
+export function resolveApiAssetUrl(pathOrUrl: string, referenceUrl?: string) {
+  if (!pathOrUrl) return '';
+  if (/^https?:\/\//i.test(pathOrUrl)) return pathOrUrl;
+
+  let baseUrl = String(apiClient.defaults?.baseURL || '/');
+  if (referenceUrl && /^https?:\/\//i.test(referenceUrl)) {
+    try {
+      const uploadUrl = new URL(referenceUrl);
+      const markerIndex = uploadUrl.pathname.indexOf('/file/upload');
+      uploadUrl.pathname = markerIndex >= 0 ? uploadUrl.pathname.slice(0, markerIndex + 1) : uploadUrl.pathname.replace(/[^/]*$/, '');
+      uploadUrl.search = '';
+      uploadUrl.hash = '';
+      baseUrl = uploadUrl.toString();
+    } catch {
+      // Fall back to the configured API base URL below.
+    }
+  }
+
+  try {
+    const normalizedBase = baseUrl.endsWith('/') ? baseUrl : `${baseUrl}/`;
+    return new URL(pathOrUrl.replace(/^\/+/, ''), normalizedBase).toString();
+  } catch {
+    return pathOrUrl;
+  }
+}

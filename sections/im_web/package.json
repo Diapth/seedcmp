@@ -1,16 +1,27 @@
 {
   "name": "tsdaodao-vue-monorepo",
   "private": true,
+  "type": "module",
   "version": "1.0.0",
   "scripts": {
     "dev": "pnpm --filter chat dev",
     "build": "pnpm --filter chat build",
-    "type-check": "pnpm -r exec vue-tsc --noEmit"
+    "type-check": "pnpm -r exec vue-tsc --noEmit",
+    "lint": "eslint .",
+    "test:unit": "pnpm --filter chat test:unit",
+    "test:unit:coverage": "pnpm --filter chat test:unit:coverage",
+    "test:e2e": "pnpm --filter chat test:e2e",
+    "test:e2e:ui": "pnpm --filter chat test:e2e:ui"
   },
   "devDependencies": {
-    "typescript": "^5.4.2",
-    "vite": "^5.2.2",
+    "@eslint/js": "^10.0.1",
     "@vitejs/plugin-vue": "^5.0.4",
+    "eslint": "^10.4.0",
+    "eslint-plugin-vue": "^10.9.1",
+    "globals": "^17.6.0",
+    "typescript": "^5.4.2",
+    "typescript-eslint": "^8.59.4",
+    "vite": "^5.2.2",
     "vue-tsc": "^2.0.6"
   }
 }

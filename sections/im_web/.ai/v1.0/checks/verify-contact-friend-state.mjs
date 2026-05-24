@@ -2,10 +2,11 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
+import { imWebRoot } from './paths.mjs';
 import { pathToFileURL } from 'node:url';
 import ts from 'typescript';
 
-const repoRoot = path.resolve(import.meta.dirname, '..', '..');
+const repoRoot = imWebRoot;
 const sourcePath = path.join(repoRoot, 'packages/contacts-vue/src/utils/friendSearchState.ts');
 const source = fs.readFileSync(sourcePath, 'utf8');
 const compiled = ts.transpileModule(source, {

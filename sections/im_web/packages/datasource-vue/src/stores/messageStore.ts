@@ -1,7 +1,8 @@
 import { defineStore } from 'pinia';
 import { ref } from 'vue';
-import WKSDK, { Message as WKMessage } from 'wukongimjssdk';
-import { syncApi } from '../api';
+import WKSDK, { Message as WKMessage, MessageImage } from 'wukongimjssdk';
+import { commonApi, resolveApiAssetUrl, syncApi } from '../api';
+import { MessageFile } from '../contentTypes';
 import { useConversationStore } from './conversationStore';
 import { useUserStore } from './userStore';
 
@@ -27,10 +28,40 @@ export interface Reaction {
   [key: string]: any;
 }
 
+const MEDIA_UPLOAD_TYPE = 'chat';
+
+function getFileExtension(file: File) {
+  const name = file.name || '';
+  const dotIndex = name.lastIndexOf('.');
+  return dotIndex >= 0 ? name.slice(dotIndex) : '';
+}
+
+function safeUploadSegment(value: string) {
+  const normalized = String(value || 'file').trim().replace(/[^\w.-]+/g, '_');
+  return normalized || 'file';
+}
+
+function buildMediaUploadPath(channelId: string, channelType: number, file: File) {
+  const extension = getFileExtension(file);
+  const basename = safeUploadSegment(file.name.replace(/\.[^/.]*$/, ''));
+  const randomPart = Math.random().toString(16).slice(2);
+  return `/${channelType}/${safeUploadSegment(channelId)}/${Date.now()}-${randomPart}-${basename}${extension}`;
+}
+
+function extractUploadUrl(response: any) {
+  return typeof response === 'string' ? response : response?.url || '';
+}
+
+function extractUploadedPath(response: any) {
+  if (typeof response === 'string') return response;
+  return response?.url || response?.path || response?.file_url || response?.fileURL || '';
+}
+
 export const useMessageStore = defineStore('message', () => {
   const messages = ref<Record<string, Message[]>>({});
   const typingState = ref<Record<string, { timer: any; isTyping: boolean }>>({});
   const resetVersion = ref(0);
+  const summaryVersions = ref<Record<string, number>>({});
 
   const conversationStore = useConversationStore();
   const userStore = useUserStore();
@@ -83,7 +114,7 @@ export const useMessageStore = defineStore('message', () => {
   function isConversationDigestMessage(msg: Message) {
     if (!msg || msg.isRevoked) return false;
     const type = Number(msg.content?.type || 0);
-    return ![99, 1000].includes(type);
+    return [1, 2, 3, 4, 5, 6, 7, 8, 11, 12, 13].includes(type);
   }
 
   function getLatestConversationDigestMessage(list: Message[]) {
@@ -94,10 +125,42 @@ export const useMessageStore = defineStore('message', () => {
     return getLatestConversationDigestMessage(list) || [...list].reverse().find(msg => msg && !msg.isRevoked);
   }
 
+  function updateExistingConversationSummary(channelId: string, channelType: number, lastMessage: Message) {
+    const key = `${channelId}-${channelType}`;
+    const conv = conversationStore.conversations.find(item =>
+      String(item.channel_id) === String(channelId) &&
+      Number(item.channel_type) === Number(channelType)
+    );
+    if (!conv) return false;
+
+    conv.last_msg_seq = lastMessage.messageSeq || conv.last_msg_seq;
+    conv.last_msg_time = lastMessage.timestamp || conv.last_msg_time;
+    conv.last_message = {
+      ...lastMessage,
+      payload: lastMessage.content,
+      content: lastMessage.content,
+      messageSeq: lastMessage.messageSeq,
+      timestamp: lastMessage.timestamp,
+      fromUID: lastMessage.fromUID
+    };
+    if (lastMessage.isUnreadCleared) {
+      conv.unread = 0;
+      conversationStore.unreadMap[key] = 0;
+    }
+    return true;
+  }
+
   async function ensureConversationFromMessages(channelId: string, channelType: number) {
-    const list = messages.value[`${channelId}-${channelType}`] || [];
+    const key = `${channelId}-${channelType}`;
+    const version = (summaryVersions.value[key] || 0) + 1;
+    summaryVersions.value[key] = version;
+    const list = messages.value[key] || [];
     const lastMessage = getLatestConversationMessage(list);
     if (!lastMessage) return;
+    if (summaryVersions.value[key] !== version) return;
+    if (updateExistingConversationSummary(channelId, channelType, lastMessage)) {
+      return;
+    }
     await conversationStore.ensureConversation(channelId, channelType, {
       messageSeq: lastMessage.messageSeq,
       timestamp: lastMessage.timestamp,
@@ -173,14 +236,7 @@ export const useMessageStore = defineStore('message', () => {
     messages.value[key].sort((a, b) => a.messageSeq - b.messageSeq || a.timestamp - b.timestamp);
 
     if (isConversationDigestMessage(msg)) {
-      conversationStore.addOrUpdateConversation(channelId, channelType, {
-        messageSeq: msg.messageSeq,
-        timestamp: msg.timestamp,
-        fromUID: msg.fromUID,
-        payload: msg.content,
-        isOwnMessage: msg.fromUID === userStore.currentUser?.uid,
-        isUnreadCleared: msg.isUnreadCleared === true
-      });
+      ensureConversationFromMessages(channelId, channelType);
     }
   }
 
@@ -254,18 +310,23 @@ export const useMessageStore = defineStore('message', () => {
       });
 
       if (version !== resetVersion.value) return;
-      handleMessageRevoked(channelId, channelType, clientMsgNo);
+      await handleMessageRevoked(channelId, channelType, clientMsgNo);
     } catch (e) {
       console.error('[MessageStore] Failed to revoke message', e);
     }
   }
 
-  function handleMessageRevoked(channelId: string, channelType: number, clientMsgNo: string) {
+  async function handleMessageRevoked(channelId: string, channelType: number, clientMsgNo: string) {
     const key = `${channelId}-${channelType}`;
+    summaryVersions.value[key] = (summaryVersions.value[key] || 0) + 1;
     const list = messages.value[key] || [];
     const msg = list.find(m => m.clientMsgNo === clientMsgNo);
     if (msg) {
       msg.isRevoked = true;
+      const lastMessage = getLatestConversationMessage(list);
+      if (lastMessage) {
+        updateExistingConversationSummary(channelId, channelType, lastMessage);
+      }
     }
   }
 
@@ -368,6 +429,58 @@ export const useMessageStore = defineStore('message', () => {
     }
   }
 
+  async function uploadChatFile(channelId: string, channelType: number, file: File) {
+    const uploadPath = buildMediaUploadPath(channelId, channelType, file);
+    const uploadUrl = extractUploadUrl(await commonApi.getUploadUrl(uploadPath, MEDIA_UPLOAD_TYPE));
+    if (!uploadUrl) {
+      throw new Error('Upload URL is empty.');
+    }
+
+    const formData = new FormData();
+    formData.append('file', file);
+    formData.append('contenttype', file.type || 'application/octet-stream');
+
+    const uploadResult = await commonApi.uploadFile(uploadUrl, formData);
+    const uploadedPath = extractUploadedPath(uploadResult);
+    if (!uploadedPath) {
+      throw new Error('Uploaded file path is empty.');
+    }
+
+    return resolveApiAssetUrl(uploadedPath, uploadUrl);
+  }
+
+  async function sendMediaMessage(channelId: string, channelType: number, file: File) {
+    let sentMessage: WKMessage | undefined;
+    const version = resetVersion.value;
+    const url = await uploadChatFile(channelId, channelType, file);
+    const channel = WKSDK.shared().newChannel(channelId, channelType);
+    const content = file.type.startsWith('image/')
+      ? new MessageImage(undefined, 0, 0)
+      : new MessageFile(url, file.name, file.size);
+
+    if (file.type.startsWith('image/')) {
+      (content as MessageImage).url = url;
+    }
+
+    try {
+      const res = await WKSDK.shared().chatManager.send(content, channel);
+      if (version !== resetVersion.value) return;
+      if (res) {
+        sentMessage = res;
+        if (!sentMessage.content) {
+          sentMessage.content = content;
+        }
+        addRealtimeMessage(channelId, channelType, sentMessage);
+      }
+    } catch (err) {
+      if (sentMessage) {
+        sentMessage.status = 2;
+        addRealtimeMessage(channelId, channelType, sentMessage);
+      }
+      throw err;
+    }
+  }
+
   const replyTarget = ref<Message | null>(null);
 
   function setReplyTarget(msg: Message | null) {
@@ -376,6 +489,7 @@ export const useMessageStore = defineStore('message', () => {
 
   function reset() {
     resetVersion.value++;
+    summaryVersions.value = {};
     messages.value = {};
     for (const key of Object.keys(typingState.value)) {
       if (typingState.value[key]?.timer) {
@@ -398,6 +512,7 @@ export const useMessageStore = defineStore('message', () => {
     toggleReaction,
     setTyping,
     sendMessage,
+    sendMediaMessage,
     addRealtimeMessage,
     updateMessageStatus,
     setReplyTarget,

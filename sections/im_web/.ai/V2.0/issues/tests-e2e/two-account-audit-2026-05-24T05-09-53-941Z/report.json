@@ -1,0 +1,393 @@
+{
+  "runId": "2026-05-24T05-09-53-941Z",
+  "targetUrl": "http://localhost:3000",
+  "startedAt": "2026-05-24T05:09:53.941Z",
+  "accounts": [
+    "18337488675",
+    "13733632709"
+  ],
+  "checks": [
+    {
+      "name": "账号 18337488675 登录",
+      "status": "pass",
+      "url": "http://localhost:3000/chat"
+    },
+    {
+      "name": "账号 13733632709 登录",
+      "status": "pass",
+      "url": "http://localhost:3000/chat"
+    },
+    {
+      "name": "A 会话列表时间/摘要 UI 探测",
+      "status": "pass",
+      "hasMention": 0,
+      "hasConversationTime": 17,
+      "hasPinIcon": 0
+    },
+    {
+      "name": "A 发起群聊页面",
+      "status": "pass",
+      "contacts": 6,
+      "createButtonDisabledInitially": true
+    },
+    {
+      "name": "A 添加好友页面可访问",
+      "status": "pass"
+    },
+    {
+      "name": "A 群设置抽屉",
+      "status": "pass",
+      "membersCount": 2,
+      "hasOwnerControls": 3,
+      "hasManageControls": 2,
+      "inviteModalOpened": true
+    },
+    {
+      "name": "A 刷新后会话保留",
+      "status": "pass",
+      "before": 17,
+      "after": 17
+    },
+    {
+      "name": "A 打开首个会话",
+      "status": "pass"
+    },
+    {
+      "name": "A 文本消息发送并显示",
+      "status": "pass",
+      "text": "audit-A-1779599399052"
+    },
+    {
+      "name": "A 打开首个会话",
+      "status": "pass"
+    },
+    {
+      "name": "A 图片发送入口已打通",
+      "status": "pass",
+      "beforePlaceholderCount": 0,
+      "imagePlaceholderCount": 0,
+      "imageVisible": true
+    },
+    {
+      "name": "A 文件发送入口已打通",
+      "status": "pass",
+      "beforePlaceholderCount": 0,
+      "filePlaceholderCount": 0,
+      "fileVisible": true
+    },
+    {
+      "name": "B 打开首个会话",
+      "status": "pass"
+    },
+    {
+      "name": "B 文本消息发送并显示",
+      "status": "pass",
+      "text": "audit-B-1779599402985"
+    },
+    {
+      "name": "B 打开首个会话",
+      "status": "pass"
+    },
+    {
+      "name": "B 图片发送入口已打通",
+      "status": "pass",
+      "beforePlaceholderCount": 0,
+      "imagePlaceholderCount": 0,
+      "imageVisible": true
+    },
+    {
+      "name": "B 文件发送入口已打通",
+      "status": "pass",
+      "beforePlaceholderCount": 0,
+      "filePlaceholderCount": 0,
+      "fileVisible": true
+    },
+    {
+      "name": "B 群设置抽屉",
+      "status": "pass",
+      "membersCount": 2,
+      "hasOwnerControls": 0,
+      "hasManageControls": 0,
+      "inviteModalOpened": true
+    },
+    {
+      "name": "B 刷新后会话保留",
+      "status": "pass",
+      "before": 11,
+      "after": 11
+    },
+    {
+      "name": "双账号最终会话列表可见",
+      "status": "pass"
+    },
+    {
+      "name": "控制台严重错误检查",
+      "status": "pass",
+      "count": 0,
+      "samples": []
+    },
+    {
+      "name": "网络错误检查",
+      "status": "pass",
+      "count": 0,
+      "samples": []
+    }
+  ],
+  "screenshots": [
+    "/media/leng/DiskB1/exp/seedcmp/sections/im_web/.ai/V2.0/issues/imgs/two-account-audit-2026-05-24T05-09-53-941Z/01-A-login-page.png",
+    "/media/leng/DiskB1/exp/seedcmp/sections/im_web/.ai/V2.0/issues/imgs/two-account-audit-2026-05-24T05-09-53-941Z/02-A-chat-home.png",
+    "/media/leng/DiskB1/exp/seedcmp/sections/im_web/.ai/V2.0/issues/imgs/two-account-audit-2026-05-24T05-09-53-941Z/03-B-login-page.png",
+    "/media/leng/DiskB1/exp/seedcmp/sections/im_web/.ai/V2.0/issues/imgs/two-account-audit-2026-05-24T05-09-53-941Z/04-B-chat-home.png",
+    "/media/leng/DiskB1/exp/seedcmp/sections/im_web/.ai/V2.0/issues/imgs/two-account-audit-2026-05-24T05-09-53-941Z/05-A-conversation-list-presentation.png",
+    "/media/leng/DiskB1/exp/seedcmp/sections/im_web/.ai/V2.0/issues/imgs/two-account-audit-2026-05-24T05-09-53-941Z/06-A-create-group-page.png",
+    "/media/leng/DiskB1/exp/seedcmp/sections/im_web/.ai/V2.0/issues/imgs/two-account-audit-2026-05-24T05-09-53-941Z/07-A-add-friend-page.png",
+    "/media/leng/DiskB1/exp/seedcmp/sections/im_web/.ai/V2.0/issues/imgs/two-account-audit-2026-05-24T05-09-53-941Z/08-A-group-settings-drawer.png",
+    "/media/leng/DiskB1/exp/seedcmp/sections/im_web/.ai/V2.0/issues/imgs/two-account-audit-2026-05-24T05-09-53-941Z/09-A-group-invite-modal.png",
+    "/media/leng/DiskB1/exp/seedcmp/sections/im_web/.ai/V2.0/issues/imgs/two-account-audit-2026-05-24T05-09-53-941Z/10-A-after-refresh-retention.png",
+    "/media/leng/DiskB1/exp/seedcmp/sections/im_web/.ai/V2.0/issues/imgs/two-account-audit-2026-05-24T05-09-53-941Z/11-A-first-conversation.png",
+    "/media/leng/DiskB1/exp/seedcmp/sections/im_web/.ai/V2.0/issues/imgs/two-account-audit-2026-05-24T05-09-53-941Z/12-A-sent-audit-A-1779599399052.png",
+    "/media/leng/DiskB1/exp/seedcmp/sections/im_web/.ai/V2.0/issues/imgs/two-account-audit-2026-05-24T05-09-53-941Z/13-A-first-conversation.png",
+    "/media/leng/DiskB1/exp/seedcmp/sections/im_web/.ai/V2.0/issues/imgs/two-account-audit-2026-05-24T05-09-53-941Z/14-A-media-image-send.png",
+    "/media/leng/DiskB1/exp/seedcmp/sections/im_web/.ai/V2.0/issues/imgs/two-account-audit-2026-05-24T05-09-53-941Z/15-A-media-file-send.png",
+    "/media/leng/DiskB1/exp/seedcmp/sections/im_web/.ai/V2.0/issues/imgs/two-account-audit-2026-05-24T05-09-53-941Z/16-B-first-conversation.png",
+    "/media/leng/DiskB1/exp/seedcmp/sections/im_web/.ai/V2.0/issues/imgs/two-account-audit-2026-05-24T05-09-53-941Z/17-B-sent-audit-B-1779599402985.png",
+    "/media/leng/DiskB1/exp/seedcmp/sections/im_web/.ai/V2.0/issues/imgs/two-account-audit-2026-05-24T05-09-53-941Z/18-B-first-conversation.png",
+    "/media/leng/DiskB1/exp/seedcmp/sections/im_web/.ai/V2.0/issues/imgs/two-account-audit-2026-05-24T05-09-53-941Z/19-B-media-image-send.png",
+    "/media/leng/DiskB1/exp/seedcmp/sections/im_web/.ai/V2.0/issues/imgs/two-account-audit-2026-05-24T05-09-53-941Z/20-B-media-file-send.png",
+    "/media/leng/DiskB1/exp/seedcmp/sections/im_web/.ai/V2.0/issues/imgs/two-account-audit-2026-05-24T05-09-53-941Z/21-B-group-settings-drawer.png",
+    "/media/leng/DiskB1/exp/seedcmp/sections/im_web/.ai/V2.0/issues/imgs/two-account-audit-2026-05-24T05-09-53-941Z/22-B-group-invite-modal.png",
+    "/media/leng/DiskB1/exp/seedcmp/sections/im_web/.ai/V2.0/issues/imgs/two-account-audit-2026-05-24T05-09-53-941Z/23-B-after-refresh-retention.png",
+    "/media/leng/DiskB1/exp/seedcmp/sections/im_web/.ai/V2.0/issues/imgs/two-account-audit-2026-05-24T05-09-53-941Z/24-A-final-conversations.png",
+    "/media/leng/DiskB1/exp/seedcmp/sections/im_web/.ai/V2.0/issues/imgs/two-account-audit-2026-05-24T05-09-53-941Z/25-B-final-conversations.png"
+  ],
+  "console": [
+    {
+      "account": "A",
+      "type": "log",
+      "text": "使用原生websocket",
+      "url": "http://localhost:3000/login"
+    },
+    {
+      "account": "A",
+      "type": "log",
+      "text": "websocket WebSocket",
+      "url": "http://localhost:3000/login"
+    },
+    {
+      "account": "A",
+      "type": "log",
+      "text": "[SDK] Connected successfully.",
+      "url": "http://localhost:3000/login"
+    },
+    {
+      "account": "B",
+      "type": "log",
+      "text": "使用原生websocket",
+      "url": "http://localhost:3000/login"
+    },
+    {
+      "account": "B",
+      "type": "log",
+      "text": "websocket WebSocket",
+      "url": "http://localhost:3000/login"
+    },
+    {
+      "account": "B",
+      "type": "log",
+      "text": "[SDK] Connected successfully.",
+      "url": "http://localhost:3000/login"
+    },
+    {
+      "account": "A",
+      "type": "log",
+      "text": "使用原生websocket",
+      "url": "http://localhost:3000/chat/create-group"
+    },
+    {
+      "account": "A",
+      "type": "log",
+      "text": "websocket WebSocket",
+      "url": "http://localhost:3000/chat/create-group"
+    },
+    {
+      "account": "A",
+      "type": "log",
+      "text": "[SDK] Connected successfully.",
+      "url": "http://localhost:3000/chat/create-group"
+    },
+    {
+      "account": "A",
+      "type": "log",
+      "text": "使用原生websocket",
+      "url": "http://localhost:3000/chat/add-friend"
+    },
+    {
+      "account": "A",
+      "type": "log",
+      "text": "websocket WebSocket",
+      "url": "http://localhost:3000/chat/add-friend"
+    },
+    {
+      "account": "A",
+      "type": "log",
+      "text": "[SDK] Connected successfully.",
+      "url": "http://localhost:3000/chat/add-friend"
+    },
+    {
+      "account": "A",
+      "type": "log",
+      "text": "使用原生websocket",
+      "url": "http://localhost:3000/chat"
+    },
+    {
+      "account": "A",
+      "type": "log",
+      "text": "websocket WebSocket",
+      "url": "http://localhost:3000/chat"
+    },
+    {
+      "account": "A",
+      "type": "log",
+      "text": "[SDK] Connected successfully.",
+      "url": "http://localhost:3000/chat"
+    },
+    {
+      "account": "A",
+      "type": "log",
+      "text": "使用原生websocket",
+      "url": "http://localhost:3000/chat"
+    },
+    {
+      "account": "A",
+      "type": "log",
+      "text": "websocket WebSocket",
+      "url": "http://localhost:3000/chat"
+    },
+    {
+      "account": "A",
+      "type": "log",
+      "text": "[SDK] Connected successfully.",
+      "url": "http://localhost:3000/chat"
+    },
+    {
+      "account": "A",
+      "type": "log",
+      "text": "使用原生websocket",
+      "url": "http://localhost:3000/chat"
+    },
+    {
+      "account": "A",
+      "type": "log",
+      "text": "websocket WebSocket",
+      "url": "http://localhost:3000/chat"
+    },
+    {
+      "account": "A",
+      "type": "log",
+      "text": "[SDK] Connected successfully.",
+      "url": "http://localhost:3000/chat"
+    },
+    {
+      "account": "B",
+      "type": "log",
+      "text": "使用原生websocket",
+      "url": "http://localhost:3000/chat"
+    },
+    {
+      "account": "B",
+      "type": "log",
+      "text": "websocket WebSocket",
+      "url": "http://localhost:3000/chat"
+    },
+    {
+      "account": "B",
+      "type": "log",
+      "text": "[SDK] Connected successfully.",
+      "url": "http://localhost:3000/chat"
+    },
+    {
+      "account": "B",
+      "type": "log",
+      "text": "使用原生websocket",
+      "url": "http://localhost:3000/chat"
+    },
+    {
+      "account": "B",
+      "type": "log",
+      "text": "websocket WebSocket",
+      "url": "http://localhost:3000/chat"
+    },
+    {
+      "account": "B",
+      "type": "log",
+      "text": "[SDK] Connected successfully.",
+      "url": "http://localhost:3000/chat"
+    },
+    {
+      "account": "B",
+      "type": "log",
+      "text": "使用原生websocket",
+      "url": "http://localhost:3000/chat"
+    },
+    {
+      "account": "B",
+      "type": "log",
+      "text": "websocket WebSocket",
+      "url": "http://localhost:3000/chat"
+    },
+    {
+      "account": "B",
+      "type": "log",
+      "text": "[SDK] Connected successfully.",
+      "url": "http://localhost:3000/chat"
+    },
+    {
+      "account": "A",
+      "type": "log",
+      "text": "使用原生websocket",
+      "url": "http://localhost:3000/chat"
+    },
+    {
+      "account": "A",
+      "type": "log",
+      "text": "websocket WebSocket",
+      "url": "http://localhost:3000/chat"
+    },
+    {
+      "account": "A",
+      "type": "log",
+      "text": "[SDK] Connected successfully.",
+      "url": "http://localhost:3000/chat"
+    },
+    {
+      "account": "B",
+      "type": "log",
+      "text": "使用原生websocket",
+      "url": "http://localhost:3000/chat"
+    },
+    {
+      "account": "B",
+      "type": "log",
+      "text": "websocket WebSocket",
+      "url": "http://localhost:3000/chat"
+    },
+    {
+      "account": "B",
+      "type": "log",
+      "text": "[SDK] Connected successfully.",
+      "url": "http://localhost:3000/chat"
+    }
+  ],
+  "networkErrors": [],
+  "pageErrors": [],
+  "failed": [],
+  "finishedAt": "2026-05-24T05:10:09.116Z",
+  "summary": {
+    "checks": 22,
+    "failed": 0,
+    "screenshots": 25,
+    "consoleEntries": 36,
+    "networkErrors": 0,
+    "pageErrors": 0
+  }
+}

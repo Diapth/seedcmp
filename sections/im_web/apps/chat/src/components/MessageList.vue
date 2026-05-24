@@ -208,7 +208,6 @@ const menuItems = computed(() => {
           </div>
 
           <TextCell 
-            v-slot:default
             v-if="msg.content?.type === 1" 
             :message="msg" 
             :is-me="isMe(msg)" 

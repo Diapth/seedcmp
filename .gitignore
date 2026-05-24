@@ -4,10 +4,11 @@ __pycache__/
 *$py.class
 
 # other config
-.claude
-.codex
-.vscode
-.agent
+.claude/
+.codex/
+.vscode/
+.agents/
+.specify/
 
 # other models
 sections/im/
@@ -269,3 +270,13 @@ Thumbs.db
 
 # Vitest / unit test output
 apps/chat/coverage/
+
+# Playwright / browser test output
+apps/chat/playwright-report/
+apps/chat/test-results/
+playwright-report/
+test-results/
+
+# Volar / Vue-Language-Server generated files
+*.vue.js
+*VLS_globalTypes.vue.js

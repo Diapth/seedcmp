@@ -1,0 +1,414 @@
+{
+  "runId": "2026-05-23T17-53-35-628Z",
+  "targetUrl": "http://localhost:3000",
+  "startedAt": "2026-05-23T17:53:35.629Z",
+  "accounts": [
+    "18337488675",
+    "13733632709"
+  ],
+  "checks": [
+    {
+      "name": "账号 18337488675 登录",
+      "status": "pass",
+      "url": "http://localhost:3000/chat"
+    },
+    {
+      "name": "账号 13733632709 登录",
+      "status": "pass",
+      "url": "http://localhost:3000/chat"
+    },
+    {
+      "name": "A 会话列表时间/摘要 UI 探测",
+      "status": "pass",
+      "hasMention": 0,
+      "hasConversationTime": 17,
+      "hasPinIcon": 0
+    },
+    {
+      "name": "A 发起群聊页面",
+      "status": "pass",
+      "contacts": 6,
+      "createButtonDisabledInitially": true
+    },
+    {
+      "name": "A 添加好友页面可访问",
+      "status": "pass"
+    },
+    {
+      "name": "A 群设置抽屉",
+      "status": "pass",
+      "membersCount": 2,
+      "hasOwnerControls": 3,
+      "hasManageControls": 2,
+      "inviteModalOpened": true
+    },
+    {
+      "name": "A 刷新后会话保留",
+      "status": "pass",
+      "before": 17,
+      "after": 12
+    },
+    {
+      "name": "A 打开首个会话",
+      "status": "pass"
+    },
+    {
+      "name": "A 文本消息发送并显示",
+      "status": "pass",
+      "text": "audit-A-1779558817373"
+    },
+    {
+      "name": "B 打开首个会话",
+      "status": "pass"
+    },
+    {
+      "name": "B 文本消息发送并显示",
+      "status": "pass",
+      "text": "audit-B-1779558817509"
+    },
+    {
+      "name": "B 群设置抽屉",
+      "status": "pass",
+      "membersCount": 2,
+      "hasOwnerControls": 0,
+      "hasManageControls": 0,
+      "inviteModalOpened": true
+    },
+    {
+      "name": "B 刷新后会话保留",
+      "status": "pass",
+      "before": 11,
+      "after": 9
+    },
+    {
+      "name": "双账号最终会话列表可见",
+      "status": "pass"
+    },
+    {
+      "name": "控制台严重错误检查",
+      "status": "warn",
+      "count": 2,
+      "samples": [
+        {
+          "account": "A",
+          "type": "error",
+          "text": "Failed to load resource: the server responded with a status of 400 (Bad Request)",
+          "url": "http://localhost:3000/chat/conversation/c9d61c7f903c48ca93458e50436fca6e/2"
+        },
+        {
+          "account": "A",
+          "type": "warning",
+          "text": "[ConversationStore] Remote update conversation extra command failed; local state was kept {error: AxiosError: Request failed with status code 400\n    at settle (http://localhost:3000/node_modules/.…, msg: 发送同步扩展会话cmd失败！, status: 400}",
+          "url": "http://localhost:3000/chat/conversation/c9d61c7f903c48ca93458e50436fca6e/2"
+        }
+      ]
+    },
+    {
+      "name": "网络错误检查",
+      "status": "warn",
+      "count": 3,
+      "samples": [
+        {
+          "account": "B",
+          "url": "http://100.79.157.76:8090/v1/coversation/clearUnread",
+          "method": "PUT",
+          "failure": "net::ERR_ABORTED"
+        },
+        {
+          "account": "B",
+          "url": "http://100.79.157.76:8090/v1/coversation/clearUnread",
+          "method": "PUT",
+          "failure": "net::ERR_ABORTED"
+        },
+        {
+          "account": "A",
+          "url": "http://100.79.157.76:8090/v1/conversations/c9d61c7f903c48ca93458e50436fca6e/2/extra",
+          "status": 400,
+          "method": "POST"
+        }
+      ]
+    }
+  ],
+  "screenshots": [
+    "/media/leng/DiskB1/exp/seedcmp/sections/im_web/.ai/V2.0/issues/imgs/two-account-audit-2026-05-23T17-53-35-628Z/01-A-login-page.png",
+    "/media/leng/DiskB1/exp/seedcmp/sections/im_web/.ai/V2.0/issues/imgs/two-account-audit-2026-05-23T17-53-35-628Z/02-A-chat-home.png",
+    "/media/leng/DiskB1/exp/seedcmp/sections/im_web/.ai/V2.0/issues/imgs/two-account-audit-2026-05-23T17-53-35-628Z/03-B-login-page.png",
+    "/media/leng/DiskB1/exp/seedcmp/sections/im_web/.ai/V2.0/issues/imgs/two-account-audit-2026-05-23T17-53-35-628Z/04-B-chat-home.png",
+    "/media/leng/DiskB1/exp/seedcmp/sections/im_web/.ai/V2.0/issues/imgs/two-account-audit-2026-05-23T17-53-35-628Z/05-A-conversation-list-presentation.png",
+    "/media/leng/DiskB1/exp/seedcmp/sections/im_web/.ai/V2.0/issues/imgs/two-account-audit-2026-05-23T17-53-35-628Z/06-A-create-group-page.png",
+    "/media/leng/DiskB1/exp/seedcmp/sections/im_web/.ai/V2.0/issues/imgs/two-account-audit-2026-05-23T17-53-35-628Z/07-A-add-friend-page.png",
+    "/media/leng/DiskB1/exp/seedcmp/sections/im_web/.ai/V2.0/issues/imgs/two-account-audit-2026-05-23T17-53-35-628Z/08-A-group-settings-drawer.png",
+    "/media/leng/DiskB1/exp/seedcmp/sections/im_web/.ai/V2.0/issues/imgs/two-account-audit-2026-05-23T17-53-35-628Z/09-A-group-invite-modal.png",
+    "/media/leng/DiskB1/exp/seedcmp/sections/im_web/.ai/V2.0/issues/imgs/two-account-audit-2026-05-23T17-53-35-628Z/10-A-after-refresh-retention.png",
+    "/media/leng/DiskB1/exp/seedcmp/sections/im_web/.ai/V2.0/issues/imgs/two-account-audit-2026-05-23T17-53-35-628Z/11-A-first-conversation.png",
+    "/media/leng/DiskB1/exp/seedcmp/sections/im_web/.ai/V2.0/issues/imgs/two-account-audit-2026-05-23T17-53-35-628Z/12-A-sent-audit-A-1779558817373.png",
+    "/media/leng/DiskB1/exp/seedcmp/sections/im_web/.ai/V2.0/issues/imgs/two-account-audit-2026-05-23T17-53-35-628Z/13-B-first-conversation.png",
+    "/media/leng/DiskB1/exp/seedcmp/sections/im_web/.ai/V2.0/issues/imgs/two-account-audit-2026-05-23T17-53-35-628Z/14-B-sent-audit-B-1779558817509.png",
+    "/media/leng/DiskB1/exp/seedcmp/sections/im_web/.ai/V2.0/issues/imgs/two-account-audit-2026-05-23T17-53-35-628Z/15-B-group-settings-drawer.png",
+    "/media/leng/DiskB1/exp/seedcmp/sections/im_web/.ai/V2.0/issues/imgs/two-account-audit-2026-05-23T17-53-35-628Z/16-B-group-invite-modal.png",
+    "/media/leng/DiskB1/exp/seedcmp/sections/im_web/.ai/V2.0/issues/imgs/two-account-audit-2026-05-23T17-53-35-628Z/17-B-after-refresh-retention.png",
+    "/media/leng/DiskB1/exp/seedcmp/sections/im_web/.ai/V2.0/issues/imgs/two-account-audit-2026-05-23T17-53-35-628Z/18-A-final-conversations.png",
+    "/media/leng/DiskB1/exp/seedcmp/sections/im_web/.ai/V2.0/issues/imgs/two-account-audit-2026-05-23T17-53-35-628Z/19-B-final-conversations.png"
+  ],
+  "console": [
+    {
+      "account": "A",
+      "type": "log",
+      "text": "使用原生websocket",
+      "url": "http://localhost:3000/login"
+    },
+    {
+      "account": "A",
+      "type": "log",
+      "text": "websocket WebSocket",
+      "url": "http://localhost:3000/login"
+    },
+    {
+      "account": "A",
+      "type": "log",
+      "text": "[SDK] Connected successfully.",
+      "url": "http://localhost:3000/login"
+    },
+    {
+      "account": "B",
+      "type": "log",
+      "text": "使用原生websocket",
+      "url": "http://localhost:3000/login"
+    },
+    {
+      "account": "B",
+      "type": "log",
+      "text": "websocket WebSocket",
+      "url": "http://localhost:3000/login"
+    },
+    {
+      "account": "B",
+      "type": "log",
+      "text": "[SDK] Connected successfully.",
+      "url": "http://localhost:3000/login"
+    },
+    {
+      "account": "A",
+      "type": "log",
+      "text": "使用原生websocket",
+      "url": "http://localhost:3000/chat/create-group"
+    },
+    {
+      "account": "A",
+      "type": "log",
+      "text": "websocket WebSocket",
+      "url": "http://localhost:3000/chat/create-group"
+    },
+    {
+      "account": "A",
+      "type": "log",
+      "text": "[SDK] Connected successfully.",
+      "url": "http://localhost:3000/chat/create-group"
+    },
+    {
+      "account": "A",
+      "type": "log",
+      "text": "使用原生websocket",
+      "url": "http://localhost:3000/chat/add-friend"
+    },
+    {
+      "account": "A",
+      "type": "log",
+      "text": "websocket WebSocket",
+      "url": "http://localhost:3000/chat/add-friend"
+    },
+    {
+      "account": "A",
+      "type": "log",
+      "text": "[SDK] Connected successfully.",
+      "url": "http://localhost:3000/chat/add-friend"
+    },
+    {
+      "account": "A",
+      "type": "log",
+      "text": "使用原生websocket",
+      "url": "http://localhost:3000/chat"
+    },
+    {
+      "account": "A",
+      "type": "log",
+      "text": "websocket WebSocket",
+      "url": "http://localhost:3000/chat"
+    },
+    {
+      "account": "A",
+      "type": "log",
+      "text": "[SDK] Connected successfully.",
+      "url": "http://localhost:3000/chat"
+    },
+    {
+      "account": "A",
+      "type": "log",
+      "text": "使用原生websocket",
+      "url": "http://localhost:3000/chat"
+    },
+    {
+      "account": "A",
+      "type": "log",
+      "text": "websocket WebSocket",
+      "url": "http://localhost:3000/chat"
+    },
+    {
+      "account": "A",
+      "type": "log",
+      "text": "[SDK] Connected successfully.",
+      "url": "http://localhost:3000/chat"
+    },
+    {
+      "account": "A",
+      "type": "log",
+      "text": "使用原生websocket",
+      "url": "http://localhost:3000/chat"
+    },
+    {
+      "account": "A",
+      "type": "log",
+      "text": "websocket WebSocket",
+      "url": "http://localhost:3000/chat"
+    },
+    {
+      "account": "A",
+      "type": "log",
+      "text": "[SDK] Connected successfully.",
+      "url": "http://localhost:3000/chat"
+    },
+    {
+      "account": "B",
+      "type": "log",
+      "text": "使用原生websocket",
+      "url": "http://localhost:3000/chat"
+    },
+    {
+      "account": "B",
+      "type": "log",
+      "text": "websocket WebSocket",
+      "url": "http://localhost:3000/chat"
+    },
+    {
+      "account": "B",
+      "type": "log",
+      "text": "[SDK] Connected successfully.",
+      "url": "http://localhost:3000/chat"
+    },
+    {
+      "account": "B",
+      "type": "log",
+      "text": "使用原生websocket",
+      "url": "http://localhost:3000/chat"
+    },
+    {
+      "account": "B",
+      "type": "log",
+      "text": "websocket WebSocket",
+      "url": "http://localhost:3000/chat"
+    },
+    {
+      "account": "B",
+      "type": "log",
+      "text": "[SDK] Connected successfully.",
+      "url": "http://localhost:3000/chat"
+    },
+    {
+      "account": "A",
+      "type": "error",
+      "text": "Failed to load resource: the server responded with a status of 400 (Bad Request)",
+      "url": "http://localhost:3000/chat/conversation/c9d61c7f903c48ca93458e50436fca6e/2"
+    },
+    {
+      "account": "A",
+      "type": "warning",
+      "text": "[ConversationStore] Remote update conversation extra command failed; local state was kept {error: AxiosError: Request failed with status code 400\n    at settle (http://localhost:3000/node_modules/.…, msg: 发送同步扩展会话cmd失败！, status: 400}",
+      "url": "http://localhost:3000/chat/conversation/c9d61c7f903c48ca93458e50436fca6e/2"
+    },
+    {
+      "account": "B",
+      "type": "log",
+      "text": "使用原生websocket",
+      "url": "http://localhost:3000/chat"
+    },
+    {
+      "account": "B",
+      "type": "log",
+      "text": "websocket WebSocket",
+      "url": "http://localhost:3000/chat"
+    },
+    {
+      "account": "B",
+      "type": "log",
+      "text": "[SDK] Connected successfully.",
+      "url": "http://localhost:3000/chat"
+    },
+    {
+      "account": "A",
+      "type": "log",
+      "text": "使用原生websocket",
+      "url": "http://localhost:3000/chat"
+    },
+    {
+      "account": "A",
+      "type": "log",
+      "text": "websocket WebSocket",
+      "url": "http://localhost:3000/chat"
+    },
+    {
+      "account": "A",
+      "type": "log",
+      "text": "[SDK] Connected successfully.",
+      "url": "http://localhost:3000/chat"
+    },
+    {
+      "account": "B",
+      "type": "log",
+      "text": "使用原生websocket",
+      "url": "http://localhost:3000/chat"
+    },
+    {
+      "account": "B",
+      "type": "log",
+      "text": "websocket WebSocket",
+      "url": "http://localhost:3000/chat"
+    },
+    {
+      "account": "B",
+      "type": "log",
+      "text": "[SDK] Connected successfully.",
+      "url": "http://localhost:3000/chat"
+    }
+  ],
+  "networkErrors": [
+    {
+      "account": "B",
+      "url": "http://100.79.157.76:8090/v1/coversation/clearUnread",
+      "method": "PUT",
+      "failure": "net::ERR_ABORTED"
+    },
+    {
+      "account": "B",
+      "url": "http://100.79.157.76:8090/v1/coversation/clearUnread",
+      "method": "PUT",
+      "failure": "net::ERR_ABORTED"
+    },
+    {
+      "account": "A",
+      "url": "http://100.79.157.76:8090/v1/conversations/c9d61c7f903c48ca93458e50436fca6e/2/extra",
+      "status": 400,
+      "method": "POST"
+    }
+  ],
+  "pageErrors": [],
+  "failed": [],
+  "finishedAt": "2026-05-23T17:53:38.328Z",
+  "summary": {
+    "checks": 16,
+    "failed": 0,
+    "screenshots": 19,
+    "consoleEntries": 38,
+    "networkErrors": 3,
+    "pageErrors": 0
+  }
+}

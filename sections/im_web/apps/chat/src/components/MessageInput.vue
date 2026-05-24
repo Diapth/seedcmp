@@ -135,11 +135,11 @@ async function sendSelectedFile(file: File) {
   if (!file) return;
   try {
     uploadHint.value = file.type.startsWith('image/') ? `正在发送图片: ${file.name}` : `正在发送文件: ${file.name}`;
-    if (file.type.startsWith('image/')) {
-      ArcoMessage.info('图片发送能力正在完善，当前先保留显式入口与文件检测');
-      return;
-    }
-    ArcoMessage.info('文件发送能力正在完善，当前先保留显式入口与文件检测');
+    await messageStore.sendMediaMessage(props.channelId, props.channelType, file);
+    ArcoMessage.success(file.type.startsWith('image/') ? '图片已发送' : '文件已发送');
+  } catch (err) {
+    console.error('Failed to send selected file', err);
+    ArcoMessage.error(file.type.startsWith('image/') ? '图片发送失败，请稍后重试' : '文件发送失败，请稍后重试');
   } finally {
     uploadHint.value = '';
   }

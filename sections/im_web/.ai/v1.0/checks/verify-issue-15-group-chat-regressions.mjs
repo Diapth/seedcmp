@@ -1,7 +1,8 @@
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
+import { imWebRoot } from './paths.mjs';
 
-const root = new URL('../..', import.meta.url).pathname;
+const root = imWebRoot;
 
 function read(relativePath) {
   return readFileSync(join(root, relativePath), 'utf8');

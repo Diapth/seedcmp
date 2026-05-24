@@ -93,10 +93,29 @@ export class MessageFile extends MessageContent {
   name!: string;
   size!: number;
 
+  constructor(url?: string, name?: string, size?: number) {
+    super();
+    this.url = url || '';
+    this.name = name || '';
+    this.size = size || 0;
+  }
+
+  get contentType(): number {
+    return 8;
+  }
+
   decodeJSON(content: any) {
     this.url = content.url || '';
     this.name = content.name || '';
     this.size = content.size || 0;
+  }
+
+  encodeJSON() {
+    return {
+      url: this.url || '',
+      name: this.name || '',
+      size: this.size || 0
+    };
   }
 
   get conversationDigest(): string {

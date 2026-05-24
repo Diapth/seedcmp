@@ -23,6 +23,7 @@ export interface Conversation {
 export const useConversationStore = defineStore('conversation', () => {
   const conversations = ref<Conversation[]>([]);
   const drafts = ref<Record<string, string>>({});
+  const syncedDrafts = ref<Record<string, string | undefined>>({});
   const unreadMap = ref<Record<string, number>>({});
   const clearedUnreadSeqs = ref<Record<string, number>>({});
   const lastSyncVersion = ref<number>(0);
@@ -73,6 +74,7 @@ export const useConversationStore = defineStore('conversation', () => {
   }
 
   function isConversationDigestSource(raw: any) {
+    if (raw?.isRevoked || raw?.is_deleted === 1 || raw?.is_revoked === 1 || raw?.revoke === 1) return false;
     return raw && ![99, 1000].includes(getMessageType(raw));
   }
 
@@ -373,6 +375,7 @@ export const useConversationStore = defineStore('conversation', () => {
           if (item.draft) {
             drafts.value[key] = item.draft;
           }
+          syncedDrafts.value[key] = item.draft || '';
           const conv = findConversation(channelId, channelType);
           if (conv) {
             conv.draft = item.draft || '';
@@ -408,8 +411,13 @@ export const useConversationStore = defineStore('conversation', () => {
     }
     draftSyncTimers.value[key] = setTimeout(async () => {
       delete draftSyncTimers.value[key];
+      const draft = drafts.value[key] || '';
+      if (draft === '' && !syncedDrafts.value[key]) {
+        return;
+      }
       try {
-        await syncApi.updateConversationExtra(channelId, channelType, { draft: drafts.value[key] || '' });
+        await syncApi.updateConversationExtra(channelId, channelType, { draft });
+        syncedDrafts.value[key] = draft;
       } catch (e) {
         warnRemoteCommandFailure('update conversation extra', e);
       }
@@ -544,8 +552,6 @@ export const useConversationStore = defineStore('conversation', () => {
       return conv;
     }
 
-    const info = await channelStore.getChannelInfo(channelId, channelType);
-    if (version !== resetVersion.value) return undefined;
     const next: Conversation = {
       channel_id: channelId,
       channel_type: channelType,
@@ -553,15 +559,24 @@ export const useConversationStore = defineStore('conversation', () => {
       last_msg_seq: message?.messageSeq || 0,
       last_msg_time: message?.timestamp || Math.floor(Date.now() / 1000),
       last_message: isDigest ? normalizedMsg : undefined,
-      top: info.top || 0,
-      mute: info.mute || 0,
+      top: 0,
+      mute: 0,
       draft: drafts.value[key] || '',
-      name: info.name,
-      avatar: info.avatar
+      name: '',
+      avatar: ''
     };
     conversations.value.push(next);
     unreadMap.value[key] = 0;
     compactConversations();
+    const info = await channelStore.getChannelInfo(channelId, channelType);
+    if (version !== resetVersion.value) return undefined;
+    const current = findConversation(channelId, channelType);
+    if (current) {
+      current.top = current.top || info.top || 0;
+      current.mute = current.mute || info.mute || 0;
+      current.name = current.name || info.name || '';
+      current.avatar = current.avatar || info.avatar || '';
+    }
     return next;
   }
 
@@ -583,6 +598,7 @@ export const useConversationStore = defineStore('conversation', () => {
     resetVersion.value++;
     conversations.value = [];
     drafts.value = {};
+    syncedDrafts.value = {};
     unreadMap.value = {};
     clearedUnreadSeqs.value = {};
     lastSyncVersion.value = 0;
