@@ -14,12 +14,13 @@ const props = defineProps<{
 
 const url = computed(() => props.message.content?.url || props.message.payload?.url || '');
 const duration = computed(() => props.message.content?.time || props.message.payload?.time || 0);
+const isAvailable = computed(() => !!url.value);
 
 const isPlaying = ref(false);
 let audio: HTMLAudioElement | null = null;
 
 function togglePlay() {
-  if (!url.value) return;
+  if (!isAvailable.value) return;
 
   if (isPlaying.value) {
     audio?.pause();
@@ -53,7 +54,7 @@ onBeforeUnmount(() => {
 </script>
 
 <template>
-  <div class="voice-cell" :class="{ 'is-me': isMe }" @click="togglePlay">
+  <div class="voice-cell" :class="{ 'is-me': isMe, unavailable: !isAvailable }" @click="togglePlay">
     <div class="bubble">
       <div class="voice-icon-wrapper">
         <svg v-if="!isPlaying" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" class="voice-icon">
@@ -66,7 +67,7 @@ onBeforeUnmount(() => {
           <span class="bar bar-3"></span>
         </div>
       </div>
-      <span class="voice-duration">{{ duration }}"</span>
+      <span class="voice-duration">{{ isAvailable ? `${duration}"` : '语音不可用' }}</span>
     </div>
   </div>
 </template>
@@ -76,6 +77,11 @@ onBeforeUnmount(() => {
   display: flex;
   width: 100%;
   cursor: pointer;
+}
+
+.voice-cell.unavailable {
+  cursor: not-allowed;
+  opacity: 0.72;
 }
 
 .bubble {

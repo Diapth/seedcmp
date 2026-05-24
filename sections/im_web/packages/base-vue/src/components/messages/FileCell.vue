@@ -16,6 +16,7 @@ const props = defineProps<{
 const url = computed(() => props.message.content?.url || props.message.payload?.url || '');
 const name = computed(() => props.message.content?.name || props.message.payload?.name || '未知文件');
 const size = computed(() => props.message.content?.size || props.message.payload?.size || 0);
+const isAvailable = computed(() => !!url.value);
 
 const sizeStr = computed(() => {
   if (size.value === 0) return '0 B';
@@ -26,17 +27,17 @@ const sizeStr = computed(() => {
 });
 
 function handleDownload() {
-  if (!url.value) return;
+  if (!isAvailable.value) return;
   window.open(url.value, '_blank');
 }
 </script>
 
 <template>
-  <div class="file-cell" :class="{ 'is-me': isMe }" @click="handleDownload">
+  <div class="file-cell" :class="{ 'is-me': isMe, unavailable: !isAvailable }" @click="handleDownload">
     <div class="bubble">
       <div class="file-details">
         <span class="file-name" :title="name">{{ name }}</span>
-        <span class="file-size">{{ sizeStr }}</span>
+        <span class="file-size">{{ isAvailable ? sizeStr : '下载不可用' }}</span>
       </div>
       <div class="file-icon-wrapper">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" class="file-svg">
@@ -56,6 +57,10 @@ function handleDownload() {
   display: flex;
   width: 100%;
   cursor: pointer;
+}
+
+.file-cell.unavailable {
+  cursor: not-allowed;
 }
 
 .bubble {

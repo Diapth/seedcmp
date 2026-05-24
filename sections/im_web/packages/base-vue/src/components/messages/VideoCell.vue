@@ -16,13 +16,14 @@ const props = defineProps<{
 
 const url = computed(() => props.message.content?.url || props.message.payload?.url || '');
 const cover = computed(() => props.message.content?.cover || props.message.payload?.cover || '');
+const isAvailable = computed(() => !!url.value);
 
 const showPlayer = ref(false);
 </script>
 
 <template>
   <div class="video-cell" :class="{ 'is-me': isMe }">
-    <div class="bubble" @click="showPlayer = true">
+    <div class="bubble" :class="{ unavailable: !isAvailable }" @click="isAvailable && (showPlayer = true)">
       <img v-if="cover" :src="cover" class="video-thumbnail" alt="Video cover" />
       <div v-else class="video-placeholder">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" class="placeholder-icon">
@@ -37,15 +38,16 @@ const showPlayer = ref(false);
         </svg>
       </div>
 
-      <div class="play-overlay">
+      <div v-if="isAvailable" class="play-overlay">
         <svg viewBox="0 0 24 24" fill="currentColor" class="play-icon">
           <polygon points="5 3 19 12 5 21 5 3" />
         </svg>
       </div>
+      <div v-else class="video-unavailable">视频不可用</div>
     </div>
 
     <!-- Video Modal Player -->
-    <div v-if="showPlayer" class="player-modal" @click="showPlayer = false">
+    <div v-if="showPlayer && isAvailable" class="player-modal" @click="showPlayer = false">
       <div class="player-container" @click.stop>
         <video :src="url" controls autoplay class="player-video"></video>
         <button class="close-player-btn" @click="showPlayer = false">
@@ -77,6 +79,11 @@ const showPlayer = ref(false);
   align-items: center;
   justify-content: center;
   aspect-ratio: 16 / 10;
+}
+
+.bubble.unavailable {
+  cursor: not-allowed;
+  opacity: 0.72;
 }
 
 .video-thumbnail {
@@ -126,6 +133,17 @@ const showPlayer = ref(false);
   width: 16px;
   height: 16px;
   margin-left: 2px;
+}
+
+.video-unavailable {
+  position: absolute;
+  left: 10px;
+  bottom: 10px;
+  padding: 3px 7px;
+  border-radius: var(--radius-sm);
+  background: rgba(0, 0, 0, 0.58);
+  color: #ffffff;
+  font-size: 12px;
 }
 
 .video-cell.is-me {

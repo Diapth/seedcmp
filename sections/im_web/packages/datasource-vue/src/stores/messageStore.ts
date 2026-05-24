@@ -127,15 +127,14 @@ export const useMessageStore = defineStore('message', () => {
 
   function updateExistingConversationSummary(channelId: string, channelType: number, lastMessage: Message) {
     const key = `${channelId}-${channelType}`;
-    const conv = conversationStore.conversations.find(item =>
+    const matching = conversationStore.conversations.filter(item =>
       String(item.channel_id) === String(channelId) &&
       Number(item.channel_type) === Number(channelType)
     );
+    const conv = matching[0];
     if (!conv) return false;
 
-    conv.last_msg_seq = lastMessage.messageSeq || conv.last_msg_seq;
-    conv.last_msg_time = lastMessage.timestamp || conv.last_msg_time;
-    conv.last_message = {
+    const summary = {
       ...lastMessage,
       payload: lastMessage.content,
       content: lastMessage.content,
@@ -143,10 +142,18 @@ export const useMessageStore = defineStore('message', () => {
       timestamp: lastMessage.timestamp,
       fromUID: lastMessage.fromUID
     };
+    for (const item of matching) {
+      item.last_msg_seq = lastMessage.messageSeq || item.last_msg_seq;
+      item.last_msg_time = lastMessage.timestamp || item.last_msg_time;
+      item.last_message = summary;
+      if (lastMessage.isUnreadCleared) {
+        item.unread = 0;
+      }
+    }
     if (lastMessage.isUnreadCleared) {
-      conv.unread = 0;
       conversationStore.unreadMap[key] = 0;
     }
+
     return true;
   }
 
