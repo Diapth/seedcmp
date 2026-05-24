@@ -280,3 +280,9 @@ test-results/
 # Volar / Vue-Language-Server generated files
 *.vue.js
 *VLS_globalTypes.vue.js
+
+# VLS-generated JS companions for TS files in packages
+sections/im_web/packages/base-vue/src/**/*.js
+sections/im_web/packages/contacts-vue/src/**/*.js
+sections/im_web/packages/datasource-vue/src/**/*.js
+sections/im_web/packages/login-vue/src/**/*.js
