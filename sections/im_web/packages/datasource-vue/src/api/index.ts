@@ -161,6 +161,18 @@ export const groupApi = {
   inviteMembers(groupNo: string, members: string[]) {
     return apiClient.post(`groups/${groupNo}/members`, { members });
   },
+  // 需要管理员确认的群成员邀请
+  inviteMembersForApproval(groupNo: string, uids: string[], remark = '') {
+    return apiClient.post(`groups/${groupNo}/member/invite`, { uids, remark });
+  },
+  // 获取群邀请详情
+  getInviteDetail(inviteNo: string) {
+    return apiClient.get(`group/invites/${inviteNo}`);
+  },
+  // 确认群邀请
+  confirmInvite(authCode: string) {
+    return apiClient.post(`group/invite/sure?auth_code=${authCode}`);
+  },
   // 移除群成员
   removeMembers(groupNo: string, members: string[]) {
     return apiDelete(`groups/${groupNo}/members`, { members });
@@ -194,6 +206,14 @@ export const groupApi = {
   transferOwner(groupNo: string, toUid: string) {
     return apiClient.post(`groups/${groupNo}/transfer/${toUid}`);
   },
+  // 获取群二维码
+  getGroupQRCode(groupNo: string) {
+    return apiClient.get(`groups/${groupNo}/qrcode`);
+  },
+  // 扫码入群
+  scanJoinGroup(groupNo: string, authCode: string) {
+    return apiClient.get(`groups/${groupNo}/scanjoin?auth_code=${authCode}`);
+  },
   // 退群
   exitGroup(groupNo: string) {
     return apiClient.post(`groups/${groupNo}/exit`);
@@ -209,6 +229,10 @@ export const groupApi = {
   // 个别成员禁言/解禁
   muteMember(groupNo: string, data: { member_uid: string; action: number; key: number }) {
     return apiClient.post(`groups/${groupNo}/forbidden_with_member`, data);
+  },
+  // 添加或移除群黑名单
+  blacklistMember(groupNo: string, action: 0 | 1, uids: string[]) {
+    return apiClient.post(`groups/${groupNo}/blacklist/${action}`, { uids });
   }
 };
 

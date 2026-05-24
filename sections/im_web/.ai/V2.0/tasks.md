@@ -101,23 +101,31 @@
 
 ### Tests for User Story 2
 
-- [ ] T038 [P] [US2] Add group role and permission fallback tests in `sections/im_web/apps/chat/tests/groupPermissions.test.ts`
-- [ ] T039 [P] [US2] Add group invite, QR, approval, expired, and unavailable state tests in `sections/im_web/apps/chat/tests/groupJoinFlows.test.ts`
-- [ ] T040 [P] [US2] Add group settings drawer component tests in `sections/im_web/apps/chat/tests/groupSettingsDrawer.test.ts`
-- [ ] T041 [US2] Add Playwright group management smoke flow in `sections/im_web/apps/chat/tests-e2e/smoke-uc2-group-management.spec.ts`
+- [X] T038 [P] [US2] Add group role and permission fallback tests in `sections/im_web/apps/chat/tests/groupPermissions.test.ts`
+- [X] T039 [P] [US2] Add group invite, QR, approval, expired, and unavailable state tests in `sections/im_web/apps/chat/tests/groupJoinFlows.test.ts`
+- [X] T040 [P] [US2] Add group settings drawer component tests in `sections/im_web/apps/chat/tests/groupSettingsDrawer.test.ts`
+- [X] T041 [US2] Add Playwright group management smoke flow in `sections/im_web/apps/chat/tests-e2e/smoke-uc2-group-management.spec.ts`
 
 ### Implementation for User Story 2
 
-- [ ] T042 [US2] Complete group profile, announcement, saved status, mute setting, lifecycle, and permission state in `sections/im_web/packages/datasource-vue/src/stores/groupStore.ts`
-- [ ] T043 [US2] Complete member role, mute, blacklist, remove, transfer, exit, and disband store actions in `sections/im_web/packages/datasource-vue/src/stores/groupStore.ts`
-- [ ] T044 [US2] Complete group settings UI, permission gates, destructive confirmations, and unavailable states in `sections/im_web/packages/base-vue/src/components/GroupSettingsDrawer.vue`
-- [ ] T045 [US2] Complete create group, invite selection, and member list workflows in `sections/im_web/apps/chat/src/views/CreateGroupPage.vue` and `sections/im_web/apps/chat/src/views/GroupMemberList.vue`
-- [ ] T046 [US2] Implement QR invite and invite confirmation UI states in `sections/im_web/apps/chat/src/views/CreateGroupPage.vue` and `sections/im_web/packages/base-vue/src/components/GroupSettingsDrawer.vue`
-- [ ] T047 [US2] Normalize group realtime notices and member updates in `sections/im_web/packages/datasource-vue/src/cmd/index.ts`
-- [ ] T048 [US2] Run `pnpm type-check`, `pnpm build`, `pnpm test:unit`, and the US2 Playwright smoke from `sections/im_web/package.json` and record evidence in `sections/im_web/.ai/V2.0/tasks.md`
-- [ ] T049 [US2] Complete US2 code review against the checklist in `sections/im_web/.ai/V2.0/plan.md`
+- [X] T042 [US2] Complete group profile, announcement, saved status, mute setting, lifecycle, and permission state in `sections/im_web/packages/datasource-vue/src/stores/groupStore.ts`
+- [X] T043 [US2] Complete member role, mute, blacklist, remove, transfer, exit, and disband store actions in `sections/im_web/packages/datasource-vue/src/stores/groupStore.ts`
+- [X] T044 [US2] Complete group settings UI, permission gates, destructive confirmations, and unavailable states in `sections/im_web/packages/base-vue/src/components/GroupSettingsDrawer.vue`
+- [X] T045 [US2] Complete create group, invite selection, and member list workflows in `sections/im_web/apps/chat/src/views/CreateGroupPage.vue` and `sections/im_web/apps/chat/src/views/GroupMemberList.vue`
+- [X] T046 [US2] Implement QR invite and invite confirmation UI states in `sections/im_web/apps/chat/src/views/CreateGroupPage.vue` and `sections/im_web/packages/base-vue/src/components/GroupSettingsDrawer.vue`
+- [X] T047 [US2] Normalize group realtime notices and member updates in `sections/im_web/packages/datasource-vue/src/cmd/index.ts`
+- [X] T048 [US2] Run `pnpm type-check`, `pnpm build`, `pnpm test:unit`, and the US2 Playwright smoke from `sections/im_web/package.json` and record evidence in `sections/im_web/.ai/V2.0/tasks.md`
+- [X] T049 [US2] Complete US2 code review against the checklist in `sections/im_web/.ai/V2.0/plan.md`
 
 **Checkpoint**: US2 is independently functional and testable.
+
+**2026-05-24 US2 Close Evidence**
+
+- T038-T040: Added `groupPermissions.test.ts`, `groupJoinFlows.test.ts`, and `groupSettingsDrawer.test.ts` covering permission fallback, store-owned group actions, invite/QR/approval/expired/unavailable state contracts, and drawer destructive/permission UI contracts.
+- T041 smoke: `cd sections/im_web/apps/chat && pnpm exec playwright test tests-e2e/smoke-uc2-group-management.spec.ts --project=chromium` exit 0, 1 passed. The smoke logs in, opens a group conversation, opens settings, and verifies QR, invitation, mute, and invite member controls.
+- T042-T047: `groupStore.ts` now owns profile/settings, invite, member remove, role management, member mute, full mute, blacklist, transfer, exit, disband, QR, invite confirmation, and scan join state. `api/index.ts` wraps the verified group invite/QR/scan/blacklist endpoints. `GroupSettingsDrawer.vue`, `CreateGroupPage.vue`, and `GroupMemberList.vue` expose permission-gated actions, destructive confirmations, invite approval, QR, expired/unavailable copy, and member management. `cmd/index.ts` refreshes group info/member state for realtime group membership, manager, transfer, blacklist, and forbidden updates.
+- Verification: `cd sections/im_web && pnpm type-check` exit 0; `cd sections/im_web && pnpm build` exit 0 with existing large chunk warning; `cd sections/im_web && pnpm test:unit` exit 0, 14 files / 40 tests passed.
+- Code review: local review against the plan checklist found no blocking US2 issues. Group state mutations are centralized in datasource store actions; UI uses permission gates and confirmations; unsupported/uncertain blacklist and QR states are visible as disabled/unavailable states where appropriate; backend wrappers map to TangSengDaoDaoServer routes. Residual non-blocking risk: full invite approval and scan-join end-to-end approval still depends on multi-account backend setup.
 
 ---
 

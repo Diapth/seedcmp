@@ -9,7 +9,6 @@ import {
   useGroupStore
 } from '@tsdaodao/datasource-vue';
 import { useUserStore } from '@tsdaodao/datasource-vue';
-import { groupApi } from '@tsdaodao/datasource-vue';
 import { ChannelAvatar } from '@tsdaodao/base-vue';
 import { Message } from '@arco-design/web-vue';
 
@@ -55,9 +54,9 @@ onMounted(async () => {
 
 async function handleRemoveMember(uid: string) {
   try {
-    await groupApi.removeMembers(groupNo.value, [uid]);
+    if (!window.confirm('确认移出该成员？')) return;
+    await groupStore.removeMembers(groupNo.value, [uid]);
     Message.success('已移出该成员');
-    await groupStore.fetchGroupMembers(groupNo.value);
   } catch (err: any) {
     Message.error(err.msg || '操作失败');
   }
@@ -65,9 +64,8 @@ async function handleRemoveMember(uid: string) {
 
 async function handleAppointManager(uid: string) {
   try {
-    await groupApi.appointManager(groupNo.value, [uid]);
+    await groupStore.appointManager(groupNo.value, uid);
     Message.success('已设为管理员');
-    await groupStore.fetchGroupMembers(groupNo.value);
   } catch (err: any) {
     Message.error(err.msg || '操作失败');
   }
@@ -75,9 +73,8 @@ async function handleAppointManager(uid: string) {
 
 async function handleRemoveManager(uid: string) {
   try {
-    await groupApi.removeManager(groupNo.value, [uid]);
+    await groupStore.removeManager(groupNo.value, uid);
     Message.success('已取消管理员');
-    await groupStore.fetchGroupMembers(groupNo.value);
   } catch (err: any) {
     Message.error(err.msg || '操作失败');
   }
@@ -86,9 +83,28 @@ async function handleRemoveManager(uid: string) {
 async function handleMuteMember(uid: string, action: number) {
   try {
     // action: 1 to mute, 0 to unmute
-    await groupApi.muteMember(groupNo.value, { member_uid: uid, action, key: 1 });
+    await groupStore.muteMember(groupNo.value, uid, action === 1);
     Message.success(action === 1 ? '已禁言该成员' : '已解除禁言');
-    await groupStore.fetchGroupMembers(groupNo.value);
+  } catch (err: any) {
+    Message.error(err.msg || '操作失败');
+  }
+}
+
+async function handleTransferOwner(uid: string) {
+  try {
+    if (!window.confirm('确认转让群主？')) return;
+    await groupStore.transferOwner(groupNo.value, uid);
+    Message.success('群主已转让');
+  } catch (err: any) {
+    Message.error(err.msg || '操作失败');
+  }
+}
+
+async function handleBlacklistMember(uid: string) {
+  try {
+    if (!window.confirm('确认加入黑名单？')) return;
+    await groupStore.blacklistMembers(groupNo.value, [uid], true);
+    Message.success('已加入黑名单');
   } catch (err: any) {
     Message.error(err.msg || '操作失败');
   }
@@ -148,6 +164,14 @@ function handleGoBack() {
               取消管理员
             </button>
 
+            <button
+              v-if="isOwner && Number(m.role || 0) !== 1"
+              class="action-btn"
+              @click="handleTransferOwner(m.uid)"
+            >
+              转让群主
+            </button>
+
             <!-- Mute buttons -->
             <button 
               v-if="canManage && canManageGroupMember(groupInfo, m)" 
@@ -165,6 +189,14 @@ function handleGoBack() {
               @click="handleRemoveMember(m.uid)"
             >
               移出
+            </button>
+
+            <button
+              v-if="canManage && canManageGroupMember(groupInfo, m)"
+              class="action-btn blacklist-btn"
+              @click="handleBlacklistMember(m.uid)"
+            >
+              黑名单
             </button>
           </div>
         </div>
@@ -319,7 +351,8 @@ function handleGoBack() {
   border-color: #ff4d4f40;
 }
 
-.kick-btn {
+.kick-btn,
+.blacklist-btn {
   background-color: #ff4d4f15;
   color: #ff4d4f;
   border-color: #ff4d4f40;

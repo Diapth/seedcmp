@@ -106,6 +106,22 @@ export function registerCMDListeners() {
       case 'syncReminders':
         break;
 
+      case 'groupMemberAdd':
+      case 'groupMemberRemove':
+      case 'groupMemberUpdate':
+      case 'groupManagerUpdate':
+      case 'groupTransferOwner':
+      case 'groupBlacklistUpdate':
+      case 'groupForbiddenUpdate':
+        if (channel && channel.channelType === 2) {
+          delete groupStore.groups[channel.channelID];
+          groupStore.getGroupInfo(channel.channelID);
+          groupStore.fetchGroupMembers(channel.channelID);
+          channelStore.fetchGroupMembers(channel.channelID);
+          conversationStore.ensureGroupConversations();
+        }
+        break;
+
       case 'messageRevoke':
         if (channel && param.client_msg_no) {
           messageStore.handleMessageRevoked(channel.channelID, channel.channelType, param.client_msg_no);
