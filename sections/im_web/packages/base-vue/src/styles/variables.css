@@ -11,6 +11,7 @@
   --color-danger: #E53935;
   --transition-fast: 0.15s ease;
   --radius-sm: 2px;
+  --chat-background: var(--bg-primary);
 }
 
 [theme-mode="dark"] {
@@ -22,4 +23,5 @@
   --text-main: #F5F5F7;
   --text-secondary: #B0B0B0;
   --text-muted: #8E8E93;
+  --chat-background: #121212;
 }

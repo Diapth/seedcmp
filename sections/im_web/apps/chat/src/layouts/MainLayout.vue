@@ -16,6 +16,7 @@ import MyProfileDrawer from '../views/MyProfileDrawer.vue';
 const activeTab = ref<'chats' | 'contacts'>('chats');
 const searchQuery = ref('');
 const showMyProfileDrawer = ref(false);
+const themeMode = ref<'light' | 'dark'>((localStorage.getItem('theme-mode') as 'light' | 'dark') || 'light');
 
 const router = useRouter();
 const userStore = useUserStore();
@@ -40,12 +41,23 @@ const connectionBanner = computed(() => {
 const recoveryState = computed(() => sdkStore.recoveryState);
 
 onMounted(async () => {
+  applyThemeMode();
   if (userStore.isLoggedIn && userStore.currentUser) {
     await groupStore.fetchMyGroups();
     conversationStore.ensureGroupConversations();
     await conversationStore.syncConversations();
   }
 });
+
+function applyThemeMode() {
+  document.documentElement.setAttribute('theme-mode', themeMode.value);
+}
+
+function toggleTheme() {
+  themeMode.value = themeMode.value === 'dark' ? 'light' : 'dark';
+  localStorage.setItem('theme-mode', themeMode.value);
+  applyThemeMode();
+}
 
 function handleLogout() {
   userStore.logout();
@@ -86,6 +98,9 @@ function handleKickoutRelogin() {
             <polyline points="16 17 21 12 16 7" />
             <line x1="21" y1="12" x2="9" y2="12" />
           </svg>
+        </button>
+        <button class="theme-btn" @click="toggleTheme" :title="themeMode === 'dark' ? '切换浅色' : '切换深色'">
+          {{ themeMode === 'dark' ? '☀' : '◐' }}
         </button>
       </div>
 
@@ -256,6 +271,17 @@ function handleKickoutRelogin() {
   transition: background-color 0.2s, color 0.2s;
 }
 
+.theme-btn {
+  width: 30px;
+  height: 30px;
+  border: var(--border-hairline);
+  border-radius: var(--radius-sm);
+  background-color: var(--bg-secondary);
+  color: var(--text-primary);
+  cursor: pointer;
+  font-size: 14px;
+}
+
 .logout-btn:hover {
   background-color: var(--bg-hover);
   color: var(--text-primary);
@@ -381,5 +407,30 @@ function handleKickoutRelogin() {
 .clear-search-btn:hover {
   background-color: var(--bg-hover);
   color: var(--text-primary);
+}
+
+@media (max-width: 720px) {
+  .main-layout {
+    display: grid;
+    grid-template-columns: minmax(88px, 36vw) minmax(0, 1fr);
+  }
+
+  .sidebar {
+    width: auto;
+    min-width: 88px;
+  }
+
+  .user-info,
+  .tab-btn {
+    font-size: 12px;
+  }
+
+  .sidebar-search {
+    padding: 8px;
+  }
+
+  .chat-viewport {
+    min-width: 0;
+  }
 }
 </style>

@@ -240,21 +240,29 @@
 
 ### Tests for User Story 6
 
-- [ ] T081 [P] [US6] Add large history rendering and scroll stability tests in `sections/im_web/apps/chat/tests/largeHistory.test.ts`
-- [ ] T082 [P] [US6] Add dark mode and responsive layout tests in `sections/im_web/apps/chat/tests/themeResponsive.test.ts`
-- [ ] T083 [P] [US6] Add notification and unread behavior tests in `sections/im_web/apps/chat/tests/notificationUnread.test.ts`
-- [ ] T084 [US6] Add Playwright large history and desktop readiness smoke flow in `sections/im_web/apps/chat/tests-e2e/smoke-uc8-large-history.spec.ts`
+- [X] T081 [P] [US6] Add large history rendering and scroll stability tests in `sections/im_web/apps/chat/tests/largeHistory.test.ts`
+- [X] T082 [P] [US6] Add dark mode and responsive layout tests in `sections/im_web/apps/chat/tests/themeResponsive.test.ts`
+- [X] T083 [P] [US6] Add notification and unread behavior tests in `sections/im_web/apps/chat/tests/notificationUnread.test.ts`
+- [X] T084 [US6] Add Playwright large history and desktop readiness smoke flow in `sections/im_web/apps/chat/tests-e2e/smoke-uc8-large-history.spec.ts`
 
 ### Implementation for User Story 6
 
-- [ ] T085 [US6] Improve large message list rendering and stable sizing in `sections/im_web/apps/chat/src/components/MessageList.vue`
-- [ ] T086 [US6] Improve conversation list unread and notification state handling in `sections/im_web/apps/chat/src/views/ConversationList.vue` and `sections/im_web/packages/datasource-vue/src/stores/conversationStore.ts`
-- [ ] T087 [US6] Complete dark mode persistence and responsive shell behavior in `sections/im_web/apps/chat/src/layouts/MainLayout.vue` and `sections/im_web/packages/base-vue/src/styles/variables.css`
-- [ ] T088 [US6] Complete desktop-style notification permission, denied, revoked, and unavailable states in `sections/im_web/apps/chat/src/views/MyProfileDrawer.vue`
-- [ ] T089 [US6] Run `pnpm type-check`, `pnpm build`, `pnpm test:unit`, and the US6 Playwright smoke from `sections/im_web/package.json` and record evidence in `sections/im_web/.ai/V2.0/tasks.md`
-- [ ] T090 [US6] Complete US6 code review against the checklist in `sections/im_web/.ai/V2.0/plan.md`
+- [X] T085 [US6] Improve large message list rendering and stable sizing in `sections/im_web/apps/chat/src/components/MessageList.vue`
+- [X] T086 [US6] Improve conversation list unread and notification state handling in `sections/im_web/apps/chat/src/views/ConversationList.vue` and `sections/im_web/packages/datasource-vue/src/stores/conversationStore.ts`
+- [X] T087 [US6] Complete dark mode persistence and responsive shell behavior in `sections/im_web/apps/chat/src/layouts/MainLayout.vue` and `sections/im_web/packages/base-vue/src/styles/variables.css`
+- [X] T088 [US6] Complete desktop-style notification permission, denied, revoked, and unavailable states in `sections/im_web/apps/chat/src/views/MyProfileDrawer.vue`
+- [X] T089 [US6] Run `pnpm type-check`, `pnpm build`, `pnpm test:unit`, and the US6 Playwright smoke from `sections/im_web/package.json` and record evidence in `sections/im_web/.ai/V2.0/tasks.md`
+- [X] T090 [US6] Complete US6 code review against the checklist in `sections/im_web/.ai/V2.0/plan.md`
 
 **Checkpoint**: US6 is independently functional and testable.
+
+**2026-05-24 US6 Close Evidence**
+
+- T081-T083: Added `largeHistory.test.ts`, `themeResponsive.test.ts`, and `notificationUnread.test.ts` covering bounded large-history rendering, stable row sizing, dark-mode persistence, responsive shell rules, notification permission states, and muted unread affordances.
+- T084 smoke: `cd sections/im_web/apps/chat && pnpm exec playwright test tests-e2e/smoke-uc8-large-history.spec.ts --project=chromium` exit 0, 1 passed. The smoke verifies login, theme toggle persistence on the document, responsive shell visibility, conversation entry, message list, and input surface.
+- T085-T088: `MessageList.vue` now renders a bounded `visibleMessages` window with spacer heights and stable row sizing for large histories. `ConversationList.vue` exposes desktop notification permission/unavailable/denied states and muted unread styling. `MainLayout.vue` persists dark/light mode in `localStorage`, applies `theme-mode`, and adds responsive layout rules. `variables.css` now exposes `--chat-background` for light/dark readiness; `MyProfileDrawer.vue` already carries the detailed notification permission, denied, and unsupported states from US4.
+- Verification: targeted US6 Vitest command `cd sections/im_web/apps/chat && pnpm exec vitest run tests/largeHistory.test.ts tests/themeResponsive.test.ts tests/notificationUnread.test.ts --config vitest.config.ts` exit 0, 3 files / 5 tests passed; `cd sections/im_web && pnpm type-check` exit 0; `cd sections/im_web && pnpm build` exit 0 with existing large chunk warning; full unit suite passed with `cd sections/im_web/apps/chat && pnpm exec vitest run --config vitest.config.ts --pool=threads --poolOptions.threads.singleThread=true`, 25 files / 59 tests passed.
+- Code review: local review against the plan checklist found no blocking US6 issues. Large-history rendering is bounded without changing message-store ownership, dark mode is persisted at the shell/document level, notification states are visible and non-blocking, and muted unread badges remain distinguishable. Residual non-blocking risk: true thousands-of-message performance still needs live account/manual stress verification beyond the bounded test contracts.
 
 ---
 

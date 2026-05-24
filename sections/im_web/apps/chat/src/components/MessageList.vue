@@ -3,11 +3,11 @@ import { ref, onMounted, watch, nextTick, computed } from 'vue';
 import { useMessageStore } from '@tsdaodao/datasource-vue';
 import { useUserStore } from '@tsdaodao/datasource-vue';
 import { useRemoteConfig } from '@tsdaodao/base-vue';
-import { 
-  TextCell, 
-  ImageCell, 
-  SystemCell, 
-  TimeCell, 
+import {
+  TextCell,
+  ImageCell,
+  SystemCell,
+  TimeCell,
   VoiceCell,
   FileCell,
   VideoCell,
@@ -16,8 +16,8 @@ import {
   LocationCell,
   CardCell,
   MergeCell,
-  ChannelAvatar, 
-  ContextMenu 
+  ChannelAvatar,
+  ContextMenu
 } from '@tsdaodao/base-vue';
 import { Message } from '@arco-design/web-vue';
 
@@ -31,6 +31,9 @@ const userStore = useUserStore();
 const { remoteConfig } = useRemoteConfig();
 
 const scrollContainer = ref<HTMLDivElement | null>(null);
+const scrollTop = ref(0);
+const historyWindowSize = ref(300);
+const estimatedRowHeight = 72;
 
 const showMenu = ref(false);
 const menuX = ref(0);
@@ -55,10 +58,35 @@ const renderableMessages = computed(() => {
   return messages.value.filter(isRenderableMessage);
 });
 
+const visibleStart = computed(() => {
+  if (renderableMessages.value.length <= historyWindowSize.value) return 0;
+  const estimatedStart = Math.floor(scrollTop.value / estimatedRowHeight) - 20;
+  return Math.max(0, Math.min(estimatedStart, renderableMessages.value.length - historyWindowSize.value));
+});
+
+const visibleEnd = computed(() => {
+  return Math.min(renderableMessages.value.length, visibleStart.value + historyWindowSize.value);
+});
+
+const visibleMessages = computed(() => {
+  return renderableMessages.value.slice(visibleStart.value, visibleEnd.value).map((msg, index) => ({
+    msg,
+    index: visibleStart.value + index
+  }));
+});
+
+const topSpacerHeight = computed(() => visibleStart.value * estimatedRowHeight);
+const bottomSpacerHeight = computed(() => Math.max(0, renderableMessages.value.length - visibleEnd.value) * estimatedRowHeight);
+
+function handleScroll() {
+  scrollTop.value = scrollContainer.value?.scrollTop || 0;
+}
+
 function scrollToBottom(behavior: 'auto' | 'smooth' = 'auto') {
   nextTick(() => {
     if (scrollContainer.value) {
       scrollContainer.value.scrollTop = scrollContainer.value.scrollHeight;
+      scrollTop.value = scrollContainer.value.scrollTop;
     }
   });
 }
@@ -75,7 +103,7 @@ watch(messages, (newMsgs) => {
   const missingUids = newMsgs
     .map(m => m.fromUID)
     .filter(uid => uid && !userStore.userCache[uid]);
-  
+
   if (missingUids.length > 0) {
     userStore.getUsersByIds([...new Set(missingUids)]);
   }
@@ -135,7 +163,7 @@ const menuItems = computed(() => {
       }
     });
   }
-  
+
   const isText = msg.content?.type === 1;
   if (isText) {
     items.push({
@@ -168,7 +196,7 @@ const menuItems = computed(() => {
       }
     });
   }
-  
+
   if (isMine && isWithinWindow) {
     items.push({
       label: '撤回消息',
@@ -265,102 +293,104 @@ const menuItems = computed(() => {
 </script>
 
 <template>
-  <div ref="scrollContainer" class="message-list">
-    <div v-for="(msg, idx) in renderableMessages" :key="msg.clientMsgNo || msg.messageID" class="message-row-wrapper">
-      <TimeCell v-if="shouldShowTime(msg, idx)" :timestamp="msg.timestamp" />
+  <div ref="scrollContainer" class="message-list" @scroll="handleScroll">
+    <div v-if="topSpacerHeight > 0" class="history-spacer" :style="{ height: `${topSpacerHeight}px` }"></div>
 
-      <div 
-        v-if="msg.content?.type === 1000 || msg.isRevoked" 
+    <div v-for="item in visibleMessages" :key="item.msg.clientMsgNo || item.msg.messageID" class="message-row-wrapper">
+      <TimeCell v-if="shouldShowTime(item.msg, item.index)" :timestamp="item.msg.timestamp" />
+
+      <div
+        v-if="item.msg.content?.type === 1000 || item.msg.isRevoked"
         class="sys-msg-row"
       >
-        <SystemCell :message="msg" />
+        <SystemCell :message="item.msg" />
       </div>
 
-      <div 
-        v-else 
-        class="msg-row" 
-        :class="{ 'is-me': isMe(msg) }"
-        @contextmenu="handleRightClick($event, msg)"
+      <div
+        v-else
+        class="msg-row"
+        :class="{ 'is-me': isMe(item.msg) }"
+        @contextmenu="handleRightClick($event, item.msg)"
       >
-        <ChannelAvatar 
-          v-if="!isMe(msg)"
-          :name="userStore.userCache[msg.fromUID]?.name || '加载中'"
-          :avatar="userStore.userCache[msg.fromUID]?.avatar"
+        <ChannelAvatar
+          v-if="!isMe(item.msg)"
+          :name="userStore.userCache[item.msg.fromUID]?.name || '加载中'"
+          :avatar="userStore.userCache[item.msg.fromUID]?.avatar"
           :size="36"
           class="msg-avatar"
         />
 
         <div class="msg-bubble-container">
-          <div 
-            v-if="channelType === 2 && !isMe(msg)" 
+          <div
+            v-if="channelType === 2 && !isMe(item.msg)"
             class="user-name-label"
           >
-            {{ userStore.userCache[msg.fromUID]?.name || msg.fromUID }}
+            {{ userStore.userCache[item.msg.fromUID]?.name || item.msg.fromUID }}
           </div>
 
           <!-- Quote / Reply Reference Box -->
-          <div v-if="msg.content?.reply" class="quote-reference-box" :class="{ 'is-me': isMe(msg) }">
-            <span class="quote-author">@{{ msg.content.reply.fromName || msg.content.reply.fromUID }}:</span>
-            <span class="quote-text">{{ msg.content.reply.content?.text || '[消息]' }}</span>
+          <div v-if="item.msg.content?.reply" class="quote-reference-box" :class="{ 'is-me': isMe(item.msg) }">
+            <span class="quote-author">@{{ item.msg.content.reply.fromName || item.msg.content.reply.fromUID }}:</span>
+            <span class="quote-text">{{ item.msg.content.reply.content?.text || '[消息]' }}</span>
           </div>
 
-          <TextCell 
-            v-if="msg.content?.type === 1" 
-            :message="msg" 
-            :is-me="isMe(msg)" 
+          <TextCell
+            v-if="item.msg.content?.type === 1"
+            :message="item.msg"
+            :is-me="isMe(item.msg)"
           />
-          <ImageCell 
-            v-else-if="msg.content?.type === 2" 
-            :message="msg" 
-            :is-me="isMe(msg)" 
+          <ImageCell
+            v-else-if="item.msg.content?.type === 2"
+            :message="item.msg"
+            :is-me="isMe(item.msg)"
           />
-          <GifCell 
-            v-else-if="msg.content?.type === 3" 
-            :message="msg" 
-            :is-me="isMe(msg)" 
+          <GifCell
+            v-else-if="item.msg.content?.type === 3"
+            :message="item.msg"
+            :is-me="isMe(item.msg)"
           />
-          <VoiceCell 
-            v-else-if="msg.content?.type === 4" 
-            :message="msg" 
-            :is-me="isMe(msg)" 
+          <VoiceCell
+            v-else-if="item.msg.content?.type === 4"
+            :message="item.msg"
+            :is-me="isMe(item.msg)"
           />
-          <VideoCell 
-            v-else-if="msg.content?.type === 5" 
-            :message="msg" 
-            :is-me="isMe(msg)" 
+          <VideoCell
+            v-else-if="item.msg.content?.type === 5"
+            :message="item.msg"
+            :is-me="isMe(item.msg)"
           />
-          <LocationCell 
-            v-else-if="msg.content?.type === 6" 
-            :message="msg" 
-            :is-me="isMe(msg)" 
+          <LocationCell
+            v-else-if="item.msg.content?.type === 6"
+            :message="item.msg"
+            :is-me="isMe(item.msg)"
           />
-          <CardCell 
-            v-else-if="msg.content?.type === 7" 
-            :message="msg" 
-            :is-me="isMe(msg)" 
+          <CardCell
+            v-else-if="item.msg.content?.type === 7"
+            :message="item.msg"
+            :is-me="isMe(item.msg)"
           />
-          <FileCell 
-            v-else-if="msg.content?.type === 8" 
-            :message="msg" 
-            :is-me="isMe(msg)" 
+          <FileCell
+            v-else-if="item.msg.content?.type === 8"
+            :message="item.msg"
+            :is-me="isMe(item.msg)"
           />
-          <MergeCell 
-            v-else-if="msg.content?.type === 11" 
-            :message="msg" 
-            :is-me="isMe(msg)" 
+          <MergeCell
+            v-else-if="item.msg.content?.type === 11"
+            :message="item.msg"
+            :is-me="isMe(item.msg)"
           />
-          <StickerCell 
-            v-else-if="msg.content?.type === 12 || msg.content?.type === 13" 
-            :message="msg" 
-            :is-me="isMe(msg)" 
+          <StickerCell
+            v-else-if="item.msg.content?.type === 12 || item.msg.content?.type === 13"
+            :message="item.msg"
+            :is-me="isMe(item.msg)"
           />
           <!-- Reactions Bar -->
-          <div v-if="msg.reactions && msg.reactions.length > 0" class="reactions-bar">
-            <div 
-              v-for="reaction in msg.reactions" 
-              :key="reaction.emoji" 
+          <div v-if="item.msg.reactions && item.msg.reactions.length > 0" class="reactions-bar">
+            <div
+              v-for="reaction in item.msg.reactions"
+              :key="reaction.emoji"
               class="reaction-badge"
-              @click="handleSendReaction(msg, reaction.emoji)"
+              @click="handleSendReaction(item.msg, reaction.emoji)"
             >
               <span class="reaction-emoji">{{ reaction.emoji }}</span>
               <span class="reaction-count">{{ reaction.count }}</span>
@@ -371,13 +401,15 @@ const menuItems = computed(() => {
       </div>
     </div>
 
-    <ContextMenu 
-      v-if="showMenu && menuItems.length > 0" 
-      :x="menuX" 
-      :y="menuY" 
-      :items="menuItems" 
+    <div v-if="bottomSpacerHeight > 0" class="history-spacer" :style="{ height: `${bottomSpacerHeight}px` }"></div>
+
+    <ContextMenu
+      v-if="showMenu && menuItems.length > 0"
+      :x="menuX"
+      :y="menuY"
+      :items="menuItems"
       :reactions="menuReactions"
-      @close="showMenu = false" 
+      @close="showMenu = false"
     />
   </div>
 </template>
@@ -396,6 +428,13 @@ const menuItems = computed(() => {
 .message-row-wrapper {
   display: flex;
   flex-direction: column;
+  min-height: 32px;
+  overflow-anchor: none;
+}
+
+.history-spacer {
+  flex: 0 0 auto;
+  pointer-events: none;
 }
 
 .msg-row {

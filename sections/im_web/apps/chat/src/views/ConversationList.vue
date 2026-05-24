@@ -16,6 +16,7 @@ const showContextMenu = ref(false);
 const contextMenuX = ref(0);
 const contextMenuY = ref(0);
 const selectedConversation = ref<any>(null);
+const notificationPermissionState = ref<'granted' | 'denied' | 'default' | 'unsupported'>('unsupported');
 
 const digestFallbackByType: Record<number, string> = {
   2: '[图片]',
@@ -33,6 +34,7 @@ const digestFallbackByType: Record<number, string> = {
 };
 
 onMounted(async () => {
+  syncNotificationPermission();
   if (conversationStore.conversations.length === 0) {
     loading.value = true;
     try {
@@ -45,6 +47,22 @@ onMounted(async () => {
     }
   }
 });
+
+function syncNotificationPermission() {
+  if (typeof Notification === 'undefined') {
+    notificationPermissionState.value = 'unsupported';
+    return;
+  }
+  notificationPermissionState.value = Notification.permission;
+}
+
+async function requestNotificationPermission() {
+  if (typeof Notification === 'undefined') {
+    notificationPermissionState.value = 'unsupported';
+    return;
+  }
+  notificationPermissionState.value = await Notification.requestPermission();
+}
 
 watch(
   () => conversationStore.sortedConversations.map(conv => {
@@ -292,6 +310,13 @@ function getDigestPresentation(conv: any) {
     </div>
 
     <div v-else class="list-wrapper">
+      <div v-if="notificationPermissionState !== 'granted'" class="notification-hint">
+        <span v-if="notificationPermissionState === 'unsupported'">当前浏览器不支持桌面通知</span>
+        <span v-else-if="notificationPermissionState === 'denied'">桌面通知已被浏览器拒绝</span>
+        <span v-else>开启桌面通知以便接收未读提醒</span>
+        <button v-if="notificationPermissionState === 'default'" @click="requestNotificationPermission">开启</button>
+      </div>
+
       <div 
         v-for="conv in conversationStore.sortedConversations" 
         :key="conv.channel_id + '-' + conv.channel_type"
@@ -341,7 +366,7 @@ function getDigestPresentation(conv: any) {
                   <path d="M4 4.8L5.2 3.6 20.4 18.8 19.2 20l-2.5-2.5H8.8L5 21.2V8.8L4 4.8zM7 8.4v7.6l1.1-1.1h5.2L7 8.4zM9.6 5h6.9A2.5 2.5 0 0 1 19 7.5v7.1l-2-2V7.5a.5.5 0 0 0-.5-.5h-4.9l-2-2z" />
                 </svg>
               </span>
-              <span v-if="getUnreadCount(conv) > 0" class="unread-badge">
+              <span v-if="getUnreadCount(conv) > 0" class="unread-badge" :class="{ 'muted-unread': conv.mute === 1 }">
                 {{ getUnreadCount(conv) > 99 ? '99+' : getUnreadCount(conv) }}
               </span>
             </div>
@@ -377,6 +402,30 @@ function getDigestPresentation(conv: any) {
 .list-wrapper {
   display: flex;
   flex-direction: column;
+}
+
+.notification-hint {
+  min-height: 32px;
+  padding: 0 12px;
+  border-bottom: var(--border-hairline);
+  background-color: var(--bg-secondary);
+  color: var(--text-secondary);
+  font-size: 12px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.notification-hint button {
+  height: 24px;
+  padding: 0 8px;
+  border: var(--border-hairline);
+  border-radius: var(--radius-sm);
+  background-color: var(--bg-primary);
+  color: var(--text-primary);
+  font-size: 12px;
+  cursor: pointer;
 }
 
 .conversation-item {
@@ -512,5 +561,9 @@ function getDigestPresentation(conv: any) {
   display: flex;
   align-items: center;
   justify-content: center;
+}
+
+.unread-badge.muted-unread {
+  background-color: var(--text-muted);
 }
 </style>
