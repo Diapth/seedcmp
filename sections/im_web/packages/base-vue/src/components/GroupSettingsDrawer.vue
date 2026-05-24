@@ -6,6 +6,7 @@ import { useConversationStore } from '@tsdaodao/datasource-vue';
 import { getMyGroupRole } from '@tsdaodao/datasource-vue';
 import { friendApi, groupApi } from '@tsdaodao/datasource-vue';
 import ChannelAvatar from './ChannelAvatar.vue';
+import AppDialog from './AppDialog.vue';
 import { Message } from '@arco-design/web-vue';
 
 const props = defineProps<{
@@ -35,6 +36,8 @@ const inviteSearching = ref(false);
 const showQrModal = ref(false);
 const qrState = ref<'idle' | 'loading' | 'ready' | 'expired' | 'approval' | 'unavailable'>('idle');
 const qrCodeUrl = ref('');
+const pendingDestructiveAction = ref<null | { title: string; message: string; run: () => Promise<void> }>(null);
+const destructiveLoading = ref(false);
 const inviteMode = computed(() => Number(groupInfo.value?.invite || 0) === 1);
 
 const currentMember = computed(() => {
@@ -185,10 +188,6 @@ async function loadQRCode() {
   }
 }
 
-function confirmDestructive(message: string) {
-  return window.confirm(message);
-}
-
 function openInviteModal() {
   inviteKeyword.value = '';
   inviteSearchResult.value = null;
@@ -259,26 +258,41 @@ async function submitInviteMembers() {
 }
 
 async function handleDisband() {
-  if (!confirmDestructive('确认解散群组？该操作会影响所有成员。')) return;
-  try {
-    await groupStore.disbandGroup(props.groupNo);
-    Message.success('群组已解散');
-    await conversationStore.deleteConversation(props.groupNo, 2);
-    emit('close');
-  } catch (err: any) {
-    Message.error(err.msg || '操作失败');
-  }
+  pendingDestructiveAction.value = {
+    title: '解散群组',
+    message: '确认解散群组？该操作会影响所有成员。',
+    run: async () => {
+      await groupStore.disbandGroup(props.groupNo);
+      Message.success('群组已解散');
+      await conversationStore.deleteConversation(props.groupNo, 2);
+      emit('close');
+    }
+  };
 }
 
 async function handleExit() {
-  if (!confirmDestructive('确认退出群聊？')) return;
+  pendingDestructiveAction.value = {
+    title: '退出群聊',
+    message: '确认退出群聊？',
+    run: async () => {
+      await groupStore.exitGroup(props.groupNo);
+      Message.success('已退出群聊');
+      await conversationStore.deleteConversation(props.groupNo, 2);
+      emit('close');
+    }
+  };
+}
+
+async function confirmDestructiveAction() {
+  if (!pendingDestructiveAction.value) return;
+  destructiveLoading.value = true;
   try {
-    await groupStore.exitGroup(props.groupNo);
-    Message.success('已退出群聊');
-    await conversationStore.deleteConversation(props.groupNo, 2);
-    emit('close');
+    await pendingDestructiveAction.value.run();
+    pendingDestructiveAction.value = null;
   } catch (err: any) {
     Message.error(err.msg || '操作失败');
+  } finally {
+    destructiveLoading.value = false;
   }
 }
 </script>
@@ -461,6 +475,16 @@ async function handleExit() {
         </div>
       </div>
     </div>
+    <AppDialog
+      :visible="!!pendingDestructiveAction"
+      :title="pendingDestructiveAction?.title || ''"
+      :message="pendingDestructiveAction?.message || ''"
+      :loading="destructiveLoading"
+      danger
+      confirm-text="确认"
+      @confirm="confirmDestructiveAction"
+      @close="pendingDestructiveAction = null"
+    />
   </div>
 </template>
 
@@ -802,13 +826,17 @@ async function handleExit() {
   display: flex;
   align-items: center;
   justify-content: center;
-  z-index: 2100;
+  z-index: 3200;
+  padding: 24px;
 }
 
 .invite-modal {
   width: 420px;
+  max-width: min(420px, calc(100vw - 32px));
+  max-height: min(560px, calc(100vh - 48px));
+  overflow: auto;
   background: var(--bg-primary);
-  border-radius: 8px;
+  border-radius: var(--radius-sm);
   padding: 20px;
   box-shadow: 0 16px 48px rgba(0, 0, 0, 0.18);
   display: flex;

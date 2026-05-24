@@ -9,7 +9,7 @@ import {
   useGroupStore
 } from '@tsdaodao/datasource-vue';
 import { useUserStore } from '@tsdaodao/datasource-vue';
-import { ChannelAvatar } from '@tsdaodao/base-vue';
+import { AppDialog, ChannelAvatar } from '@tsdaodao/base-vue';
 import { Message } from '@arco-design/web-vue';
 
 const route = useRoute();
@@ -22,6 +22,8 @@ const groupNo = computed(() => route.params.groupNo as string);
 const groupInfo = computed(() => groupStore.groups[groupNo.value]);
 const members = computed(() => groupStore.groupMembers[groupNo.value] || []);
 const memberKeyword = ref('');
+const pendingAction = ref<null | { title: string; message: string; danger?: boolean; run: () => Promise<void> }>(null);
+const pendingActionLoading = ref(false);
 
 const filteredMembers = computed(() => {
   const keyword = memberKeyword.value.trim().toLowerCase();
@@ -53,13 +55,15 @@ onMounted(async () => {
 });
 
 async function handleRemoveMember(uid: string) {
-  try {
-    if (!window.confirm('确认移出该成员？')) return;
-    await groupStore.removeMembers(groupNo.value, [uid]);
-    Message.success('已移出该成员');
-  } catch (err: any) {
-    Message.error(err.msg || '操作失败');
-  }
+  pendingAction.value = {
+    title: '移出成员',
+    message: '确认移出该成员？',
+    danger: true,
+    run: async () => {
+      await groupStore.removeMembers(groupNo.value, [uid]);
+      Message.success('已移出该成员');
+    }
+  };
 }
 
 async function handleAppointManager(uid: string) {
@@ -91,22 +95,39 @@ async function handleMuteMember(uid: string, action: number) {
 }
 
 async function handleTransferOwner(uid: string) {
-  try {
-    if (!window.confirm('确认转让群主？')) return;
-    await groupStore.transferOwner(groupNo.value, uid);
-    Message.success('群主已转让');
-  } catch (err: any) {
-    Message.error(err.msg || '操作失败');
-  }
+  pendingAction.value = {
+    title: '转让群主',
+    message: '确认转让群主？',
+    danger: true,
+    run: async () => {
+      await groupStore.transferOwner(groupNo.value, uid);
+      Message.success('群主已转让');
+    }
+  };
 }
 
 async function handleBlacklistMember(uid: string) {
+  pendingAction.value = {
+    title: '加入黑名单',
+    message: '确认加入黑名单？',
+    danger: true,
+    run: async () => {
+      await groupStore.blacklistMembers(groupNo.value, [uid], true);
+      Message.success('已加入黑名单');
+    }
+  };
+}
+
+async function confirmPendingAction() {
+  if (!pendingAction.value) return;
+  pendingActionLoading.value = true;
   try {
-    if (!window.confirm('确认加入黑名单？')) return;
-    await groupStore.blacklistMembers(groupNo.value, [uid], true);
-    Message.success('已加入黑名单');
+    await pendingAction.value.run();
+    pendingAction.value = null;
   } catch (err: any) {
     Message.error(err.msg || '操作失败');
+  } finally {
+    pendingActionLoading.value = false;
   }
 }
 
@@ -202,6 +223,17 @@ function handleGoBack() {
         </div>
       </div>
     </div>
+
+    <AppDialog
+      :visible="!!pendingAction"
+      :title="pendingAction?.title || ''"
+      :message="pendingAction?.message || ''"
+      :danger="pendingAction?.danger"
+      :loading="pendingActionLoading"
+      confirm-text="确认"
+      @confirm="confirmPendingAction"
+      @close="pendingAction = null"
+    />
   </div>
 </template>
 

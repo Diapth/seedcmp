@@ -17,7 +17,8 @@ import {
   CardCell,
   MergeCell,
   ChannelAvatar,
-  ContextMenu
+  ContextMenu,
+  AppDialog
 } from '@tsdaodao/base-vue';
 import { Message } from '@arco-design/web-vue';
 
@@ -39,6 +40,8 @@ const showMenu = ref(false);
 const menuX = ref(0);
 const menuY = ref(0);
 const selectedMsg = ref<any>(null);
+const editDialogVisible = ref(false);
+const editDialogText = ref('');
 const channelKey = computed(() => `${props.channelId}-${props.channelType}`);
 
 const messages = computed(() => {
@@ -184,15 +187,9 @@ const menuItems = computed(() => {
     items.push({
       label: '编辑消息',
       disabled: !canUseBackendAction,
-      action: async () => {
-        const nextText = window.prompt('编辑消息', msg.content?.text || '');
-        if (!nextText || nextText === msg.content?.text) return;
-        try {
-          await messageStore.editMessage(props.channelId, props.channelType, msg, nextText);
-          Message.success('已编辑消息');
-        } catch (err: any) {
-          Message.error(err.message || err.msg || '编辑失败');
-        }
+      action: () => {
+        editDialogText.value = msg.content?.text || '';
+        editDialogVisible.value = true;
       }
     });
   }
@@ -290,6 +287,22 @@ const menuItems = computed(() => {
 
   return items;
 });
+
+async function handleConfirmEdit(value?: string) {
+  if (!selectedMsg.value) return;
+  const nextText = String(value || '').trim();
+  if (!nextText || nextText === selectedMsg.value.content?.text) {
+    editDialogVisible.value = false;
+    return;
+  }
+  try {
+    await messageStore.editMessage(props.channelId, props.channelType, selectedMsg.value, nextText);
+    Message.success('已编辑消息');
+    editDialogVisible.value = false;
+  } catch (err: any) {
+    Message.error(err.message || err.msg || '编辑失败');
+  }
+}
 </script>
 
 <template>
@@ -411,6 +424,17 @@ const menuItems = computed(() => {
       :reactions="menuReactions"
       @close="showMenu = false"
     />
+
+    <AppDialog
+      v-model="editDialogText"
+      :visible="editDialogVisible"
+      title="编辑消息"
+      mode="input"
+      placeholder="输入新的消息内容"
+      confirm-text="保存"
+      @confirm="handleConfirmEdit"
+      @close="editDialogVisible = false"
+    />
   </div>
 </template>
 
@@ -456,7 +480,9 @@ const menuItems = computed(() => {
   display: flex;
   flex-direction: column;
   gap: 4px;
-  max-width: 70%;
+  min-width: 0;
+  max-width: min(70%, 720px);
+  overflow-wrap: anywhere;
 }
 
 .msg-row.is-me .msg-bubble-container {

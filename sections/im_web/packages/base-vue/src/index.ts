@@ -11,6 +11,7 @@ export { default as KickoutOverlay } from './components/KickoutOverlay.vue';
 export { default as ChannelAvatar } from './components/ChannelAvatar.vue';
 export { default as SkeletonScreen } from './components/SkeletonScreen.vue';
 export { default as ContextMenu } from './components/ContextMenu.vue';
+export { default as AppDialog } from './components/AppDialog.vue';
 export { default as TextCell } from './components/messages/TextCell.vue';
 export { default as ImageCell } from './components/messages/ImageCell.vue';
 export { default as SystemCell } from './components/messages/SystemCell.vue';

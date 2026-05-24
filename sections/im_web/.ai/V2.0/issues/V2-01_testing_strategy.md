@@ -231,6 +231,27 @@ dist/assets/index-BQvvyWGb.js  1,413.97 kB │ gzip: 508.44 kB
 | [V2-08](V2-08_group_owner_permission_regression.md) | ISSUE-16 | 群主权限未使用成员角色导致公告和头像入口缺失 | P1 |
 | [V2-09](V2-09_browser_audit_conversation_extra_400.md) | 2026-05-23 审计 | 发送消息无意义空草稿触发 conversation extra 400 | P1 |
 | [V2-10](V2-10_incomplete_image_and_file_sending.md) | 2026-05-24 自动测试 | 单聊及群聊图片与文件发送功能未完全打通 | P1 |
+| [V2-11](V2-11_automated_screenshot_ui_misalignment.md) | 2026-05-24 用户反馈 | 自动化截屏测试发现多个 UI 组件错位 | P1 |
+| [V2-12](V2-12_replace_browser_alerts_with_component_modals.md) | 2026-05-24 用户反馈 | 所有弹窗必须使用组件弹窗而不是浏览器 alert/confirm/prompt | P1 |
+| [V2-13](V2-13_file_url_must_use_lan_accessible_host.md) | 2026-05-24 用户反馈 | 文件访问地址不能使用 127.0.0.1:8090，必须使用局域网可访问地址 | P0 |
+
+### 2026-05-24 V2-11 至 V2-13 修复验证
+
+| Issue | 覆盖 | 结果 |
+|---|---|---|
+| [V2-11](V2-11_automated_screenshot_ui_misalignment.md) | `uiLayoutStability.test.ts` + `smoke-v2-11-ui-layout.spec.ts` | ✅ Resolved |
+| [V2-12](V2-12_replace_browser_alerts_with_component_modals.md) | 静态 grep + `noNativeDialogs.test.ts` + E2E smoke | ✅ Resolved |
+| [V2-13](V2-13_file_url_must_use_lan_accessible_host.md) | `mediaUrlNormalization.test.ts` + E2E smoke | ✅ Resolved |
+
+本轮完整门禁：
+
+| 命令 | 结果 |
+|---|---|
+| `cd sections/im_web/apps/chat && pnpm exec vitest run tests/noNativeDialogs.test.ts tests/mediaUrlNormalization.test.ts tests/uiLayoutStability.test.ts tests/messageMediaSending.test.ts --config vitest.config.ts` | ✅ Pass，4 files / 7 tests |
+| `cd sections/im_web && pnpm type-check` | ✅ Pass |
+| `cd sections/im_web && pnpm test:unit` | ✅ Pass，28 files / 63 tests |
+| `cd sections/im_web && pnpm build` | ✅ Pass，保留既有 chunk size warning |
+| `cd sections/im_web && pnpm test:e2e` | ✅ Pass，8/8 passed |
 
 ---
 

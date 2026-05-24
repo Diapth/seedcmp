@@ -399,6 +399,8 @@ onBeforeUnmount(() => {
 .message-input-container {
   display: flex;
   flex-direction: column;
+  min-height: 132px;
+  min-width: 0;
   background-color: var(--bg-primary);
   border-top: var(--border-hairline);
   padding: 12px 16px;
@@ -495,6 +497,7 @@ onBeforeUnmount(() => {
 
 .input-actions {
   display: flex;
+  flex-wrap: wrap;
   gap: 12px;
   margin-bottom: 8px;
 }
@@ -576,6 +579,7 @@ onBeforeUnmount(() => {
 
 .input-footer {
   display: flex;
+  flex-wrap: wrap;
   align-items: center;
   justify-content: space-between;
   gap: 16px;
@@ -583,6 +587,7 @@ onBeforeUnmount(() => {
 }
 
 .input-hint {
+  min-width: 0;
   font-size: 11px;
   color: var(--text-secondary);
   overflow: hidden;
