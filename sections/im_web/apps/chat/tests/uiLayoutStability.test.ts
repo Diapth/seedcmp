@@ -20,4 +20,14 @@ describe('UI layout stability contracts', () => {
     expect(text).toContain('max-width: min(')
     expect(text).toContain('max-height: min(')
   })
+
+  it('keeps file message cards a single stable width without nested shrinkage', async () => {
+    const fileCell = await import('../../../packages/base-vue/src/components/messages/FileCell.vue?raw')
+    const text = fileCell.default
+
+    expect(text).toContain('width: clamp(240px, 34vw, 320px)')
+    expect(text).toContain('max-width: 100%')
+    expect(text).toContain('width: 100%')
+    expect(text).not.toContain('max-width: 60%')
+  })
 })

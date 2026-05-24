@@ -18,12 +18,18 @@ const messageStore = useMessageStore();
 const userStore = useUserStore();
 const remoteResults = ref<any[]>([]);
 const remoteSearchState = ref<'idle' | 'loading' | 'failed'>('idle');
+const viteEnv = (import.meta as unknown as { env?: Record<string, string | boolean | undefined> }).env || {};
+const enableRemoteSearch = viteEnv.VITE_ENABLE_REMOTE_GLOBAL_SEARCH === 'true';
 
 const searchQuery = computed(() => props.query.trim().toLowerCase());
 
 watch(searchQuery, async (query) => {
   remoteResults.value = [];
   if (!query) return;
+  if (!enableRemoteSearch) {
+    remoteSearchState.value = 'idle';
+    return;
+  }
   remoteSearchState.value = 'loading';
   try {
     const res: any = await commonApi.globalSearch({
@@ -33,7 +39,10 @@ watch(searchQuery, async (query) => {
     });
     remoteResults.value = Array.isArray(res) ? res : (res?.items || res?.list || []);
     remoteSearchState.value = 'idle';
-  } catch {
+  } catch (err) {
+    if (viteEnv.DEV) {
+      console.info('[SearchResultList] Remote global search unavailable, using local results only.', err);
+    }
     remoteSearchState.value = 'failed';
   }
 }, { immediate: true });

@@ -55,7 +55,8 @@ function handleDownload() {
 <style scoped>
 .file-cell {
   display: flex;
-  width: 100%;
+  width: clamp(240px, 34vw, 320px);
+  max-width: 100%;
   cursor: pointer;
 }
 
@@ -67,7 +68,8 @@ function handleDownload() {
   display: flex;
   align-items: center;
   gap: 16px;
-  max-width: 60%;
+  width: 100%;
+  min-width: 0;
   padding: 12px 16px;
   border-radius: var(--radius-sm);
   border: var(--border-hairline);
@@ -85,6 +87,7 @@ function handleDownload() {
   flex-direction: column;
   gap: 4px;
   overflow: hidden;
+  min-width: 0;
   flex: 1;
 }
 

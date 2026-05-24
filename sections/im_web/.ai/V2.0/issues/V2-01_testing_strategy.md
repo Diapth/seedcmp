@@ -234,6 +234,8 @@ dist/assets/index-BQvvyWGb.js  1,413.97 kB │ gzip: 508.44 kB
 | [V2-11](V2-11_automated_screenshot_ui_misalignment.md) | 2026-05-24 用户反馈 | 自动化截屏测试发现多个 UI 组件错位 | P1 |
 | [V2-12](V2-12_replace_browser_alerts_with_component_modals.md) | 2026-05-24 用户反馈 | 所有弹窗必须使用组件弹窗而不是浏览器 alert/confirm/prompt | P1 |
 | [V2-13](V2-13_file_url_must_use_lan_accessible_host.md) | 2026-05-24 用户反馈 | 文件访问地址不能使用 127.0.0.1:8090，必须使用局域网可访问地址 | P0 |
+| [V2-14](V2-14_file_message_card_visual_misalignment.md) | 2026-05-24 手册可视化审计 | 文件消息卡片视觉错位与宽度不稳定 | P1 |
+| [V2-15](V2-15_global_search_remote_400_in_visual_audit.md) | 2026-05-24 手册可视化审计 | 全局搜索远程接口 400 污染可视化审计 | P1 |
 
 ### 2026-05-24 V2-11 至 V2-13 修复验证
 
@@ -252,6 +254,15 @@ dist/assets/index-BQvvyWGb.js  1,413.97 kB │ gzip: 508.44 kB
 | `cd sections/im_web && pnpm test:unit` | ✅ Pass，28 files / 63 tests |
 | `cd sections/im_web && pnpm build` | ✅ Pass，保留既有 chunk size warning |
 | `cd sections/im_web && pnpm test:e2e` | ✅ Pass，8/8 passed |
+
+### 2026-05-24 手动测试手册可视化审计
+
+按 `manual-testing-guide.md` 执行浏览器自动可视化审计，覆盖登录、会话打开、文本发送、文件发送、群设置抽屉、邀请成员弹窗、全局搜索、工作台、680px 响应式、控制台错误和网络错误。
+
+| 报告 | 结果 |
+|---|---|
+| `sections/im_web/.ai/V2.0/issues/tests-e2e/manual-visual-audit-2026-05-24T12-54-37-825Z/summary.md` | 发现 [V2-14](V2-14_file_message_card_visual_misalignment.md) 和 [V2-15](V2-15_global_search_remote_400_in_visual_audit.md) |
+| `sections/im_web/.ai/V2.0/issues/tests-e2e/manual-visual-audit-2026-05-24T13-07-08-392Z/summary.md` | ✅ Pass，12 checks，0 failed，10 screenshots，0 network errors |
 
 ---
 

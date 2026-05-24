@@ -6,6 +6,7 @@ describe('global search result contracts', () => {
     const text = source.default
 
     expect(text).toContain('commonApi.globalSearch')
+    expect(text).toContain('VITE_ENABLE_REMOTE_GLOBAL_SEARCH')
     expect(text).toContain('remoteResults')
     expect(text).toContain('filteredContacts')
     expect(text).toContain('filteredGroups')
