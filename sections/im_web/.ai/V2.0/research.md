@@ -29,3 +29,13 @@
 - Decision: Use the V2.0 issue set as the canonical record for remaining regressions and gaps.
 - Rationale: The migrated issues already map the major risk areas: testing, websocket recovery, unread retention, command sync, creation state, message UI stability, sort regressions, and owner permissions.
 - Alternatives considered: Track gaps only in ad hoc notes; rejected because issue-level tracking is easier to validate and close.
+
+## 7. Final backend alignment and deferrals
+- Decision: Treat messaging, group management, account/device, reconnect recovery, search, workplace configuration, notification state, and media upload as implemented client flows with backend wrappers. Treat robot commands, report submission, QR login confirmation, invite approval, scan join, and multi-device missed-message convergence as backend-dependent flows that expose visible unavailable, failure, or smoke-limited states when the live environment cannot complete them.
+- Rationale: V2.0 now has client-side store ownership, UI surfaces, tests, and smoke coverage for all desired stories, but several flows require a paired mobile client, multiple backend accounts, robot/report endpoints, or realtime gateway conditions that cannot be deterministically produced in the local smoke suite.
+- Alternatives considered: Remove backend-dependent affordances entirely; rejected because the spec requires discoverable workplace, robot, report, and recovery surfaces. Mark all backend-dependent flows as fully proven; rejected because it would overstate evidence beyond the current test environment.
+
+## 8. Final verification command stability
+- Decision: Run Vitest through `vitest run --pool=threads --poolOptions.threads.singleThread=true` and wire `apps/chat` `test:unit` to that stable mode.
+- Rationale: During US5/US6 verification the default Vitest worker pool triggered Node/V8 native crashes without assertion failures, while the single-thread pool completed the full suite cleanly.
+- Alternatives considered: Keep the default worker pool and document intermittent crashes; rejected because final release gates should be repeatable.

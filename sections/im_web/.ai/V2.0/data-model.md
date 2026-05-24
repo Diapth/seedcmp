@@ -6,7 +6,7 @@
 - Rules: ordering must use server-backed message time; unread and mention counts must survive refresh and reconnect
 
 ## Message
-- Fields: `id`, `conversationId`, `senderId`, `contentType`, `content`, `status`, `createdAt`, `updatedAt`, `deletedAt`, `revokedAt`, `replyTo`, `mentions`, `reactions`, `receiptState`, `mediaMeta`
+- Fields: `id`, `conversationId`, `senderId`, `contentType`, `content`, `status`, `createdAt`, `updatedAt`, `deletedAt`, `revokedAt`, `replyTo`, `mentions`, `reactions`, `receiptState`, `mediaMeta`, `clientMsgNo`, `retryPayload`
 - Relationships: belongs to one `Conversation`; may reference another `Message` through `replyTo`
 - Rules: outgoing messages need pending/sent/failed states; system messages must not be rendered as normal user chatter; duplicate visible messages must be prevented during sync overlap
 
@@ -21,22 +21,22 @@
 - Rules: permissions may need fallback from group summary to member role; member state must stay in sync with settings and management actions
 
 ## UserProfile
-- Fields: `userId`, `name`, `avatar`, `shortId`, `qrCodeState`, `devices`, `notificationSettings`, `securitySettings`
+- Fields: `userId`, `name`, `avatar`, `shortId`, `qrCodeState`, `devices`, `notificationSettings`, `securitySettings`, `personalQrPayload`
 - Relationships: drives identity across conversations, contacts, and settings pages
 - Rules: updates must flow into visible chat identity after refresh
 
 ## RealtimeSession
-- Fields: `connectionState`, `reconnectState`, `kickoutState`, `pendingQueue`, `lastSyncAt`, `lastError`
+- Fields: `connectionState`, `reconnectState`, `kickoutState`, `pendingQueue`, `lastSyncAt`, `lastError`, `reconnectAttemptCount`, `lastRecoveredAt`, `recoveryState`
 - Relationships: controls the active SDK session and recovery state
 - Rules: offline or reconnecting work must be preserved and either replayed or marked failed with recovery guidance
 
 ## SearchResult
-- Fields: `category`, `targetId`, `targetType`, `title`, `subtitle`, `routeTarget`, `context`
+- Fields: `category`, `targetId`, `targetType`, `title`, `subtitle`, `routeTarget`, `context`, `channelId`, `channelType`
 - Relationships: can point to a conversation, person, group, or message
 - Rules: results must be grouped and actionable
 
 ## WorkplaceApp
-- Fields: `id`, `name`, `icon`, `banner`, `category`, `route`, `order`, `recentUseState`
+- Fields: `id`, `name`, `icon`, `banner`, `category`, `route`, `url`, `order`, `enabled`, `recentUseState`
 - Relationships: grouped under workplace surfaces
 - Rules: unsupported workplace content should remain hidden or unavailable, not broken
 
@@ -49,3 +49,18 @@
 - Fields: `id`, `targetType`, `targetId`, `category`, `description`, `attachments`, `status`
 - Relationships: submitted from a conversation, group, or user context
 - Rules: reporting must preserve core chat state even if submission fails
+
+## ClientConfig
+- Fields: `revokeSecond`, `featureVisibility`, `chatBackground`, `updatePrompt`, `workplaceApps`
+- Relationships: drives message action windows, workplace visibility, update prompts, and future client feature flags
+- Rules: missing config must normalize to safe defaults; unsupported features must stay hidden or visibly unavailable
+
+## NotificationState
+- Fields: `permissionState`, `enabled`, `deviceTokenState`, `lastError`
+- Relationships: belongs to `UserProfile` and influences conversation unread affordances
+- Rules: unsupported, denied, default, and granted states must be visible and non-blocking
+
+## HistoryWindow
+- Fields: `visibleStart`, `visibleEnd`, `windowSize`, `topSpacerHeight`, `bottomSpacerHeight`, `estimatedRowHeight`
+- Relationships: derived from `Message` records for the active conversation
+- Rules: rendering must be bounded for large histories while preserving scroll stability and message order

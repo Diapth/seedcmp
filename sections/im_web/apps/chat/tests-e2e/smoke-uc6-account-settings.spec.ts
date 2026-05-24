@@ -22,7 +22,8 @@ test('UC-6 account settings: profile, devices, and QR login surfaces are reachab
   await expect(page.getByText('个人资料与设置')).toBeVisible()
   await expect(page.getByText('个人二维码')).toBeVisible()
   await expect(page.getByLabel('个人二维码')).toBeVisible()
-  await expect(page.getByText(/桌面通知|当前浏览器不支持通知|收到新消息时显示桌面提醒/)).toBeVisible()
+  await expect(page.getByText('桌面通知', { exact: true })).toBeVisible()
+  await expect(page.getByText(/当前浏览器不支持通知|收到新消息时显示桌面提醒|桌面通知已被浏览器拒绝/).first()).toBeVisible()
 
   await page.getByRole('button', { name: '打开设备管理' }).click()
   await expect(page).toHaveURL(/\/chat\/devices/, { timeout: 5000 })

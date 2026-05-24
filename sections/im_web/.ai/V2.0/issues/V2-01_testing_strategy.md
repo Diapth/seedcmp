@@ -286,3 +286,24 @@ pnpm test:unit:watch              # Vitest 监听模式（开发时用）
 - `pnpm lint` 当前 0 error，仍有 10 个既有 unused warning 可后续清理
 - `pnpm build` 当前通过，仍有已知大 chunk warning 可后续通过 manualChunks 优化
 - 后续 Story 可继续补强更复杂的 Store fake SDK mock 和专项 Playwright 场景
+
+---
+
+## 2026-05-24 V2.0 Final Release Verification
+
+| 检查项 | 命令 | 结果 |
+|---|---|---|
+| TypeScript 类型检查 | `cd sections/im_web && pnpm type-check` | ✅ Pass |
+| 生产构建 | `cd sections/im_web && pnpm build` | ✅ Pass；仍有既有 large chunk warning |
+| 单元 / 组件 / Store 测试 | `cd sections/im_web && pnpm test:unit` | ✅ Pass，25 files / 59 tests |
+| Playwright smoke | `cd sections/im_web && pnpm test:e2e` | ✅ Pass，7 tests |
+
+### Final manual realtime recovery notes
+
+- Recovery-critical automated coverage now includes SDK connection state, reconnect transition, offline pending queue retry/failure, kickout sensitive cleanup, conversation/message/group recovery sync, and US4/US8 shell visibility checks.
+- Live manual checks that still require paired backend/device setup: true gateway disconnect/reconnect timing, multi-device missed-message convergence, QR login confirmation from a paired mobile client, robot command execution, report submission, invite approval, and scan-join approval.
+- Default Vitest worker pool triggered Node/V8 native crashes without assertion failures during late-stage verification. The chat `test:unit` script now uses the verified stable single-thread pool.
+
+### Release readiness
+
+All V2.0 tasks T001-T096 are complete with per-phase git commits, story-level smoke evidence, and final root workspace verification. Remaining risks are non-blocking backend/environment validation items rather than known client-side blockers.

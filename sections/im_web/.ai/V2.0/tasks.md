@@ -270,12 +270,19 @@
 
 **Purpose**: Final verification and release readiness after all desired stories are complete.
 
-- [ ] T091 [P] Update final backend-alignment and deferral notes in `sections/im_web/.ai/V2.0/research.md`
-- [ ] T092 [P] Update smoke instructions and environment notes in `sections/im_web/.ai/V2.0/quickstart.md`
-- [ ] T093 [P] Update entity and state changes discovered during implementation in `sections/im_web/.ai/V2.0/data-model.md`
-- [ ] T094 Run full `pnpm type-check`, `pnpm build`, `pnpm test:unit`, and `pnpm test:e2e` verification from `sections/im_web/package.json`
-- [ ] T095 Run final manual realtime recovery checks and record results in `sections/im_web/.ai/V2.0/issues/V2-01_testing_strategy.md`
-- [ ] T096 Complete final code review and record release readiness in `sections/im_web/.ai/V2.0/tasks.md`
+- [X] T091 [P] Update final backend-alignment and deferral notes in `sections/im_web/.ai/V2.0/research.md`
+- [X] T092 [P] Update smoke instructions and environment notes in `sections/im_web/.ai/V2.0/quickstart.md`
+- [X] T093 [P] Update entity and state changes discovered during implementation in `sections/im_web/.ai/V2.0/data-model.md`
+- [X] T094 Run full `pnpm type-check`, `pnpm build`, `pnpm test:unit`, and `pnpm test:e2e` verification from `sections/im_web/package.json`
+- [X] T095 Run final manual realtime recovery checks and record results in `sections/im_web/.ai/V2.0/issues/V2-01_testing_strategy.md`
+- [X] T096 Complete final code review and record release readiness in `sections/im_web/.ai/V2.0/tasks.md`
+
+**2026-05-24 Final Release Evidence**
+
+- T091-T093: Updated `research.md`, `quickstart.md`, and `data-model.md` with backend-alignment/deferral notes, smoke commands, environment constraints, stabilized Vitest command behavior, and final entity/state additions for pending queues, recovery, client config, notifications, workplace, reports, and large-history windows.
+- T094 verification: `cd sections/im_web && pnpm type-check` exit 0; `cd sections/im_web && pnpm build` exit 0 with existing large chunk warning; `cd sections/im_web && pnpm test:unit` exit 0, 25 files / 59 tests passed; `cd sections/im_web && pnpm test:e2e` exit 0, 7 Playwright smoke tests passed.
+- T095 manual realtime recovery record: final manual notes were recorded in `sections/im_web/.ai/V2.0/issues/V2-01_testing_strategy.md`. Automated recovery coverage includes SDK connection states, reconnect transitions, offline queue retry/failure, kickout cleanup, and conversation/message/group recovery sync. Live multi-device/gateway convergence remains a backend/device environment validation item.
+- T096 final review: local review against the plan checklist found no blocking release issues. Package boundaries remain intact, durable state is store-owned, backend-dependent flows expose unavailable/failure states, destructive actions use explicit controls, responsive/theme/notification states are visible, and all task phases have been committed independently. Residual non-blocking risks: known large build chunk warning and live backend validation for QR scan confirmation, robot/report endpoints, scan join/invite approval, and true multi-device recovery.
 
 ---
 
