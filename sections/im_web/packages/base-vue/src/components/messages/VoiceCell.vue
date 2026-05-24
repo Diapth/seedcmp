@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { ref, computed, onBeforeUnmount } from 'vue';
+import { normalizeMediaUrl } from '../../service/mediaUrl';
 
 const props = defineProps<{
   message: {
@@ -12,7 +13,7 @@ const props = defineProps<{
   isMe: boolean;
 }>();
 
-const url = computed(() => props.message.content?.url || props.message.payload?.url || '');
+const url = computed(() => normalizeMediaUrl(props.message.content?.url || props.message.payload?.url || ''));
 const duration = computed(() => props.message.content?.time || props.message.payload?.time || 0);
 const isAvailable = computed(() => !!url.value);
 

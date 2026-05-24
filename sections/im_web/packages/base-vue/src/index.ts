@@ -6,6 +6,7 @@ export * from './service/StorageService';
 export * from './service/APIClient';
 export * from './service/EventBus';
 export * from './service/Const';
+export * from './service/mediaUrl';
 export * from './composables/useRemoteConfig';
 export { default as KickoutOverlay } from './components/KickoutOverlay.vue';
 export { default as ChannelAvatar } from './components/ChannelAvatar.vue';

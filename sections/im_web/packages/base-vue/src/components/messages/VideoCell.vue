@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { ref, computed } from 'vue';
+import { normalizeMediaUrl } from '../../service/mediaUrl';
 
 const props = defineProps<{
   message: {
@@ -14,8 +15,8 @@ const props = defineProps<{
   isMe: boolean;
 }>();
 
-const url = computed(() => props.message.content?.url || props.message.payload?.url || '');
-const cover = computed(() => props.message.content?.cover || props.message.payload?.cover || '');
+const url = computed(() => normalizeMediaUrl(props.message.content?.url || props.message.payload?.url || ''));
+const cover = computed(() => normalizeMediaUrl(props.message.content?.cover || props.message.payload?.cover || ''));
 const isAvailable = computed(() => !!url.value);
 
 const showPlayer = ref(false);

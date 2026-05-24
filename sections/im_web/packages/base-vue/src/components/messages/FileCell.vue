@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { computed } from 'vue';
+import { normalizeMediaUrl } from '../../service/mediaUrl';
 
 const props = defineProps<{
   message: {
@@ -13,7 +14,7 @@ const props = defineProps<{
   isMe: boolean;
 }>();
 
-const url = computed(() => props.message.content?.url || props.message.payload?.url || '');
+const url = computed(() => normalizeMediaUrl(props.message.content?.url || props.message.payload?.url || ''));
 const name = computed(() => props.message.content?.name || props.message.payload?.name || '未知文件');
 const size = computed(() => props.message.content?.size || props.message.payload?.size || 0);
 const isAvailable = computed(() => !!url.value);

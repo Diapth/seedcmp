@@ -1,20 +1,4 @@
-import { apiClient, apiDelete } from '@tsdaodao/base-vue';
-
-const DEFAULT_LAN_MEDIA_ORIGIN = 'http://100.79.157.76:8090';
-
-function getLanMediaOrigin() {
-  const envOrigin = (import.meta as any).env?.VITE_MEDIA_BASE_URL || (import.meta as any).env?.VITE_FILE_BASE_URL;
-  if (envOrigin) return String(envOrigin).replace(/\/+$/, '');
-  try {
-    const base = new URL(String(apiClient.defaults?.baseURL || DEFAULT_LAN_MEDIA_ORIGIN));
-    if ((base.hostname === '127.0.0.1' || base.hostname === 'localhost') && base.port === '8090') {
-      return DEFAULT_LAN_MEDIA_ORIGIN;
-    }
-    return base.origin;
-  } catch {
-    return DEFAULT_LAN_MEDIA_ORIGIN;
-  }
-}
+import { apiClient, apiDelete, normalizeMediaUrl } from '@tsdaodao/base-vue';
 
 // 1. 身份认证与登录设备管理 API (Auth & Device)
 export const authApi = {
@@ -382,41 +366,8 @@ export const commonApi = {
 };
 
 export function resolveApiAssetUrl(pathOrUrl: string, referenceUrl?: string) {
-  if (!pathOrUrl) return '';
-  if (/^https?:\/\//i.test(pathOrUrl)) {
-    try {
-      const url = new URL(pathOrUrl);
-      if ((url.hostname === '127.0.0.1' || url.hostname === 'localhost') && url.port === '8090') {
-        const mediaOrigin = new URL(getLanMediaOrigin());
-        url.protocol = mediaOrigin.protocol;
-        url.hostname = mediaOrigin.hostname;
-        url.port = mediaOrigin.port;
-        return url.toString();
-      }
-    } catch {
-      return pathOrUrl;
-    }
-    return pathOrUrl;
-  }
-
-  let baseUrl = String(apiClient.defaults?.baseURL || '/');
-  if (referenceUrl && /^https?:\/\//i.test(referenceUrl)) {
-    try {
-      const uploadUrl = new URL(referenceUrl);
-      const markerIndex = uploadUrl.pathname.indexOf('/file/upload');
-      uploadUrl.pathname = markerIndex >= 0 ? uploadUrl.pathname.slice(0, markerIndex + 1) : uploadUrl.pathname.replace(/[^/]*$/, '');
-      uploadUrl.search = '';
-      uploadUrl.hash = '';
-      baseUrl = uploadUrl.toString();
-    } catch {
-      // Fall back to the configured API base URL below.
-    }
-  }
-
-  try {
-    const normalizedBase = baseUrl.endsWith('/') ? baseUrl : `${baseUrl}/`;
-    return new URL(pathOrUrl.replace(/^\/+/, ''), normalizedBase).toString();
-  } catch {
-    return pathOrUrl;
-  }
+  return normalizeMediaUrl(pathOrUrl, {
+    baseUrl: String(apiClient.defaults?.baseURL || '/'),
+    referenceUrl
+  });
 }

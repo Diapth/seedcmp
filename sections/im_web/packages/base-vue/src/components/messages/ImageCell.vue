@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { computed, ref, watch } from 'vue';
+import { normalizeMediaUrl } from '../../service/mediaUrl';
 
 const props = defineProps<{
   message: {
@@ -13,7 +14,7 @@ const props = defineProps<{
 }>();
 
 const imageUrl = computed(() => {
-  return props.message.content?.url || props.message.payload?.url || '';
+  return normalizeMediaUrl(props.message.content?.url || props.message.payload?.url || '');
 });
 
 const imageLoadState = ref<'idle' | 'loading' | 'loaded' | 'error'>('idle');

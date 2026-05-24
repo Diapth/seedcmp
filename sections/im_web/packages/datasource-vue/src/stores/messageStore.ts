@@ -81,6 +81,10 @@ function extractUploadedPath(response: any) {
   return response?.url || response?.path || response?.file_url || response?.fileURL || '';
 }
 
+function normalizeMediaUrl(url: string) {
+  return url ? resolveApiAssetUrl(url) : '';
+}
+
 export const useMessageStore = defineStore('message', () => {
   const messages = ref<Record<string, Message[]>>({});
   const typingState = ref<Record<string, { timer: any; isTyping: boolean }>>({});
@@ -140,6 +144,9 @@ export const useMessageStore = defineStore('message', () => {
     const normalized = { ...content };
     if (normalized.type === 1 && normalized.text === undefined && normalized.content !== undefined) {
       normalized.text = normalized.content;
+    }
+    if (typeof normalized.url === 'string') {
+      normalized.url = normalizeMediaUrl(normalized.url);
     }
 
     return normalized;
