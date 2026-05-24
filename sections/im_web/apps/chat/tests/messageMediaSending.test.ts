@@ -94,8 +94,8 @@ describe('message media sending', () => {
   })
 
   it('uploads an image and sends a type 2 image message through the SDK', async () => {
-    const { useMessageStore } = await import('../../../packages/datasource-vue/src/stores/messageStore')
-    const { useUserStore } = await import('../../../packages/datasource-vue/src/stores/userStore')
+    const { useMessageStore } = await import('../../../packages/datasource-vue/src/stores/messageStore.ts')
+    const { useUserStore } = await import('../../../packages/datasource-vue/src/stores/userStore.ts')
     const userStore = useUserStore()
     userStore.currentUser = { uid: 'u1', name: 'Me' }
 
@@ -132,8 +132,8 @@ describe('message media sending', () => {
   })
 
   it('uploads a regular file and sends a type 8 file message through the SDK', async () => {
-    const { useMessageStore } = await import('../../../packages/datasource-vue/src/stores/messageStore')
-    const { useUserStore } = await import('../../../packages/datasource-vue/src/stores/userStore')
+    const { useMessageStore } = await import('../../../packages/datasource-vue/src/stores/messageStore.ts')
+    const { useUserStore } = await import('../../../packages/datasource-vue/src/stores/userStore.ts')
     const userStore = useUserStore()
     userStore.currentUser = { uid: 'u1', name: 'Me' }
 
@@ -161,6 +161,31 @@ describe('message media sending', () => {
       url: 'http://100.79.157.76:8090/v1/file/preview/chat/1/target/report.pdf',
       name: 'report.pdf',
       size: file.size
+    })
+  })
+
+  it('marks failed media uploads as retryable local messages', async () => {
+    const { useMessageStore } = await import('../../../packages/datasource-vue/src/stores/messageStore.ts')
+    const { useUserStore } = await import('../../../packages/datasource-vue/src/stores/userStore.ts')
+    const userStore = useUserStore()
+    userStore.currentUser = { uid: 'u1', name: 'Me' }
+
+    const file = new File(['broken'], 'broken.png', { type: 'image/png' })
+    getUploadUrl.mockRejectedValue(new Error('upload unavailable'))
+
+    const store = useMessageStore()
+    await expect(store.sendMediaMessage('target', 1, file)).rejects.toThrow('upload unavailable')
+
+    const list = store.getChannelMessages('target', 1)
+    expect(list).toHaveLength(1)
+    expect(list[0]).toMatchObject({
+      status: 'fail',
+      retryable: true,
+      content: {
+        type: 2,
+        name: 'broken.png',
+        unavailable: true
+      }
     })
   })
 })

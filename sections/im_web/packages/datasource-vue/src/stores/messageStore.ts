@@ -16,6 +16,13 @@ export interface Message {
   isRevoked: boolean;
   revokeUID?: string;
   status: 'sending' | 'success' | 'fail';
+  retryable?: boolean;
+  retryPayload?: {
+    kind: 'text' | 'media';
+    text?: string;
+    options?: SendMessageOptions;
+    file?: File;
+  };
   reactions?: any[];
   remoteExtra?: any;
   isUnreadCleared?: boolean;
@@ -29,6 +36,23 @@ export interface Reaction {
 }
 
 const MEDIA_UPLOAD_TYPE = 'chat';
+
+interface SendMessageOptions {
+  mention?: { all?: boolean; uids?: string[] };
+  reply?: any;
+}
+
+interface Reminder {
+  id: number;
+  channel_id: string;
+  channel_type: number;
+  message_id: string;
+  message_seq: number;
+  text: string;
+  done: number;
+  version: number;
+  [key: string]: any;
+}
 
 function getFileExtension(file: File) {
   const name = file.name || '';
@@ -60,6 +84,11 @@ function extractUploadedPath(response: any) {
 export const useMessageStore = defineStore('message', () => {
   const messages = ref<Record<string, Message[]>>({});
   const typingState = ref<Record<string, { timer: any; isTyping: boolean }>>({});
+  const receipts = ref<Record<string, { readed: any[]; unread: any[]; unavailable?: boolean }>>({});
+  const pinnedMessages = ref<Record<string, Message[]>>({});
+  const pinnedVersions = ref<Record<string, number>>({});
+  const reminders = ref<Reminder[]>([]);
+  const reminderVersion = ref(0);
   const resetVersion = ref(0);
   const summaryVersions = ref<Record<string, number>>({});
 
@@ -67,7 +96,7 @@ export const useMessageStore = defineStore('message', () => {
   const userStore = useUserStore();
 
   function getChannelMessages(channelId: string, channelType: number): Message[] {
-    const key = `${channelId}-${channelType}`;
+    const key = getChannelKey(channelId, channelType);
     return messages.value[key] || [];
   }
 
@@ -96,6 +125,10 @@ export const useMessageStore = defineStore('message', () => {
       revoke: extra.revoke === 1 || extra.revoke === true,
       readedCount: extra.readed_count || extra.readedCount || 0,
       unreadCount: extra.unread_count || extra.unreadCount || 0,
+      isPinned: extra.is_pinned === 1 || extra.isPinned === true,
+      isMutualDeleted: extra.is_mutual_deleted === 1 || extra.isMutualDeleted === true,
+      contentEdit: extra.content_edit || extra.contentEdit,
+      editedAt: extra.edited_at || extra.editedAt,
       revoker: extra.revoker
     };
   }
@@ -109,6 +142,28 @@ export const useMessageStore = defineStore('message', () => {
     }
 
     return normalized;
+  }
+
+  function createClientMsgNo() {
+    return `web-${Date.now()}-${Math.random().toString(16).slice(2)}`;
+  }
+
+  function getChannelKey(channelId: string, channelType: number) {
+    return `${channelId}-${channelType}`;
+  }
+
+  function applyMessageExtra(msg: Message, remoteExtra: any) {
+    const normalizedExtra = normalizeRemoteExtra(remoteExtra) || {};
+    msg.remoteExtra = {
+      ...(msg.remoteExtra || {}),
+      ...normalizedExtra
+    };
+    if (normalizedExtra.revoke) {
+      msg.isRevoked = true;
+    }
+    if (normalizedExtra.contentEdit) {
+      msg.content = normalizeMessageContent(normalizedExtra.contentEdit);
+    }
   }
 
   function isConversationDigestMessage(msg: Message) {
@@ -126,7 +181,7 @@ export const useMessageStore = defineStore('message', () => {
   }
 
   function updateExistingConversationSummary(channelId: string, channelType: number, lastMessage: Message) {
-    const key = `${channelId}-${channelType}`;
+    const key = getChannelKey(channelId, channelType);
     const matching = conversationStore.conversations.filter(item =>
       String(item.channel_id) === String(channelId) &&
       Number(item.channel_type) === Number(channelType)
@@ -158,7 +213,7 @@ export const useMessageStore = defineStore('message', () => {
   }
 
   async function ensureConversationFromMessages(channelId: string, channelType: number) {
-    const key = `${channelId}-${channelType}`;
+    const key = getChannelKey(channelId, channelType);
     const version = (summaryVersions.value[key] || 0) + 1;
     summaryVersions.value[key] = version;
     const list = messages.value[key] || [];
@@ -199,7 +254,7 @@ export const useMessageStore = defineStore('message', () => {
         const synced: Message[] = res.messages.filter((item: any) => item.is_deleted !== 1).map((item: any) => {
           const remoteExtra = normalizeRemoteExtra(item.message_extra);
 
-          return {
+          const message: Message = {
             messageID: String(item.message_idstr || item.message_id || ''),
             messageSeq: item.message_seq,
             clientMsgNo: item.client_msg_no,
@@ -212,6 +267,10 @@ export const useMessageStore = defineStore('message', () => {
             reactions: item.reactions || [],
             remoteExtra
           };
+          if (remoteExtra?.contentEdit) {
+            message.content = normalizeMessageContent(remoteExtra.contentEdit);
+          }
+          return message;
         });
 
         const currentList = messages.value[key] || [];
@@ -228,7 +287,7 @@ export const useMessageStore = defineStore('message', () => {
   }
 
   function addMessage(channelId: string, channelType: number, msg: Message) {
-    const key = `${channelId}-${channelType}`;
+    const key = getChannelKey(channelId, channelType);
     if (!messages.value[key]) {
       messages.value[key] = [];
     }
@@ -324,7 +383,7 @@ export const useMessageStore = defineStore('message', () => {
   }
 
   async function handleMessageRevoked(channelId: string, channelType: number, clientMsgNo: string) {
-    const key = `${channelId}-${channelType}`;
+    const key = getChannelKey(channelId, channelType);
     summaryVersions.value[key] = (summaryVersions.value[key] || 0) + 1;
     const list = messages.value[key] || [];
     const msg = list.find(m => m.clientMsgNo === clientMsgNo);
@@ -400,17 +459,42 @@ export const useMessageStore = defineStore('message', () => {
     };
   }
 
-  async function sendMessage(
-    channelId: string, 
-    channelType: number, 
-    text: string, 
-    options?: { 
-      mention?: { all?: boolean; uids?: string[] }; 
-      reply?: any 
+  function buildTextContent(text: string, options?: SendMessageOptions) {
+    const content = normalizeMessageContent({ type: 1, text, content: text });
+    if (options?.mention) {
+      content.mention = options.mention;
     }
+    if (options?.reply) {
+      content.reply = options.reply;
+    }
+    return content;
+  }
+
+  function buildPendingTextMessage(text: string, options?: SendMessageOptions, clientMsgNo = createClientMsgNo()): Message {
+    return {
+      messageID: '',
+      messageSeq: 0,
+      clientMsgNo,
+      fromUID: userStore.currentUser?.uid || '',
+      timestamp: Math.floor(Date.now() / 1000),
+      content: buildTextContent(text, options),
+      isRevoked: false,
+      status: 'sending',
+      retryable: false,
+      retryPayload: { kind: 'text', text, options }
+    };
+  }
+
+  async function sendMessage(
+    channelId: string,
+    channelType: number,
+    text: string,
+    options?: SendMessageOptions,
+    retryClientMsgNo?: string
   ) {
-    let sentMessage: WKMessage | undefined;
     const version = resetVersion.value;
+    const pending = buildPendingTextMessage(text, options, retryClientMsgNo);
+    addMessage(channelId, channelType, pending);
     try {
       const channel = WKSDK.shared().newChannel(channelId, channelType);
       const textMsg = WKSDK.shared().newMessageText(text);
@@ -424,16 +508,36 @@ export const useMessageStore = defineStore('message', () => {
       const res = await WKSDK.shared().chatManager.send(textMsg, channel);
       if (version !== resetVersion.value) return;
       if (res) {
-        sentMessage = res;
+        res.clientMsgNo = pending.clientMsgNo;
+        if (!res.content) {
+          res.content = textMsg;
+        }
         addRealtimeMessage(channelId, channelType, res);
       }
     } catch (err) {
-      if (sentMessage) {
-        sentMessage.status = 2;
-        addRealtimeMessage(channelId, channelType, sentMessage);
-      }
+      addMessage(channelId, channelType, {
+        ...pending,
+        status: 'fail',
+        retryable: true
+      });
       throw err;
     }
+  }
+
+  async function retryMessage(channelId: string, channelType: number, clientMsgNo: string) {
+    const msg = getChannelMessages(channelId, channelType).find(item => item.clientMsgNo === clientMsgNo);
+    if (!msg?.retryPayload) {
+      throw new Error('This message cannot be retried.');
+    }
+    if (msg.retryPayload.kind === 'text') {
+      await sendMessage(channelId, channelType, msg.retryPayload.text || '', msg.retryPayload.options, clientMsgNo);
+      return;
+    }
+    if (msg.retryPayload.kind === 'media' && msg.retryPayload.file) {
+      await sendMediaMessage(channelId, channelType, msg.retryPayload.file, clientMsgNo);
+      return;
+    }
+    throw new Error('This message cannot be retried.');
   }
 
   async function uploadChatFile(channelId: string, channelType: number, file: File) {
@@ -456,35 +560,255 @@ export const useMessageStore = defineStore('message', () => {
     return resolveApiAssetUrl(uploadedPath, uploadUrl);
   }
 
-  async function sendMediaMessage(channelId: string, channelType: number, file: File) {
+  async function sendMediaMessage(channelId: string, channelType: number, file: File, retryClientMsgNo?: string) {
     let sentMessage: WKMessage | undefined;
     const version = resetVersion.value;
-    const url = await uploadChatFile(channelId, channelType, file);
-    const channel = WKSDK.shared().newChannel(channelId, channelType);
-    const content = file.type.startsWith('image/')
-      ? new MessageImage(undefined, 0, 0)
-      : new MessageFile(url, file.name, file.size);
-
-    if (file.type.startsWith('image/')) {
-      (content as MessageImage).url = url;
-    }
+    const clientMsgNo = retryClientMsgNo || createClientMsgNo();
+    addMessage(channelId, channelType, {
+      messageID: '',
+      messageSeq: 0,
+      clientMsgNo,
+      fromUID: userStore.currentUser?.uid || '',
+      timestamp: Math.floor(Date.now() / 1000),
+      content: {
+        type: file.type.startsWith('image/') ? 2 : 8,
+        name: file.name,
+        size: file.size,
+        url: '',
+        unavailable: false
+      },
+      isRevoked: false,
+      status: 'sending',
+      retryable: false,
+      retryPayload: { kind: 'media', file }
+    });
 
     try {
+      const url = await uploadChatFile(channelId, channelType, file);
+      const channel = WKSDK.shared().newChannel(channelId, channelType);
+      const content = file.type.startsWith('image/')
+        ? new MessageImage(undefined, 0, 0)
+        : new MessageFile(url, file.name, file.size);
+
+      if (file.type.startsWith('image/')) {
+        (content as MessageImage).url = url;
+      }
       const res = await WKSDK.shared().chatManager.send(content, channel);
       if (version !== resetVersion.value) return;
       if (res) {
         sentMessage = res;
+        sentMessage.clientMsgNo = clientMsgNo;
         if (!sentMessage.content) {
           sentMessage.content = content;
         }
         addRealtimeMessage(channelId, channelType, sentMessage);
       }
     } catch (err) {
-      if (sentMessage) {
-        sentMessage.status = 2;
-        addRealtimeMessage(channelId, channelType, sentMessage);
-      }
+      addMessage(channelId, channelType, {
+        messageID: sentMessage?.messageID || '',
+        messageSeq: sentMessage?.messageSeq || 0,
+        clientMsgNo,
+        fromUID: sentMessage?.fromUID || userStore.currentUser?.uid || '',
+        timestamp: sentMessage?.timestamp || Math.floor(Date.now() / 1000),
+        content: {
+          type: file.type.startsWith('image/') ? 2 : 8,
+          name: file.name,
+          size: file.size,
+          url: '',
+          unavailable: true
+        },
+        isRevoked: false,
+        status: 'fail',
+        retryable: true,
+        retryPayload: { kind: 'media', file }
+      });
       throw err;
+    }
+  }
+
+  async function editMessage(channelId: string, channelType: number, msg: Message, text: string) {
+    if (!msg.messageID || !msg.messageSeq) {
+      throw new Error('Only sent messages can be edited.');
+    }
+    const nextContent = buildTextContent(text);
+    await syncApi.editMessage({
+      channel_id: channelId,
+      channel_type: channelType,
+      message_id: msg.messageID,
+      message_seq: msg.messageSeq,
+      content_edit: JSON.stringify(nextContent)
+    });
+    msg.content = nextContent;
+    msg.remoteExtra = {
+      ...(msg.remoteExtra || {}),
+      contentEdit: nextContent,
+      editedAt: Math.floor(Date.now() / 1000)
+    };
+    await ensureConversationFromMessages(channelId, channelType);
+  }
+
+  async function deleteLocalMessage(channelId: string, channelType: number, msg: Message) {
+    await syncApi.deleteMessage([{
+      channel_id: channelId,
+      channel_type: channelType,
+      message_id: msg.messageID,
+      message_seq: msg.messageSeq
+    }]);
+    const key = getChannelKey(channelId, channelType);
+    messages.value[key] = (messages.value[key] || []).filter(item => item.clientMsgNo !== msg.clientMsgNo);
+    await ensureConversationFromMessages(channelId, channelType);
+  }
+
+  async function deleteMutualMessage(channelId: string, channelType: number, msg: Message) {
+    await syncApi.mutualDeleteMessage({
+      channel_id: channelId,
+      channel_type: channelType,
+      message_id: msg.messageID,
+      message_seq: msg.messageSeq
+    });
+    msg.remoteExtra = {
+      ...(msg.remoteExtra || {}),
+      isMutualDeleted: true
+    };
+    msg.content = {
+      type: 1000,
+      text: '消息已删除'
+    };
+    await ensureConversationFromMessages(channelId, channelType);
+  }
+
+  async function markMessagesRead(channelId: string, channelType: number, messageIds: string[]) {
+    await syncApi.markReaded({ channel_id: channelId, channel_type: channelType, message_ids: messageIds });
+    const idSet = new Set(messageIds.map(String));
+    for (const msg of getChannelMessages(channelId, channelType)) {
+      if (idSet.has(String(msg.messageID))) {
+        msg.remoteExtra = {
+          ...(msg.remoteExtra || {}),
+          readed: true
+        };
+      }
+    }
+  }
+
+  async function fetchReceipt(messageId: string) {
+    try {
+      const res: any = await syncApi.getMessageReceipt(messageId);
+      const normalized = Array.isArray(res)
+        ? { readed: res, unread: [], unavailable: false }
+        : {
+            readed: res?.readed || res?.read || [],
+            unread: res?.unread || res?.unreaded || [],
+            unavailable: false
+          };
+      receipts.value[messageId] = normalized;
+      return normalized;
+    } catch (e) {
+      receipts.value[messageId] = { readed: [], unread: [], unavailable: true };
+      throw e;
+    }
+  }
+
+  async function togglePinnedMessage(channelId: string, channelType: number, msg: Message) {
+    await syncApi.pinMessage({
+      channel_id: channelId,
+      channel_type: channelType,
+      message_id: msg.messageID,
+      message_seq: msg.messageSeq
+    });
+    msg.remoteExtra = {
+      ...(msg.remoteExtra || {}),
+      isPinned: !msg.remoteExtra?.isPinned
+    };
+    const key = getChannelKey(channelId, channelType);
+    const current = pinnedMessages.value[key] || [];
+    if (msg.remoteExtra.isPinned) {
+      pinnedMessages.value[key] = current.some(item => item.messageID === msg.messageID) ? current : [...current, msg];
+    } else {
+      pinnedMessages.value[key] = current.filter(item => item.messageID !== msg.messageID);
+    }
+  }
+
+  async function syncPinnedMessages(channelId: string, channelType: number) {
+    const key = getChannelKey(channelId, channelType);
+    const res: any = await syncApi.syncPinnedMessages({
+      channel_id: channelId,
+      channel_type: channelType,
+      version: pinnedVersions.value[key] || 0
+    });
+    const pinnedList = res?.pinned_messages || [];
+    const messagesById = new Map<string, Message>();
+    for (const msg of getChannelMessages(channelId, channelType)) {
+      messagesById.set(String(msg.messageID), msg);
+    }
+    for (const raw of res?.messages || []) {
+      const remoteExtra = normalizeRemoteExtra(raw.message_extra);
+      const msg: Message = {
+        messageID: String(raw.message_idstr || raw.message_id || ''),
+        messageSeq: raw.message_seq,
+        clientMsgNo: raw.client_msg_no,
+        fromUID: raw.from_uid,
+        timestamp: raw.timestamp,
+        content: normalizeSyncedPayload(raw.payload),
+        isRevoked: raw.revoke === 1 || raw.is_revoked === 1 || remoteExtra?.revoke === true,
+        revokeUID: remoteExtra?.revoker,
+        status: 'success',
+        reactions: raw.reactions || [],
+        remoteExtra
+      };
+      messagesById.set(msg.messageID, msg);
+      addMessage(channelId, channelType, msg);
+    }
+    pinnedMessages.value[key] = pinnedList
+      .filter((item: any) => item.is_deleted !== 1)
+      .map((item: any) => {
+        pinnedVersions.value[key] = Math.max(pinnedVersions.value[key] || 0, Number(item.version || 0));
+        const existing = messagesById.get(String(item.message_id));
+        if (existing) {
+          existing.remoteExtra = { ...(existing.remoteExtra || {}), isPinned: true };
+          return existing;
+        }
+        return {
+          messageID: String(item.message_id),
+          messageSeq: item.message_seq,
+          clientMsgNo: `pinned-${item.message_id}`,
+          fromUID: '',
+          timestamp: 0,
+          content: { type: 1000, text: '置顶消息暂不可预览' },
+          isRevoked: false,
+          status: 'success',
+          remoteExtra: { isPinned: true, unavailable: true }
+        } as Message;
+      });
+    return pinnedMessages.value[key];
+  }
+
+  async function syncReminders(channelIds?: string[]) {
+    const res: any = await syncApi.syncReminders({
+      version: reminderVersion.value,
+      limit: 100,
+      channel_ids: channelIds
+    });
+    const list = Array.isArray(res) ? res : [];
+    for (const item of list) {
+      reminderVersion.value = Math.max(reminderVersion.value, Number(item.version || 0));
+      const existingIndex = reminders.value.findIndex(reminder => Number(reminder.id) === Number(item.id));
+      if (existingIndex >= 0) {
+        reminders.value[existingIndex] = { ...reminders.value[existingIndex], ...item };
+      } else {
+        reminders.value.push(item);
+      }
+    }
+    reminders.value = reminders.value.filter(item => item.done !== 1);
+    return reminders.value;
+  }
+
+  async function doneReminders(ids: number[]) {
+    await syncApi.doneReminders(ids);
+    const idSet = new Set(ids.map(Number));
+    for (const reminder of reminders.value) {
+      if (idSet.has(Number(reminder.id))) {
+        reminder.done = 1;
+      }
     }
   }
 
@@ -498,6 +822,11 @@ export const useMessageStore = defineStore('message', () => {
     resetVersion.value++;
     summaryVersions.value = {};
     messages.value = {};
+    receipts.value = {};
+    pinnedMessages.value = {};
+    pinnedVersions.value = {};
+    reminders.value = [];
+    reminderVersion.value = 0;
     for (const key of Object.keys(typingState.value)) {
       if (typingState.value[key]?.timer) {
         clearTimeout(typingState.value[key].timer);
@@ -510,6 +839,9 @@ export const useMessageStore = defineStore('message', () => {
   return {
     messages,
     typingState,
+    receipts,
+    pinnedMessages,
+    reminders,
     replyTarget,
     getChannelMessages,
     syncMessages,
@@ -517,8 +849,18 @@ export const useMessageStore = defineStore('message', () => {
     revokeMessage,
     handleMessageRevoked,
     toggleReaction,
+    editMessage,
+    deleteLocalMessage,
+    deleteMutualMessage,
+    markMessagesRead,
+    fetchReceipt,
+    togglePinnedMessage,
+    syncPinnedMessages,
+    syncReminders,
+    doneReminders,
     setTyping,
     sendMessage,
+    retryMessage,
     sendMediaMessage,
     addRealtimeMessage,
     updateMessageStatus,

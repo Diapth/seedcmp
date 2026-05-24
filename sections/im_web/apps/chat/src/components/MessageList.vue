@@ -119,8 +119,24 @@ async function handleSendReaction(msg: any, emoji: string) {
 const menuItems = computed(() => {
   if (!selectedMsg.value) return [];
   const items = [];
+  const msg = selectedMsg.value;
+  const canUseBackendAction = Boolean(msg.messageID && msg.messageSeq);
+
+  if (msg.status === 'fail' && msg.retryable) {
+    items.push({
+      label: '重试发送',
+      action: async () => {
+        try {
+          await messageStore.retryMessage(props.channelId, props.channelType, msg.clientMsgNo);
+          Message.success('已重新发送');
+        } catch (err: any) {
+          Message.error(err.message || err.msg || '重试失败');
+        }
+      }
+    });
+  }
   
-  const isText = selectedMsg.value.content?.type === 1;
+  const isText = msg.content?.type === 1;
   if (isText) {
     items.push({
       label: '复制文本',
@@ -132,9 +148,26 @@ const menuItems = computed(() => {
     });
   }
 
-  const isMine = isMe(selectedMsg.value);
+  const isMine = isMe(msg);
   const now = Math.floor(Date.now() / 1000);
-  const isWithinWindow = (now - selectedMsg.value.timestamp) < remoteConfig.value.revoke_second;
+  const isWithinWindow = (now - msg.timestamp) < remoteConfig.value.revoke_second;
+
+  if (isMine && isText && isWithinWindow) {
+    items.push({
+      label: '编辑消息',
+      disabled: !canUseBackendAction,
+      action: async () => {
+        const nextText = window.prompt('编辑消息', msg.content?.text || '');
+        if (!nextText || nextText === msg.content?.text) return;
+        try {
+          await messageStore.editMessage(props.channelId, props.channelType, msg, nextText);
+          Message.success('已编辑消息');
+        } catch (err: any) {
+          Message.error(err.message || err.msg || '编辑失败');
+        }
+      }
+    });
+  }
   
   if (isMine && isWithinWindow) {
     items.push({
@@ -157,11 +190,75 @@ const menuItems = computed(() => {
   }
 
   items.push({
-    label: '回复',
-    action: () => {
-      messageStore.setReplyTarget(selectedMsg.value);
+    label: msg.remoteExtra?.isPinned ? '取消置顶' : '设为置顶',
+    disabled: !canUseBackendAction,
+    action: async () => {
+      try {
+        await messageStore.togglePinnedMessage(props.channelId, props.channelType, msg);
+        Message.success(msg.remoteExtra?.isPinned ? '已置顶消息' : '已取消置顶');
+      } catch (err: any) {
+        Message.error(err.message || err.msg || '置顶操作失败');
+      }
     }
   });
+
+  items.push({
+    label: '查看回执',
+    disabled: !canUseBackendAction,
+    action: async () => {
+      try {
+        const receipt = await messageStore.fetchReceipt(msg.messageID);
+        const readed = receipt.readed?.length || 0;
+        const unread = receipt.unread?.length || 0;
+        Message.info(`已读 ${readed} 人，未读 ${unread} 人`);
+      } catch (err: any) {
+        Message.warning(err.message || err.msg || '回执暂不可用');
+      }
+    }
+  });
+
+  items.push({
+    label: '提醒暂不可用',
+    disabled: true,
+    action: () => {}
+  });
+
+  items.push({
+    label: '回复',
+    action: () => {
+      messageStore.setReplyTarget(msg);
+    }
+  });
+
+  items.push({
+    label: '本地删除',
+    danger: true,
+    disabled: !canUseBackendAction,
+    action: async () => {
+      try {
+        await messageStore.deleteLocalMessage(props.channelId, props.channelType, msg);
+        Message.success('已在本地删除');
+      } catch (err: any) {
+        Message.error(err.message || err.msg || '删除失败');
+      }
+    }
+  });
+
+  if (isMine || props.channelType === 2) {
+    items.push({
+      label: '双向删除',
+      danger: true,
+      disabled: !canUseBackendAction,
+      action: async () => {
+        try {
+          await messageStore.deleteMutualMessage(props.channelId, props.channelType, msg);
+          Message.success('已双向删除');
+        } catch (err: any) {
+          Message.error(err.message || err.msg || '双向删除失败');
+        }
+      }
+    });
+  }
 
   return items;
 });

@@ -155,6 +155,36 @@ export class MessageSticker extends MessageContent {
   }
 }
 
+export class UnsupportedMessageContent extends MessageContent {
+  type!: number;
+  raw!: any;
+  text = '[暂不支持的消息]';
+
+  constructor(type = 0, raw?: any) {
+    super();
+    this.type = type;
+    this.raw = raw;
+  }
+
+  decodeJSON(content: any) {
+    this.raw = content;
+    this.type = Number(content?.type || this.type || 0);
+  }
+
+  get conversationDigest(): string {
+    return '[暂不支持的消息]';
+  }
+}
+
+export function createUnavailableMessage(type: number, raw?: any) {
+  return {
+    type,
+    text: '[暂不支持的消息]',
+    raw,
+    unavailable: true
+  };
+}
+
 export function registerMessageContentTypes() {
   const sdk = WKSDK.shared();
 

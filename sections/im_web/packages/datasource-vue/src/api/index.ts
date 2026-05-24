@@ -249,9 +249,26 @@ export const syncApi = {
   revokeMessage(params: { channel_id: string; channel_type: number; message_id: string; client_msg_no: string }) {
     return apiClient.post('message/revoke', null, { params });
   },
+  // 编辑消息
+  editMessage(data: { channel_id: string; channel_type: number; message_id: string; message_seq: number; content_edit: string }) {
+    return apiClient.post('message/edit', data);
+  },
+  // 本地删除消息
+  deleteMessage(data: Array<{ channel_id: string; channel_type: number; message_id: string; message_seq: number }>) {
+    return apiDelete('message', data);
+  },
+  // 双向删除消息
+  mutualDeleteMessage(data: { channel_id: string; channel_type: number; message_id: string; message_seq: number }) {
+    return apiDelete('message/mutual', data);
+  },
   // 消息标记已读
   markReaded(data: { channel_id: string; channel_type: number; message_ids: string[] }) {
     return apiClient.post('message/readed', data);
+  },
+  // 消息回执详情
+  getMessageReceipt(messageId: string, readed?: 0 | 1) {
+    const params = readed === undefined ? undefined : { readed };
+    return apiClient.get(`messages/${messageId}/receipt`, { params });
   },
   // 清除未读计数 (typo 拼写 coversation 保持一致，与后端路由匹配)
   clearUnread(channelId: string, channelType: number) {
@@ -264,6 +281,26 @@ export const syncApi = {
   // 增量同步消息回应
   syncReactions(data: { channel_id: string; channel_type: number; version: number }) {
     return apiClient.post('reaction/sync', data);
+  },
+  // 置顶或取消置顶消息
+  pinMessage(data: { channel_id: string; channel_type: number; message_id: string; message_seq: number }) {
+    return apiClient.post('message/pinned', data);
+  },
+  // 增量同步置顶消息
+  syncPinnedMessages(data: { channel_id: string; channel_type: number; version: number }) {
+    return apiClient.post('message/pinned/sync', data);
+  },
+  // 清空置顶消息
+  clearPinnedMessages(data: { channel_id: string; channel_type: number }) {
+    return apiClient.post('message/pinned/clear', data);
+  },
+  // 同步提醒
+  syncReminders(data: { version: number; limit: number; channel_ids?: string[] }) {
+    return apiClient.post('message/reminder/sync', data);
+  },
+  // 完成提醒
+  doneReminders(ids: number[]) {
+    return apiClient.post('message/reminder/done', ids);
   }
 };
 

@@ -83,7 +83,7 @@ describe('message store daily messaging normalization', () => {
   })
 
   it('normalizes text payloads and suppresses duplicate synced/realtime messages by clientMsgNo', async () => {
-    const { useMessageStore } = await import('../../../packages/datasource-vue/src/stores/messageStore')
+    const { useMessageStore } = await import('../../../packages/datasource-vue/src/stores/messageStore.ts')
     const store = useMessageStore()
 
     store.addRealtimeMessage('friend-a', 1, {
@@ -126,8 +126,8 @@ describe('message store daily messaging normalization', () => {
   })
 
   it('does not let unsupported content become the conversation digest', async () => {
-    const { useMessageStore } = await import('../../../packages/datasource-vue/src/stores/messageStore')
-    const { useConversationStore } = await import('../../../packages/datasource-vue/src/stores/conversationStore')
+    const { useMessageStore } = await import('../../../packages/datasource-vue/src/stores/messageStore.ts')
+    const { useConversationStore } = await import('../../../packages/datasource-vue/src/stores/conversationStore.ts')
     const messageStore = useMessageStore()
     const conversationStore = useConversationStore()
 
@@ -155,5 +155,16 @@ describe('message store daily messaging normalization', () => {
       const conv = conversationStore.conversations.find(item => item.channel_id === 'friend-a')
       expect(conv?.last_message?.content).toMatchObject({ type: 1, text: 'visible text' })
     })
+  })
+
+  it('registers all supported content types and exposes an unavailable fallback content type', async () => {
+    const source = await import('../../../packages/datasource-vue/src/contentTypes/index.ts?raw')
+
+    for (const type of [3, 4, 5, 6, 7, 8, 11, 12, 13]) {
+      expect(source.default).toContain(`sdk.register(${type}`)
+    }
+    expect(source.default).toContain('UnsupportedMessageContent')
+    expect(source.default).toContain('createUnavailableMessage')
+    expect(source.default).toContain('[暂不支持的消息]')
   })
 })

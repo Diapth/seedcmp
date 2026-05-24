@@ -67,29 +67,29 @@
 - [X] T025 [P] [US1] Add message normalization, duplicate suppression, and unsupported content tests in `sections/im_web/apps/chat/tests/messageStoreDailyMessaging.test.ts`
 - [X] T026 [P] [US1] Add message action, reaction, receipt, pin, and reminder store tests in `sections/im_web/apps/chat/tests/messageActions.test.ts`
 - [X] T027 [P] [US1] Add media send and preview component tests in `sections/im_web/apps/chat/tests/messageMediaCells.test.ts`
-- [ ] T028 [US1] Add Playwright daily messaging smoke flow in `sections/im_web/apps/chat/tests-e2e/smoke-uc1-daily-messaging.spec.ts`
+- [X] T028 [US1] Add Playwright daily messaging smoke flow in `sections/im_web/apps/chat/tests-e2e/smoke-uc1-daily-messaging.spec.ts`
 
 ### Implementation for User Story 1
 
-- [ ] T029 [P] [US1] Complete supported message content type registration and unavailable fallbacks in `sections/im_web/packages/datasource-vue/src/contentTypes/index.ts`
+- [X] T029 [P] [US1] Complete supported message content type registration and unavailable fallbacks in `sections/im_web/packages/datasource-vue/src/contentTypes/index.ts`
 - [X] T030 [US1] Implement message send, retry, pending, failed, and duplicate suppression behavior in `sections/im_web/packages/datasource-vue/src/stores/messageStore.ts`
-- [ ] T031 [US1] Implement media asset upload, preview, play, download, and retry state mapping in `sections/im_web/packages/datasource-vue/src/api/index.ts` and `sections/im_web/packages/datasource-vue/src/stores/messageStore.ts`
+- [X] T031 [US1] Implement media asset upload, preview, play, download, and retry state mapping in `sections/im_web/packages/datasource-vue/src/api/index.ts` and `sections/im_web/packages/datasource-vue/src/stores/messageStore.ts`
 - [X] T032 [P] [US1] Complete media and unsupported message rendering in `sections/im_web/packages/base-vue/src/components/messages/ImageCell.vue`, `sections/im_web/packages/base-vue/src/components/messages/FileCell.vue`, `sections/im_web/packages/base-vue/src/components/messages/VoiceCell.vue`, and `sections/im_web/packages/base-vue/src/components/messages/VideoCell.vue`
-- [ ] T033 [US1] Implement edit, revoke, local delete, mutual delete, reply, and mention action surfaces in `sections/im_web/apps/chat/src/components/MessageList.vue`, `sections/im_web/apps/chat/src/components/MessageInput.vue`, and `sections/im_web/packages/base-vue/src/components/ContextMenu.vue`
-- [ ] T034 [US1] Implement reactions, receipts, pinned messages, and reminders with verified-backend or unavailable states in `sections/im_web/packages/datasource-vue/src/stores/messageStore.ts` and `sections/im_web/apps/chat/src/components/MessageList.vue`
-- [ ] T035 [US1] Keep conversation summaries, unread counts, mentions, and stale-summary cleanup synchronized in `sections/im_web/packages/datasource-vue/src/stores/conversationStore.ts`
-- [ ] T036 [US1] Run `pnpm type-check`, `pnpm build`, `pnpm test:unit`, and the US1 Playwright smoke from `sections/im_web/package.json` and record evidence in `sections/im_web/.ai/V2.0/tasks.md`
-- [ ] T037 [US1] Complete US1 code review against the checklist in `sections/im_web/.ai/V2.0/plan.md`
+- [X] T033 [US1] Implement edit, revoke, local delete, mutual delete, reply, and mention action surfaces in `sections/im_web/apps/chat/src/components/MessageList.vue`, `sections/im_web/apps/chat/src/components/MessageInput.vue`, and `sections/im_web/packages/base-vue/src/components/ContextMenu.vue`
+- [X] T034 [US1] Implement reactions, receipts, pinned messages, and reminders with verified-backend or unavailable states in `sections/im_web/packages/datasource-vue/src/stores/messageStore.ts` and `sections/im_web/apps/chat/src/components/MessageList.vue`
+- [X] T035 [US1] Keep conversation summaries, unread counts, mentions, and stale-summary cleanup synchronized in `sections/im_web/packages/datasource-vue/src/stores/conversationStore.ts`
+- [X] T036 [US1] Run `pnpm type-check`, `pnpm build`, `pnpm test:unit`, and the US1 Playwright smoke from `sections/im_web/package.json` and record evidence in `sections/im_web/.ai/V2.0/tasks.md`
+- [X] T037 [US1] Complete US1 code review against the checklist in `sections/im_web/.ai/V2.0/plan.md`
 
 **Checkpoint**: US1 is independently functional and testable.
 
-**2026-05-24 US1 Partial Evidence**
+**2026-05-24 US1 Close Evidence**
 
-- T025: Added `messageStoreDailyMessaging.test.ts` covering text payload normalization, realtime/history duplicate suppression by `clientMsgNo`, and unsupported-content exclusion from conversation summaries.
-- T026: Added `messageActions.test.ts` covering revoke summary cleanup and reaction participant/count toggling after backend acknowledgement. Receipt, pin, and reminder closure remain for T034 before US1 can close.
-- T027/T032: Added `messageMediaCells.test.ts` and media cell unavailable/load states for image, file, voice, and video rendering.
-- T030: Message store now recomputes conversation summaries from the latest digest-eligible message, fences stale async summary writes, ignores unsupported digest types, and updates summaries after revoke without retaining stale revoked text.
-- Verification: `cd sections/im_web/apps/chat && pnpm exec vitest run tests/messageActions.test.ts --config vitest.config.ts` exit 0, 2 tests passed; same command for `messageStoreDailyMessaging.test.ts` exit 0, 2 tests passed; same command for `messageMediaCells.test.ts` exit 0, 2 tests passed; `cd sections/im_web && pnpm test:unit` exit 0, 11 files / 29 tests; `cd sections/im_web && pnpm type-check` exit 0.
+- T025/T026/T027: `messageStoreDailyMessaging.test.ts`, `messageActions.test.ts`, `messageMediaSending.test.ts`, and `messageMediaCells.test.ts` cover payload normalization, duplicate suppression, unsupported fallback registration, send pending/fail/retry, media upload retry state, revoke/edit/delete, reactions, receipts, pinned messages, reminders, reply/mention surfaces, and media preview/unavailable states.
+- T029-T035: `messageStore.ts` owns daily messaging state for optimistic text/media sends, retryable failures, backend-backed edit/revoke/local delete/mutual delete, read receipts, reaction toggles, pinned-message sync, reminder sync/done state, conversation summary recomputation, and stale revoked/unsupported digest cleanup. `api/index.ts` wraps verified TangSengDaoDaoServer message endpoints for edit, delete, mutual delete, readed, receipt, pinned, and reminder flows. `MessageList.vue`, `MessageInput.vue`, and `ContextMenu.vue` expose the corresponding UI actions and disabled unavailable states.
+- T028 smoke: `cd sections/im_web/apps/chat && pnpm exec playwright test tests-e2e/smoke-uc1-daily-messaging.spec.ts --project=chromium` exit 0, 1 passed. The smoke logs in, sends a text message, and verifies the right-click daily action surface.
+- Verification: `cd sections/im_web && pnpm type-check` exit 0; `cd sections/im_web && pnpm build` exit 0 with existing large chunk warning; `cd sections/im_web && pnpm test:unit` exit 0, 11 files / 35 tests passed.
+- Code review: local review against the plan checklist found no blocking US1 issues. Package ownership stays in datasource stores/API wrappers with UI-only action surfaces in chat/base components; backend-backed actions use confirmed TangSengDaoDaoServer routes; unsupported reminder creation remains a disabled visible state rather than a fake action; destructive actions are explicit menu actions; build, unit, and smoke evidence reviewed. Residual non-blocking risks: full manual multi-device receipt/reaction convergence still depends on backend test accounts, and Vite still reports the pre-existing large `index` chunk warning.
 
 ---
 

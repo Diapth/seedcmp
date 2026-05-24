@@ -8,6 +8,7 @@ const props = defineProps<{
     label: string;
     action: () => void;
     danger?: boolean;
+    disabled?: boolean;
   }>;
   reactions?: Array<{
     emoji: string;
@@ -59,8 +60,8 @@ onBeforeUnmount(() => {
       v-for="(item, idx) in items" 
       :key="idx" 
       class="context-menu-item"
-      :class="{ danger: item.danger }"
-      @click="handleItemClick(item.action)"
+      :class="{ danger: item.danger, disabled: item.disabled }"
+      @click="item.disabled ? undefined : handleItemClick(item.action)"
     >
       {{ item.label }}
     </div>
@@ -98,6 +99,15 @@ onBeforeUnmount(() => {
 
 .context-menu-item.danger:hover {
   background-color: #ff4d4f10;
+}
+
+.context-menu-item.disabled {
+  color: var(--text-disabled, #9ca3af);
+  cursor: not-allowed;
+}
+
+.context-menu-item.disabled:hover {
+  background-color: transparent;
 }
 
 .reactions-menu-bar {
