@@ -636,9 +636,7 @@ export const useMessageStore = defineStore('message', () => {
       if (res) {
         sentMessage = res;
         sentMessage.clientMsgNo = clientMsgNo;
-        if (!sentMessage.content) {
-          sentMessage.content = content;
-        }
+        sentMessage.content = content;
         addRealtimeMessage(channelId, channelType, sentMessage);
         removePendingMessage(clientMsgNo);
       }

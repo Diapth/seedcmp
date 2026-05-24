@@ -6,6 +6,15 @@ const getUploadUrl = vi.fn()
 const send = vi.fn()
 const newChannel = vi.fn((channelId: string, channelType: number) => ({ channelID: channelId, channelType }))
 
+function normalizeMockMediaUrl(pathOrUrl: string, options: { baseUrl?: string; referenceUrl?: string } = {}) {
+  const base = options.referenceUrl && /^https?:\/\//i.test(options.referenceUrl)
+    ? options.referenceUrl.replace(/file\/upload.*$/, '')
+    : (options.baseUrl || 'http://100.79.157.76:8090/v1/')
+  return /^https?:\/\//i.test(pathOrUrl)
+    ? pathOrUrl
+    : new URL(pathOrUrl.replace(/^\/+/, ''), base.endsWith('/') ? base : `${base}/`).toString()
+}
+
 vi.mock('@tsdaodao/base-vue', () => ({
   apiClient: {
     defaults: {
@@ -14,6 +23,7 @@ vi.mock('@tsdaodao/base-vue', () => ({
     get: vi.fn(),
     post: vi.fn()
   },
+  normalizeMediaUrl: vi.fn(normalizeMockMediaUrl),
   apiDelete: vi.fn(),
   StorageService: {
     get: vi.fn(),
@@ -159,6 +169,42 @@ describe('message media sending', () => {
     expect(sentContent.contentType).toBe(8)
     expect(sentContent.encodeJSON()).toEqual({
       url: 'http://100.79.157.76:8090/v1/file/preview/chat/1/target/report.pdf',
+      name: 'report.pdf',
+      size: file.size
+    })
+  })
+
+  it('keeps the local file card when the SDK echoes a filename text payload', async () => {
+    const { useMessageStore } = await import('../../../packages/datasource-vue/src/stores/messageStore.ts')
+    const { useUserStore } = await import('../../../packages/datasource-vue/src/stores/userStore.ts')
+    const userStore = useUserStore()
+    userStore.currentUser = { uid: 'u1', name: 'Me' }
+
+    const file = new File(['document'], 'report.pdf', { type: 'application/pdf' })
+    getUploadUrl.mockResolvedValue({ url: 'file/upload?type=chat&path=/1/target/report.pdf' })
+    uploadFile.mockResolvedValue({ path: 'file/preview/chat/1/target/report.pdf' })
+    send.mockResolvedValue({
+      messageID: 'm-file',
+      messageSeq: 3,
+      clientMsgNo: 'c-file',
+      fromUID: 'u1',
+      timestamp: 200,
+      status: 1,
+      reactions: [],
+      remoteExtra: undefined,
+      content: {
+        type: 1,
+        content: 'report.pdf'
+      }
+    })
+
+    const store = useMessageStore()
+    await store.sendMediaMessage('target', 1, file)
+
+    const list = store.getChannelMessages('target', 1)
+    expect(list).toHaveLength(1)
+    expect(list[0].content).toMatchObject({
+      type: 8,
       name: 'report.pdf',
       size: file.size
     })
