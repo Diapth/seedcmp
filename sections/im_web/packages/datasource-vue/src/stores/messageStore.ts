@@ -89,6 +89,7 @@ export const useMessageStore = defineStore('message', () => {
   const pinnedVersions = ref<Record<string, number>>({});
   const reminders = ref<Reminder[]>([]);
   const reminderVersion = ref(0);
+  const pendingQueue = ref<Array<{ channelId: string; channelType: number; clientMsgNo: string }>>([]);
   const resetVersion = ref(0);
   const summaryVersions = ref<Record<string, number>>({});
 
@@ -163,6 +164,32 @@ export const useMessageStore = defineStore('message', () => {
     }
     if (normalizedExtra.contentEdit) {
       msg.content = normalizeMessageContent(normalizedExtra.contentEdit);
+    }
+  }
+
+  function queuePendingMessage(channelId: string, channelType: number, clientMsgNo: string) {
+    if (!clientMsgNo) return;
+    const exists = pendingQueue.value.some(item =>
+      item.channelId === channelId &&
+      item.channelType === channelType &&
+      item.clientMsgNo === clientMsgNo
+    );
+    if (!exists) {
+      pendingQueue.value.push({ channelId, channelType, clientMsgNo });
+    }
+  }
+
+  function removePendingMessage(clientMsgNo: string) {
+    pendingQueue.value = pendingQueue.value.filter(item => item.clientMsgNo !== clientMsgNo);
+  }
+
+  function markPendingFailed(clientMsgNo: string) {
+    for (const key of Object.keys(messages.value)) {
+      const msg = messages.value[key]?.find(item => item.clientMsgNo === clientMsgNo);
+      if (msg && msg.status === 'sending') {
+        msg.status = 'fail';
+        msg.retryable = true;
+      }
     }
   }
 
@@ -495,6 +522,7 @@ export const useMessageStore = defineStore('message', () => {
     const version = resetVersion.value;
     const pending = buildPendingTextMessage(text, options, retryClientMsgNo);
     addMessage(channelId, channelType, pending);
+    queuePendingMessage(channelId, channelType, pending.clientMsgNo);
     try {
       const channel = WKSDK.shared().newChannel(channelId, channelType);
       const textMsg = WKSDK.shared().newMessageText(text);
@@ -513,6 +541,7 @@ export const useMessageStore = defineStore('message', () => {
           res.content = textMsg;
         }
         addRealtimeMessage(channelId, channelType, res);
+        removePendingMessage(pending.clientMsgNo);
       }
     } catch (err) {
       addMessage(channelId, channelType, {
@@ -520,6 +549,7 @@ export const useMessageStore = defineStore('message', () => {
         status: 'fail',
         retryable: true
       });
+      queuePendingMessage(channelId, channelType, pending.clientMsgNo);
       throw err;
     }
   }
@@ -564,6 +594,7 @@ export const useMessageStore = defineStore('message', () => {
     let sentMessage: WKMessage | undefined;
     const version = resetVersion.value;
     const clientMsgNo = retryClientMsgNo || createClientMsgNo();
+    queuePendingMessage(channelId, channelType, clientMsgNo);
     addMessage(channelId, channelType, {
       messageID: '',
       messageSeq: 0,
@@ -602,6 +633,7 @@ export const useMessageStore = defineStore('message', () => {
           sentMessage.content = content;
         }
         addRealtimeMessage(channelId, channelType, sentMessage);
+        removePendingMessage(clientMsgNo);
       }
     } catch (err) {
       addMessage(channelId, channelType, {
@@ -622,7 +654,29 @@ export const useMessageStore = defineStore('message', () => {
         retryable: true,
         retryPayload: { kind: 'media', file }
       });
+      queuePendingMessage(channelId, channelType, clientMsgNo);
       throw err;
+    }
+  }
+
+  async function retryPendingQueue() {
+    const queued = [...pendingQueue.value];
+    for (const item of queued) {
+      const msg = getChannelMessages(item.channelId, item.channelType).find(message => message.clientMsgNo === item.clientMsgNo);
+      if (!msg) {
+        removePendingMessage(item.clientMsgNo);
+        continue;
+      }
+      if (msg.status === 'sending') {
+        markPendingFailed(item.clientMsgNo);
+      }
+      if (msg.retryable) {
+        try {
+          await retryMessage(item.channelId, item.channelType, item.clientMsgNo);
+        } catch {
+          markPendingFailed(item.clientMsgNo);
+        }
+      }
     }
   }
 
@@ -827,6 +881,7 @@ export const useMessageStore = defineStore('message', () => {
     pinnedVersions.value = {};
     reminders.value = [];
     reminderVersion.value = 0;
+    pendingQueue.value = [];
     for (const key of Object.keys(typingState.value)) {
       if (typingState.value[key]?.timer) {
         clearTimeout(typingState.value[key].timer);
@@ -842,6 +897,7 @@ export const useMessageStore = defineStore('message', () => {
     receipts,
     pinnedMessages,
     reminders,
+    pendingQueue,
     replyTarget,
     getChannelMessages,
     syncMessages,
@@ -861,6 +917,9 @@ export const useMessageStore = defineStore('message', () => {
     setTyping,
     sendMessage,
     retryMessage,
+    retryPendingQueue,
+    queuePendingMessage,
+    markPendingFailed,
     sendMediaMessage,
     addRealtimeMessage,
     updateMessageStatus,

@@ -5,6 +5,7 @@ import { useChannelStore } from './channelStore';
 import { useGroupStore } from './groupStore';
 import { useUserStore } from './userStore';
 import { buildConversationFromGroup } from './groupChatUtils';
+import { useMessageStore } from './messageStore';
 
 export interface Conversation {
   channel_id: string;
@@ -29,6 +30,8 @@ export const useConversationStore = defineStore('conversation', () => {
   const lastSyncVersion = ref<number>(0);
   const manuallyDeletedConversationKeys = ref<Record<string, true>>({});
   const draftSyncTimers = ref<Record<string, ReturnType<typeof setTimeout>>>({});
+  const recoveryState = ref<'idle' | 'syncing' | 'recovered' | 'failed'>('idle');
+  const lastRecoveryAt = ref(0);
   const resetVersion = ref(0);
 
   const channelStore = useChannelStore();
@@ -594,6 +597,28 @@ export const useConversationStore = defineStore('conversation', () => {
     }
   }
 
+  async function recoverAfterReconnect() {
+    recoveryState.value = 'syncing';
+    try {
+      await syncConversations();
+      await syncGroupConversations();
+      const messageStore = useMessageStore();
+      const activeConversations = [...uniqueConversations.value];
+      await Promise.all(activeConversations.map(async conv => {
+        await messageStore.syncMessages(conv.channel_id, conv.channel_type);
+        await messageStore.syncPinnedMessages(conv.channel_id, conv.channel_type);
+      }));
+      await messageStore.syncReminders(activeConversations.map(conv => conv.channel_id));
+      await groupStore.fetchMyGroups();
+      ensureGroupConversations();
+      recoveryState.value = 'recovered';
+      lastRecoveryAt.value = Date.now();
+    } catch (e) {
+      recoveryState.value = 'failed';
+      throw e;
+    }
+  }
+
   function reset() {
     resetVersion.value++;
     conversations.value = [];
@@ -603,6 +628,8 @@ export const useConversationStore = defineStore('conversation', () => {
     clearedUnreadSeqs.value = {};
     lastSyncVersion.value = 0;
     manuallyDeletedConversationKeys.value = {};
+    recoveryState.value = 'idle';
+    lastRecoveryAt.value = 0;
     for (const key of Object.keys(draftSyncTimers.value)) {
       clearTimeout(draftSyncTimers.value[key]);
     }
@@ -614,6 +641,8 @@ export const useConversationStore = defineStore('conversation', () => {
     drafts,
     unreadMap,
     clearedUnreadSeqs,
+    recoveryState,
+    lastRecoveryAt,
     sortedConversations,
     totalUnreadCount,
     uniqueConversations,
@@ -628,6 +657,7 @@ export const useConversationStore = defineStore('conversation', () => {
     addOrUpdateConversation,
     ensureConversation,
     deleteConversation,
+    recoverAfterReconnect,
     reset
   };
 });

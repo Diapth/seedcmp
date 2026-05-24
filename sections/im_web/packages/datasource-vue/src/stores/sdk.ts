@@ -5,16 +5,62 @@ import { apiClient } from '@tsdaodao/base-vue';
 import { registerCMDListeners, registerMessageListeners } from '../cmd';
 import { registerMessageContentTypes } from '../contentTypes';
 import { resolveWebsocketConnectAddr } from './sdkAddress';
+import { useConversationStore } from './conversationStore';
+import { useMessageStore } from './messageStore';
 
 export const useSdkStore = defineStore('sdk', () => {
   const isConnected = ref(false);
   const isKickedOut = ref(false);
   const connectionStatus = ref<ConnectStatus>(ConnectStatus.Disconnect);
+  const connectionState = ref<'connected' | 'connecting' | 'reconnecting' | 'offline' | 'kicked'>('offline');
+  const recoveryState = ref<'idle' | 'syncing' | 'recovered' | 'failed'>('idle');
+  const lastError = ref('');
+  const lastRecoveredAt = ref(0);
+  const reconnectAttemptCount = ref(0);
 
   let reconnectAttempts = 0;
   let reconnectTimer: any = null;
   let initializedUid = '';
   let initializedToken = '';
+
+  function setConnectionState(state: typeof connectionState.value, error = '') {
+    connectionState.value = state;
+    lastError.value = error;
+  }
+
+  function markRecovered() {
+    recoveryState.value = 'recovered';
+    lastRecoveredAt.value = Date.now();
+  }
+
+  async function runRecoverySync() {
+    recoveryState.value = 'syncing';
+    try {
+      const conversationStore = useConversationStore();
+      const messageStore = useMessageStore();
+      await conversationStore.recoverAfterReconnect();
+      await messageStore.retryPendingQueue();
+      markRecovered();
+    } catch (err: any) {
+      recoveryState.value = 'failed';
+      lastError.value = err?.message || String(err || 'Recovery failed');
+    }
+  }
+
+  function scheduleReconnect() {
+    if (isKickedOut.value) return;
+    setConnectionState(reconnectAttempts > 0 ? 'reconnecting' : 'offline');
+    const delay = Math.min(1000 * Math.pow(2, reconnectAttempts), 30000);
+    reconnectAttemptCount.value = reconnectAttempts + 1;
+    console.log(`[SDK] Reconnecting in ${delay}ms (attempt ${reconnectAttempts + 1})...`);
+
+    if (reconnectTimer) clearTimeout(reconnectTimer);
+    reconnectTimer = setTimeout(() => {
+      reconnectAttempts++;
+      reconnectAttemptCount.value = reconnectAttempts;
+      WKSDK.shared().connect();
+    }, delay);
+  }
 
   function handleDisconnectAndReconnect() {
     if (connectionStatus.value === ConnectStatus.Connected) {
@@ -23,15 +69,7 @@ export const useSdkStore = defineStore('sdk', () => {
     isConnected.value = false;
 
     if (isKickedOut.value) return;
-
-    const delay = Math.min(1000 * Math.pow(2, reconnectAttempts), 30000);
-    console.log(`[SDK] Reconnecting in ${delay}ms (attempt ${reconnectAttempts + 1})...`);
-
-    if (reconnectTimer) clearTimeout(reconnectTimer);
-    reconnectTimer = setTimeout(() => {
-      reconnectAttempts++;
-      WKSDK.shared().connect();
-    }, delay);
+    scheduleReconnect();
   }
 
   // Flag to avoid double registration
@@ -44,6 +82,8 @@ export const useSdkStore = defineStore('sdk', () => {
 
     // Reset kickout state
     isKickedOut.value = false;
+    setConnectionState('connecting');
+    recoveryState.value = 'idle';
     initializedUid = uid;
     initializedToken = token;
 
@@ -65,6 +105,7 @@ export const useSdkStore = defineStore('sdk', () => {
         cb(resolveWebsocketConnectAddr(res?.ws_addr));
       } catch (err) {
         console.error('[SDK] Failed to get connect address, falling back', err);
+        lastError.value = err instanceof Error ? err.message : String(err || 'connect address failed');
         cb(resolveWebsocketConnectAddr(''));
       }
     };
@@ -74,19 +115,24 @@ export const useSdkStore = defineStore('sdk', () => {
       connectionStatus.value = status;
       if (status === ConnectStatus.Connected) {
         isConnected.value = true;
+        setConnectionState('connected');
         reconnectAttempts = 0;
+        reconnectAttemptCount.value = 0;
         if (reconnectTimer) {
           clearTimeout(reconnectTimer);
           reconnectTimer = null;
         }
         console.log('[SDK] Connected successfully.');
+        void runRecoverySync();
       } else {
         isConnected.value = false;
 
         if (status === ConnectStatus.ConnectKick || reasonCode === 2) {
           isKickedOut.value = true;
+          setConnectionState('kicked', 'Account was logged in elsewhere.');
           console.warn('[SDK] Kicked out by server.');
         } else if (status === ConnectStatus.ConnectFail || status === ConnectStatus.Disconnect) {
+          setConnectionState('offline');
           if (!isKickedOut.value) {
             handleDisconnectAndReconnect();
           }
@@ -105,6 +151,8 @@ export const useSdkStore = defineStore('sdk', () => {
     }
     WKSDK.shared().disconnect();
     isConnected.value = false;
+    setConnectionState('offline');
+    recoveryState.value = 'idle';
     initializedUid = '';
     initializedToken = '';
   }
@@ -113,7 +161,16 @@ export const useSdkStore = defineStore('sdk', () => {
     isConnected,
     isKickedOut,
     connectionStatus,
+    connectionState,
+    recoveryState,
+    lastError,
+    lastRecoveredAt,
+    reconnectAttemptCount,
     initializeSDK,
+    setConnectionState,
+    scheduleReconnect,
+    markRecovered,
+    runRecoverySync,
     disconnect
   };
 });

@@ -1,17 +1,17 @@
 <script setup lang="ts">
 import { computed } from 'vue';
 import { useRouter } from 'vue-router';
-import { useSdkStore } from '@tsdaodao/datasource-vue';
-import { StorageService, KickoutOverlay } from '@tsdaodao/base-vue';
+import { useKickoutStore, useSdkStore } from '@tsdaodao/datasource-vue';
+import { KickoutOverlay } from '@tsdaodao/base-vue';
 
 const router = useRouter();
 const sdkStore = useSdkStore();
+const kickoutStore = useKickoutStore();
 
 const isKickedOut = computed(() => sdkStore.isKickedOut);
 
 const handleRelogin = () => {
-  StorageService.clear();
-  sdkStore.disconnect();
+  kickoutStore.clearSensitiveState();
   router.push('/login');
 };
 </script>

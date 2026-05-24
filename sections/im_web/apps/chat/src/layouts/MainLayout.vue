@@ -1,10 +1,11 @@
 <script setup lang="ts">
-import { ref, onMounted } from 'vue';
+import { computed, ref, onMounted } from 'vue';
 import { useRouter } from 'vue-router';
 import { useUserStore } from '@tsdaodao/datasource-vue';
 import { useConversationStore } from '@tsdaodao/datasource-vue';
 import { useKickoutStore } from '@tsdaodao/datasource-vue';
 import { useGroupStore } from '@tsdaodao/datasource-vue';
+import { useSdkStore } from '@tsdaodao/datasource-vue';
 import { KickoutOverlay, ChannelAvatar } from '@tsdaodao/base-vue';
 import ConversationList from '../views/ConversationList.vue';
 import { ContactList } from '@tsdaodao/contacts-vue';
@@ -21,6 +22,22 @@ const userStore = useUserStore();
 const conversationStore = useConversationStore();
 const kickoutStore = useKickoutStore();
 const groupStore = useGroupStore();
+const sdkStore = useSdkStore();
+
+const connectionStateLabel = computed(() => {
+  if (sdkStore.connectionState === 'connected' && sdkStore.recoveryState === 'syncing') return '恢复同步中';
+  if (sdkStore.connectionState === 'connected') return '在线';
+  if (sdkStore.connectionState === 'connecting') return '连接中';
+  if (sdkStore.connectionState === 'reconnecting') return '正在重连';
+  if (sdkStore.connectionState === 'kicked') return '已被踢出';
+  return '离线';
+});
+
+const connectionBanner = computed(() => {
+  return sdkStore.connectionState !== 'connected' || sdkStore.recoveryState === 'syncing' || sdkStore.recoveryState === 'failed';
+});
+
+const recoveryState = computed(() => sdkStore.recoveryState);
 
 onMounted(async () => {
   if (userStore.isLoggedIn && userStore.currentUser) {
@@ -44,6 +61,11 @@ function handleKickoutRelogin() {
 
 <template>
   <div class="main-layout">
+    <div v-if="connectionBanner" class="connection-banner" :class="`state-${sdkStore.connectionState}`">
+      <span>{{ connectionStateLabel }}</span>
+      <span v-if="recoveryState === 'syncing'">恢复同步</span>
+      <span v-else-if="sdkStore.lastError">{{ sdkStore.lastError }}</span>
+    </div>
     <!-- Left Sidebar -->
     <div class="sidebar">
       <!-- Profile & Top Bar -->
@@ -134,6 +156,36 @@ function handleKickoutRelogin() {
   width: 100vw;
   overflow: hidden;
   background-color: var(--bg-primary);
+  position: relative;
+}
+
+.connection-banner {
+  position: absolute;
+  top: 8px;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 20;
+  min-height: 28px;
+  max-width: min(520px, calc(100vw - 32px));
+  padding: 0 12px;
+  border: var(--border-hairline);
+  border-radius: var(--radius-sm);
+  background: var(--bg-primary);
+  color: var(--text-primary);
+  font-size: 12px;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.08);
+}
+
+.connection-banner.state-reconnecting,
+.connection-banner.state-offline {
+  color: #d46b08;
+}
+
+.connection-banner.state-kicked {
+  color: #cf1322;
 }
 
 .sidebar {
