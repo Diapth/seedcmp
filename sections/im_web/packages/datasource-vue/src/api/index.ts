@@ -351,6 +351,17 @@ export const commonApi = {
   // 全局搜索
   globalSearch(data: any) {
     return apiClient.post('search/global', data);
+  },
+  // 举报用户、群组或消息
+  submitReport(data: any) {
+    return apiClient.post('reports', data);
+  },
+  // 机器人菜单或快捷指令
+  getRobotMenus(channelId: string, channelType: number) {
+    return apiClient.get(`robots/menu?channel_id=${channelId}&channel_type=${channelType}`);
+  },
+  sendRobotCommand(data: any) {
+    return apiClient.post('robots/command', data);
   }
 };
 

@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { ref, computed, watch, onBeforeUnmount } from 'vue';
 import { Message as ArcoMessage } from '@arco-design/web-vue';
-import { useMessageStore, useConversationStore, useGroupStore, useUserStore } from '@tsdaodao/datasource-vue';
+import { commonApi, useMessageStore, useConversationStore, useGroupStore, useUserStore } from '@tsdaodao/datasource-vue';
 import WKSDK, { CMDContent } from 'wukongimjssdk';
 
 const props = defineProps<{
@@ -19,6 +19,9 @@ const textareaRef = ref<HTMLTextAreaElement | null>(null);
 const imageInputRef = ref<HTMLInputElement | null>(null);
 const fileInputRef = ref<HTMLInputElement | null>(null);
 const uploadHint = ref('');
+const robotMenuState = ref<'idle' | 'loading' | 'ready' | 'unavailable' | 'failed'>('idle');
+const robotMenus = ref<Array<{ id: string; title: string; command: string }>>([]);
+const robotAck = ref('');
 let typingTimeout: any = null;
 
 // Mention state
@@ -129,6 +132,45 @@ function openFilePicker() {
 function insertMentionTrigger() {
   inputText.value = `${inputText.value}${inputText.value && !inputText.value.endsWith(' ') ? ' ' : ''}@`;
   textareaRef.value?.focus();
+}
+
+async function openRobotMenu() {
+  if (robotMenuState.value === 'ready') {
+    robotMenuState.value = 'idle';
+    return;
+  }
+  robotMenuState.value = 'loading';
+  robotAck.value = '';
+  try {
+    const res: any = await commonApi.getRobotMenus(props.channelId, props.channelType);
+    const list = Array.isArray(res) ? res : (res?.menus || res?.items || []);
+    robotMenus.value = list.map((item: any, index: number) => ({
+      id: String(item.id || item.command || index),
+      title: String(item.title || item.name || item.command || '机器人指令'),
+      command: String(item.command || item.payload || item.name || '')
+    })).filter((item: any) => item.command);
+    robotMenuState.value = robotMenus.value.length ? 'ready' : 'unavailable';
+  } catch {
+    robotMenuState.value = 'unavailable';
+  }
+}
+
+async function sendRobotCommand(command: string) {
+  robotMenuState.value = 'loading';
+  robotAck.value = '';
+  try {
+    await commonApi.sendRobotCommand({
+      channel_id: props.channelId,
+      channel_type: props.channelType,
+      command
+    });
+    robotAck.value = 'robot ack';
+    robotMenuState.value = 'idle';
+    ArcoMessage.success('机器人指令已发送');
+  } catch {
+    robotMenuState.value = 'failed';
+    robotAck.value = '机器人暂不可用';
+  }
 }
 
 async function sendSelectedFile(file: File) {
@@ -267,6 +309,9 @@ onBeforeUnmount(() => {
     </div>
 
     <div class="input-actions">
+      <button class="action-btn" title="机器人菜单" @click="openRobotMenu">
+        Bot
+      </button>
       <button class="action-btn" title="选择图片" @click="openImagePicker">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" class="action-svg">
           <rect x="3" y="3" width="18" height="18" rx="2" ry="2" />
@@ -283,6 +328,22 @@ onBeforeUnmount(() => {
       <button v-if="channelType === 2" class="action-btn" title="插入@成员" @click="insertMentionTrigger">
         @
       </button>
+    </div>
+
+    <div v-if="robotMenuState !== 'idle'" class="robot-panel">
+      <div v-if="robotMenuState === 'loading'" class="robot-state">机器人响应中...</div>
+      <div v-else-if="robotMenuState === 'unavailable' || robotMenuState === 'failed'" class="robot-state">机器人暂不可用</div>
+      <div v-else class="robot-menu">
+        <button
+          v-for="item in robotMenus"
+          :key="item.id"
+          class="robot-command"
+          @click="sendRobotCommand(item.command)"
+        >
+          {{ item.title }}
+        </button>
+      </div>
+      <div v-if="robotAck" class="robot-ack">{{ robotAck }}</div>
     </div>
 
     <div class="input-area-wrapper">
@@ -459,6 +520,37 @@ onBeforeUnmount(() => {
 .action-svg {
   width: 20px;
   height: 20px;
+}
+
+.robot-panel {
+  margin-bottom: 8px;
+  padding: 8px;
+  border: var(--border-hairline);
+  border-radius: var(--radius-sm);
+  background-color: var(--bg-secondary);
+}
+
+.robot-state,
+.robot-ack {
+  font-size: 12px;
+  color: var(--text-secondary);
+}
+
+.robot-menu {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.robot-command {
+  height: 28px;
+  padding: 0 10px;
+  border: var(--border-hairline);
+  border-radius: var(--radius-sm);
+  background-color: var(--bg-primary);
+  color: var(--text-primary);
+  font-size: 12px;
+  cursor: pointer;
 }
 
 .hidden-input {

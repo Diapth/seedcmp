@@ -205,22 +205,30 @@
 
 ### Tests for User Story 5
 
-- [ ] T070 [P] [US5] Add categorized search tests in `sections/im_web/apps/chat/tests/searchResults.test.ts`
-- [ ] T071 [P] [US5] Add workplace and client config tests in `sections/im_web/apps/chat/tests/workplaceConfig.test.ts`
-- [ ] T072 [P] [US5] Add robot and report unavailable/submit state tests in `sections/im_web/apps/chat/tests/robotReportFlows.test.ts`
-- [ ] T073 [US5] Add Playwright discovery and reporting smoke flow in `sections/im_web/apps/chat/tests-e2e/smoke-uc7-discovery-productivity.spec.ts`
+- [X] T070 [P] [US5] Add categorized search tests in `sections/im_web/apps/chat/tests/searchResults.test.ts`
+- [X] T071 [P] [US5] Add workplace and client config tests in `sections/im_web/apps/chat/tests/workplaceConfig.test.ts`
+- [X] T072 [P] [US5] Add robot and report unavailable/submit state tests in `sections/im_web/apps/chat/tests/robotReportFlows.test.ts`
+- [X] T073 [US5] Add Playwright discovery and reporting smoke flow in `sections/im_web/apps/chat/tests-e2e/smoke-uc7-discovery-productivity.spec.ts`
 
 ### Implementation for User Story 5
 
-- [ ] T074 [US5] Complete global search service and result routing in `sections/im_web/packages/datasource-vue/src/api/index.ts` and `sections/im_web/apps/chat/src/components/SearchResultList.vue`
-- [ ] T075 [US5] Complete workplace banner, category, app, recent app, add/remove, and ordering states in `sections/im_web/apps/chat/src/views/ChatWelcome.vue`
-- [ ] T076 [US5] Complete robot menu, inline result, response, ack, and unavailable states in `sections/im_web/apps/chat/src/components/MessageInput.vue` and `sections/im_web/apps/chat/src/components/MessageList.vue`
-- [ ] T077 [US5] Complete report target, category, description, attachment, submit, and failure states in `sections/im_web/apps/chat/src/views/UserProfileDrawer.vue`
-- [ ] T078 [US5] Apply common client configuration, feature visibility, chat background, and update prompt states in `sections/im_web/packages/base-vue/src/composables/useRemoteConfig.ts`
-- [ ] T079 [US5] Run `pnpm type-check`, `pnpm build`, `pnpm test:unit`, and the US5 Playwright smoke from `sections/im_web/package.json` and record evidence in `sections/im_web/.ai/V2.0/tasks.md`
-- [ ] T080 [US5] Complete US5 code review against the checklist in `sections/im_web/.ai/V2.0/plan.md`
+- [X] T074 [US5] Complete global search service and result routing in `sections/im_web/packages/datasource-vue/src/api/index.ts` and `sections/im_web/apps/chat/src/components/SearchResultList.vue`
+- [X] T075 [US5] Complete workplace banner, category, app, recent app, add/remove, and ordering states in `sections/im_web/apps/chat/src/views/ChatWelcome.vue`
+- [X] T076 [US5] Complete robot menu, inline result, response, ack, and unavailable states in `sections/im_web/apps/chat/src/components/MessageInput.vue` and `sections/im_web/apps/chat/src/components/MessageList.vue`
+- [X] T077 [US5] Complete report target, category, description, attachment, submit, and failure states in `sections/im_web/apps/chat/src/views/UserProfileDrawer.vue`
+- [X] T078 [US5] Apply common client configuration, feature visibility, chat background, and update prompt states in `sections/im_web/packages/base-vue/src/composables/useRemoteConfig.ts`
+- [X] T079 [US5] Run `pnpm type-check`, `pnpm build`, `pnpm test:unit`, and the US5 Playwright smoke from `sections/im_web/package.json` and record evidence in `sections/im_web/.ai/V2.0/tasks.md`
+- [X] T080 [US5] Complete US5 code review against the checklist in `sections/im_web/.ai/V2.0/plan.md`
 
 **Checkpoint**: US5 is independently functional and testable.
+
+**2026-05-24 US5 Close Evidence**
+
+- T070-T072: Added `searchResults.test.ts`, `workplaceConfig.test.ts`, and `robotReportFlows.test.ts` covering categorized global search contracts, workplace/client config normalization, robot menu/unavailable states, and report submit/failure state contracts.
+- T073 smoke: `cd sections/im_web/apps/chat && pnpm exec playwright test tests-e2e/smoke-uc7-discovery-productivity.spec.ts --project=chromium` exit 0, 1 passed. The smoke verifies workplace visibility, global search surface, and safe robot menu/unavailable states in an active conversation.
+- T074-T078: `commonApi` now wraps global search, report, and robot endpoints. `SearchResultList.vue` combines local cached people/groups/messages with backend global search results and routes categorized results. `ChatWelcome.vue` now renders a config-driven workplace with categories, app ordering, recent apps, add/remove state, and update prompt. `MessageInput.vue` exposes robot menu, command ack, and unavailable/failure states without disrupting normal message input. `UserProfileDrawer.vue` supports report target/category/description/attachment submit and failure states. `useRemoteConfig.ts` normalizes feature visibility, chat background, update prompts, and workplace apps.
+- Verification: targeted US5 Vitest command `cd sections/im_web/apps/chat && pnpm exec vitest run tests/searchResults.test.ts tests/workplaceConfig.test.ts tests/robotReportFlows.test.ts --config vitest.config.ts` exit 0, 3 files / 5 tests passed; `cd sections/im_web && pnpm type-check` exit 0; `cd sections/im_web && pnpm build` exit 0 with existing large chunk warning; full unit suite passed with `cd sections/im_web/apps/chat && pnpm exec vitest run --config vitest.config.ts --pool=threads --poolOptions.threads.singleThread=true`, 22 files / 54 tests passed. The default `pnpm test:unit` worker pool hit a Node/V8 native crash after the US5 changes; no test assertion failures were emitted, and the single-thread run completed cleanly.
+- Code review: local review against the plan checklist found no blocking US5 issues. Backend-dependent robot/report paths expose clear unavailable or failure states, search remains grouped/actionable, workplace content is config-driven with safe defaults, and normal chat input/send behavior remains intact. Residual non-blocking risk: live robot commands and report submission depend on backend endpoint availability in the deployed environment.
 
 ---
 

@@ -1,8 +1,8 @@
 <script setup lang="ts">
-import { computed } from 'vue';
+import { computed, ref, watch } from 'vue';
 import { useRouter } from 'vue-router';
 import { useContactStore } from '@tsdaodao/contacts-vue';
-import { useGroupStore, useMessageStore, useUserStore } from '@tsdaodao/datasource-vue';
+import { commonApi, useGroupStore, useMessageStore, useUserStore } from '@tsdaodao/datasource-vue';
 import { ChannelAvatar } from '@tsdaodao/base-vue';
 
 const props = defineProps<{
@@ -16,8 +16,27 @@ const contactStore = useContactStore();
 const groupStore = useGroupStore();
 const messageStore = useMessageStore();
 const userStore = useUserStore();
+const remoteResults = ref<any[]>([]);
+const remoteSearchState = ref<'idle' | 'loading' | 'failed'>('idle');
 
 const searchQuery = computed(() => props.query.trim().toLowerCase());
+
+watch(searchQuery, async (query) => {
+  remoteResults.value = [];
+  if (!query) return;
+  remoteSearchState.value = 'loading';
+  try {
+    const res: any = await commonApi.globalSearch({
+      keyword: query,
+      limit: 20,
+      categories: ['user', 'group', 'message']
+    });
+    remoteResults.value = Array.isArray(res) ? res : (res?.items || res?.list || []);
+    remoteSearchState.value = 'idle';
+  } catch {
+    remoteSearchState.value = 'failed';
+  }
+}, { immediate: true });
 
 // Filter Contacts
 const filteredContacts = computed(() => {
@@ -25,18 +44,32 @@ const filteredContacts = computed(() => {
   return contactStore.contacts.filter(c => 
     (c.name || '').toLowerCase().includes(searchQuery.value) ||
     (c.uid || '').toLowerCase().includes(searchQuery.value)
-  );
+  ).concat(remoteResults.value
+    .filter(item => ['user', 'person', 'contact'].includes(String(item.category || item.type || '').toLowerCase()))
+    .map(item => ({
+      uid: item.targetId || item.uid || item.id,
+      name: item.title || item.name || item.uid,
+      avatar: item.avatar || ''
+    }))
+  ).filter((item, index, list) => item.uid && list.findIndex(next => next.uid === item.uid) === index);
 });
 
 // Filter Groups
 const filteredGroups = computed(() => {
   if (!searchQuery.value) return [];
   // Standard groups
-  const groupsList = Object.values(groupStore.groups) || [];
+  const groupsList: any[] = Object.values(groupStore.groups) || [];
   return groupsList.filter(g => 
     (g.name || '').toLowerCase().includes(searchQuery.value) ||
     (g.group_id || '').toLowerCase().includes(searchQuery.value)
-  );
+  ).concat(remoteResults.value
+    .filter(item => String(item.category || item.type || '').toLowerCase() === 'group')
+    .map(item => ({
+      group_id: item.targetId || item.group_id || item.id,
+      name: item.title || item.name || item.group_id,
+      avatar: item.avatar || ''
+    }))
+  ).filter((item, index, list) => item.group_id && list.findIndex(next => next.group_id === item.group_id) === index);
 });
 
 // Filter Messages (Chat History)
@@ -61,7 +94,21 @@ const filteredMessages = computed(() => {
     });
   });
   
-  return results.slice(0, 10); // Limit to 10 matching messages for preview
+  const remoteMessages = remoteResults.value
+    .filter(item => String(item.category || item.type || '').toLowerCase() === 'message')
+    .map(item => ({
+      message: {
+        messageID: item.id || item.message_id,
+        clientMsgNo: item.client_msg_no,
+        timestamp: item.timestamp || Date.now() / 1000,
+        content: { text: item.context || item.subtitle || item.title }
+      },
+      channelId: item.channel_id || item.channelId || item.targetId,
+      channelType: Number(item.channel_type || item.channelType || 1),
+      senderName: item.senderName || item.sender_name || item.title || '聊天记录'
+    }));
+
+  return results.concat(remoteMessages).slice(0, 10);
 });
 
 const hasResults = computed(() => {
@@ -72,6 +119,11 @@ const hasResults = computed(() => {
 
 function handleOpenChat(channelId: string, channelType: number) {
   router.push(`/chat/conversation/${channelId}/${channelType}`);
+  emit('select');
+}
+
+function handleOpenUser(uid: string) {
+  router.push(`/chat/conversation/${uid}/1`);
   emit('select');
 }
 </script>
@@ -94,7 +146,7 @@ function handleOpenChat(channelId: string, channelType: number) {
             v-for="c in filteredContacts" 
             :key="c.uid" 
             class="result-item"
-            @click="handleOpenChat(c.uid, 1)"
+            @click="handleOpenUser(c.uid)"
           >
             <ChannelAvatar :avatar="c.avatar" :name="c.name" :size="34" />
             <div class="item-info">

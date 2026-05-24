@@ -1,9 +1,9 @@
 /* __placeholder__ */
-import { computed, onMounted } from 'vue';
+import { computed, ref, onMounted } from 'vue';
 import { useRouter } from 'vue-router';
 import { useUserStore } from '@tsdaodao/datasource-vue';
 import { useContactStore } from '@tsdaodao/contacts-vue';
-import { friendApi } from '@tsdaodao/datasource-vue';
+import { commonApi, friendApi } from '@tsdaodao/datasource-vue';
 import { ChannelAvatar } from '@tsdaodao/base-vue';
 import { Message } from '@arco-design/web-vue';
 const { defineProps, defineSlots, defineEmits, defineExpose, defineModel, defineOptions, withDefaults, } = await import('vue');
@@ -15,6 +15,14 @@ const contactStore = useContactStore();
 const userDetails = computed(() => {
     return userStore.userCache[props.uid] || { uid: props.uid, name: '加载中...', avatar: '' };
 });
+const reportState = ref('idle');
+const reportCategory = ref('spam');
+const reportDescription = ref('');
+const reportAttachment = ref('');
+const reportTarget = computed(() => ({
+    target_type: 'user',
+    target_id: props.uid
+}));
 const isFriend = computed(() => {
     return contactStore.contacts.some(c => c.uid === props.uid);
 });
@@ -58,6 +66,30 @@ function handleAddFriend() {
     emit('close');
     router.push({ path: '/chat/add-friend', query: { uid: props.uid } });
 }
+function openReportForm() {
+    reportState.value = 'editing';
+}
+async function submitReport() {
+    if (!reportDescription.value.trim()) {
+        Message.warning('请填写举报说明');
+        return;
+    }
+    reportState.value = 'submitting';
+    try {
+        await commonApi.submitReport({
+            ...reportTarget.value,
+            category: reportCategory.value,
+            description: reportDescription.value.trim(),
+            attachments: reportAttachment.value ? [reportAttachment.value] : []
+        });
+        reportState.value = 'submitted';
+        Message.success('举报已提交');
+    }
+    catch (err) {
+        reportState.value = 'failed';
+        Message.error(err.msg || '举报提交失败');
+    }
+}
 let __VLS_modelEmitsType;
 const __VLS_componentsOption = {};
 let __VLS_name;
@@ -92,8 +124,18 @@ function __VLS_template() {
     __VLS_intrinsicElements.div;
     __VLS_intrinsicElements.div;
     __VLS_intrinsicElements.div;
+    __VLS_intrinsicElements.div;
+    __VLS_intrinsicElements.div;
+    __VLS_intrinsicElements.div;
+    __VLS_intrinsicElements.div;
+    __VLS_intrinsicElements.div;
+    __VLS_intrinsicElements.div;
     __VLS_intrinsicElements.h4;
     __VLS_intrinsicElements.h4;
+    __VLS_intrinsicElements.button;
+    __VLS_intrinsicElements.button;
+    __VLS_intrinsicElements.button;
+    __VLS_intrinsicElements.button;
     __VLS_intrinsicElements.button;
     __VLS_intrinsicElements.button;
     __VLS_intrinsicElements.button;
@@ -112,6 +154,25 @@ function __VLS_template() {
     __VLS_components.ChannelAvatar;
     // @ts-ignore
     [ChannelAvatar,];
+    __VLS_intrinsicElements.label;
+    __VLS_intrinsicElements.label;
+    __VLS_intrinsicElements.label;
+    __VLS_intrinsicElements.label;
+    __VLS_intrinsicElements.label;
+    __VLS_intrinsicElements.label;
+    __VLS_intrinsicElements.select;
+    __VLS_intrinsicElements.select;
+    __VLS_intrinsicElements.option;
+    __VLS_intrinsicElements.option;
+    __VLS_intrinsicElements.option;
+    __VLS_intrinsicElements.option;
+    __VLS_intrinsicElements.option;
+    __VLS_intrinsicElements.option;
+    __VLS_intrinsicElements.option;
+    __VLS_intrinsicElements.option;
+    __VLS_intrinsicElements.textarea;
+    __VLS_intrinsicElements.textarea;
+    __VLS_intrinsicElements.input;
     if (__VLS_ctx.visible) {
         {
             const __VLS_0 = __VLS_intrinsicElements["div"];
@@ -284,7 +345,7 @@ function __VLS_template() {
                                     const __VLS_97 = __VLS_96({ ...{ 'onClick': {}, }, class: ("action-btn secondary-btn"), }, ...__VLS_functionalComponentArgsRest(__VLS_96));
                                     ({}({ ...{ 'onClick': {}, }, class: ("action-btn secondary-btn"), }));
                                     let __VLS_100 = { 'click': __VLS_pickEvent(__VLS_99['click'], {}.onClick) };
-                                    __VLS_100 = { click: (__VLS_ctx.handleAddBlacklist) };
+                                    __VLS_100 = { click: (__VLS_ctx.openReportForm) };
                                     (__VLS_98.slots).default;
                                     const __VLS_98 = __VLS_pickFunctionalComponentCtx(__VLS_95, __VLS_97);
                                     let __VLS_99;
@@ -292,19 +353,155 @@ function __VLS_template() {
                                 {
                                     const __VLS_101 = __VLS_intrinsicElements["button"];
                                     const __VLS_102 = __VLS_elementAsFunctionalComponent(__VLS_101);
-                                    const __VLS_103 = __VLS_102({ ...{ 'onClick': {}, }, class: ("action-btn danger-btn"), }, ...__VLS_functionalComponentArgsRest(__VLS_102));
-                                    ({}({ ...{ 'onClick': {}, }, class: ("action-btn danger-btn"), }));
+                                    const __VLS_103 = __VLS_102({ ...{ 'onClick': {}, }, class: ("action-btn secondary-btn"), }, ...__VLS_functionalComponentArgsRest(__VLS_102));
+                                    ({}({ ...{ 'onClick': {}, }, class: ("action-btn secondary-btn"), }));
                                     let __VLS_106 = { 'click': __VLS_pickEvent(__VLS_105['click'], {}.onClick) };
-                                    __VLS_106 = { click: (__VLS_ctx.handleDeleteFriend) };
+                                    __VLS_106 = { click: (__VLS_ctx.handleAddBlacklist) };
                                     (__VLS_104.slots).default;
                                     const __VLS_104 = __VLS_pickFunctionalComponentCtx(__VLS_101, __VLS_103);
                                     let __VLS_105;
+                                }
+                                {
+                                    const __VLS_107 = __VLS_intrinsicElements["button"];
+                                    const __VLS_108 = __VLS_elementAsFunctionalComponent(__VLS_107);
+                                    const __VLS_109 = __VLS_108({ ...{ 'onClick': {}, }, class: ("action-btn danger-btn"), }, ...__VLS_functionalComponentArgsRest(__VLS_108));
+                                    ({}({ ...{ 'onClick': {}, }, class: ("action-btn danger-btn"), }));
+                                    let __VLS_112 = { 'click': __VLS_pickEvent(__VLS_111['click'], {}.onClick) };
+                                    __VLS_112 = { click: (__VLS_ctx.handleDeleteFriend) };
+                                    (__VLS_110.slots).default;
+                                    const __VLS_110 = __VLS_pickFunctionalComponentCtx(__VLS_107, __VLS_109);
+                                    let __VLS_111;
                                 }
                                 (__VLS_93.slots).default;
                                 const __VLS_93 = __VLS_pickFunctionalComponentCtx(__VLS_90, __VLS_92);
                             }
                             // @ts-ignore
-                            [isFriend, handleAddBlacklist, handleDeleteFriend,];
+                            [isFriend, openReportForm, handleAddBlacklist, handleDeleteFriend,];
+                        }
+                        if (__VLS_ctx.reportState !== 'idle') {
+                            {
+                                const __VLS_113 = __VLS_intrinsicElements["div"];
+                                const __VLS_114 = __VLS_elementAsFunctionalComponent(__VLS_113);
+                                const __VLS_115 = __VLS_114({ ...{}, class: ("report-panel"), }, ...__VLS_functionalComponentArgsRest(__VLS_114));
+                                ({}({ ...{}, class: ("report-panel"), }));
+                                {
+                                    const __VLS_118 = __VLS_intrinsicElements["label"];
+                                    const __VLS_119 = __VLS_elementAsFunctionalComponent(__VLS_118);
+                                    const __VLS_120 = __VLS_119({ ...{}, class: ("report-label"), }, ...__VLS_functionalComponentArgsRest(__VLS_119));
+                                    ({}({ ...{}, class: ("report-label"), }));
+                                    (__VLS_121.slots).default;
+                                    const __VLS_121 = __VLS_pickFunctionalComponentCtx(__VLS_118, __VLS_120);
+                                }
+                                {
+                                    const __VLS_123 = __VLS_intrinsicElements["select"];
+                                    const __VLS_124 = __VLS_elementAsFunctionalComponent(__VLS_123);
+                                    const __VLS_125 = __VLS_124({ ...{}, value: ((__VLS_ctx.reportCategory)), class: ("report-input"), }, ...__VLS_functionalComponentArgsRest(__VLS_124));
+                                    ({}({ ...{}, value: ((__VLS_ctx.reportCategory)), class: ("report-input"), }));
+                                    {
+                                        const __VLS_128 = __VLS_intrinsicElements["option"];
+                                        const __VLS_129 = __VLS_elementAsFunctionalComponent(__VLS_128);
+                                        const __VLS_130 = __VLS_129({ ...{}, value: ("spam"), }, ...__VLS_functionalComponentArgsRest(__VLS_129));
+                                        ({}({ ...{}, value: ("spam"), }));
+                                        (__VLS_131.slots).default;
+                                        const __VLS_131 = __VLS_pickFunctionalComponentCtx(__VLS_128, __VLS_130);
+                                    }
+                                    {
+                                        const __VLS_133 = __VLS_intrinsicElements["option"];
+                                        const __VLS_134 = __VLS_elementAsFunctionalComponent(__VLS_133);
+                                        const __VLS_135 = __VLS_134({ ...{}, value: ("abuse"), }, ...__VLS_functionalComponentArgsRest(__VLS_134));
+                                        ({}({ ...{}, value: ("abuse"), }));
+                                        (__VLS_136.slots).default;
+                                        const __VLS_136 = __VLS_pickFunctionalComponentCtx(__VLS_133, __VLS_135);
+                                    }
+                                    {
+                                        const __VLS_138 = __VLS_intrinsicElements["option"];
+                                        const __VLS_139 = __VLS_elementAsFunctionalComponent(__VLS_138);
+                                        const __VLS_140 = __VLS_139({ ...{}, value: ("fraud"), }, ...__VLS_functionalComponentArgsRest(__VLS_139));
+                                        ({}({ ...{}, value: ("fraud"), }));
+                                        (__VLS_141.slots).default;
+                                        const __VLS_141 = __VLS_pickFunctionalComponentCtx(__VLS_138, __VLS_140);
+                                    }
+                                    {
+                                        const __VLS_143 = __VLS_intrinsicElements["option"];
+                                        const __VLS_144 = __VLS_elementAsFunctionalComponent(__VLS_143);
+                                        const __VLS_145 = __VLS_144({ ...{}, value: ("other"), }, ...__VLS_functionalComponentArgsRest(__VLS_144));
+                                        ({}({ ...{}, value: ("other"), }));
+                                        (__VLS_146.slots).default;
+                                        const __VLS_146 = __VLS_pickFunctionalComponentCtx(__VLS_143, __VLS_145);
+                                    }
+                                    (__VLS_126.slots).default;
+                                    const __VLS_126 = __VLS_pickFunctionalComponentCtx(__VLS_123, __VLS_125);
+                                }
+                                {
+                                    const __VLS_148 = __VLS_intrinsicElements["label"];
+                                    const __VLS_149 = __VLS_elementAsFunctionalComponent(__VLS_148);
+                                    const __VLS_150 = __VLS_149({ ...{}, class: ("report-label"), }, ...__VLS_functionalComponentArgsRest(__VLS_149));
+                                    ({}({ ...{}, class: ("report-label"), }));
+                                    (__VLS_151.slots).default;
+                                    const __VLS_151 = __VLS_pickFunctionalComponentCtx(__VLS_148, __VLS_150);
+                                }
+                                {
+                                    const __VLS_153 = __VLS_intrinsicElements["textarea"];
+                                    const __VLS_154 = __VLS_elementAsFunctionalComponent(__VLS_153);
+                                    const __VLS_155 = __VLS_154({ ...{}, value: ((__VLS_ctx.reportDescription)), class: ("report-textarea"), placeholder: ("描述你遇到的问题"), }, ...__VLS_functionalComponentArgsRest(__VLS_154));
+                                    ({}({ ...{}, value: ((__VLS_ctx.reportDescription)), class: ("report-textarea"), placeholder: ("描述你遇到的问题"), }));
+                                    const __VLS_156 = __VLS_pickFunctionalComponentCtx(__VLS_153, __VLS_155);
+                                }
+                                {
+                                    const __VLS_158 = __VLS_intrinsicElements["label"];
+                                    const __VLS_159 = __VLS_elementAsFunctionalComponent(__VLS_158);
+                                    const __VLS_160 = __VLS_159({ ...{}, class: ("report-label"), }, ...__VLS_functionalComponentArgsRest(__VLS_159));
+                                    ({}({ ...{}, class: ("report-label"), }));
+                                    (__VLS_161.slots).default;
+                                    const __VLS_161 = __VLS_pickFunctionalComponentCtx(__VLS_158, __VLS_160);
+                                }
+                                {
+                                    const __VLS_163 = __VLS_intrinsicElements["input"];
+                                    const __VLS_164 = __VLS_elementAsFunctionalComponent(__VLS_163);
+                                    const __VLS_165 = __VLS_164({ ...{}, class: ("report-input"), placeholder: ("可选，填写截图或文件链接"), }, ...__VLS_functionalComponentArgsRest(__VLS_164));
+                                    ({}({ ...{}, class: ("report-input"), placeholder: ("可选，填写截图或文件链接"), }));
+                                    (__VLS_ctx.reportAttachment);
+                                    const __VLS_166 = __VLS_pickFunctionalComponentCtx(__VLS_163, __VLS_165);
+                                }
+                                {
+                                    const __VLS_168 = __VLS_intrinsicElements["button"];
+                                    const __VLS_169 = __VLS_elementAsFunctionalComponent(__VLS_168);
+                                    const __VLS_170 = __VLS_169({ ...{ 'onClick': {}, }, class: ("action-btn primary-btn"), disabled: ((__VLS_ctx.reportState === 'submitting')), }, ...__VLS_functionalComponentArgsRest(__VLS_169));
+                                    ({}({ ...{ 'onClick': {}, }, class: ("action-btn primary-btn"), disabled: ((__VLS_ctx.reportState === 'submitting')), }));
+                                    let __VLS_173 = { 'click': __VLS_pickEvent(__VLS_172['click'], {}.onClick) };
+                                    __VLS_173 = { click: (__VLS_ctx.submitReport) };
+                                    (__VLS_ctx.reportState === 'submitting' ? '提交中...' : '提交举报');
+                                    (__VLS_171.slots).default;
+                                    const __VLS_171 = __VLS_pickFunctionalComponentCtx(__VLS_168, __VLS_170);
+                                    let __VLS_172;
+                                }
+                                if (__VLS_ctx.reportState === 'submitted') {
+                                    {
+                                        const __VLS_174 = __VLS_intrinsicElements["div"];
+                                        const __VLS_175 = __VLS_elementAsFunctionalComponent(__VLS_174);
+                                        const __VLS_176 = __VLS_175({ ...{}, class: ("report-state"), }, ...__VLS_functionalComponentArgsRest(__VLS_175));
+                                        ({}({ ...{}, class: ("report-state"), }));
+                                        (__VLS_177.slots).default;
+                                        const __VLS_177 = __VLS_pickFunctionalComponentCtx(__VLS_174, __VLS_176);
+                                    }
+                                    // @ts-ignore
+                                    [reportState, reportCategory, reportCategory, reportDescription, reportDescription, reportAttachment, reportState, reportState, submitReport, reportState, reportState,];
+                                }
+                                else if (__VLS_ctx.reportState === 'failed') {
+                                    {
+                                        const __VLS_179 = __VLS_intrinsicElements["div"];
+                                        const __VLS_180 = __VLS_elementAsFunctionalComponent(__VLS_179);
+                                        const __VLS_181 = __VLS_180({ ...{}, class: ("report-state"), }, ...__VLS_functionalComponentArgsRest(__VLS_180));
+                                        ({}({ ...{}, class: ("report-state"), }));
+                                        (__VLS_182.slots).default;
+                                        const __VLS_182 = __VLS_pickFunctionalComponentCtx(__VLS_179, __VLS_181);
+                                    }
+                                    // @ts-ignore
+                                    [reportState,];
+                                }
+                                (__VLS_116.slots).default;
+                                const __VLS_116 = __VLS_pickFunctionalComponentCtx(__VLS_113, __VLS_115);
+                            }
                         }
                         (__VLS_76.slots).default;
                         const __VLS_76 = __VLS_pickFunctionalComponentCtx(__VLS_73, __VLS_75);
@@ -342,7 +539,20 @@ function __VLS_template() {
         __VLS_styleScopedClasses["action-btn"];
         __VLS_styleScopedClasses["secondary-btn"];
         __VLS_styleScopedClasses["action-btn"];
+        __VLS_styleScopedClasses["secondary-btn"];
+        __VLS_styleScopedClasses["action-btn"];
         __VLS_styleScopedClasses["danger-btn"];
+        __VLS_styleScopedClasses["report-panel"];
+        __VLS_styleScopedClasses["report-label"];
+        __VLS_styleScopedClasses["report-input"];
+        __VLS_styleScopedClasses["report-label"];
+        __VLS_styleScopedClasses["report-textarea"];
+        __VLS_styleScopedClasses["report-label"];
+        __VLS_styleScopedClasses["report-input"];
+        __VLS_styleScopedClasses["action-btn"];
+        __VLS_styleScopedClasses["primary-btn"];
+        __VLS_styleScopedClasses["report-state"];
+        __VLS_styleScopedClasses["report-state"];
     }
     var __VLS_slots;
     return __VLS_slots;
@@ -353,11 +563,17 @@ const __VLS_internalComponent = (await import('vue')).defineComponent({
             ChannelAvatar: ChannelAvatar,
             emit: emit,
             userDetails: userDetails,
+            reportState: reportState,
+            reportCategory: reportCategory,
+            reportDescription: reportDescription,
+            reportAttachment: reportAttachment,
             isFriend: isFriend,
             handleSendMessage: handleSendMessage,
             handleDeleteFriend: handleDeleteFriend,
             handleAddBlacklist: handleAddBlacklist,
             handleAddFriend: handleAddFriend,
+            openReportForm: openReportForm,
+            submitReport: submitReport,
         };
     },
     props: {},
