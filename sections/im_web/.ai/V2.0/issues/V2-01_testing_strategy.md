@@ -237,6 +237,9 @@ dist/assets/index-BQvvyWGb.js  1,413.97 kB │ gzip: 508.44 kB
 | [V2-14](V2-14_file_message_card_visual_misalignment.md) | 2026-05-24 手册可视化审计 | 文件消息卡片视觉错位与宽度不稳定 | P1 |
 | [V2-15](V2-15_global_search_remote_400_in_visual_audit.md) | 2026-05-24 手册可视化审计 | 全局搜索远程接口 400 污染可视化审计 | P1 |
 | [V2-16](V2-16_file_send_filename_text_echo.md) | 2026-05-25 用户反馈 | 发送文件后文件名被渲染成独立文本消息 | P0 |
+| [V2-17](V2-17_chat_ui_responsive_file_send_layout_regression.md) | 2026-05-25 用户反馈 | 发送文件后聊天 UI 在不同窗口比例下布局变形 | P1 |
+| [V2-18](V2-18_sent_message_duplicate_rendering.md) | 2026-05-25 用户反馈 | 发送任意消息后发送方 UI 显示两条内容 | P0 |
+| [V2-19](V2-19_chat_group_contact_notification_mention_regressions.md) | 2026-05-25 用户反馈 | 群二维码、Bot、好友资料、未读红点与 @ 功能回归合集 | P0 |
 
 ### 2026-05-24 V2-11 至 V2-13 修复验证
 

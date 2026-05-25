@@ -518,7 +518,7 @@ export const useConversationStore = defineStore('conversation', () => {
       conversations.value.push({
         channel_id: channelId,
         channel_type: channelType,
-        unread: (isOwnMessage || !isDigest) ? 0 : 1,
+        unread: (message.isUnreadCleared || isOwnMessage || !isDigest) ? 0 : 1,
         last_msg_seq: message.messageSeq || 0,
         last_msg_time: message.timestamp || Math.floor(Date.now() / 1000),
         last_message: isDigest ? normalizedMsg : undefined,
@@ -528,7 +528,7 @@ export const useConversationStore = defineStore('conversation', () => {
         name: info.name,
         avatar: info.avatar
       });
-      unreadMap.value[key] = (isOwnMessage || !isDigest) ? 0 : 1;
+      unreadMap.value[key] = (message.isUnreadCleared || isOwnMessage || !isDigest) ? 0 : 1;
     }
     compactConversations();
   }
@@ -541,6 +541,7 @@ export const useConversationStore = defineStore('conversation', () => {
     if (manuallyDeletedConversationKeys.value[key]) return undefined;
 
     const conv = findConversation(channelId, channelType);
+    const isOwnMessage = message?.isOwnMessage === true || message?.fromUID === userStore.currentUser?.uid;
     const isDigest = message ? isConversationDigestSource(message) : false;
     const normalizedMsg = message ? normalizeLastMessage({ last_message: message }) : undefined;
 
@@ -551,6 +552,13 @@ export const useConversationStore = defineStore('conversation', () => {
         if (isDigest || !conv.last_message) {
           conv.last_message = normalizedMsg;
         }
+        if (message.isUnreadCleared && isDigest) {
+          conv.unread = 0;
+          unreadMap.value[key] = 0;
+        } else if (!isOwnMessage && isDigest) {
+          conv.unread = Number(conv.unread || 0) + 1;
+          unreadMap.value[key] = conv.unread;
+        }
       }
       return conv;
     }
@@ -558,7 +566,7 @@ export const useConversationStore = defineStore('conversation', () => {
     const next: Conversation = {
       channel_id: channelId,
       channel_type: channelType,
-      unread: 0,
+      unread: (message?.isUnreadCleared || isOwnMessage || !isDigest) ? 0 : 1,
       last_msg_seq: message?.messageSeq || 0,
       last_msg_time: message?.timestamp || Math.floor(Date.now() / 1000),
       last_message: isDigest ? normalizedMsg : undefined,
@@ -569,7 +577,7 @@ export const useConversationStore = defineStore('conversation', () => {
       avatar: ''
     };
     conversations.value.push(next);
-    unreadMap.value[key] = 0;
+    unreadMap.value[key] = next.unread;
     compactConversations();
     const info = await channelStore.getChannelInfo(channelId, channelType);
     if (version !== resetVersion.value) return undefined;

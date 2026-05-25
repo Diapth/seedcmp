@@ -125,6 +125,50 @@ describe('message store daily messaging normalization', () => {
     })
   })
 
+  it('increments unread when an existing non-active conversation receives a realtime message', async () => {
+    const { useMessageStore } = await import('../../../packages/datasource-vue/src/stores/messageStore.ts')
+    const { useConversationStore } = await import('../../../packages/datasource-vue/src/stores/conversationStore.ts')
+    const messageStore = useMessageStore()
+    const conversationStore = useConversationStore()
+
+    conversationStore.conversations.push({
+      channel_id: 'friend-a',
+      channel_type: 1,
+      unread: 0,
+      last_msg_seq: 1,
+      last_msg_time: 100,
+      last_message: {
+        messageSeq: 1,
+        timestamp: 100,
+        fromUID: 'friend-a',
+        payload: { type: 1, text: 'existing' },
+        content: { type: 1, text: 'existing' }
+      },
+      top: 0,
+      mute: 0,
+      name: 'Friend A',
+      avatar: ''
+    })
+    conversationStore.unreadMap['friend-a-1'] = 0
+
+    messageStore.addRealtimeMessage('friend-a', 1, {
+      messageID: 'm-new',
+      messageSeq: 2,
+      clientMsgNo: 'client-new',
+      fromUID: 'friend-a',
+      timestamp: 101,
+      status: 1,
+      reactions: [],
+      remoteExtra: undefined,
+      content: { contentType: 1, contentObj: { text: 'new unread' } }
+    } as any, { isUnreadCleared: false })
+
+    await vi.waitFor(() => {
+      expect(conversationStore.conversations.find(item => item.channel_id === 'friend-a')?.unread).toBe(1)
+      expect(conversationStore.unreadMap['friend-a-1']).toBe(1)
+    })
+  })
+
   it('does not let unsupported content become the conversation digest', async () => {
     const { useMessageStore } = await import('../../../packages/datasource-vue/src/stores/messageStore.ts')
     const { useConversationStore } = await import('../../../packages/datasource-vue/src/stores/conversationStore.ts')

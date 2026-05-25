@@ -241,10 +241,14 @@ export const useMessageStore = defineStore('message', () => {
       item.last_message = summary;
       if (lastMessage.isUnreadCleared) {
         item.unread = 0;
+      } else if (lastMessage.fromUID !== userStore.currentUser?.uid) {
+        item.unread = Number(item.unread || 0) + 1;
       }
     }
     if (lastMessage.isUnreadCleared) {
       conversationStore.unreadMap[key] = 0;
+    } else if (lastMessage.fromUID !== userStore.currentUser?.uid) {
+      conversationStore.unreadMap[key] = Number(matching[0]?.unread || 0);
     }
 
     return true;
@@ -267,7 +271,7 @@ export const useMessageStore = defineStore('message', () => {
       fromUID: lastMessage.fromUID,
       payload: lastMessage.content,
       isOwnMessage: lastMessage.fromUID === userStore.currentUser?.uid,
-      isUnreadCleared: true
+      isUnreadCleared: lastMessage.isUnreadCleared === true
     });
   }
 
