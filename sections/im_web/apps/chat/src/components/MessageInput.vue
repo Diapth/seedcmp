@@ -399,13 +399,15 @@ onBeforeUnmount(() => {
 .message-input-container {
   display: flex;
   flex-direction: column;
-  min-height: 132px;
+  flex-shrink: 0;
   min-width: 0;
   background-color: var(--bg-primary);
   border-top: var(--border-hairline);
   padding: 12px 16px;
   position: relative;
-  flex-shrink: 0;
+  /* 固定 composer 高度范围，防止 robot-panel 或 reply-bar 撑破布局 */
+  max-height: 320px;
+  overflow: hidden;
 }
 
 /* Mention Popup */
@@ -561,7 +563,8 @@ onBeforeUnmount(() => {
 }
 
 .input-area-wrapper {
-  flex: 1;
+  flex: 0 0 auto;
+  overflow: hidden;
 }
 
 .input-textarea {

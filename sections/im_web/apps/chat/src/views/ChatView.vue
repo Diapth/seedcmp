@@ -124,6 +124,8 @@ function handleMembersClick() {
   display: flex;
   flex-direction: column;
   height: 100%;
+  min-height: 0;
+  overflow: hidden;
   background-color: var(--bg-primary);
 }
 

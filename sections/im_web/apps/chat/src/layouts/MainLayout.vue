@@ -329,7 +329,10 @@ function handleKickoutRelogin() {
 
 .chat-viewport {
   flex: 1;
+  min-width: 0;
+  min-height: 0;
   height: 100%;
+  overflow: hidden;
   background-color: var(--bg-primary);
 }
 
@@ -431,6 +434,8 @@ function handleKickoutRelogin() {
 
   .chat-viewport {
     min-width: 0;
+    min-height: 0;
+    overflow: hidden;
   }
 }
 </style>
