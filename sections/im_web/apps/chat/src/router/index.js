@@ -1,7 +1,7 @@
 import { createRouter, createWebHistory } from 'vue-router';
 import { StorageService } from '@tsdaodao/base-vue';
 import { LoginPage } from '@tsdaodao/login-vue';
-import { FriendRequestsPage, AddFriendPage, BlacklistPage } from '@tsdaodao/contacts-vue';
+import { FriendRequestsPage, AddFriendPage, BlacklistPage, RobotConfigPage } from '@tsdaodao/contacts-vue';
 const routes = [
     {
         path: '/',
@@ -48,6 +48,11 @@ const routes = [
                 path: 'blacklist',
                 name: 'Blacklist',
                 component: BlacklistPage
+            },
+            {
+                path: 'robots',
+                name: 'RobotConfig',
+                component: RobotConfigPage
             },
             {
                 path: 'create-group',

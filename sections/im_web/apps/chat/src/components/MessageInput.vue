@@ -20,9 +20,10 @@ const imageInputRef = ref<HTMLInputElement | null>(null);
 const fileInputRef = ref<HTMLInputElement | null>(null);
 const uploadHint = ref('');
 const robotMenuState = ref<'idle' | 'loading' | 'ready' | 'unavailable' | 'failed'>('idle');
-const robotMenus = ref<Array<{ id: string; title: string; command: string }>>([]);
+const robotMenus = ref<Array<{ id: string; title: string; command: string; robotId: string }>>([]);
 const robotAck = ref('');
 let typingTimeout: any = null;
+const SYSTEM_ROBOT_ID = 'u_10000';
 
 // Mention state
 const showMentionPopup = ref(false);
@@ -162,11 +163,18 @@ async function openRobotMenu() {
   robotAck.value = '';
   try {
     const res: any = await commonApi.getRobotMenus(props.channelId, props.channelType);
-    const list = Array.isArray(res) ? res : (res?.menus || res?.items || []);
+    let robotId = props.channelId;
+    let list = Array.isArray(res) ? (res[0]?.menus || res) : (res?.menus || res?.items || []);
+    if (!list.length && props.channelId !== SYSTEM_ROBOT_ID) {
+      const fallbackRes: any = await commonApi.getRobotMenus(SYSTEM_ROBOT_ID, 1);
+      robotId = SYSTEM_ROBOT_ID;
+      list = Array.isArray(fallbackRes) ? (fallbackRes[0]?.menus || fallbackRes) : (fallbackRes?.menus || fallbackRes?.items || []);
+    }
     robotMenus.value = list.map((item: any, index: number) => ({
-      id: String(item.id || item.command || index),
-      title: String(item.title || item.name || item.command || '机器人指令'),
-      command: String(item.command || item.payload || item.name || '')
+      id: String(item.id || item.cmd || item.command || index),
+      title: String(item.title || item.remark || item.name || item.cmd || item.command || '机器人指令'),
+      command: String(item.cmd || item.command || item.payload || item.name || ''),
+      robotId: String(item.robot_id || item.robotId || robotId)
     })).filter((item: any) => item.command);
     robotMenuState.value = robotMenus.value.length ? 'ready' : 'unavailable';
   } catch {
@@ -177,11 +185,14 @@ async function openRobotMenu() {
 async function sendRobotCommand(command: string) {
   robotMenuState.value = 'loading';
   robotAck.value = '';
+  const menu = robotMenus.value.find(item => item.command === command);
+  const robotId = menu?.robotId || SYSTEM_ROBOT_ID;
   try {
-    await commonApi.sendRobotCommand({
-      channel_id: props.channelId,
-      channel_type: props.channelType,
-      command
+    await messageStore.sendMessage(props.channelId, props.channelType, command, {
+      robot: {
+        robotId,
+        command
+      }
     });
     robotAck.value = 'robot ack';
     robotMenuState.value = 'idle';

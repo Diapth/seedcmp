@@ -1,7 +1,7 @@
 import { createRouter, createWebHistory, RouteRecordRaw } from 'vue-router';
 import { StorageService } from '@tsdaodao/base-vue';
 import { LoginPage } from '@tsdaodao/login-vue';
-import { FriendRequestsPage, AddFriendPage, BlacklistPage } from '@tsdaodao/contacts-vue';
+import { FriendRequestsPage, AddFriendPage, BlacklistPage, RobotConfigPage } from '@tsdaodao/contacts-vue';
 
 const routes: Array<RouteRecordRaw> = [
   {
@@ -49,6 +49,11 @@ const routes: Array<RouteRecordRaw> = [
         path: 'blacklist',
         name: 'Blacklist',
         component: BlacklistPage
+      },
+      {
+        path: 'robots',
+        name: 'RobotConfig',
+        component: RobotConfigPage
       },
       {
         path: 'create-group',

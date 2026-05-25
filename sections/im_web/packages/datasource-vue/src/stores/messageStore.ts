@@ -1,6 +1,6 @@
 import { defineStore } from 'pinia';
 import { ref } from 'vue';
-import WKSDK, { Message as WKMessage, MessageImage } from 'wukongimjssdk';
+import WKSDK, { Message as WKMessage, MessageContent, MessageImage } from 'wukongimjssdk';
 import { commonApi, resolveApiAssetUrl, syncApi } from '../api';
 import { MessageFile } from '../contentTypes';
 import { useConversationStore } from './conversationStore';
@@ -40,6 +40,43 @@ const MEDIA_UPLOAD_TYPE = 'chat';
 interface SendMessageOptions {
   mention?: { all?: boolean; uids?: string[] };
   reply?: any;
+  robot?: {
+    robotId: string;
+    command: string;
+  };
+}
+
+export class RobotCommandContent extends MessageContent {
+  text: string;
+  robotId: string;
+  command: string;
+
+  constructor(text: string, robotId: string, command: string) {
+    super();
+    this.text = text;
+    this.robotId = robotId;
+    this.command = command;
+  }
+
+  get contentType(): number {
+    return 1;
+  }
+
+  get conversationDigest(): string {
+    return this.text;
+  }
+
+  encodeJSON() {
+    return {
+      content: this.text,
+      robot_id: this.robotId,
+      entities: [{
+        type: 'bot_command',
+        offset: 0,
+        length: [...this.command].length
+      }]
+    };
+  }
 }
 
 interface Reminder {
@@ -539,6 +576,14 @@ export const useMessageStore = defineStore('message', () => {
 
   function buildTextContent(text: string, options?: SendMessageOptions) {
     const content = normalizeMessageContent({ type: 1, text, content: text });
+    if (options?.robot) {
+      content.robot_id = options.robot.robotId;
+      content.entities = [{
+        type: 'bot_command',
+        offset: 0,
+        length: [...options.robot.command].length
+      }];
+    }
     if (options?.mention) {
       content.mention = options.mention;
     }
@@ -577,7 +622,9 @@ export const useMessageStore = defineStore('message', () => {
     sendingFromThisTab.add(pending.clientMsgNo);
     try {
       const channel = WKSDK.shared().newChannel(channelId, channelType);
-      const textMsg = WKSDK.shared().newMessageText(text);
+      const textMsg = options?.robot
+        ? new RobotCommandContent(text, options.robot.robotId, options.robot.command)
+        : WKSDK.shared().newMessageText(text);
       if (options?.mention) {
         textMsg.mention = options.mention;
       }
@@ -630,7 +677,7 @@ export const useMessageStore = defineStore('message', () => {
 
   async function uploadChatFile(channelId: string, channelType: number, file: File) {
     const uploadPath = buildMediaUploadPath(channelId, channelType, file);
-    const uploadUrl = extractUploadUrl(await commonApi.getUploadUrl(uploadPath, MEDIA_UPLOAD_TYPE));
+    const uploadUrl = resolveApiAssetUrl(extractUploadUrl(await commonApi.getUploadUrl(uploadPath, MEDIA_UPLOAD_TYPE)));
     if (!uploadUrl) {
       throw new Error('Upload URL is empty.');
     }

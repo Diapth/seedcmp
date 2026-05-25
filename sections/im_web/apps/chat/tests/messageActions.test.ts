@@ -70,7 +70,13 @@ vi.mock('wukongimjssdk', () => ({
       chatManager: { send }
     })
   },
-  MessageContent: class {},
+  MessageContent: class {
+    encode() {
+      const contentObj = this.encodeJSON()
+      contentObj.type = this.contentType
+      return new TextEncoder().encode(JSON.stringify(contentObj))
+    }
+  },
   MediaMessageContent: class {},
   MessageImage: class {}
 }))
@@ -147,6 +153,48 @@ describe('message action state', () => {
     expect(messageStore.getChannelMessages('friend-a', 1).find(item => item.clientMsgNo === 'c2')?.isRevoked).toBe(true)
     await vi.waitFor(() => {
       expect(conversationStore.conversations.find(item => item.channel_id === 'friend-a')?.last_message?.content?.text).toBe('first text')
+    })
+  })
+
+  it('sends system robot menu commands as text payloads with bot command entities', async () => {
+    const { useMessageStore } = await import('../../../packages/datasource-vue/src/stores/messageStore.ts')
+    const store = useMessageStore()
+
+    await store.sendMessage('u_10000', 1, '/基本信息', {
+      robot: {
+        robotId: 'u_10000',
+        command: '/基本信息'
+      }
+    } as any)
+
+    const sentContent = send.mock.calls[0][0]
+    expect(sentContent.encodeJSON()).toEqual({
+      content: '/基本信息',
+      robot_id: 'u_10000',
+      entities: [{
+        type: 'bot_command',
+        offset: 0,
+        length: 5
+      }]
+    })
+    expect(JSON.parse(new TextDecoder().decode(sentContent.encode()))).toEqual({
+      content: '/基本信息',
+      robot_id: 'u_10000',
+      entities: [{
+        type: 'bot_command',
+        offset: 0,
+        length: 5
+      }],
+      type: 1
+    })
+    expect(store.getChannelMessages('u_10000', 1)[0].content).toMatchObject({
+      text: '/基本信息',
+      robot_id: 'u_10000',
+      entities: [{
+        type: 'bot_command',
+        offset: 0,
+        length: 5
+      }]
     })
   })
 

@@ -10,6 +10,13 @@ function normalizeMockMediaUrl(pathOrUrl: string, options: { baseUrl?: string; r
   const base = options.referenceUrl && /^https?:\/\//i.test(options.referenceUrl)
     ? options.referenceUrl.replace(/file\/upload.*$/, '')
     : (options.baseUrl || 'http://100.79.157.76:8090/v1/')
+  if (/^https?:\/\//i.test(pathOrUrl)) {
+    const url = new URL(pathOrUrl)
+    if (url.hostname === '127.0.0.1' || url.hostname === 'localhost') {
+      url.hostname = '100.79.157.76'
+    }
+    return url.toString()
+  }
   return /^https?:\/\//i.test(pathOrUrl)
     ? pathOrUrl
     : new URL(pathOrUrl.replace(/^\/+/, ''), base.endsWith('/') ? base : `${base}/`).toString()
@@ -172,6 +179,38 @@ describe('message media sending', () => {
       name: 'report.pdf',
       size: file.size
     })
+  })
+
+  it('rewrites loopback upload URLs before posting selected files', async () => {
+    const { useMessageStore } = await import('../../../packages/datasource-vue/src/stores/messageStore.ts')
+    const { useUserStore } = await import('../../../packages/datasource-vue/src/stores/userStore.ts')
+    const userStore = useUserStore()
+    userStore.currentUser = { uid: 'u1', name: 'Me' }
+
+    const file = new File(['document'], 'current.md', { type: 'text/markdown' })
+    getUploadUrl.mockResolvedValue({
+      url: 'http://127.0.0.1:8090/v1/file/upload?type=chat&path=/1/target/current.md'
+    })
+    uploadFile.mockResolvedValue({ path: 'file/preview/chat/1/target/current.md' })
+    send.mockResolvedValue({
+      messageID: 'm-file',
+      messageSeq: 3,
+      clientMsgNo: 'c-file',
+      fromUID: 'u1',
+      timestamp: 200,
+      status: 1,
+      reactions: [],
+      remoteExtra: undefined,
+      content: undefined
+    })
+
+    const store = useMessageStore()
+    await store.sendMediaMessage('target', 1, file)
+
+    expect(uploadFile).toHaveBeenCalledWith(
+      'http://100.79.157.76:8090/v1/file/upload?type=chat&path=/1/target/current.md',
+      expect.any(FormData)
+    )
   })
 
   it('keeps the local file card when the SDK echoes a filename text payload', async () => {

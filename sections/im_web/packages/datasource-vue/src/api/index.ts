@@ -295,8 +295,13 @@ export const syncApi = {
     return apiClient.get(`messages/${messageId}/receipt`, { params });
   },
   // 清除未读计数 (typo 拼写 coversation 保持一致，与后端路由匹配)
-  clearUnread(channelId: string, channelType: number) {
-    return apiClient.put('coversation/clearUnread', { channel_id: channelId, channel_type: channelType });
+  clearUnread(channelId: string, channelType: number, messageSeq = 0) {
+    return apiClient.put('coversation/clearUnread', {
+      channel_id: channelId,
+      channel_type: channelType,
+      unread: 0,
+      message_seq: messageSeq
+    });
   },
   // 消息回应/表态
   addReaction(data: { channel_id: string; channel_type: number; message_id: string; emoji: string }) {
@@ -358,10 +363,10 @@ export const commonApi = {
   },
   // 机器人菜单或快捷指令
   getRobotMenus(channelId: string, channelType: number) {
-    return apiClient.get(`robots/menu?channel_id=${channelId}&channel_type=${channelType}`);
-  },
-  sendRobotCommand(data: any) {
-    return apiClient.post('robots/command', data);
+    return apiClient.post('robot/sync', [{
+      robot_id: channelId,
+      version: 0
+    }]);
   }
 };
 

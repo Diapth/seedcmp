@@ -476,7 +476,7 @@ export const useConversationStore = defineStore('conversation', () => {
       clearedUnreadSeqs.value[key] = Math.max(Number(clearedUnreadSeqs.value[key] || 0), Number(conv.last_msg_seq || 0));
     }
     try {
-      await syncApi.clearUnread(channelId, channelType);
+      await syncApi.clearUnread(channelId, channelType, Number(conv?.last_msg_seq || 0));
     } catch (e) {
       warnRemoteCommandFailure('clear unread', e);
     }
