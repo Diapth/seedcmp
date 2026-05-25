@@ -88,7 +88,6 @@ function getUnreadCount(conv: any): number {
 }
 
 function handleSelect(channelId: string, channelType: number) {
-  void conversationStore.clearUnread(channelId, channelType);
   router.push(`/chat/conversation/${channelId}/${channelType}`);
 }
 

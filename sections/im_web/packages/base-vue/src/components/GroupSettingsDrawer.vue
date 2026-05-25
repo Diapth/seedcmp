@@ -8,6 +8,7 @@ import { friendApi, groupApi } from '@tsdaodao/datasource-vue';
 import ChannelAvatar from './ChannelAvatar.vue';
 import AppDialog from './AppDialog.vue';
 import { Message } from '@arco-design/web-vue';
+import QRCode from 'qrcode';
 
 const props = defineProps<{
   groupNo: string;
@@ -36,9 +37,18 @@ const inviteSearching = ref(false);
 const showQrModal = ref(false);
 const qrState = ref<'idle' | 'loading' | 'ready' | 'expired' | 'approval' | 'unavailable'>('idle');
 const qrCodeUrl = ref('');
+const qrImageUrl = ref('');
 const pendingDestructiveAction = ref<null | { title: string; message: string; run: () => Promise<void> }>(null);
 const destructiveLoading = ref(false);
 const inviteMode = computed(() => Number(groupInfo.value?.invite || 0) === 1);
+const qrPayload = computed(() => qrCodeUrl.value.trim());
+const qrModules = computed(() => qrPayload.value ? qrPayload.value.length : 0);
+const qrImageSource = computed(() => {
+  if (/^(data:image\/|https?:\/\/.*\.(png|jpe?g|webp|gif|svg)(\?|#|$))/i.test(qrPayload.value)) {
+    return qrPayload.value;
+  }
+  return qrImageUrl.value;
+});
 
 const currentMember = computed(() => {
   const uid = String(userStore.currentUser?.uid || '');
@@ -177,12 +187,26 @@ async function loadQRCode() {
   showQrModal.value = true;
   qrState.value = inviteMode.value ? 'approval' : 'loading';
   qrCodeUrl.value = '';
+  qrImageUrl.value = '';
   if (inviteMode.value) return;
 
   try {
     const res: any = await groupStore.getGroupQRCode(props.groupNo);
     qrCodeUrl.value = res?.qrcode || res?.url || '';
-    qrState.value = qrCodeUrl.value ? 'ready' : 'unavailable';
+    if (qrCodeUrl.value) {
+      qrImageUrl.value = await QRCode.toDataURL(qrPayload.value, {
+        errorCorrectionLevel: 'M',
+        margin: 1,
+        width: 192,
+        color: {
+          dark: '#111827',
+          light: '#ffffff'
+        }
+      });
+      qrState.value = 'ready';
+    } else {
+      qrState.value = 'unavailable';
+    }
   } catch {
     qrState.value = 'unavailable';
   }
@@ -466,7 +490,11 @@ async function confirmDestructiveAction() {
       <div class="invite-modal" @click.stop>
         <div class="invite-title">群二维码</div>
         <div v-if="qrState === 'loading'" class="invite-desc">正在加载群二维码</div>
-        <div v-else-if="qrState === 'ready'" class="qr-box">{{ qrCodeUrl }}</div>
+        <div v-else-if="qrState === 'ready'" class="qr-box">
+          <img v-if="qrImageSource" class="qr-image" :src="qrImageSource" alt="群二维码" />
+          <div class="qr-grid" aria-hidden="true" :data-module-count="qrModules"></div>
+          <div class="qr-link">{{ qrPayload }}</div>
+        </div>
         <div v-else-if="qrState === 'approval'" class="invite-desc">邀请确认已开启，扫码入群待审批</div>
         <div v-else-if="qrState === 'expired'" class="invite-desc">群二维码已过期</div>
         <div v-else class="invite-desc">群二维码暂不可用</div>
@@ -856,14 +884,39 @@ async function confirmDestructiveAction() {
 }
 
 .qr-box {
-  min-height: 88px;
-  padding: 12px;
+  align-items: center;
+  min-height: 224px;
+  padding: 16px;
   border: var(--border-hairline);
   border-radius: var(--radius-sm);
   background: var(--bg-secondary);
   color: var(--text-primary);
   font-size: 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.qr-image {
+  width: 192px;
+  height: 192px;
+  border: 8px solid #ffffff;
+  border-radius: var(--radius-sm);
+  background: #ffffff;
+  image-rendering: pixelated;
+  box-shadow: 0 1px 4px rgba(15, 23, 42, 0.12);
+}
+
+.qr-grid {
+  display: none;
+}
+
+.qr-link {
+  max-width: 100%;
+  color: var(--text-secondary);
+  font-size: 11px;
   word-break: break-all;
+  text-align: center;
 }
 
 .invite-search-row {

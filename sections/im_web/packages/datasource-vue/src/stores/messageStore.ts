@@ -96,6 +96,9 @@ export const useMessageStore = defineStore('message', () => {
   const pendingQueue = ref<Array<{ channelId: string; channelType: number; clientMsgNo: string }>>([]);
   const resetVersion = ref(0);
   const summaryVersions = ref<Record<string, number>>({});
+  // Tracks clientMsgNos currently being sent from THIS browser tab.
+  // Used by the global messageListener to skip own-message duplicates.
+  const sendingFromThisTab = new Set<string>();
 
   const conversationStore = useConversationStore();
   const userStore = useUserStore();
@@ -188,6 +191,7 @@ export const useMessageStore = defineStore('message', () => {
 
   function removePendingMessage(clientMsgNo: string) {
     pendingQueue.value = pendingQueue.value.filter(item => item.clientMsgNo !== clientMsgNo);
+    sendingFromThisTab.delete(clientMsgNo);
   }
 
   function markPendingFailed(clientMsgNo: string) {
@@ -310,9 +314,32 @@ export const useMessageStore = defineStore('message', () => {
         const currentList = messages.value[key] || [];
         const mergedMap = new Map<string, Message>();
         currentList.forEach(m => mergedMap.set(m.clientMsgNo, m));
-        synced.forEach(m => mergedMap.set(m.clientMsgNo, m));
 
-        messages.value[key] = Array.from(mergedMap.values()).sort((a, b) => a.messageSeq - b.messageSeq);
+        // Build a messageID -> local-clientMsgNo index for deduplication.
+        // When the server returns a message whose messageID already exists locally
+        // (but with a different clientMsgNo, e.g. our web-xxx vs SDK's wk-xxx),
+        // update the local entry in-place instead of adding a duplicate.
+        const localByMsgId = new Map<string, string>(); // messageID -> clientMsgNo
+        currentList.forEach(m => { if (m.messageID) localByMsgId.set(m.messageID, m.clientMsgNo); });
+
+        synced.forEach(m => {
+          if (m.messageID && localByMsgId.has(m.messageID)) {
+            const localKey = localByMsgId.get(m.messageID)!;
+            const existing = mergedMap.get(localKey);
+            if (existing) {
+              mergedMap.set(localKey, { ...existing, ...m, clientMsgNo: localKey });
+              return;
+            }
+          }
+          mergedMap.set(m.clientMsgNo, m);
+        });
+
+        messages.value[key] = Array.from(mergedMap.values()).sort((a, b) => {
+          const seqA = a.messageSeq > 0 ? a.messageSeq : Infinity;
+          const seqB = b.messageSeq > 0 ? b.messageSeq : Infinity;
+          if (seqA !== seqB) return seqA - seqB;
+          return a.timestamp - b.timestamp;
+        });
         await ensureConversationFromMessages(channelId, channelType);
       }
     } catch (e) {
@@ -326,14 +353,27 @@ export const useMessageStore = defineStore('message', () => {
       messages.value[key] = [];
     }
 
-    const idx = messages.value[key].findIndex(m => m.clientMsgNo === msg.clientMsgNo);
-    if (idx !== -1) {
-      messages.value[key][idx] = { ...messages.value[key][idx], ...msg };
-    } else {
-      messages.value[key].push(msg);
+    const list = messages.value[key];
+
+    // Deduplicate: match by clientMsgNo first, then by messageID (for realtime -> sync merge)
+    let idx = list.findIndex(m => m.clientMsgNo === msg.clientMsgNo);
+    if (idx === -1 && msg.messageID) {
+      idx = list.findIndex(m => m.messageID && m.messageID === msg.messageID);
     }
 
-    messages.value[key].sort((a, b) => a.messageSeq - b.messageSeq || a.timestamp - b.timestamp);
+    if (idx !== -1) {
+      list[idx] = { ...list[idx], ...msg };
+    } else {
+      list.push(msg);
+    }
+
+    // Sort: confirmed messages (messageSeq > 0) by seq, pending (messageSeq === 0) by timestamp at end
+    list.sort((a, b) => {
+      const seqA = a.messageSeq > 0 ? a.messageSeq : Infinity;
+      const seqB = b.messageSeq > 0 ? b.messageSeq : Infinity;
+      if (seqA !== seqB) return seqA - seqB;
+      return a.timestamp - b.timestamp;
+    });
 
     if (isConversationDigestMessage(msg)) {
       ensureConversationFromMessages(channelId, channelType);
@@ -530,6 +570,7 @@ export const useMessageStore = defineStore('message', () => {
     const pending = buildPendingTextMessage(text, options, retryClientMsgNo);
     addMessage(channelId, channelType, pending);
     queuePendingMessage(channelId, channelType, pending.clientMsgNo);
+    sendingFromThisTab.add(pending.clientMsgNo);
     try {
       const channel = WKSDK.shared().newChannel(channelId, channelType);
       const textMsg = WKSDK.shared().newMessageText(text);
@@ -543,14 +584,20 @@ export const useMessageStore = defineStore('message', () => {
       const res = await WKSDK.shared().chatManager.send(textMsg, channel);
       if (version !== resetVersion.value) return;
       if (res) {
-        res.clientMsgNo = pending.clientMsgNo;
-        if (!res.content) {
-          res.content = textMsg;
-        }
-        addRealtimeMessage(channelId, channelType, res);
+        // Update the pending message in-place using our own clientMsgNo.
+        // Do NOT call addRealtimeMessage(res) — the SDK's res.clientMsgNo is
+        // SDK-internal and differs from ours; feeding it into addMessage would
+        // create a second entry that conflicts with what syncMessages pulls from
+        // the server (which also stores the SDK clientMsgNo).
+        updateMessageStatus(pending.clientMsgNo, {
+          messageID: String(res.messageID || ''),
+          messageSeq: res.messageSeq || 0,
+          status: 'success'
+        });
         removePendingMessage(pending.clientMsgNo);
       }
     } catch (err) {
+      sendingFromThisTab.delete(pending.clientMsgNo);
       addMessage(channelId, channelType, {
         ...pending,
         status: 'fail',
@@ -602,7 +649,8 @@ export const useMessageStore = defineStore('message', () => {
     const version = resetVersion.value;
     const clientMsgNo = retryClientMsgNo || createClientMsgNo();
     queuePendingMessage(channelId, channelType, clientMsgNo);
-    addMessage(channelId, channelType, {
+    sendingFromThisTab.add(clientMsgNo);
+    const pendingMedia: Message = {
       messageID: '',
       messageSeq: 0,
       clientMsgNo,
@@ -619,7 +667,8 @@ export const useMessageStore = defineStore('message', () => {
       status: 'sending',
       retryable: false,
       retryPayload: { kind: 'media', file }
-    });
+    };
+    addMessage(channelId, channelType, pendingMedia);
 
     try {
       const url = await uploadChatFile(channelId, channelType, file);
@@ -635,12 +684,25 @@ export const useMessageStore = defineStore('message', () => {
       if (version !== resetVersion.value) return;
       if (res) {
         sentMessage = res;
-        sentMessage.clientMsgNo = clientMsgNo;
-        sentMessage.content = content;
-        addRealtimeMessage(channelId, channelType, sentMessage);
+        // Update the pending message in-place: preserve our clientMsgNo so that
+        // syncMessages (which sees the SDK's clientMsgNo from the server) doesn't
+        // create a second entry for the same message.
+        updateMessageStatus(clientMsgNo, {
+          messageID: String(res.messageID || ''),
+          messageSeq: res.messageSeq || 0,
+          status: 'success',
+          // Patch the content url so the file/image card shows the real url
+          content: {
+            type: file.type.startsWith('image/') ? 2 : 8,
+            name: file.name,
+            size: file.size,
+            url
+          }
+        });
         removePendingMessage(clientMsgNo);
       }
     } catch (err) {
+      sendingFromThisTab.delete(clientMsgNo);
       addMessage(channelId, channelType, {
         messageID: sentMessage?.messageID || '',
         messageSeq: sentMessage?.messageSeq || 0,
@@ -894,6 +956,11 @@ export const useMessageStore = defineStore('message', () => {
     }
     typingState.value = {};
     replyTarget.value = null;
+    sendingFromThisTab.clear();
+  }
+
+  function isFromThisTabSend(clientMsgNo: string): boolean {
+    return sendingFromThisTab.has(clientMsgNo);
   }
 
   return {
@@ -929,6 +996,7 @@ export const useMessageStore = defineStore('message', () => {
     addRealtimeMessage,
     updateMessageStatus,
     setReplyTarget,
+    isFromThisTabSend,
     reset
   };
 });

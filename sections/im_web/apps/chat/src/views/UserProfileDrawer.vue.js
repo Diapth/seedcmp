@@ -1,5 +1,5 @@
 /* __placeholder__ */
-import { computed, ref, onMounted } from 'vue';
+import { computed, ref, watch } from 'vue';
 import { useRouter } from 'vue-router';
 import { useUserStore } from '@tsdaodao/datasource-vue';
 import { useContactStore } from '@tsdaodao/contacts-vue';
@@ -24,13 +24,19 @@ const reportTarget = computed(() => ({
     target_id: props.uid
 }));
 const isFriend = computed(() => {
-    return contactStore.contacts.some(c => c.uid === props.uid);
+    return contactStore.contacts.some(c => String(c.uid) === String(props.uid));
 });
-onMounted(() => {
-    if (props.uid && !userStore.userCache[props.uid]) {
-        userStore.getUsersByIds([props.uid]);
+watch(() => [props.visible, props.uid], ([visible, uid]) => {
+    if (!visible || !uid)
+        return;
+    if (!userStore.userCache[uid]) {
+        void userStore.getUsersByIds([uid]);
     }
-});
+    void contactStore.syncContacts();
+}, { immediate: true });
+function removeLocalContact(uid) {
+    contactStore.contacts = contactStore.contacts.filter(c => String(c.uid) !== String(uid));
+}
 async function handleSendMessage() {
     emit('close');
     router.push(`/chat/conversation/${props.uid}/1`);
@@ -40,13 +46,13 @@ async function handleDeleteFriend() {
         await friendApi.deleteFriend(props.uid);
         Message.success('已删除好友');
         // 乐观更新，立刻移除
-        contactStore.contacts = contactStore.contacts.filter(c => c.uid !== props.uid);
+        removeLocalContact(props.uid);
         contactStore.syncContacts();
         emit('close');
     }
     catch (err) {
         // 后端如果报400或者路由问题，也强制乐观更新以避免界面卡死
-        contactStore.contacts = contactStore.contacts.filter(c => c.uid !== props.uid);
+        removeLocalContact(props.uid);
         Message.success('已删除好友');
         emit('close');
     }

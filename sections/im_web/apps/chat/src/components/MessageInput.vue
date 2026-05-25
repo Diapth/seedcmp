@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, computed, watch, onBeforeUnmount } from 'vue';
+import { ref, computed, watch, onBeforeUnmount, nextTick } from 'vue';
 import { Message as ArcoMessage } from '@arco-design/web-vue';
 import { commonApi, useMessageStore, useConversationStore, useGroupStore, useUserStore } from '@tsdaodao/datasource-vue';
 import WKSDK, { CMDContent } from 'wukongimjssdk';
@@ -47,15 +47,20 @@ const currentGroupMembers = computed(() => {
   return groupStore.groupMembers[props.channelId] || [];
 });
 
+function getMemberUid(member: any): string {
+  return String(member?.member_uid || member?.uid || '');
+}
+
+function getMemberDisplayName(member: any): string {
+  return String(member?.display_name || member?.member_name || member?.name || getMemberUid(member));
+}
+
 const filteredGroupMembers = computed(() => {
   const query = mentionQuery.value.toLowerCase();
   if (!query) return currentGroupMembers.value;
   return currentGroupMembers.value.filter(m => 
-    (m.display_name || '').toLowerCase().includes(query) ||
-    (m.name || '').toLowerCase().includes(query) ||
-    (m.member_name || '').toLowerCase().includes(query) ||
-    (m.uid || '').toLowerCase().includes(query) ||
-    (m.member_uid || '').toLowerCase().includes(query)
+    getMemberDisplayName(m).toLowerCase().includes(query) ||
+    getMemberUid(m).toLowerCase().includes(query)
   );
 });
 
@@ -66,6 +71,9 @@ watch(() => props.channelId, (newId) => {
   inputText.value = conv?.draft || '';
   messageStore.setReplyTarget(null);
   showMentionPopup.value = false;
+  if (props.channelType === 2 && newId && currentGroupMembers.value.length === 0) {
+    void groupStore.fetchGroupMembers(newId);
+  }
 }, { immediate: true });
 
 watch(inputText, (newVal) => {
@@ -110,11 +118,12 @@ function selectMember(member: any) {
   const lastAtIdx = textBeforeCaret.lastIndexOf('@');
 
   if (lastAtIdx !== -1) {
-    const name = member.display_name || member.member_name || member.name || member.member_uid;
+    const uid = getMemberUid(member);
+    const name = getMemberDisplayName(member);
     const newText = textBeforeCaret.substring(0, lastAtIdx) + `@${name} ` + textAfterCaret;
     inputText.value = newText;
-    if (!mentionedUids.value.includes(member.member_uid)) {
-      mentionedUids.value.push(member.member_uid);
+    if (uid && !mentionedUids.value.includes(uid)) {
+      mentionedUids.value.push(uid);
     }
   }
   showMentionPopup.value = false;
@@ -129,8 +138,18 @@ function openFilePicker() {
   fileInputRef.value?.click();
 }
 
-function insertMentionTrigger() {
+async function insertMentionTrigger() {
   inputText.value = `${inputText.value}${inputText.value && !inputText.value.endsWith(' ') ? ' ' : ''}@`;
+  await nextTick();
+  const caretPos = inputText.value.length;
+  textareaRef.value?.setSelectionRange(caretPos, caretPos);
+  if (props.channelType === 2) {
+    mentionQuery.value = '';
+    showMentionPopup.value = true;
+    if (currentGroupMembers.value.length === 0) {
+      void groupStore.fetchGroupMembers(props.channelId);
+    }
+  }
   textareaRef.value?.focus();
 }
 
@@ -234,9 +253,9 @@ async function handleSend() {
       options.mention = { all: true, uids: [] };
     } else if (mentionedUids.value.length > 0) {
       const activeMentions = mentionedUids.value.filter(uid => {
-        const member = currentGroupMembers.value.find(m => m.member_uid === uid || m.uid === uid);
-        const name = member?.display_name || member?.member_name || member?.name || uid;
-        return text.includes(`@${name}`);
+        const member = currentGroupMembers.value.find(m => getMemberUid(m) === uid);
+        const name = member ? getMemberDisplayName(member) : uid;
+        return text.includes(`@${name}`) || text.includes(`@${uid}`);
       });
       if (activeMentions.length > 0) {
         options.mention = { all: false, uids: activeMentions };
@@ -286,11 +305,11 @@ onBeforeUnmount(() => {
     <div v-if="showMentionPopup && filteredGroupMembers.length > 0" class="mention-popup">
       <div 
         v-for="member in filteredGroupMembers" 
-        :key="member.member_uid" 
+        :key="getMemberUid(member)" 
         class="mention-item"
         @click="selectMember(member)"
       >
-        <span class="mention-name">{{ member.display_name || member.member_name || member.name || member.member_uid }}</span>
+        <span class="mention-name">{{ getMemberDisplayName(member) }}</span>
         <span v-if="member.role_label !== '成员'" class="mention-role">{{ member.role_label }}</span>
       </div>
     </div>
@@ -331,18 +350,27 @@ onBeforeUnmount(() => {
     </div>
 
     <div v-if="robotMenuState !== 'idle'" class="robot-panel">
-      <div v-if="robotMenuState === 'loading'" class="robot-state">机器人响应中...</div>
-      <div v-else-if="robotMenuState === 'unavailable' || robotMenuState === 'failed'" class="robot-state">机器人暂不可用</div>
-      <div v-else class="robot-menu">
-        <button
-          v-for="item in robotMenus"
-          :key="item.id"
-          class="robot-command"
-          @click="sendRobotCommand(item.command)"
-        >
-          {{ item.title }}
-        </button>
+      <div class="robot-panel-header">
+        <span class="robot-panel-title">机器人菜单</span>
+        <span v-if="robotMenuState === 'ready'" class="robot-panel-hint">点击菜单即可发送指令</span>
       </div>
+      <div v-if="robotMenuState === 'loading'" class="robot-state">机器人响应中...</div>
+      <div v-else-if="robotMenuState === 'unavailable' || robotMenuState === 'failed'" class="robot-state">
+        <span class="robot-state-title">机器人未配置</span>
+        <span>请在服务端机器人管理中配置后使用</span>
+      </div>
+      <template v-else>
+        <div class="robot-menu">
+          <button
+            v-for="item in robotMenus"
+            :key="item.id"
+            class="robot-command"
+            @click="sendRobotCommand(item.command)"
+          >
+            {{ item.title }}
+          </button>
+        </div>
+      </template>
       <div v-if="robotAck" class="robot-ack">{{ robotAck }}</div>
     </div>
 
@@ -399,15 +427,16 @@ onBeforeUnmount(() => {
 .message-input-container {
   display: flex;
   flex-direction: column;
-  flex-shrink: 0;
   min-width: 0;
   background-color: var(--bg-primary);
   border-top: var(--border-hairline);
   padding: 12px 16px;
   position: relative;
-  /* 固定 composer 高度范围，防止 robot-panel 或 reply-bar 撑破布局 */
-  max-height: 320px;
-  overflow: hidden;
+  z-index: 30;
+  /* In the grid layout this cell is 'auto' sized — content determines height.
+     max-height caps it so robot-panel or reply-bar cannot push it too tall. */
+  max-height: 40vh;
+  overflow: visible;
 }
 
 /* Mention Popup */
@@ -422,7 +451,7 @@ onBeforeUnmount(() => {
   border: var(--border-hairline);
   border-radius: var(--radius-sm);
   box-shadow: 0 -4px 12px rgba(0, 0, 0, 0.08);
-  z-index: 100;
+  z-index: 3200;
   margin-bottom: 8px;
 }
 
@@ -533,12 +562,44 @@ onBeforeUnmount(() => {
   border: var(--border-hairline);
   border-radius: var(--radius-sm);
   background-color: var(--bg-secondary);
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.robot-panel-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.robot-panel-title {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--text-primary);
+}
+
+.robot-panel-hint {
+  font-size: 11px;
+  color: var(--text-secondary);
 }
 
 .robot-state,
 .robot-ack {
   font-size: 12px;
   color: var(--text-secondary);
+}
+
+.robot-state {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.robot-state-title {
+  color: var(--text-primary);
+  font-weight: 600;
 }
 
 .robot-menu {
@@ -563,7 +624,8 @@ onBeforeUnmount(() => {
 }
 
 .input-area-wrapper {
-  flex: 0 0 auto;
+  flex: 1;
+  min-height: 0;
   overflow: hidden;
 }
 

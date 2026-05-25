@@ -5,6 +5,7 @@ import path from 'path'
 export default defineConfig({
   plugins: [vue()],
   resolve: {
+    extensions: ['.ts', '.tsx', '.mts', '.mjs', '.js', '.jsx', '.json'],
     alias: {
       '@tsdaodao/base-vue': path.resolve(__dirname, '../../packages/base-vue/src'),
       '@tsdaodao/datasource-vue': path.resolve(__dirname, '../../packages/datasource-vue/src'),

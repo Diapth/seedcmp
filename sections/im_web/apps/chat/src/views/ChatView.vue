@@ -32,6 +32,12 @@ const isTyping = computed(() => {
   return messageStore.typingState[key]?.isTyping === true;
 });
 
+function isChatViewActive(cid: string, ctype: number) {
+  return route.name === 'Conversation' &&
+    String(route.params.channelId || '') === String(cid) &&
+    Number(route.params.channelType || 0) === Number(ctype);
+}
+
 async function loadChannelDetails() {
   const cid = channelId.value;
   const ctype = channelType.value;
@@ -42,7 +48,9 @@ async function loadChannelDetails() {
   }
 
   await messageStore.syncMessages(cid, ctype);
-  await conversationStore.clearUnread(cid, ctype);
+  if (isChatViewActive(cid, ctype)) {
+    await conversationStore.clearUnread(cid, ctype);
+  }
 }
 
 onMounted(() => {
@@ -54,7 +62,9 @@ watch([channelId, channelType], () => {
 });
 
 watch(() => messageStore.messages[channelKey.value]?.length, () => {
-  void conversationStore.clearUnread(channelId.value, channelType.value);
+  if (isChatViewActive(channelId.value, channelType.value)) {
+    void conversationStore.clearUnread(channelId.value, channelType.value);
+  }
 });
 
 function handleHeaderClick() {
@@ -121,10 +131,11 @@ function handleMembersClick() {
 
 <style scoped>
 .chat-view-container {
-  display: flex;
-  flex-direction: column;
+  /* Grid layout: header(fixed) | message-list(fills all remaining) | composer(auto) */
+  display: grid;
+  grid-template-rows: 64px 1fr auto;
   height: 100%;
-  min-height: 0;
+  width: 100%;
   overflow: hidden;
   background-color: var(--bg-primary);
 }

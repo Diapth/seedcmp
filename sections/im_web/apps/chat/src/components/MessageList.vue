@@ -68,7 +68,8 @@ const visibleStart = computed(() => {
 });
 
 const visibleEnd = computed(() => {
-  return Math.min(renderableMessages.value.length, visibleStart.value + historyWindowSize.value);
+  // Always render to the end of the list to avoid bottomSpacer inaccuracy
+  return renderableMessages.value.length;
 });
 
 const visibleMessages = computed(() => {
@@ -79,7 +80,8 @@ const visibleMessages = computed(() => {
 });
 
 const topSpacerHeight = computed(() => visibleStart.value * estimatedRowHeight);
-const bottomSpacerHeight = computed(() => Math.max(0, renderableMessages.value.length - visibleEnd.value) * estimatedRowHeight);
+// NOTE: No bottomSpacer — estimated heights are inaccurate for mixed-content messages
+// and cause large blank areas at the bottom. We always render to the end of the list.
 
 function handleScroll() {
   scrollTop.value = scrollContainer.value?.scrollTop || 0;
@@ -414,7 +416,6 @@ async function handleConfirmEdit(value?: string) {
       </div>
     </div>
 
-    <div v-if="bottomSpacerHeight > 0" class="history-spacer" :style="{ height: `${bottomSpacerHeight}px` }"></div>
 
     <ContextMenu
       v-if="showMenu && menuItems.length > 0"
@@ -440,21 +441,24 @@ async function handleConfirmEdit(value?: string) {
 
 <style scoped>
 .message-list {
-  flex: 1;
-  min-height: 0;
+  /* Fills the grid 1fr row. Must have overflow-y:auto for scrolling.
+     height:100% + overflow-y:auto is the minimal correct pattern in a grid cell. */
+  height: 100%;
   overflow-y: auto;
+  overflow-x: hidden;
   padding: 16px;
   display: flex;
   flex-direction: column;
-  gap: 16px;
+  gap: 8px;
   background-color: var(--bg-primary);
+  box-sizing: border-box;
 }
 
 .message-row-wrapper {
   display: flex;
   flex-direction: column;
-  min-height: 32px;
   overflow-anchor: none;
+  flex-shrink: 0;
 }
 
 .history-spacer {
@@ -475,6 +479,7 @@ async function handleConfirmEdit(value?: string) {
 
 .msg-avatar {
   margin-top: 4px;
+  flex-shrink: 0;
 }
 
 .msg-bubble-container {

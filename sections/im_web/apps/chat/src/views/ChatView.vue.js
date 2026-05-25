@@ -26,6 +26,11 @@ const isTyping = computed(() => {
     const key = `${channelId.value}-${channelType.value}`;
     return messageStore.typingState[key]?.isTyping === true;
 });
+function isChatViewActive(cid, ctype) {
+    return route.name === 'Conversation' &&
+        String(route.params.channelId || '') === String(cid) &&
+        Number(route.params.channelType || 0) === Number(ctype);
+}
 async function loadChannelDetails() {
     const cid = channelId.value;
     const ctype = channelType.value;
@@ -35,7 +40,9 @@ async function loadChannelDetails() {
         channelStore.getChannelInfo(cid, ctype);
     }
     await messageStore.syncMessages(cid, ctype);
-    await conversationStore.clearUnread(cid, ctype);
+    if (isChatViewActive(cid, ctype)) {
+        await conversationStore.clearUnread(cid, ctype);
+    }
 }
 onMounted(() => {
     loadChannelDetails();
@@ -44,7 +51,9 @@ watch([channelId, channelType], () => {
     loadChannelDetails();
 });
 watch(() => messageStore.messages[channelKey.value]?.length, () => {
-    void conversationStore.clearUnread(channelId.value, channelType.value);
+    if (isChatViewActive(channelId.value, channelType.value)) {
+        void conversationStore.clearUnread(channelId.value, channelType.value);
+    }
 });
 function handleHeaderClick() {
     if (channelType.value === 1) {
