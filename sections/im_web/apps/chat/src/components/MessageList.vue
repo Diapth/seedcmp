@@ -27,6 +27,10 @@ const props = defineProps<{
   channelType: number;
 }>();
 
+const emit = defineEmits<{
+  (event: 'open-preview', payload: any): void;
+}>();
+
 const messageStore = useMessageStore();
 const userStore = useUserStore();
 const { remoteConfig } = useRemoteConfig();
@@ -305,6 +309,21 @@ async function handleConfirmEdit(value?: string) {
     Message.error(err.message || err.msg || '编辑失败');
   }
 }
+
+function handleFilePreview(payload: any) {
+  emit('open-preview', {
+    source: 'file',
+    ...payload
+  });
+}
+
+function handleCodePreview(payload: any) {
+  emit('open-preview', {
+    source: 'ai-code',
+    kind: 'ai-html',
+    ...payload
+  });
+}
 </script>
 
 <template>
@@ -353,6 +372,7 @@ async function handleConfirmEdit(value?: string) {
             v-if="item.msg.content?.type === 1"
             :message="item.msg"
             :is-me="isMe(item.msg)"
+            @preview-code="handleCodePreview"
           />
           <ImageCell
             v-else-if="item.msg.content?.type === 2"
@@ -388,6 +408,7 @@ async function handleConfirmEdit(value?: string) {
             v-else-if="item.msg.content?.type === 8"
             :message="item.msg"
             :is-me="isMe(item.msg)"
+            @preview="handleFilePreview"
           />
           <MergeCell
             v-else-if="item.msg.content?.type === 11"

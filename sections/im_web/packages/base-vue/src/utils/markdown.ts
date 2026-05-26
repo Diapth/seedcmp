@@ -11,6 +11,33 @@ function escapeAttribute(value: string) {
   return escapeHtml(value).replace(/`/g, '&#96;');
 }
 
+function normalizeCodeLanguage(fence: string) {
+  return fence.replace(/^```/, '').trim().split(/\s+/)[0].toLowerCase();
+}
+
+function isHtmlLanguage(language: string) {
+  return ['html', 'htm'].includes(language);
+}
+
+function renderCodeBlock(code: string, language: string, index: number) {
+  const label = language || 'code';
+  const previewButton = isHtmlLanguage(language)
+    ? '<button type="button" class="markdown-code-action" data-code-action="preview-html">预览</button>'
+    : '';
+  return [
+    `<div class="markdown-code-block" data-code-index="${index}" data-code-language="${escapeAttribute(language)}">`,
+    '<div class="markdown-code-header">',
+    `<span class="markdown-code-lang">${escapeHtml(label)}</span>`,
+    '<div class="markdown-code-actions">',
+    previewButton,
+    '<button type="button" class="markdown-code-action" data-code-action="copy">复制</button>',
+    '</div>',
+    '</div>',
+    `<pre><code data-code-index="${index}">${escapeHtml(code)}</code></pre>`,
+    '</div>'
+  ].join('');
+}
+
 function renderInlineMarkdown(value: string) {
   let html = escapeHtml(value);
   html = html.replace(/`([^`]+)`/g, '<code>$1</code>');
@@ -27,6 +54,8 @@ export function renderMarkdown(markdown: string) {
   const html: string[] = [];
   let inCode = false;
   let codeLines: string[] = [];
+  let codeLanguage = '';
+  let codeIndex = 0;
   let inList = false;
   let inOrderedList = false;
 
@@ -44,12 +73,15 @@ export function renderMarkdown(markdown: string) {
   for (const line of lines) {
     if (line.trim().startsWith('```')) {
       if (inCode) {
-        html.push(`<pre><code>${escapeHtml(codeLines.join('\n'))}</code></pre>`);
+        html.push(renderCodeBlock(codeLines.join('\n'), codeLanguage, codeIndex));
+        codeIndex += 1;
         codeLines = [];
+        codeLanguage = '';
         inCode = false;
       } else {
         closeList();
         inCode = true;
+        codeLanguage = normalizeCodeLanguage(line.trim());
       }
       continue;
     }
@@ -112,9 +144,8 @@ export function renderMarkdown(markdown: string) {
   }
 
   if (inCode) {
-    html.push(`<pre><code>${escapeHtml(codeLines.join('\n'))}</code></pre>`);
+    html.push(renderCodeBlock(codeLines.join('\n'), codeLanguage, codeIndex));
   }
   closeList();
   return html.join('');
 }
-
