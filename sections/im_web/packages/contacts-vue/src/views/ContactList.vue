@@ -9,6 +9,7 @@ const router = useRouter();
 const contactStore = useContactStore();
 const groupStore = useGroupStore();
 const SYSTEM_ROBOT_ID = 'u_10000';
+const DEEPSEEK_AI_ROBOT_ID = 'deepseek_ai_robot';
 
 onMounted(() => {
   contactStore.syncContacts();
@@ -42,6 +43,10 @@ function handleConfigureRobot() {
 
 function handleSystemRobot() {
   router.push(`/chat/conversation/${SYSTEM_ROBOT_ID}/1`);
+}
+
+function handleDeepSeekRobot() {
+  router.push(`/chat/conversation/${DEEPSEEK_AI_ROBOT_ID}/1`);
 }
 
 function scrollToGroupList() {
@@ -144,6 +149,22 @@ function scrollToLetter(letter: string) {
         </div>
         <div class="action-label">系统机器人</div>
         <span class="action-count">u_10000</span>
+      </div>
+
+      <div class="action-item ai-robot-action" @click="handleDeepSeekRobot">
+        <div class="action-icon deepseek-icon">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" class="svg-icon">
+            <path d="M12 3v3" />
+            <rect x="4" y="6" width="16" height="14" rx="3" />
+            <path d="M8 13h.01" />
+            <path d="M16 13h.01" />
+            <path d="M9 17c1.5 1 4.5 1 6 0" />
+            <path d="M3 11h2" />
+            <path d="M19 11h2" />
+          </svg>
+        </div>
+        <div class="action-label">DeepSeek AI</div>
+        <span class="action-count robot-tag">机器人</span>
       </div>
     </div>
 
@@ -284,7 +305,15 @@ function scrollToLetter(letter: string) {
   background-color: #2563eb;
 }
 
+.deepseek-icon {
+  background-color: #7c3aed;
+}
+
 .robot-config-action {
+  border-top: var(--border-hairline);
+}
+
+.ai-robot-action {
   border-top: var(--border-hairline);
 }
 

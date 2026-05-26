@@ -181,6 +181,45 @@ describe('message media sending', () => {
     })
   })
 
+  it('uploads voice audio and sends a type 4 voice message through the SDK', async () => {
+    const { useMessageStore } = await import('../../../packages/datasource-vue/src/stores/messageStore.ts')
+    const { useUserStore } = await import('../../../packages/datasource-vue/src/stores/userStore.ts')
+    const userStore = useUserStore()
+    userStore.currentUser = { uid: 'u1', name: 'Me' }
+
+    const file = new File(['voice-bytes'], 'voice.webm', { type: 'audio/webm' })
+    getUploadUrl.mockResolvedValue({ url: 'file/upload?type=chat&path=/1/target/voice.webm' })
+    uploadFile.mockResolvedValue({ path: 'file/preview/chat/1/target/voice.webm' })
+    send.mockResolvedValue({
+      messageID: 'm-voice',
+      messageSeq: 4,
+      clientMsgNo: 'c-voice',
+      fromUID: 'u1',
+      timestamp: 300,
+      status: 1,
+      reactions: [],
+      remoteExtra: undefined,
+      content: undefined
+    })
+
+    const store = useMessageStore()
+    await store.sendVoiceMessage('target', 1, file, 3)
+
+    const formData = uploadFile.mock.calls[0][1] as FormData
+    expect(formData.get('file')).toBe(file)
+    expect(formData.get('contenttype')).toBe('audio/webm')
+    const sentContent = send.mock.calls[0][0]
+    expect(sentContent.contentType).toBe(4)
+    expect(sentContent.encodeJSON()).toEqual({
+      url: 'http://100.79.157.76:8090/v1/file/preview/chat/1/target/voice.webm',
+      time: 3
+    })
+    expect(store.getChannelMessages('target', 1)[0].content).toMatchObject({
+      type: 4,
+      time: 3
+    })
+  })
+
   it('rewrites loopback upload URLs before posting selected files', async () => {
     const { useMessageStore } = await import('../../../packages/datasource-vue/src/stores/messageStore.ts')
     const { useUserStore } = await import('../../../packages/datasource-vue/src/stores/userStore.ts')

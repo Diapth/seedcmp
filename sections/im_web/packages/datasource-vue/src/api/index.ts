@@ -1,4 +1,49 @@
-import { apiClient, apiDelete, normalizeMediaUrl } from '@tsdaodao/base-vue';
+import { apiClient, apiDelete, normalizeMediaUrl, StorageService } from '@tsdaodao/base-vue';
+
+export type AiStreamEvent = {
+  delta?: string;
+  done?: boolean;
+  error?: string;
+  message_id?: string;
+  message_seq?: number;
+  timestamp?: number;
+  model?: string;
+};
+
+export function parseAiStreamLine(line: string): AiStreamEvent | null {
+  const trimmed = line.trim();
+  if (!trimmed || trimmed.startsWith(':')) return null;
+  if (!trimmed.startsWith('data:')) return null;
+
+  const data = trimmed.slice(5).trim();
+  if (!data) return null;
+  if (data === '[DONE]') return { done: true };
+
+  try {
+    const payload = JSON.parse(data);
+    if (payload?.error || payload?.msg) {
+      return { error: String(payload.error || payload.msg) };
+    }
+    if (payload?.done === true) {
+      return {
+        done: true,
+        message_id: payload.message_id === undefined ? undefined : String(payload.message_id),
+        message_seq: payload.message_seq === undefined ? undefined : Number(payload.message_seq),
+        timestamp: payload.timestamp === undefined ? undefined : Number(payload.timestamp),
+        model: payload.model === undefined ? undefined : String(payload.model)
+      };
+    }
+
+    const delta = payload?.delta ?? payload?.content ?? payload?.choices?.[0]?.delta?.content;
+    if (delta !== undefined) {
+      return { delta: String(delta) };
+    }
+  } catch {
+    return { delta: data };
+  }
+
+  return null;
+}
 
 // 1. 身份认证与登录设备管理 API (Auth & Device)
 export const authApi = {
@@ -367,6 +412,91 @@ export const commonApi = {
       robot_id: channelId,
       version: 0
     }]);
+  },
+  requestAiReply(data: {
+    channel_id: string;
+    channel_type: number;
+    prompt: string;
+    system_prompt?: string;
+    model?: string;
+    history?: Array<{ role: 'user' | 'assistant' | 'system'; content: string }>;
+  }) {
+    return apiClient.post('robot/ai_reply', data, { timeout: 45000 });
+  },
+  async requestAiReplyStream(
+    data: {
+      channel_id: string;
+      channel_type: number;
+      prompt: string;
+      system_prompt?: string;
+      model?: string;
+      history?: Array<{ role: 'user' | 'assistant' | 'system'; content: string }>;
+      stream?: boolean;
+    },
+    handlers: {
+      onDelta?: (delta: string) => void;
+      onDone?: (event: AiStreamEvent) => void;
+      onError?: (message: string) => void;
+      signal?: AbortSignal;
+    } = {}
+  ) {
+    const token = StorageService.get('token');
+    const url = `${String(apiClient.defaults?.baseURL || '/v1/').replace(/\/$/, '')}/robot/ai_reply`;
+    const response = await fetch(url, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        Accept: 'text/event-stream',
+        ...(token ? { token } : {})
+      },
+      body: JSON.stringify({ ...data, stream: true }),
+      signal: handlers.signal
+    });
+
+    if (!response.ok || !response.body) {
+      const payload = await response.json().catch(() => ({}));
+      throw {
+        msg: payload?.msg || `AI 助手暂不可用 (${response.status})`,
+        status: response.status
+      };
+    }
+
+    const reader = response.body.getReader();
+    const decoder = new TextDecoder();
+    let buffer = '';
+    let finalEvent: AiStreamEvent = {};
+
+    while (true) {
+      const { value, done } = await reader.read();
+      if (done) break;
+      buffer += decoder.decode(value, { stream: true });
+      const lines = buffer.split(/\r?\n/);
+      buffer = lines.pop() || '';
+
+      for (const line of lines) {
+        const event = parseAiStreamLine(line);
+        if (!event) continue;
+        if (event.error) {
+          handlers.onError?.(event.error);
+          throw { msg: event.error };
+        }
+        if (event.delta) {
+          handlers.onDelta?.(event.delta);
+        }
+        if (event.done) {
+          finalEvent = event;
+          handlers.onDone?.(event);
+        }
+      }
+    }
+
+    const tail = parseAiStreamLine(buffer);
+    if (tail?.delta) handlers.onDelta?.(tail.delta);
+    if (tail?.done) {
+      finalEvent = tail;
+      handlers.onDone?.(tail);
+    }
+    return finalEvent;
   }
 };
 

@@ -232,6 +232,13 @@ export const useConversationStore = defineStore('conversation', () => {
     console.warn(`[ConversationStore] Remote ${action} command failed; local state was kept`, e);
   }
 
+  function isBrandNewEmptyConversation(channelId: string, channelType: number, conv?: Conversation) {
+    return channelId === 'deepseek_ai_robot' &&
+      channelType === 1 &&
+      !conv &&
+      Number(unreadMap.value[getConversationKey(channelId, channelType)] || 0) === 0;
+  }
+
   function getEffectiveUnread(item: any, key: string) {
     const unread = Number(item.unread || 0);
     const clearedSeq = Number(clearedUnreadSeqs.value[key] || 0);
@@ -471,6 +478,9 @@ export const useConversationStore = defineStore('conversation', () => {
     const key = getConversationKey(channelId, channelType);
     unreadMap.value[key] = 0;
     const conv = findConversation(channelId, channelType);
+    if (isBrandNewEmptyConversation(channelId, channelType, conv)) {
+      return;
+    }
     if (conv) {
       conv.unread = 0;
       clearedUnreadSeqs.value[key] = Math.max(Number(clearedUnreadSeqs.value[key] || 0), Number(conv.last_msg_seq || 0));

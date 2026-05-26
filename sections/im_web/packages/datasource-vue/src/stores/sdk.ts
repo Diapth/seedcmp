@@ -3,7 +3,7 @@ import { ref } from 'vue';
 import WKSDK, { ConnectStatus } from 'wukongimjssdk';
 import { apiClient } from '@tsdaodao/base-vue';
 import { registerCMDListeners, registerMessageListeners } from '../cmd';
-import { registerMessageContentTypes } from '../contentTypes';
+import { registerMessageContentTypes } from '../contentTypes/index';
 import { resolveWebsocketConnectAddr } from './sdkAddress';
 import { useConversationStore } from './conversationStore';
 import { useMessageStore } from './messageStore';

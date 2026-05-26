@@ -2,7 +2,7 @@ import { defineStore } from 'pinia';
 import { ref } from 'vue';
 import WKSDK, { Message as WKMessage, MessageContent, MessageImage } from 'wukongimjssdk';
 import { commonApi, resolveApiAssetUrl, syncApi } from '../api';
-import { MessageFile } from '../contentTypes';
+import { MessageFile, MessageVoice } from '../contentTypes/index';
 import { useConversationStore } from './conversationStore';
 import { useUserStore } from './userStore';
 
@@ -18,10 +18,11 @@ export interface Message {
   status: 'sending' | 'success' | 'fail';
   retryable?: boolean;
   retryPayload?: {
-    kind: 'text' | 'media';
+    kind: 'text' | 'media' | 'voice';
     text?: string;
     options?: SendMessageOptions;
     file?: File;
+    duration?: number;
   };
   reactions?: any[];
   remoteExtra?: any;
@@ -36,6 +37,7 @@ export interface Reaction {
 }
 
 const MEDIA_UPLOAD_TYPE = 'chat';
+const DEEPSEEK_AI_ROBOT_ID = 'deepseek_ai_robot';
 
 interface SendMessageOptions {
   mention?: { all?: boolean; uids?: string[] };
@@ -192,6 +194,127 @@ export const useMessageStore = defineStore('message', () => {
     return normalized;
   }
 
+  function normalizeAiRobotMessageContent(fromUID: string, content: any, streaming = false) {
+    const normalized = normalizeMessageContent(content);
+    if (String(fromUID || '') !== DEEPSEEK_AI_ROBOT_ID || Number(normalized.type || 0) !== 1) {
+      return normalized;
+    }
+    return normalizeMessageContent({
+      ...normalized,
+      format: normalized.format || 'markdown',
+      markdown: normalized.markdown ?? true,
+      ai: normalized.ai ?? true,
+      streaming
+    });
+  }
+
+  function isLocalStreamingAiMessage(msg: Message) {
+    return String(msg.clientMsgNo || '').startsWith('ai-stream-') &&
+      String(msg.fromUID || '') === DEEPSEEK_AI_ROBOT_ID &&
+      (
+        msg.content?.streaming === true ||
+        msg.status === 'sending' ||
+        Number(msg.messageSeq || 0) === 0 ||
+        String(msg.messageID || '').startsWith('ai-stream-')
+      );
+  }
+
+  function findMergeableLocalAiStream(list: Message[], incoming: Message, options?: { protectHistory?: boolean }) {
+    if (String(incoming.fromUID || '') !== DEEPSEEK_AI_ROBOT_ID) return undefined;
+    const candidates = list.filter(isLocalStreamingAiMessage);
+    if (!candidates.length) return undefined;
+    const incomingSeq = Number(incoming.messageSeq || 0);
+    const maxConfirmedSeq = list.reduce((max, item) => {
+      if (isLocalStreamingAiMessage(item)) return max;
+      return Math.max(max, Number(item.messageSeq || 0));
+    }, 0);
+    if (options?.protectHistory === true && incomingSeq > 0 && maxConfirmedSeq > 0 && incomingSeq <= maxConfirmedSeq) {
+      const newestStream = candidates.sort((a, b) => Number(b.timestamp || 0) - Number(a.timestamp || 0))[0];
+      if (Number(incoming.timestamp || 0) + 5 < Number(newestStream.timestamp || 0)) {
+        return undefined;
+      }
+    }
+    return candidates.sort((a, b) => {
+      const timeDiff = Number(b.timestamp || 0) - Number(a.timestamp || 0);
+      if (timeDiff !== 0) return timeDiff;
+      return String(b.clientMsgNo || '').localeCompare(String(a.clientMsgNo || ''));
+    })[0];
+  }
+
+  function mergePersistedAiIntoLocal(local: Message, incoming: Message): Message {
+    return {
+      ...local,
+      ...incoming,
+      clientMsgNo: local.clientMsgNo,
+      content: normalizeAiRobotMessageContent(incoming.fromUID, incoming.content, false),
+      status: 'success'
+    };
+  }
+
+  function getMessageText(msg: Message) {
+    return String(msg.content?.text || msg.content?.content || '');
+  }
+
+  function getMessageMergeKey(msg: Message) {
+    const clientMsgNo = String(msg.clientMsgNo || '');
+    if (clientMsgNo) return `client:${clientMsgNo}`;
+
+    const messageID = String(msg.messageID || '');
+    if (messageID) return `id:${messageID}`;
+
+    const messageSeq = Number(msg.messageSeq || 0);
+    if (messageSeq > 0) {
+      return `seq:${String(msg.fromUID || '')}:${messageSeq}`;
+    }
+
+    return `fallback:${String(msg.fromUID || '')}:${Number(msg.timestamp || 0)}:${getMessageText(msg)}`;
+  }
+
+  function pruneDuplicateAiStreams(list: Message[]) {
+    const persistedAiText = new Set(
+      list
+        .filter(item =>
+          String(item.fromUID || '') === DEEPSEEK_AI_ROBOT_ID &&
+          !isLocalStreamingAiMessage(item) &&
+          Number(item.messageSeq || 0) > 0
+        )
+        .map(getMessageText)
+        .filter(Boolean)
+    );
+    if (!persistedAiText.size) return;
+    for (let i = list.length - 1; i >= 0; i--) {
+      const item = list[i];
+      if (
+        isLocalStreamingAiMessage(item) &&
+        persistedAiText.has(getMessageText(item))
+      ) {
+        list.splice(i, 1);
+      }
+    }
+  }
+
+  function isDeepSeekAiChannel(channelId: string, channelType: number) {
+    return Number(channelType) === 1 && String(channelId || '') === DEEPSEEK_AI_ROBOT_ID;
+  }
+
+  function sortMessagesForChannel(list: Message[], channelId: string, channelType: number) {
+    list.sort((a, b) => {
+      if (isDeepSeekAiChannel(channelId, channelType)) {
+        const timeDiff = Number(a.timestamp || 0) - Number(b.timestamp || 0);
+        if (timeDiff !== 0) return timeDiff;
+
+        const aIsAi = String(a.fromUID || '') === DEEPSEEK_AI_ROBOT_ID;
+        const bIsAi = String(b.fromUID || '') === DEEPSEEK_AI_ROBOT_ID;
+        if (aIsAi !== bIsAi) return aIsAi ? 1 : -1;
+      }
+
+      const seqA = a.messageSeq > 0 ? a.messageSeq : Infinity;
+      const seqB = b.messageSeq > 0 ? b.messageSeq : Infinity;
+      if (seqA !== seqB) return seqA - seqB;
+      return a.timestamp - b.timestamp;
+    });
+  }
+
   function createClientMsgNo() {
     return `web-${Date.now()}-${Math.random().toString(16).slice(2)}`;
   }
@@ -316,7 +439,7 @@ export const useMessageStore = defineStore('message', () => {
     const version = resetVersion.value;
     const key = `${channelId}-${channelType}`;
     const list = messages.value[key] || [];
-    const startSeq = list.length > 0 ? list[list.length - 1].messageSeq : 0;
+    const startSeq = list.reduce((max, item) => Math.max(max, Number(item.messageSeq || 0)), 0);
 
     try {
       const res: any = await syncApi.syncMessages({
@@ -332,14 +455,15 @@ export const useMessageStore = defineStore('message', () => {
       if (res && Array.isArray(res.messages)) {
         const synced: Message[] = res.messages.filter((item: any) => item.is_deleted !== 1).map((item: any) => {
           const remoteExtra = normalizeRemoteExtra(item.message_extra);
+          const fromUID = item.from_uid;
 
           const message: Message = {
             messageID: String(item.message_idstr || item.message_id || ''),
             messageSeq: item.message_seq,
-            clientMsgNo: item.client_msg_no,
-            fromUID: item.from_uid,
+            clientMsgNo: String(item.client_msg_no || ''),
+            fromUID,
             timestamp: item.timestamp,
-            content: normalizeSyncedPayload(item.payload),
+            content: normalizeAiRobotMessageContent(fromUID, normalizeSyncedPayload(item.payload), false),
             isRevoked: item.revoke === 1 || item.is_revoked === 1 || remoteExtra?.revoke === true,
             revokeUID: remoteExtra?.revoker,
             status: 'success',
@@ -354,33 +478,38 @@ export const useMessageStore = defineStore('message', () => {
 
         const currentList = messages.value[key] || [];
         const mergedMap = new Map<string, Message>();
-        currentList.forEach(m => mergedMap.set(m.clientMsgNo, m));
+        currentList.forEach(m => mergedMap.set(getMessageMergeKey(m), m));
 
-        // Build a messageID -> local-clientMsgNo index for deduplication.
+        // Build a messageID -> local merge-key index for deduplication.
         // When the server returns a message whose messageID already exists locally
         // (but with a different clientMsgNo, e.g. our web-xxx vs SDK's wk-xxx),
         // update the local entry in-place instead of adding a duplicate.
-        const localByMsgId = new Map<string, string>(); // messageID -> clientMsgNo
-        currentList.forEach(m => { if (m.messageID) localByMsgId.set(m.messageID, m.clientMsgNo); });
+        const localByMsgId = new Map<string, string>(); // messageID -> merge key
+        currentList.forEach(m => {
+          const messageID = String(m.messageID || '');
+          if (messageID) localByMsgId.set(messageID, getMessageMergeKey(m));
+        });
 
         synced.forEach(m => {
           if (m.messageID && localByMsgId.has(m.messageID)) {
             const localKey = localByMsgId.get(m.messageID)!;
             const existing = mergedMap.get(localKey);
             if (existing) {
-              mergedMap.set(localKey, { ...existing, ...m, clientMsgNo: localKey });
+              mergedMap.set(localKey, { ...existing, ...m, clientMsgNo: existing.clientMsgNo || m.clientMsgNo });
               return;
             }
           }
-          mergedMap.set(m.clientMsgNo, m);
+          const localStreamingAi = findMergeableLocalAiStream(Array.from(mergedMap.values()), m, { protectHistory: true });
+          if (localStreamingAi) {
+            mergedMap.set(getMessageMergeKey(localStreamingAi), mergePersistedAiIntoLocal(localStreamingAi, m));
+            return;
+          }
+          mergedMap.set(getMessageMergeKey(m), m);
         });
 
-        messages.value[key] = Array.from(mergedMap.values()).sort((a, b) => {
-          const seqA = a.messageSeq > 0 ? a.messageSeq : Infinity;
-          const seqB = b.messageSeq > 0 ? b.messageSeq : Infinity;
-          if (seqA !== seqB) return seqA - seqB;
-          return a.timestamp - b.timestamp;
-        });
+        const nextList = Array.from(mergedMap.values());
+        sortMessagesForChannel(nextList, channelId, channelType);
+        messages.value[key] = nextList;
         await ensureConversationFromMessages(channelId, channelType);
       }
     } catch (e) {
@@ -396,25 +525,45 @@ export const useMessageStore = defineStore('message', () => {
 
     const list = messages.value[key];
 
-    // Deduplicate: match by clientMsgNo first, then by messageID (for realtime -> sync merge)
-    let idx = list.findIndex(m => m.clientMsgNo === msg.clientMsgNo);
-    if (idx === -1 && msg.messageID) {
-      idx = list.findIndex(m => m.messageID && m.messageID === msg.messageID);
+    const normalizedMsg: Message = {
+      ...msg,
+      messageID: String(msg.messageID || ''),
+      clientMsgNo: String(msg.clientMsgNo || ''),
+      fromUID: String(msg.fromUID || ''),
+      content: normalizeAiRobotMessageContent(String(msg.fromUID || ''), msg.content, msg.content?.streaming === true)
+    };
+
+    // Deduplicate: match by non-empty clientMsgNo first, then by messageID.
+    // Backend robot messages may have an empty client_msg_no; treating '' as a
+    // real dedupe key collapses historical AI replies into the latest one.
+    let idx = -1;
+    if (normalizedMsg.clientMsgNo) {
+      idx = list.findIndex(m => String(m.clientMsgNo || '') === normalizedMsg.clientMsgNo);
+    }
+    if (idx === -1 && normalizedMsg.messageID) {
+      idx = list.findIndex(m => m.messageID && String(m.messageID) === normalizedMsg.messageID);
     }
 
     if (idx !== -1) {
-      list[idx] = { ...list[idx], ...msg };
+      list[idx] = {
+        ...list[idx],
+        ...normalizedMsg,
+        clientMsgNo: list[idx].clientMsgNo || normalizedMsg.clientMsgNo
+      };
     } else {
-      list.push(msg);
+      const localStreamingAi = findMergeableLocalAiStream(list, normalizedMsg);
+      if (localStreamingAi) {
+        const localIdx = list.findIndex(m => m.clientMsgNo === localStreamingAi.clientMsgNo);
+        if (localIdx !== -1) {
+          list[localIdx] = mergePersistedAiIntoLocal(localStreamingAi, normalizedMsg);
+        }
+      } else {
+        list.push(normalizedMsg);
+      }
     }
+    pruneDuplicateAiStreams(list);
 
-    // Sort: confirmed messages (messageSeq > 0) by seq, pending (messageSeq === 0) by timestamp at end
-    list.sort((a, b) => {
-      const seqA = a.messageSeq > 0 ? a.messageSeq : Infinity;
-      const seqB = b.messageSeq > 0 ? b.messageSeq : Infinity;
-      if (seqA !== seqB) return seqA - seqB;
-      return a.timestamp - b.timestamp;
-    });
+    sortMessagesForChannel(list, channelId, channelType);
 
     if (isConversationDigestMessage(msg)) {
       ensureConversationFromMessages(channelId, channelType);
@@ -440,12 +589,12 @@ export const useMessageStore = defineStore('message', () => {
 
   function addRealtimeMessage(channelId: string, channelType: number, rawMessage: WKMessage, options?: { isUnreadCleared?: boolean }) {
     const normalized: Message = {
-      messageID: rawMessage.messageID,
-      messageSeq: rawMessage.messageSeq,
-      clientMsgNo: rawMessage.clientMsgNo,
-      fromUID: rawMessage.fromUID,
-      timestamp: rawMessage.timestamp,
-      content: normalizeContent(rawMessage.content),
+      messageID: String(rawMessage.messageID || ''),
+      messageSeq: Number(rawMessage.messageSeq || 0),
+      clientMsgNo: String(rawMessage.clientMsgNo || ''),
+      fromUID: String(rawMessage.fromUID || ''),
+      timestamp: Number(rawMessage.timestamp || Math.floor(Date.now() / 1000)),
+      content: normalizeAiRobotMessageContent(String(rawMessage.fromUID || ''), normalizeContent(rawMessage.content), false),
       isRevoked: rawMessage.remoteExtra?.revoke === true || rawMessage.isDeleted === true,
       revokeUID: rawMessage.remoteExtra?.revoker,
       status: rawMessage.status === 2 ? 'fail' : (rawMessage.status === 0 ? 'sending' : 'success'),
@@ -464,10 +613,30 @@ export const useMessageStore = defineStore('message', () => {
       const idx = list.findIndex(m => m.clientMsgNo === clientMsgNo);
       if (idx === -1) continue;
 
-      const next = { ...list[idx], ...patch };
+      const current = list[idx];
+      const next: Message = {
+        ...current,
+        ...patch,
+        messageID: patch.messageID === undefined ? current.messageID : String(patch.messageID || ''),
+        clientMsgNo: current.clientMsgNo,
+        fromUID: patch.fromUID === undefined ? current.fromUID : String(patch.fromUID || ''),
+        content: patch.content === undefined
+          ? current.content
+          : normalizeAiRobotMessageContent(patch.fromUID === undefined ? current.fromUID : String(patch.fromUID || ''), patch.content, patch.content?.streaming === true)
+      };
       list[idx] = next;
 
+      if (next.messageID) {
+        for (let i = list.length - 1; i >= 0; i--) {
+          if (i === idx) continue;
+          if (String(list[i].messageID || '') === String(next.messageID)) {
+            list.splice(i, 1);
+          }
+        }
+      }
       const [channelId, channelType] = key.split('-');
+      sortMessagesForChannel(list, channelId, Number(channelType));
+
       conversationStore.addOrUpdateConversation(channelId, Number(channelType), {
         messageSeq: next.messageSeq,
         timestamp: next.timestamp,
@@ -478,6 +647,20 @@ export const useMessageStore = defineStore('message', () => {
       });
       return;
     }
+  }
+
+  function removeMessageByClientMsgNo(clientMsgNo: string) {
+    if (!clientMsgNo) return false;
+    for (const key of Object.keys(messages.value)) {
+      const list = messages.value[key] || [];
+      const next = list.filter(item => item.clientMsgNo !== clientMsgNo);
+      if (next.length === list.length) continue;
+      messages.value[key] = next;
+      const [channelId, channelType] = key.split('-');
+      void ensureConversationFromMessages(channelId, Number(channelType));
+      return true;
+    }
+    return false;
   }
 
   async function revokeMessage(channelId: string, channelType: number, clientMsgNo: string, messageId: string) {
@@ -672,6 +855,10 @@ export const useMessageStore = defineStore('message', () => {
       await sendMediaMessage(channelId, channelType, msg.retryPayload.file, clientMsgNo);
       return;
     }
+    if (msg.retryPayload.kind === 'voice' && msg.retryPayload.file) {
+      await sendVoiceMessage(channelId, channelType, msg.retryPayload.file, msg.retryPayload.duration || 0, clientMsgNo);
+      return;
+    }
     throw new Error('This message cannot be retried.');
   }
 
@@ -771,6 +958,76 @@ export const useMessageStore = defineStore('message', () => {
         status: 'fail',
         retryable: true,
         retryPayload: { kind: 'media', file }
+      });
+      queuePendingMessage(channelId, channelType, clientMsgNo);
+      throw err;
+    }
+  }
+
+  async function sendVoiceMessage(channelId: string, channelType: number, file: File, duration: number, retryClientMsgNo?: string) {
+    let sentMessage: WKMessage | undefined;
+    const version = resetVersion.value;
+    const clientMsgNo = retryClientMsgNo || createClientMsgNo();
+    const normalizedDuration = Math.max(1, Math.round(duration || 1));
+    queuePendingMessage(channelId, channelType, clientMsgNo);
+    sendingFromThisTab.add(clientMsgNo);
+    const pendingVoice: Message = {
+      messageID: '',
+      messageSeq: 0,
+      clientMsgNo,
+      fromUID: userStore.currentUser?.uid || '',
+      timestamp: Math.floor(Date.now() / 1000),
+      content: {
+        type: 4,
+        url: '',
+        time: normalizedDuration,
+        unavailable: false
+      },
+      isRevoked: false,
+      status: 'sending',
+      retryable: false,
+      retryPayload: { kind: 'voice', file, duration: normalizedDuration }
+    };
+    addMessage(channelId, channelType, pendingVoice);
+
+    try {
+      const url = await uploadChatFile(channelId, channelType, file);
+      const channel = WKSDK.shared().newChannel(channelId, channelType);
+      const content = new MessageVoice(url, normalizedDuration);
+      const res = await WKSDK.shared().chatManager.send(content, channel);
+      if (version !== resetVersion.value) return;
+      if (res) {
+        sentMessage = res;
+        updateMessageStatus(clientMsgNo, {
+          messageID: String(res.messageID || ''),
+          messageSeq: res.messageSeq || 0,
+          status: 'success',
+          content: {
+            type: 4,
+            url,
+            time: normalizedDuration
+          }
+        });
+        removePendingMessage(clientMsgNo);
+      }
+    } catch (err) {
+      sendingFromThisTab.delete(clientMsgNo);
+      addMessage(channelId, channelType, {
+        messageID: sentMessage?.messageID || '',
+        messageSeq: sentMessage?.messageSeq || 0,
+        clientMsgNo,
+        fromUID: sentMessage?.fromUID || userStore.currentUser?.uid || '',
+        timestamp: sentMessage?.timestamp || Math.floor(Date.now() / 1000),
+        content: {
+          type: 4,
+          url: '',
+          time: normalizedDuration,
+          unavailable: true
+        },
+        isRevoked: false,
+        status: 'fail',
+        retryable: true,
+        retryPayload: { kind: 'voice', file, duration: normalizedDuration }
       });
       queuePendingMessage(channelId, channelType, clientMsgNo);
       throw err;
@@ -1044,8 +1301,10 @@ export const useMessageStore = defineStore('message', () => {
     queuePendingMessage,
     markPendingFailed,
     sendMediaMessage,
+    sendVoiceMessage,
     addRealtimeMessage,
     updateMessageStatus,
+    removeMessageByClientMsgNo,
     setReplyTarget,
     isFromThisTabSend,
     reset

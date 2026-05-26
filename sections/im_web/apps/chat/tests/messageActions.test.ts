@@ -255,6 +255,721 @@ describe('message action state', () => {
     })
   })
 
+  it('merges local streaming AI replies with the persisted robot message returned by sync', async () => {
+    const api = await import('@tsdaodao/datasource-vue/api')
+    const { useMessageStore } = await import('../../../packages/datasource-vue/src/stores/messageStore.ts')
+    const messageStore = useMessageStore()
+
+    messageStore.addMessage('deepseek_ai_robot', 1, {
+      messageID: 'ai-stream-local',
+      messageSeq: 0,
+      clientMsgNo: 'ai-stream-local',
+      fromUID: 'deepseek_ai_robot',
+      timestamp: 100,
+      content: {
+        type: 1,
+        text: '**流式回复**',
+        content: '**流式回复**',
+        format: 'markdown',
+        markdown: true,
+        ai: true,
+        streaming: true
+      },
+      isRevoked: false,
+      status: 'sending'
+    })
+
+    messageStore.updateMessageStatus('ai-stream-local', {
+      messageID: 'm-ai-1',
+      messageSeq: 11,
+      status: 'success',
+      content: {
+        type: 1,
+        text: '**流式回复**',
+        content: '**流式回复**',
+        format: 'markdown',
+        markdown: true,
+        ai: true,
+        streaming: false
+      }
+    })
+
+    vi.mocked(api.syncApi.syncMessages).mockResolvedValueOnce({
+      messages: [{
+        message_id: 1,
+        message_idstr: 'm-ai-1',
+        message_seq: 11,
+        client_msg_no: 'server-ai-client',
+        from_uid: 'deepseek_ai_robot',
+        timestamp: 101,
+        payload: JSON.stringify({
+          type: 1,
+          text: '**流式回复**',
+          content: '**流式回复**',
+          format: 'markdown',
+          markdown: true,
+          ai: true
+        }),
+        is_deleted: 0
+      }]
+    })
+
+    await messageStore.syncMessages('deepseek_ai_robot', 1)
+
+    const list = messageStore.getChannelMessages('deepseek_ai_robot', 1)
+    expect(list).toHaveLength(1)
+    expect(list[0]).toMatchObject({
+      messageID: 'm-ai-1',
+      messageSeq: 11,
+      clientMsgNo: 'ai-stream-local',
+      fromUID: 'deepseek_ai_robot',
+      status: 'success',
+      content: {
+        text: '**流式回复**',
+        format: 'markdown',
+        markdown: true,
+        ai: true
+      }
+    })
+  })
+
+  it('syncMessages uses the last confirmed sequence and ignores pending stream rows', async () => {
+    const api = await import('@tsdaodao/datasource-vue/api')
+    const { useMessageStore } = await import('../../../packages/datasource-vue/src/stores/messageStore.ts')
+    const messageStore = useMessageStore()
+
+    messageStore.addMessage('deepseek_ai_robot', 1, {
+      messageID: 'm-user',
+      messageSeq: 7,
+      clientMsgNo: 'user-local',
+      fromUID: 'me',
+      timestamp: 100,
+      content: { type: 1, text: 'prompt' },
+      isRevoked: false,
+      status: 'success'
+    })
+    messageStore.addMessage('deepseek_ai_robot', 1, {
+      messageID: 'ai-stream-local',
+      messageSeq: 0,
+      clientMsgNo: 'ai-stream-local',
+      fromUID: 'deepseek_ai_robot',
+      timestamp: 101,
+      content: { type: 1, text: 'streaming', markdown: true, ai: true, streaming: true },
+      isRevoked: false,
+      status: 'sending'
+    })
+    vi.mocked(api.syncApi.syncMessages).mockResolvedValueOnce({ messages: [] })
+
+    await messageStore.syncMessages('deepseek_ai_robot', 1)
+
+    expect(api.syncApi.syncMessages).toHaveBeenCalledWith(expect.objectContaining({
+      channel_id: 'deepseek_ai_robot',
+      channel_type: 1,
+      start_message_seq: 7
+    }))
+  })
+
+  it('merges realtime persisted AI replies into the local streaming AI bubble', async () => {
+    const { useMessageStore } = await import('../../../packages/datasource-vue/src/stores/messageStore.ts')
+    const messageStore = useMessageStore()
+
+    messageStore.addMessage('deepseek_ai_robot', 1, {
+      messageID: 'ai-stream-local',
+      messageSeq: 0,
+      clientMsgNo: 'ai-stream-local',
+      fromUID: 'deepseek_ai_robot',
+      timestamp: 100,
+      content: {
+        type: 1,
+        text: '**实时回复**',
+        content: '**实时回复**',
+        format: 'markdown',
+        markdown: true,
+        ai: true,
+        streaming: true
+      },
+      isRevoked: false,
+      status: 'sending'
+    })
+
+    messageStore.addRealtimeMessage('deepseek_ai_robot', 1, {
+      messageID: 'm-ai-realtime',
+      messageSeq: 12,
+      clientMsgNo: 'server-ai-realtime-client',
+      fromUID: 'deepseek_ai_robot',
+      timestamp: 101,
+      status: 1,
+      content: {
+        contentType: 1,
+        contentObj: {
+          text: '**实时回复**',
+          content: '**实时回复**'
+        }
+      },
+      remoteExtra: {},
+      reactions: []
+    } as any)
+
+    const list = messageStore.getChannelMessages('deepseek_ai_robot', 1)
+    expect(list).toHaveLength(1)
+    expect(list[0]).toMatchObject({
+      messageID: 'm-ai-realtime',
+      messageSeq: 12,
+      clientMsgNo: 'ai-stream-local',
+      fromUID: 'deepseek_ai_robot',
+      status: 'success',
+      content: {
+        text: '**实时回复**',
+        format: 'markdown',
+        markdown: true,
+        ai: true,
+        streaming: false
+      }
+    })
+  })
+
+  it('deduplicates realtime AI echoes when the SDK message id is numeric after SSE finalization', async () => {
+    const { useMessageStore } = await import('../../../packages/datasource-vue/src/stores/messageStore.ts')
+    const messageStore = useMessageStore()
+
+    messageStore.addMessage('deepseek_ai_robot', 1, {
+      messageID: 'ai-stream-local',
+      messageSeq: 0,
+      clientMsgNo: 'ai-stream-local',
+      fromUID: 'deepseek_ai_robot',
+      timestamp: 100,
+      content: {
+        type: 1,
+        text: '**最终回复**',
+        content: '**最终回复**',
+        format: 'markdown',
+        markdown: true,
+        ai: true,
+        streaming: true
+      },
+      isRevoked: false,
+      status: 'sending'
+    })
+
+    messageStore.updateMessageStatus('ai-stream-local', {
+      messageID: '12345',
+      messageSeq: 15,
+      status: 'success',
+      content: {
+        type: 1,
+        text: '**最终回复**',
+        content: '**最终回复**',
+        format: 'markdown',
+        markdown: true,
+        ai: true,
+        streaming: false
+      }
+    })
+
+    messageStore.addRealtimeMessage('deepseek_ai_robot', 1, {
+      messageID: 12345,
+      messageSeq: 15,
+      clientMsgNo: 'server-ai-numeric-client',
+      fromUID: 'deepseek_ai_robot',
+      timestamp: 101,
+      status: 1,
+      content: {
+        contentType: 1,
+        contentObj: {
+          text: '**最终回复**',
+          content: '**最终回复**',
+          format: 'markdown',
+          markdown: true,
+          ai: true
+        }
+      },
+      remoteExtra: {},
+      reactions: []
+    } as any)
+
+    const list = messageStore.getChannelMessages('deepseek_ai_robot', 1)
+    expect(list).toHaveLength(1)
+    expect(list[0]).toMatchObject({
+      messageID: '12345',
+      clientMsgNo: 'ai-stream-local',
+      content: {
+        text: '**最终回复**',
+        format: 'markdown',
+        markdown: true,
+        ai: true
+      }
+    })
+  })
+
+  it('merges realtime AI replies even when the backend person-channel seq is lower than the local prompt seq', async () => {
+    const { useMessageStore } = await import('../../../packages/datasource-vue/src/stores/messageStore.ts')
+    const messageStore = useMessageStore()
+
+    messageStore.addMessage('deepseek_ai_robot', 1, {
+      messageID: 'm-user-newer',
+      messageSeq: 30,
+      clientMsgNo: 'user-newer',
+      fromUID: 'me',
+      timestamp: 100,
+      content: { type: 1, text: 'prompt' },
+      isRevoked: false,
+      status: 'success'
+    })
+    messageStore.addMessage('deepseek_ai_robot', 1, {
+      messageID: 'ai-stream-local',
+      messageSeq: 0,
+      clientMsgNo: 'ai-stream-local',
+      fromUID: 'deepseek_ai_robot',
+      timestamp: 101,
+      content: {
+        type: 1,
+        text: '**低序号回复**',
+        content: '**低序号回复**',
+        format: 'markdown',
+        markdown: true,
+        ai: true,
+        streaming: true
+      },
+      isRevoked: false,
+      status: 'sending'
+    })
+
+    messageStore.addRealtimeMessage('deepseek_ai_robot', 1, {
+      messageID: 'm-ai-lower-seq',
+      messageSeq: 29,
+      clientMsgNo: 'server-ai-lower-seq',
+      fromUID: 'deepseek_ai_robot',
+      timestamp: 102,
+      status: 1,
+      content: {
+        contentType: 1,
+        contentObj: {
+          text: '**低序号回复**',
+          content: '**低序号回复**'
+        }
+      },
+      remoteExtra: {},
+      reactions: []
+    } as any)
+
+    const list = messageStore.getChannelMessages('deepseek_ai_robot', 1)
+    expect(list.filter(item => item.fromUID === 'deepseek_ai_robot')).toHaveLength(1)
+    expect(list.find(item => item.clientMsgNo === 'ai-stream-local')).toMatchObject({
+      messageID: 'm-ai-lower-seq',
+      messageSeq: 29,
+      content: {
+        text: '**低序号回复**',
+        format: 'markdown',
+        markdown: true,
+        ai: true,
+        streaming: false
+      }
+    })
+  })
+
+  it('removes an already inserted realtime AI duplicate when SSE finalization provides the same message id', async () => {
+    const { useMessageStore } = await import('../../../packages/datasource-vue/src/stores/messageStore.ts')
+    const messageStore = useMessageStore()
+
+    messageStore.addMessage('deepseek_ai_robot', 1, {
+      messageID: 'ai-stream-local',
+      messageSeq: 0,
+      clientMsgNo: 'ai-stream-local',
+      fromUID: 'deepseek_ai_robot',
+      timestamp: 100,
+      content: {
+        type: 1,
+        text: '**最终合并**',
+        content: '**最终合并**',
+        format: 'markdown',
+        markdown: true,
+        ai: true,
+        streaming: true
+      },
+      isRevoked: false,
+      status: 'sending'
+    })
+    messageStore.addMessage('deepseek_ai_robot', 1, {
+      messageID: 'm-ai-final',
+      messageSeq: 22,
+      clientMsgNo: 'server-ai-final',
+      fromUID: 'deepseek_ai_robot',
+      timestamp: 101,
+      content: {
+        type: 1,
+        text: '**最终合并**',
+        content: '**最终合并**',
+        format: 'markdown',
+        markdown: true,
+        ai: true,
+        streaming: false
+      },
+      isRevoked: false,
+      status: 'success'
+    })
+
+    messageStore.updateMessageStatus('ai-stream-local', {
+      messageID: 'm-ai-final',
+      messageSeq: 22,
+      status: 'success',
+      content: {
+        type: 1,
+        text: '**最终合并**',
+        content: '**最终合并**',
+        format: 'markdown',
+        markdown: true,
+        ai: true,
+        streaming: false
+      }
+    })
+
+    const list = messageStore.getChannelMessages('deepseek_ai_robot', 1)
+    expect(list.filter(item => item.fromUID === 'deepseek_ai_robot')).toHaveLength(1)
+    expect(list[0].clientMsgNo).toBe('ai-stream-local')
+  })
+
+  it('prunes local AI stream duplicates when the persisted backend message has no client message number', async () => {
+    const { useMessageStore } = await import('../../../packages/datasource-vue/src/stores/messageStore.ts')
+    const messageStore = useMessageStore()
+
+    messageStore.addMessage('deepseek_ai_robot', 1, {
+      messageID: 'm-ai-persisted',
+      messageSeq: 58,
+      clientMsgNo: '',
+      fromUID: 'deepseek_ai_robot',
+      timestamp: 100,
+      content: {
+        type: 1,
+        text: '**空客户端号回复**',
+        content: '**空客户端号回复**',
+        format: 'markdown',
+        markdown: true,
+        ai: true,
+        streaming: false
+      },
+      isRevoked: false,
+      status: 'success'
+    })
+    messageStore.addMessage('deepseek_ai_robot', 1, {
+      messageID: 'ai-stream-local',
+      messageSeq: 0,
+      clientMsgNo: 'ai-stream-local',
+      fromUID: 'deepseek_ai_robot',
+      timestamp: 101,
+      content: {
+        type: 1,
+        text: '**空客户端号回复**',
+        content: '**空客户端号回复**',
+        format: 'markdown',
+        markdown: true,
+        ai: true,
+        streaming: false
+      },
+      isRevoked: false,
+      status: 'success'
+    })
+
+    const list = messageStore.getChannelMessages('deepseek_ai_robot', 1)
+    expect(list.filter(item => item.fromUID === 'deepseek_ai_robot')).toHaveLength(1)
+    expect(list[0]).toMatchObject({
+      messageID: 'm-ai-persisted',
+      clientMsgNo: '',
+      content: {
+        text: '**空客户端号回复**',
+        format: 'markdown',
+        markdown: true,
+        ai: true
+      }
+    })
+  })
+
+  it('keeps distinct persisted AI replies when backend messages have empty client message numbers', async () => {
+    const { useMessageStore } = await import('../../../packages/datasource-vue/src/stores/messageStore.ts')
+    const messageStore = useMessageStore()
+
+    messageStore.addMessage('deepseek_ai_robot', 1, {
+      messageID: 'm-ai-empty-1',
+      messageSeq: 61,
+      clientMsgNo: '',
+      fromUID: 'deepseek_ai_robot',
+      timestamp: 100,
+      content: {
+        type: 1,
+        text: '**第一条持久化回复**',
+        content: '**第一条持久化回复**',
+        format: 'markdown',
+        markdown: true,
+        ai: true
+      },
+      isRevoked: false,
+      status: 'success'
+    })
+    messageStore.addMessage('deepseek_ai_robot', 1, {
+      messageID: 'm-ai-empty-2',
+      messageSeq: 62,
+      clientMsgNo: '',
+      fromUID: 'deepseek_ai_robot',
+      timestamp: 101,
+      content: {
+        type: 1,
+        text: '**第二条持久化回复**',
+        content: '**第二条持久化回复**',
+        format: 'markdown',
+        markdown: true,
+        ai: true
+      },
+      isRevoked: false,
+      status: 'success'
+    })
+
+    const replies = messageStore.getChannelMessages('deepseek_ai_robot', 1)
+      .filter(item => item.fromUID === 'deepseek_ai_robot')
+
+    expect(replies).toHaveLength(2)
+    expect(replies.map(item => item.content.text)).toEqual([
+      '**第一条持久化回复**',
+      '**第二条持久化回复**'
+    ])
+  })
+
+  it('keeps multiple synced AI history replies with empty backend client message numbers', async () => {
+    const api = await import('@tsdaodao/datasource-vue/api')
+    const { useMessageStore } = await import('../../../packages/datasource-vue/src/stores/messageStore.ts')
+    const messageStore = useMessageStore()
+
+    vi.mocked(api.syncApi.syncMessages).mockResolvedValueOnce({
+      messages: [
+        {
+          message_id: 1,
+          message_idstr: 'm-ai-history-empty-1',
+          message_seq: 71,
+          client_msg_no: '',
+          from_uid: 'deepseek_ai_robot',
+          timestamp: 100,
+          payload: JSON.stringify({
+            type: 1,
+            text: '**历史回复一**',
+            content: '**历史回复一**',
+            format: 'markdown',
+            markdown: true,
+            ai: true
+          }),
+          is_deleted: 0
+        },
+        {
+          message_id: 2,
+          message_idstr: 'm-ai-history-empty-2',
+          message_seq: 72,
+          client_msg_no: '',
+          from_uid: 'deepseek_ai_robot',
+          timestamp: 101,
+          payload: JSON.stringify({
+            type: 1,
+            text: '**历史回复二**',
+            content: '**历史回复二**',
+            format: 'markdown',
+            markdown: true,
+            ai: true
+          }),
+          is_deleted: 0
+        }
+      ]
+    })
+
+    await messageStore.syncMessages('deepseek_ai_robot', 1)
+
+    const replies = messageStore.getChannelMessages('deepseek_ai_robot', 1)
+      .filter(item => item.fromUID === 'deepseek_ai_robot')
+
+    expect(replies).toHaveLength(2)
+    expect(replies.map(item => item.content.text)).toEqual([
+      '**历史回复一**',
+      '**历史回复二**'
+    ])
+  })
+
+  it('does not merge older synced AI history into an active local stream', async () => {
+    const api = await import('@tsdaodao/datasource-vue/api')
+    const { useMessageStore } = await import('../../../packages/datasource-vue/src/stores/messageStore.ts')
+    const messageStore = useMessageStore()
+
+    messageStore.addMessage('deepseek_ai_robot', 1, {
+      messageID: 'm-user-latest',
+      messageSeq: 20,
+      clientMsgNo: 'user-latest',
+      fromUID: 'me',
+      timestamp: 200,
+      content: { type: 1, text: 'new prompt' },
+      isRevoked: false,
+      status: 'success'
+    })
+    messageStore.addMessage('deepseek_ai_robot', 1, {
+      messageID: 'ai-stream-local',
+      messageSeq: 0,
+      clientMsgNo: 'ai-stream-local',
+      fromUID: 'deepseek_ai_robot',
+      timestamp: 201,
+      content: {
+        type: 1,
+        text: 'new stream',
+        content: 'new stream',
+        format: 'markdown',
+        markdown: true,
+        ai: true,
+        streaming: true
+      },
+      isRevoked: false,
+      status: 'sending'
+    })
+    vi.mocked(api.syncApi.syncMessages).mockResolvedValueOnce({
+      messages: [{
+        message_id: 1,
+        message_idstr: 'm-ai-old',
+        message_seq: 10,
+        client_msg_no: 'server-ai-old',
+        from_uid: 'deepseek_ai_robot',
+        timestamp: 150,
+        payload: JSON.stringify({
+          type: 1,
+          text: 'old reply',
+          content: 'old reply',
+          format: 'markdown',
+          markdown: true,
+          ai: true
+        }),
+        is_deleted: 0
+      }]
+    })
+
+    await messageStore.syncMessages('deepseek_ai_robot', 1)
+
+    const list = messageStore.getChannelMessages('deepseek_ai_robot', 1)
+    expect(list.find(item => item.clientMsgNo === 'ai-stream-local')?.content.text).toBe('new stream')
+    expect(list.find(item => item.clientMsgNo === 'server-ai-old')?.content.text).toBe('old reply')
+  })
+
+  it('merges current synced AI replies with lower person-channel seq when timestamps match the active stream', async () => {
+    const api = await import('@tsdaodao/datasource-vue/api')
+    const { useMessageStore } = await import('../../../packages/datasource-vue/src/stores/messageStore.ts')
+    const messageStore = useMessageStore()
+
+    messageStore.addMessage('deepseek_ai_robot', 1, {
+      messageID: 'm-user-newer',
+      messageSeq: 30,
+      clientMsgNo: 'user-newer',
+      fromUID: 'me',
+      timestamp: 200,
+      content: { type: 1, text: 'prompt' },
+      isRevoked: false,
+      status: 'success'
+    })
+    messageStore.addMessage('deepseek_ai_robot', 1, {
+      messageID: 'ai-stream-local',
+      messageSeq: 0,
+      clientMsgNo: 'ai-stream-local',
+      fromUID: 'deepseek_ai_robot',
+      timestamp: 201,
+      content: {
+        type: 1,
+        text: '**当前同步回复**',
+        content: '**当前同步回复**',
+        format: 'markdown',
+        markdown: true,
+        ai: true,
+        streaming: true
+      },
+      isRevoked: false,
+      status: 'sending'
+    })
+    vi.mocked(api.syncApi.syncMessages).mockResolvedValueOnce({
+      messages: [{
+        message_id: 1,
+        message_idstr: 'm-ai-current-sync',
+        message_seq: 29,
+        client_msg_no: 'server-ai-current-sync',
+        from_uid: 'deepseek_ai_robot',
+        timestamp: 202,
+        payload: JSON.stringify({
+          type: 1,
+          text: '**当前同步回复**',
+          content: '**当前同步回复**',
+          format: 'markdown',
+          markdown: true,
+          ai: true
+        }),
+        is_deleted: 0
+      }]
+    })
+
+    await messageStore.syncMessages('deepseek_ai_robot', 1)
+
+    const list = messageStore.getChannelMessages('deepseek_ai_robot', 1)
+    expect(list.filter(item => item.fromUID === 'deepseek_ai_robot')).toHaveLength(1)
+    expect(list.find(item => item.clientMsgNo === 'ai-stream-local')).toMatchObject({
+      messageID: 'm-ai-current-sync',
+      messageSeq: 29,
+      content: {
+        text: '**当前同步回复**',
+        format: 'markdown',
+        markdown: true,
+        ai: true,
+        streaming: false
+      }
+    })
+  })
+
+  it('orders DeepSeek AI replies after the triggering user message when backend seq is lower but timestamp is later', async () => {
+    const api = await import('@tsdaodao/datasource-vue/api')
+    const { useMessageStore } = await import('../../../packages/datasource-vue/src/stores/messageStore.ts')
+    const messageStore = useMessageStore()
+
+    vi.mocked(api.syncApi.syncMessages).mockResolvedValueOnce({
+      messages: [
+        {
+          message_id: 1,
+          message_idstr: 'm-ai-lower-seq-history',
+          message_seq: 99,
+          client_msg_no: '',
+          from_uid: 'deepseek_ai_robot',
+          timestamp: 201,
+          payload: JSON.stringify({
+            type: 1,
+            text: '**稍后回复**',
+            content: '**稍后回复**',
+            format: 'markdown',
+            markdown: true,
+            ai: true
+          }),
+          is_deleted: 0
+        },
+        {
+          message_id: 2,
+          message_idstr: 'm-user-higher-seq-history',
+          message_seq: 101,
+          client_msg_no: 'user-higher-seq-history',
+          from_uid: 'me',
+          timestamp: 200,
+          payload: JSON.stringify({
+            type: 1,
+            text: '触发 AI 的用户消息',
+            content: '触发 AI 的用户消息'
+          }),
+          is_deleted: 0
+        }
+      ]
+    })
+
+    await messageStore.syncMessages('deepseek_ai_robot', 1)
+
+    const texts = messageStore.getChannelMessages('deepseek_ai_robot', 1)
+      .map(item => item.content.text)
+
+    expect(texts).toEqual([
+      '触发 AI 的用户消息',
+      '**稍后回复**'
+    ])
+  })
+
   it('edits, locally deletes, mutually deletes, and marks receipts through backend-backed store actions', async () => {
     const { useMessageStore } = await import('../../../packages/datasource-vue/src/stores/messageStore.ts')
     const messageStore = useMessageStore()

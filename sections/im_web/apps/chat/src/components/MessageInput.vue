@@ -2,6 +2,7 @@
 import { ref, computed, watch, onBeforeUnmount, nextTick } from 'vue';
 import { Message as ArcoMessage } from '@arco-design/web-vue';
 import { commonApi, useMessageStore, useConversationStore, useGroupStore, useUserStore } from '@tsdaodao/datasource-vue';
+import { useRobotConfigStore } from '@tsdaodao/contacts-vue';
 import WKSDK, { CMDContent } from 'wukongimjssdk';
 
 const props = defineProps<{
@@ -13,6 +14,7 @@ const messageStore = useMessageStore();
 const conversationStore = useConversationStore();
 const groupStore = useGroupStore();
 const userStore = useUserStore();
+const robotConfigStore = useRobotConfigStore();
 
 const inputText = ref('');
 const textareaRef = ref<HTMLTextAreaElement | null>(null);
@@ -22,8 +24,17 @@ const uploadHint = ref('');
 const robotMenuState = ref<'idle' | 'loading' | 'ready' | 'unavailable' | 'failed'>('idle');
 const robotMenus = ref<Array<{ id: string; title: string; command: string; robotId: string }>>([]);
 const robotAck = ref('');
+const aiState = ref<'idle' | 'loading' | 'failed'>('idle');
+const voiceState = ref<'idle' | 'recording' | 'sending' | 'unsupported'>('idle');
+const voiceDuration = ref(0);
 let typingTimeout: any = null;
+let voiceRecorder: MediaRecorder | null = null;
+let voiceStream: MediaStream | null = null;
+let voiceChunks: Blob[] = [];
+let voiceTimer: number | undefined;
+let aiAbortController: AbortController | null = null;
 const SYSTEM_ROBOT_ID = 'u_10000';
+const DEEPSEEK_AI_ROBOT_ID = 'deepseek_ai_robot';
 
 // Mention state
 const showMentionPopup = ref(false);
@@ -41,6 +52,12 @@ const replyDigest = computed(() => {
   const target = messageStore.replyTarget;
   if (!target) return '';
   return target.content?.text || '[消息]';
+});
+
+const activeRobotConfig = computed(() => robotConfigStore.enabledConfigs[0]);
+const isAiRobotConversation = computed(() => {
+  return props.channelType === 1 &&
+    props.channelId === DEEPSEEK_AI_ROBOT_ID;
 });
 
 // Group members list
@@ -137,6 +154,237 @@ function openImagePicker() {
 
 function openFilePicker() {
   fileInputRef.value?.click();
+}
+
+function createVoiceFile(blob: Blob) {
+  const extension = blob.type.includes('mp4') ? 'm4a' : blob.type.includes('ogg') ? 'ogg' : 'webm';
+  return new File([blob], `voice-${Date.now()}.${extension}`, {
+    type: blob.type || 'audio/webm'
+  });
+}
+
+function cleanupVoiceRecording() {
+  if (voiceTimer) {
+    window.clearInterval(voiceTimer);
+    voiceTimer = undefined;
+  }
+  voiceStream?.getTracks().forEach(track => track.stop());
+  voiceStream = null;
+  voiceRecorder = null;
+  voiceChunks = [];
+}
+
+async function startVoiceRecording() {
+  if (!navigator.mediaDevices?.getUserMedia || typeof MediaRecorder === 'undefined') {
+    voiceState.value = 'unsupported';
+    ArcoMessage.warning('当前浏览器不支持语音录制');
+    return;
+  }
+  if (voiceState.value === 'recording') return;
+  try {
+    voiceStream = await navigator.mediaDevices.getUserMedia({ audio: true });
+    voiceChunks = [];
+    voiceDuration.value = 0;
+    voiceRecorder = new MediaRecorder(voiceStream);
+    voiceRecorder.addEventListener('dataavailable', event => {
+      if (event.data.size > 0) voiceChunks.push(event.data);
+    });
+    voiceRecorder.start();
+    voiceState.value = 'recording';
+    voiceTimer = window.setInterval(() => {
+      voiceDuration.value += 1;
+    }, 1000);
+  } catch (err) {
+    cleanupVoiceRecording();
+    voiceState.value = 'idle';
+    ArcoMessage.error('无法开始录音，请检查麦克风权限');
+  }
+}
+
+async function stopVoiceRecording() {
+  if (!voiceRecorder || voiceState.value !== 'recording') return;
+  const recorder = voiceRecorder;
+  const finalDuration = Math.max(1, voiceDuration.value);
+  voiceState.value = 'sending';
+  await new Promise<void>((resolve) => {
+    recorder.addEventListener('stop', () => resolve(), { once: true });
+    recorder.stop();
+  });
+  const blob = new Blob(voiceChunks, { type: recorder.mimeType || 'audio/webm' });
+  cleanupVoiceRecording();
+  try {
+    await messageStore.sendVoiceMessage(props.channelId, props.channelType, createVoiceFile(blob), finalDuration);
+    ArcoMessage.success('语音已发送');
+  } catch (err) {
+    console.error('Failed to send voice message', err);
+    ArcoMessage.error('语音发送失败，请稍后重试');
+  } finally {
+    voiceState.value = 'idle';
+    voiceDuration.value = 0;
+  }
+}
+
+function cancelVoiceRecording() {
+  if (voiceRecorder && voiceState.value === 'recording') {
+    voiceRecorder.stop();
+  }
+  cleanupVoiceRecording();
+  voiceState.value = 'idle';
+  voiceDuration.value = 0;
+}
+
+function buildAiHistory() {
+  return messageStore.getChannelMessages(props.channelId, props.channelType)
+    .filter(item => item.content?.type === 1 && (item.content?.text || item.content?.content))
+    .slice(-8)
+    .map(item => ({
+      role: item.fromUID === DEEPSEEK_AI_ROBOT_ID ? 'assistant' as const : 'user' as const,
+      content: String(item.content?.text || item.content?.content || '')
+    }));
+}
+
+function createAiReplyMessage(text = '') {
+  const clientMsgNo = `ai-stream-${Date.now()}-${Math.random().toString(16).slice(2)}`;
+  messageStore.addMessage(props.channelId, props.channelType, {
+    messageID: clientMsgNo,
+    messageSeq: 0,
+    clientMsgNo,
+    fromUID: DEEPSEEK_AI_ROBOT_ID,
+    timestamp: Math.floor(Date.now() / 1000),
+    content: {
+      type: 1,
+      text,
+      content: text,
+      format: 'markdown',
+      markdown: true,
+      ai: true,
+      streaming: true
+    },
+    isRevoked: false,
+    status: 'sending'
+  });
+  return clientMsgNo;
+}
+
+function appendAiReplyStreamChunk(clientMsgNo: string, delta: string) {
+  const existing = messageStore.getChannelMessages(props.channelId, props.channelType)
+    .find(item => item.clientMsgNo === clientMsgNo);
+  const current = String(existing?.content?.text || existing?.content?.content || '');
+  const nextText = `${current}${delta}`;
+  messageStore.updateMessageStatus(clientMsgNo, {
+    content: {
+      ...(existing?.content || {}),
+      type: 1,
+      text: nextText,
+      content: nextText,
+      format: 'markdown',
+      markdown: true,
+      ai: true,
+      streaming: true
+    },
+    status: 'sending'
+  });
+}
+
+async function sendAiAssistant(promptText?: string) {
+  const prompt = (promptText ?? inputText.value).trim();
+  if (!prompt || aiState.value === 'loading') return;
+
+  aiState.value = 'loading';
+  inputText.value = '';
+  conversationStore.updateDraft(props.channelId, props.channelType, '');
+  let aiMessageClientMsgNo = '';
+  try {
+    const history = buildAiHistory();
+    await messageStore.sendMessage(props.channelId, props.channelType, prompt);
+    const config = activeRobotConfig.value;
+    aiMessageClientMsgNo = createAiReplyMessage('');
+    aiAbortController = new AbortController();
+    const finalEvent = await commonApi.requestAiReplyStream({
+      channel_id: props.channelId,
+      channel_type: props.channelType,
+      prompt,
+      system_prompt: config?.prompt || '',
+      model: config?.model || 'deepseek-chat',
+      history
+    }, {
+      signal: aiAbortController.signal,
+      onDelta: delta => appendAiReplyStreamChunk(aiMessageClientMsgNo, delta)
+    });
+    const existing = messageStore.getChannelMessages(props.channelId, props.channelType)
+      .find(item => item.clientMsgNo === aiMessageClientMsgNo);
+    const finalText = String(existing?.content?.text || existing?.content?.content || 'AI 暂时没有返回内容。');
+    if (Number(finalEvent?.message_id || 0) > 0) {
+      messageStore.updateMessageStatus(aiMessageClientMsgNo, {
+        messageID: String(finalEvent.message_id),
+        messageSeq: Number(finalEvent?.message_seq || existing?.messageSeq || 0),
+        timestamp: Number(finalEvent?.timestamp || existing?.timestamp || Math.floor(Date.now() / 1000)),
+        content: {
+          ...(existing?.content || {}),
+          type: 1,
+          text: finalText,
+          content: finalText,
+          format: 'markdown',
+          markdown: true,
+          ai: true,
+          streaming: false
+        },
+        status: 'success'
+      });
+    } else {
+      const persistedAiReply = messageStore.getChannelMessages(props.channelId, props.channelType)
+        .find(item =>
+          item.clientMsgNo !== aiMessageClientMsgNo &&
+          item.fromUID === DEEPSEEK_AI_ROBOT_ID &&
+          Number(item.messageSeq || 0) > 0 &&
+          String(item.content?.text || item.content?.content || '') === finalText
+        );
+      if (persistedAiReply) {
+        messageStore.removeMessageByClientMsgNo(aiMessageClientMsgNo);
+      } else {
+        messageStore.updateMessageStatus(aiMessageClientMsgNo, {
+          messageID: existing?.messageID || aiMessageClientMsgNo,
+          messageSeq: Number(existing?.messageSeq || 0),
+          timestamp: Number(finalEvent?.timestamp || existing?.timestamp || Math.floor(Date.now() / 1000)),
+          content: {
+            ...(existing?.content || {}),
+            type: 1,
+            text: finalText,
+            content: finalText,
+            format: 'markdown',
+            markdown: true,
+            ai: true,
+            streaming: false
+          },
+          status: 'success'
+        });
+      }
+    }
+    ArcoMessage.success('AI 已回复');
+    aiState.value = 'idle';
+  } catch (err) {
+    console.error('Failed to request AI assistant', err);
+    if (aiMessageClientMsgNo) {
+      messageStore.updateMessageStatus(aiMessageClientMsgNo, {
+        content: {
+          type: 1,
+          text: 'AI 助手暂不可用，请稍后重试。',
+          content: 'AI 助手暂不可用，请稍后重试。',
+          format: 'markdown',
+          markdown: true,
+          ai: true,
+          streaming: false
+        },
+        status: 'fail',
+        retryable: false
+      });
+    }
+    aiState.value = 'failed';
+    inputText.value = prompt;
+    ArcoMessage.error('AI 助手暂不可用，请稍后重试');
+  } finally {
+    aiAbortController = null;
+  }
 }
 
 async function insertMentionTrigger() {
@@ -253,6 +501,11 @@ async function handleSend() {
   const text = inputText.value.trim();
   if (!text) return;
 
+  if (isAiRobotConversation.value) {
+    await sendAiAssistant(text);
+    return;
+  }
+
   inputText.value = '';
   conversationStore.updateDraft(props.channelId, props.channelType, '');
 
@@ -307,6 +560,8 @@ function handleKeyDown(e: KeyboardEvent) {
 
 onBeforeUnmount(() => {
   if (typingTimeout) clearTimeout(typingTimeout);
+  aiAbortController?.abort();
+  cleanupVoiceRecording();
 });
 </script>
 
@@ -342,6 +597,33 @@ onBeforeUnmount(() => {
       <button class="action-btn" title="机器人菜单" @click="openRobotMenu">
         Bot
       </button>
+      <button
+        v-if="!isAiRobotConversation"
+        class="action-btn"
+        :class="{ active: aiState === 'loading' }"
+        :disabled="!inputText.trim() || aiState === 'loading'"
+        title="AI 助手回复"
+        @click="() => sendAiAssistant()"
+      >
+        AI
+      </button>
+      <button
+        v-if="voiceState !== 'recording'"
+        class="action-btn"
+        :disabled="voiceState === 'sending'"
+        title="开始录音"
+        @click="startVoiceRecording"
+      >
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" class="action-svg">
+          <path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z" />
+          <path d="M19 10v1a7 7 0 0 1-14 0v-1M12 19v4M8 23h8" />
+        </svg>
+      </button>
+      <div v-else class="voice-recording-bar">
+        <span>录音中 {{ voiceDuration }}s</span>
+        <button class="voice-mini-btn" @click="stopVoiceRecording">发送</button>
+        <button class="voice-mini-btn" @click="cancelVoiceRecording">取消</button>
+      </div>
       <button class="action-btn" title="选择图片" @click="openImagePicker">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" class="action-svg">
           <rect x="3" y="3" width="18" height="18" rx="2" ry="2" />
@@ -385,6 +667,17 @@ onBeforeUnmount(() => {
       <div v-if="robotAck" class="robot-ack">{{ robotAck }}</div>
     </div>
 
+    <div v-if="isAiRobotConversation" class="robot-panel ai-contact-panel">
+      <div class="robot-panel-header">
+        <span class="robot-panel-title">DeepSeek AI</span>
+        <span class="robot-panel-hint">发送消息后自动由 AI 回复</span>
+      </div>
+      <div class="robot-state">
+        <span class="robot-state-title">AI 联系人已启用</span>
+        <span>使用系统环境变量中的 DeepSeek Key，回复会按 Markdown 显示。</span>
+      </div>
+    </div>
+
     <div class="input-area-wrapper">
       <input
         ref="imageInputRef"
@@ -414,7 +707,7 @@ onBeforeUnmount(() => {
 
     <div class="input-footer">
       <div class="input-hint">
-        {{ uploadHint || '输入自动同步草稿，Enter 发送，Ctrl+Enter 换行' }}
+        {{ uploadHint || (aiState === 'loading' ? 'AI 正在生成回复...' : voiceState === 'sending' ? '正在发送语音...' : '输入自动同步草稿，Enter 发送，Ctrl+Enter 换行') }}
       </div>
       <button 
         class="send-btn" 
@@ -562,9 +855,43 @@ onBeforeUnmount(() => {
   color: var(--text-primary);
 }
 
+.action-btn:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
+.action-btn.active {
+  background-color: rgba(22, 93, 255, 0.1);
+  color: var(--primary-color, #165dff);
+}
+
 .action-svg {
   width: 20px;
   height: 20px;
+}
+
+.voice-recording-bar {
+  min-height: 28px;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 0 8px;
+  border: var(--border-hairline);
+  border-radius: var(--radius-sm);
+  background: var(--bg-secondary);
+  color: var(--text-primary);
+  font-size: 12px;
+}
+
+.voice-mini-btn {
+  height: 22px;
+  padding: 0 8px;
+  border: var(--border-hairline);
+  border-radius: var(--radius-sm);
+  background: var(--bg-primary);
+  color: var(--text-primary);
+  cursor: pointer;
+  font-size: 12px;
 }
 
 .robot-panel {

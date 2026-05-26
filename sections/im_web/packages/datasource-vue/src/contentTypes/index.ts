@@ -22,9 +22,26 @@ export class MessageVoice extends MessageContent {
   url!: string;
   time!: number;
 
+  constructor(url?: string, time?: number) {
+    super();
+    this.url = url || '';
+    this.time = time || 0;
+  }
+
+  get contentType(): number {
+    return 4;
+  }
+
   decodeJSON(content: any) {
     this.url = content.url || '';
     this.time = content.time || 0;
+  }
+
+  encodeJSON() {
+    return {
+      url: this.url || '',
+      time: this.time || 0
+    };
   }
 
   get conversationDigest(): string {
