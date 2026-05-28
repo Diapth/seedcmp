@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { computed } from 'vue';
+import { normalizeMediaUrl } from '../../service/mediaUrl';
 
 const props = defineProps<{
   message: {
@@ -13,9 +14,20 @@ const props = defineProps<{
   isMe: boolean;
 }>();
 
-const url = computed(() => props.message.content?.url || props.message.payload?.url || '');
+const emit = defineEmits<{
+  (event: 'preview', payload: {
+    kind: 'markdown' | 'text' | 'html' | 'pdf' | 'office' | 'unsupported';
+    url: string;
+    name: string;
+    size: number;
+    extension: string;
+  }): void;
+}>();
+
+const url = computed(() => normalizeMediaUrl(props.message.content?.url || props.message.payload?.url || ''));
 const name = computed(() => props.message.content?.name || props.message.payload?.name || '未知文件');
 const size = computed(() => props.message.content?.size || props.message.payload?.size || 0);
+const isAvailable = computed(() => !!url.value);
 
 const sizeStr = computed(() => {
   if (size.value === 0) return '0 B';
@@ -25,18 +37,50 @@ const sizeStr = computed(() => {
   return parseFloat((size.value / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
 });
 
+const extension = computed(() => {
+  const cleanName = name.value.split('?')[0].toLowerCase();
+  const dot = cleanName.lastIndexOf('.');
+  return dot >= 0 ? cleanName.slice(dot + 1) : '';
+});
+
+const previewKind = computed<'markdown' | 'text' | 'html' | 'pdf' | 'office' | 'unsupported'>(() => {
+  const ext = extension.value;
+  if (['md', 'markdown'].includes(ext)) return 'markdown';
+  if (['txt', 'log', 'json', 'csv', 'xml', 'yml', 'yaml'].includes(ext)) return 'text';
+  if (['html', 'htm'].includes(ext)) return 'html';
+  if (ext === 'pdf') return 'pdf';
+  if (['doc', 'docx', 'xls', 'xlsx', 'ppt', 'pptx'].includes(ext)) return 'office';
+  return 'unsupported';
+});
+
+const canPreview = computed(() => isAvailable.value && previewKind.value !== 'unsupported');
+
 function handleDownload() {
-  if (!url.value) return;
+  if (!isAvailable.value) return;
   window.open(url.value, '_blank');
+}
+
+function openPreview() {
+  if (!canPreview.value) {
+    handleDownload();
+    return;
+  }
+  emit('preview', {
+    kind: previewKind.value,
+    url: url.value,
+    name: name.value,
+    size: size.value,
+    extension: extension.value
+  });
 }
 </script>
 
 <template>
-  <div class="file-cell" :class="{ 'is-me': isMe }" @click="handleDownload">
+  <div class="file-cell" :class="{ 'is-me': isMe, unavailable: !isAvailable }">
     <div class="bubble">
       <div class="file-details">
         <span class="file-name" :title="name">{{ name }}</span>
-        <span class="file-size">{{ sizeStr }}</span>
+        <span class="file-size">{{ isAvailable ? `${sizeStr} · ${canPreview ? '可预览' : '点击打开'}` : '下载不可用' }}</span>
       </div>
       <div class="file-icon-wrapper">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" class="file-svg">
@@ -47,6 +91,10 @@ function handleDownload() {
           <polyline points="10 9 9 9 8 9" />
         </svg>
       </div>
+      <div class="file-actions">
+        <button class="file-action" :disabled="!isAvailable" title="预览文件" @click.stop="openPreview">预览</button>
+        <button class="file-action" :disabled="!isAvailable" title="打开或下载文件" @click.stop="handleDownload">打开</button>
+      </div>
     </div>
   </div>
 </template>
@@ -54,15 +102,21 @@ function handleDownload() {
 <style scoped>
 .file-cell {
   display: flex;
-  width: 100%;
+  width: clamp(240px, 34vw, 320px);
+  max-width: 100%;
   cursor: pointer;
+}
+
+.file-cell.unavailable {
+  cursor: not-allowed;
 }
 
 .bubble {
   display: flex;
   align-items: center;
-  gap: 16px;
-  max-width: 60%;
+  gap: 12px;
+  width: 100%;
+  min-width: 0;
   padding: 12px 16px;
   border-radius: var(--radius-sm);
   border: var(--border-hairline);
@@ -80,6 +134,7 @@ function handleDownload() {
   flex-direction: column;
   gap: 4px;
   overflow: hidden;
+  min-width: 0;
   flex: 1;
 }
 
@@ -109,6 +164,29 @@ function handleDownload() {
   flex-shrink: 0;
 }
 
+.file-actions {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  flex-shrink: 0;
+}
+
+.file-action {
+  min-width: 44px;
+  height: 24px;
+  border: var(--border-hairline);
+  border-radius: var(--radius-sm);
+  background: var(--bg-secondary);
+  color: var(--text-primary);
+  font-size: 12px;
+  cursor: pointer;
+}
+
+.file-action:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
 .file-svg {
   width: 24px;
   height: 24px;
@@ -124,5 +202,11 @@ function handleDownload() {
 
 .file-cell.is-me .file-icon-wrapper {
   background-color: var(--bg-primary);
+}
+
+@media (max-width: 640px) {
+  .file-cell {
+    width: min(100%, 320px);
+  }
 }
 </style>

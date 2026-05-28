@@ -9,8 +9,7 @@ import {
   useGroupStore
 } from '@tsdaodao/datasource-vue';
 import { useUserStore } from '@tsdaodao/datasource-vue';
-import { groupApi } from '@tsdaodao/datasource-vue';
-import { ChannelAvatar } from '@tsdaodao/base-vue';
+import { AppDialog, ChannelAvatar } from '@tsdaodao/base-vue';
 import { Message } from '@arco-design/web-vue';
 
 const route = useRoute();
@@ -23,6 +22,8 @@ const groupNo = computed(() => route.params.groupNo as string);
 const groupInfo = computed(() => groupStore.groups[groupNo.value]);
 const members = computed(() => groupStore.groupMembers[groupNo.value] || []);
 const memberKeyword = ref('');
+const pendingAction = ref<null | { title: string; message: string; danger?: boolean; run: () => Promise<void> }>(null);
+const pendingActionLoading = ref(false);
 
 const filteredMembers = computed(() => {
   const keyword = memberKeyword.value.trim().toLowerCase();
@@ -54,20 +55,21 @@ onMounted(async () => {
 });
 
 async function handleRemoveMember(uid: string) {
-  try {
-    await groupApi.removeMembers(groupNo.value, [uid]);
-    Message.success('已移出该成员');
-    await groupStore.fetchGroupMembers(groupNo.value);
-  } catch (err: any) {
-    Message.error(err.msg || '操作失败');
-  }
+  pendingAction.value = {
+    title: '移出成员',
+    message: '确认移出该成员？',
+    danger: true,
+    run: async () => {
+      await groupStore.removeMembers(groupNo.value, [uid]);
+      Message.success('已移出该成员');
+    }
+  };
 }
 
 async function handleAppointManager(uid: string) {
   try {
-    await groupApi.appointManager(groupNo.value, [uid]);
+    await groupStore.appointManager(groupNo.value, uid);
     Message.success('已设为管理员');
-    await groupStore.fetchGroupMembers(groupNo.value);
   } catch (err: any) {
     Message.error(err.msg || '操作失败');
   }
@@ -75,9 +77,8 @@ async function handleAppointManager(uid: string) {
 
 async function handleRemoveManager(uid: string) {
   try {
-    await groupApi.removeManager(groupNo.value, [uid]);
+    await groupStore.removeManager(groupNo.value, uid);
     Message.success('已取消管理员');
-    await groupStore.fetchGroupMembers(groupNo.value);
   } catch (err: any) {
     Message.error(err.msg || '操作失败');
   }
@@ -86,11 +87,47 @@ async function handleRemoveManager(uid: string) {
 async function handleMuteMember(uid: string, action: number) {
   try {
     // action: 1 to mute, 0 to unmute
-    await groupApi.muteMember(groupNo.value, { member_uid: uid, action, key: 1 });
+    await groupStore.muteMember(groupNo.value, uid, action === 1);
     Message.success(action === 1 ? '已禁言该成员' : '已解除禁言');
-    await groupStore.fetchGroupMembers(groupNo.value);
   } catch (err: any) {
     Message.error(err.msg || '操作失败');
+  }
+}
+
+async function handleTransferOwner(uid: string) {
+  pendingAction.value = {
+    title: '转让群主',
+    message: '确认转让群主？',
+    danger: true,
+    run: async () => {
+      await groupStore.transferOwner(groupNo.value, uid);
+      Message.success('群主已转让');
+    }
+  };
+}
+
+async function handleBlacklistMember(uid: string) {
+  pendingAction.value = {
+    title: '加入黑名单',
+    message: '确认加入黑名单？',
+    danger: true,
+    run: async () => {
+      await groupStore.blacklistMembers(groupNo.value, [uid], true);
+      Message.success('已加入黑名单');
+    }
+  };
+}
+
+async function confirmPendingAction() {
+  if (!pendingAction.value) return;
+  pendingActionLoading.value = true;
+  try {
+    await pendingAction.value.run();
+    pendingAction.value = null;
+  } catch (err: any) {
+    Message.error(err.msg || '操作失败');
+  } finally {
+    pendingActionLoading.value = false;
   }
 }
 
@@ -148,6 +185,14 @@ function handleGoBack() {
               取消管理员
             </button>
 
+            <button
+              v-if="isOwner && Number(m.role || 0) !== 1"
+              class="action-btn"
+              @click="handleTransferOwner(m.uid)"
+            >
+              转让群主
+            </button>
+
             <!-- Mute buttons -->
             <button 
               v-if="canManage && canManageGroupMember(groupInfo, m)" 
@@ -166,10 +211,29 @@ function handleGoBack() {
             >
               移出
             </button>
+
+            <button
+              v-if="canManage && canManageGroupMember(groupInfo, m)"
+              class="action-btn blacklist-btn"
+              @click="handleBlacklistMember(m.uid)"
+            >
+              黑名单
+            </button>
           </div>
         </div>
       </div>
     </div>
+
+    <AppDialog
+      :visible="!!pendingAction"
+      :title="pendingAction?.title || ''"
+      :message="pendingAction?.message || ''"
+      :danger="pendingAction?.danger"
+      :loading="pendingActionLoading"
+      confirm-text="确认"
+      @confirm="confirmPendingAction"
+      @close="pendingAction = null"
+    />
   </div>
 </template>
 
@@ -319,7 +383,8 @@ function handleGoBack() {
   border-color: #ff4d4f40;
 }
 
-.kick-btn {
+.kick-btn,
+.blacklist-btn {
   background-color: #ff4d4f15;
   color: #ff4d4f;
   border-color: #ff4d4f40;

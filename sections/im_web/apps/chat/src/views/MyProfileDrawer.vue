@@ -18,8 +18,20 @@ const newName = ref('');
 const newAvatar = ref('');
 const isEditing = ref(false);
 const saving = ref(false);
+const notificationEnabled = ref(false);
+const notificationPermissionState = ref<'granted' | 'denied' | 'default' | 'unsupported'>('unsupported');
+const notificationSaving = ref(false);
 
 const currentUser = computed(() => userStore.currentUser);
+const personalQrPayload = computed(() => {
+  if (!currentUser.value) return '';
+  return JSON.stringify({
+    type: 'user',
+    uid: currentUser.value.uid,
+    name: currentUser.value.name,
+    short_no: currentUser.value.short_no || ''
+  });
+});
 
 function isNonBlockingCmdFailure(err: any) {
   const message = String(err?.msg || err?.message || '');
@@ -31,8 +43,19 @@ watch(() => props.visible, (val) => {
     newName.value = currentUser.value.name || '';
     newAvatar.value = currentUser.value.avatar || '';
     isEditing.value = false;
+    syncNotificationPermission();
   }
 });
+
+function syncNotificationPermission() {
+  if (typeof Notification === 'undefined') {
+    notificationPermissionState.value = 'unsupported';
+    notificationEnabled.value = false;
+    return;
+  }
+  notificationPermissionState.value = Notification.permission;
+  notificationEnabled.value = Notification.permission === 'granted';
+}
 
 async function handleSave() {
   if (!newName.value.trim()) {
@@ -42,13 +65,7 @@ async function handleSave() {
   
   saving.value = true;
   try {
-    // 1. Update Profile (Name)
-    await userApi.updateProfile({ name: newName.value.trim() });
-
-    // 2. Local State update
-    if (userStore.currentUser) {
-      userStore.currentUser.name = newName.value.trim();
-    }
+    await userStore.updateProfile({ name: newName.value.trim() });
     
     Message.success('个人资料更新成功');
     isEditing.value = false;
@@ -80,13 +97,48 @@ const presets = [
 async function selectPresetAvatar(url: string) {
   try {
     newAvatar.value = url;
-    // Update local state directly for mock / demonstration
-    if (userStore.currentUser) {
-      userStore.currentUser.avatar = url;
-    }
+    await userStore.updateAvatar(url);
     Message.success('头像设置成功');
   } catch (err) {
     console.error(err);
+    Message.error('头像设置失败');
+  }
+}
+
+async function toggleNotifications() {
+  notificationSaving.value = true;
+  try {
+    if (typeof Notification === 'undefined') {
+      notificationPermissionState.value = 'unsupported';
+      Message.warning('当前浏览器不支持桌面通知');
+      return;
+    }
+    let permission = Notification.permission;
+    if (permission === 'default') {
+      permission = await Notification.requestPermission();
+    }
+    notificationPermissionState.value = permission;
+    if (permission !== 'granted') {
+      notificationEnabled.value = false;
+      await userApi.unregisterDeviceToken().catch(() => undefined);
+      Message.warning(permission === 'denied' ? '浏览器已拒绝通知权限' : '通知权限未开启');
+      return;
+    }
+    notificationEnabled.value = !notificationEnabled.value;
+    if (notificationEnabled.value) {
+      await userApi.registerDeviceToken({
+        device_token: `web-${currentUser.value?.uid || 'anonymous'}`,
+        device_type: 'web'
+      });
+      Message.success('通知已开启');
+    } else {
+      await userApi.unregisterDeviceToken();
+      Message.success('通知已关闭');
+    }
+  } catch (err: any) {
+    Message.error(err.msg || '通知设置失败');
+  } finally {
+    notificationSaving.value = false;
   }
 }
 
@@ -167,18 +219,35 @@ function goToBlacklist() {
           </button>
         </div>
 
+        <div class="form-section">
+          <h4 class="section-title">个人二维码</h4>
+          <div class="qr-box" :title="personalQrPayload">
+            <div class="qr-grid" aria-label="个人二维码">
+              <span v-for="idx in 49" :key="idx" :class="{ dark: personalQrPayload.charCodeAt(idx % personalQrPayload.length || 0) % 2 === 0 }"></span>
+            </div>
+            <div class="qr-meta">{{ currentUser.short_no || currentUser.uid }}</div>
+          </div>
+        </div>
+
         <!-- System configurations (minimalist toggles) -->
         <div class="form-section">
           <h4 class="section-title">系统偏好</h4>
           
           <div class="pref-item">
             <div class="pref-info">
-              <span class="pref-title">通知声音</span>
-              <span class="pref-desc">收到新消息时播放通知音效</span>
+              <span class="pref-title">桌面通知</span>
+              <span class="pref-desc">
+                {{ notificationPermissionState === 'unsupported' ? '当前浏览器不支持通知' : notificationPermissionState === 'denied' ? '浏览器已拒绝通知权限' : '收到新消息时显示桌面提醒' }}
+              </span>
             </div>
-            <div class="toggle-switch active">
+            <button
+              class="toggle-switch"
+              :class="{ active: notificationEnabled }"
+              :disabled="notificationSaving || notificationPermissionState === 'unsupported'"
+              @click="toggleNotifications"
+            >
               <div class="toggle-thumb"></div>
-            </div>
+            </button>
           </div>
 
           <div class="pref-item">
@@ -389,6 +458,42 @@ function goToBlacklist() {
   gap: 8px;
 }
 
+.qr-box {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 12px;
+  border: var(--border-hairline);
+  border-radius: var(--radius-sm);
+  background-color: var(--bg-secondary);
+}
+
+.qr-grid {
+  width: 84px;
+  height: 84px;
+  display: grid;
+  grid-template-columns: repeat(7, 1fr);
+  gap: 2px;
+  padding: 6px;
+  background-color: #ffffff;
+  border: var(--border-hairline);
+}
+
+.qr-grid span {
+  background-color: #ffffff;
+}
+
+.qr-grid span.dark {
+  background-color: #1d2129;
+}
+
+.qr-meta {
+  min-width: 0;
+  font-size: 12px;
+  color: var(--text-secondary);
+  word-break: break-all;
+}
+
 .save-btn:hover {
   opacity: 0.9;
 }
@@ -427,6 +532,8 @@ function goToBlacklist() {
 .toggle-switch {
   width: 40px;
   height: 20px;
+  border: none;
+  padding: 0;
   background-color: #e5e6eb;
   border-radius: 10px;
   position: relative;
@@ -436,6 +543,11 @@ function goToBlacklist() {
 
 .toggle-switch.active {
   background-color: #52c41a;
+}
+
+.toggle-switch:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
 }
 
 .toggle-thumb {

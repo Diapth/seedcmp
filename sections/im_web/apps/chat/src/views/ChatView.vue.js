@@ -7,6 +7,7 @@ import { useConversationStore } from '@tsdaodao/datasource-vue';
 import { GroupSettingsDrawer } from '@tsdaodao/base-vue';
 import MessageList from '../components/MessageList.vue';
 import MessageInput from '../components/MessageInput.vue';
+import ChatSidePreview from '../components/ChatSidePreview.vue';
 import UserProfileDrawer from './UserProfileDrawer.vue';
 const { defineProps, defineSlots, defineEmits, defineExpose, defineModel, defineOptions, withDefaults, } = await import('vue');
 const route = useRoute();
@@ -16,6 +17,18 @@ const messageStore = useMessageStore();
 const conversationStore = useConversationStore();
 const showGroupSettings = ref(false);
 const showUserProfile = ref(false);
+const sidePreviewRequestId = ref(0);
+const sidePreview = ref({
+    visible: false,
+    type: 'file-text',
+    title: '',
+    subtitle: '',
+    sourceUrl: '',
+    sourceText: '',
+    extension: '',
+    loading: false,
+    error: ''
+});
 const channelId = computed(() => route.params.channelId);
 const channelType = computed(() => Number(route.params.channelType || 1));
 const channelKey = computed(() => `${channelId.value}-${channelType.value}`);
@@ -26,6 +39,11 @@ const isTyping = computed(() => {
     const key = `${channelId.value}-${channelType.value}`;
     return messageStore.typingState[key]?.isTyping === true;
 });
+function isChatViewActive(cid, ctype) {
+    return route.name === 'Conversation' &&
+        String(route.params.channelId || '') === String(cid) &&
+        Number(route.params.channelType || 0) === Number(ctype);
+}
 async function loadChannelDetails() {
     const cid = channelId.value;
     const ctype = channelType.value;
@@ -35,16 +53,21 @@ async function loadChannelDetails() {
         channelStore.getChannelInfo(cid, ctype);
     }
     await messageStore.syncMessages(cid, ctype);
-    await conversationStore.clearUnread(cid, ctype);
+    if (isChatViewActive(cid, ctype)) {
+        await conversationStore.clearUnread(cid, ctype);
+    }
 }
 onMounted(() => {
     loadChannelDetails();
 });
 watch([channelId, channelType], () => {
+    closeSidePreview();
     loadChannelDetails();
 });
 watch(() => messageStore.messages[channelKey.value]?.length, () => {
-    void conversationStore.clearUnread(channelId.value, channelType.value);
+    if (isChatViewActive(channelId.value, channelType.value)) {
+        void conversationStore.clearUnread(channelId.value, channelType.value);
+    }
 });
 function handleHeaderClick() {
     if (channelType.value === 1) {
@@ -57,6 +80,82 @@ function handleGroupSettingsClick() {
 function handleMembersClick() {
     showGroupSettings.value = false;
     router.push(`/chat/group-members/${channelId.value}`);
+}
+function filePreviewType(kind) {
+    const map = {
+        markdown: 'file-markdown',
+        text: 'file-text',
+        html: 'file-html',
+        pdf: 'file-pdf',
+        office: 'file-office'
+    };
+    return map[kind] || 'file-text';
+}
+function filePreviewTitle(kind) {
+    const labels = {
+        markdown: 'Markdown 预览',
+        text: '文本预览',
+        html: 'HTML 预览',
+        pdf: 'PDF 预览',
+        office: 'Office 文件预览'
+    };
+    return labels[kind] || '文件预览';
+}
+function closeSidePreview() {
+    sidePreviewRequestId.value += 1;
+    sidePreview.value.visible = false;
+    sidePreview.value.loading = false;
+    sidePreview.value.error = '';
+}
+async function handleOpenPreview(payload) {
+    const requestId = sidePreviewRequestId.value + 1;
+    sidePreviewRequestId.value = requestId;
+    if (payload?.source === 'ai-code') {
+        sidePreview.value = {
+            visible: true,
+            type: 'ai-html',
+            title: 'AI HTML 预览',
+            subtitle: payload.language ? `${payload.language} 代码块` : 'HTML 代码块',
+            sourceUrl: '',
+            sourceText: payload.code || '',
+            extension: 'html',
+            loading: false,
+            error: payload.code ? '' : '代码块内容为空'
+        };
+        return;
+    }
+    const type = filePreviewType(payload?.kind || '');
+    sidePreview.value = {
+        visible: true,
+        type,
+        title: filePreviewTitle(payload?.kind || ''),
+        subtitle: payload?.name || '',
+        sourceUrl: payload?.url || '',
+        sourceText: '',
+        extension: payload?.extension || '',
+        loading: ['file-markdown', 'file-text', 'file-html'].includes(type),
+        error: ''
+    };
+    if (!['file-markdown', 'file-text', 'file-html'].includes(type))
+        return;
+    try {
+        const res = await fetch(payload.url);
+        if (!res.ok)
+            throw new Error(`HTTP ${res.status}`);
+        if (sidePreviewRequestId.value !== requestId)
+            return;
+        sidePreview.value.sourceText = await res.text();
+    }
+    catch (err) {
+        if (sidePreviewRequestId.value !== requestId)
+            return;
+        sidePreview.value.error = err?.message || '预览加载失败';
+    }
+    finally {
+        if (sidePreviewRequestId.value !== requestId)
+            return;
+        sidePreview.value.loading = false;
+    }
 }
 let __VLS_modelEmitsType;
 const __VLS_componentsOption = {};
@@ -72,6 +171,8 @@ function __VLS_template() {
     /* CSS variable injection */
     /* CSS variable injection end */
     let __VLS_resolvedLocalAndGlobalComponents;
+    __VLS_intrinsicElements.div;
+    __VLS_intrinsicElements.div;
     __VLS_intrinsicElements.div;
     __VLS_intrinsicElements.div;
     __VLS_intrinsicElements.div;
@@ -100,6 +201,10 @@ function __VLS_template() {
     __VLS_components.MessageInput;
     // @ts-ignore
     [MessageInput,];
+    __VLS_components.ChatSidePreview;
+    __VLS_components.ChatSidePreview;
+    // @ts-ignore
+    [ChatSidePreview,];
     __VLS_components.GroupSettingsDrawer;
     __VLS_components.GroupSettingsDrawer;
     // @ts-ignore
@@ -116,150 +221,172 @@ function __VLS_template() {
         {
             const __VLS_5 = __VLS_intrinsicElements["div"];
             const __VLS_6 = __VLS_elementAsFunctionalComponent(__VLS_5);
-            const __VLS_7 = __VLS_6({ ...{}, class: ("chat-header"), }, ...__VLS_functionalComponentArgsRest(__VLS_6));
-            ({}({ ...{}, class: ("chat-header"), }));
+            const __VLS_7 = __VLS_6({ ...{}, class: ("chat-main-column"), }, ...__VLS_functionalComponentArgsRest(__VLS_6));
+            ({}({ ...{}, class: ("chat-main-column"), }));
             {
                 const __VLS_10 = __VLS_intrinsicElements["div"];
                 const __VLS_11 = __VLS_elementAsFunctionalComponent(__VLS_10);
-                const __VLS_12 = __VLS_11({ ...{ 'onClick': {}, }, class: ("header-left"), style: (({ cursor: __VLS_ctx.channelType === 1 ? 'pointer' : 'default' })), }, ...__VLS_functionalComponentArgsRest(__VLS_11));
-                ({}({ ...{ 'onClick': {}, }, class: ("header-left"), style: (({ cursor: __VLS_ctx.channelType === 1 ? 'pointer' : 'default' })), }));
-                let __VLS_15 = { 'click': __VLS_pickEvent(__VLS_14['click'], {}.onClick) };
-                __VLS_15 = { click: (__VLS_ctx.handleHeaderClick) };
+                const __VLS_12 = __VLS_11({ ...{}, class: ("chat-header"), }, ...__VLS_functionalComponentArgsRest(__VLS_11));
+                ({}({ ...{}, class: ("chat-header"), }));
                 {
-                    const __VLS_16 = __VLS_intrinsicElements["h3"];
-                    const __VLS_17 = __VLS_elementAsFunctionalComponent(__VLS_16);
-                    const __VLS_18 = __VLS_17({ ...{}, class: ("channel-name"), }, ...__VLS_functionalComponentArgsRest(__VLS_17));
-                    ({}({ ...{}, class: ("channel-name"), }));
-                    (__VLS_ctx.channelInfo?.name || '正在加载...');
-                    (__VLS_19.slots).default;
-                    const __VLS_19 = __VLS_pickFunctionalComponentCtx(__VLS_16, __VLS_18);
-                }
-                if (__VLS_ctx.isTyping) {
+                    const __VLS_15 = __VLS_intrinsicElements["div"];
+                    const __VLS_16 = __VLS_elementAsFunctionalComponent(__VLS_15);
+                    const __VLS_17 = __VLS_16({ ...{ 'onClick': {}, }, class: ("header-left"), style: (({ cursor: __VLS_ctx.channelType === 1 ? 'pointer' : 'default' })), }, ...__VLS_functionalComponentArgsRest(__VLS_16));
+                    ({}({ ...{ 'onClick': {}, }, class: ("header-left"), style: (({ cursor: __VLS_ctx.channelType === 1 ? 'pointer' : 'default' })), }));
+                    let __VLS_20 = { 'click': __VLS_pickEvent(__VLS_19['click'], {}.onClick) };
+                    __VLS_20 = { click: (__VLS_ctx.handleHeaderClick) };
                     {
-                        const __VLS_21 = __VLS_intrinsicElements["span"];
+                        const __VLS_21 = __VLS_intrinsicElements["h3"];
                         const __VLS_22 = __VLS_elementAsFunctionalComponent(__VLS_21);
-                        const __VLS_23 = __VLS_22({ ...{}, class: ("typing-indicator"), }, ...__VLS_functionalComponentArgsRest(__VLS_22));
-                        ({}({ ...{}, class: ("typing-indicator"), }));
+                        const __VLS_23 = __VLS_22({ ...{}, class: ("channel-name"), }, ...__VLS_functionalComponentArgsRest(__VLS_22));
+                        ({}({ ...{}, class: ("channel-name"), }));
+                        (__VLS_ctx.channelInfo?.name || '正在加载...');
                         (__VLS_24.slots).default;
                         const __VLS_24 = __VLS_pickFunctionalComponentCtx(__VLS_21, __VLS_23);
                     }
-                    // @ts-ignore
-                    [channelType, channelType, handleHeaderClick, channelInfo, isTyping,];
-                }
-                else {
-                    {
-                        const __VLS_26 = __VLS_intrinsicElements["span"];
-                        const __VLS_27 = __VLS_elementAsFunctionalComponent(__VLS_26);
-                        const __VLS_28 = __VLS_27({ ...{}, class: ("status-indicator"), }, ...__VLS_functionalComponentArgsRest(__VLS_27));
-                        ({}({ ...{}, class: ("status-indicator"), }));
-                        (__VLS_ctx.channelType === 2 ? '群聊' : '在线');
-                        (__VLS_29.slots).default;
-                        const __VLS_29 = __VLS_pickFunctionalComponentCtx(__VLS_26, __VLS_28);
+                    if (__VLS_ctx.isTyping) {
+                        {
+                            const __VLS_26 = __VLS_intrinsicElements["span"];
+                            const __VLS_27 = __VLS_elementAsFunctionalComponent(__VLS_26);
+                            const __VLS_28 = __VLS_27({ ...{}, class: ("typing-indicator"), }, ...__VLS_functionalComponentArgsRest(__VLS_27));
+                            ({}({ ...{}, class: ("typing-indicator"), }));
+                            (__VLS_29.slots).default;
+                            const __VLS_29 = __VLS_pickFunctionalComponentCtx(__VLS_26, __VLS_28);
+                        }
+                        // @ts-ignore
+                        [channelType, channelType, handleHeaderClick, channelInfo, isTyping,];
                     }
-                    // @ts-ignore
-                    [channelType,];
+                    else {
+                        {
+                            const __VLS_31 = __VLS_intrinsicElements["span"];
+                            const __VLS_32 = __VLS_elementAsFunctionalComponent(__VLS_31);
+                            const __VLS_33 = __VLS_32({ ...{}, class: ("status-indicator"), }, ...__VLS_functionalComponentArgsRest(__VLS_32));
+                            ({}({ ...{}, class: ("status-indicator"), }));
+                            (__VLS_ctx.channelType === 2 ? '群聊' : '在线');
+                            (__VLS_34.slots).default;
+                            const __VLS_34 = __VLS_pickFunctionalComponentCtx(__VLS_31, __VLS_33);
+                        }
+                        // @ts-ignore
+                        [channelType,];
+                    }
+                    (__VLS_18.slots).default;
+                    const __VLS_18 = __VLS_pickFunctionalComponentCtx(__VLS_15, __VLS_17);
+                    let __VLS_19;
+                }
+                {
+                    const __VLS_36 = __VLS_intrinsicElements["div"];
+                    const __VLS_37 = __VLS_elementAsFunctionalComponent(__VLS_36);
+                    const __VLS_38 = __VLS_37({ ...{}, class: ("header-right"), }, ...__VLS_functionalComponentArgsRest(__VLS_37));
+                    ({}({ ...{}, class: ("header-right"), }));
+                    if (__VLS_ctx.channelType === 2) {
+                        {
+                            const __VLS_41 = __VLS_intrinsicElements["button"];
+                            const __VLS_42 = __VLS_elementAsFunctionalComponent(__VLS_41);
+                            const __VLS_43 = __VLS_42({ ...{ 'onClick': {}, }, class: ("settings-btn"), title: ("群聊设置"), }, ...__VLS_functionalComponentArgsRest(__VLS_42));
+                            ({}({ ...{ 'onClick': {}, }, class: ("settings-btn"), title: ("群聊设置"), }));
+                            let __VLS_46 = { 'click': __VLS_pickEvent(__VLS_45['click'], {}.onClick) };
+                            __VLS_46 = { click: (__VLS_ctx.handleGroupSettingsClick) };
+                            {
+                                const __VLS_47 = __VLS_intrinsicElements["svg"];
+                                const __VLS_48 = __VLS_elementAsFunctionalComponent(__VLS_47);
+                                const __VLS_49 = __VLS_48({ ...{}, viewBox: ("0 0 24 24"), fill: ("none"), stroke: ("currentColor"), "stroke-width": ("2"), class: ("settings-icon"), }, ...__VLS_functionalComponentArgsRest(__VLS_48));
+                                ({}({ ...{}, viewBox: ("0 0 24 24"), fill: ("none"), stroke: ("currentColor"), "stroke-width": ("2"), class: ("settings-icon"), }));
+                                {
+                                    const __VLS_52 = __VLS_intrinsicElements["circle"];
+                                    const __VLS_53 = __VLS_elementAsFunctionalComponent(__VLS_52);
+                                    const __VLS_54 = __VLS_53({ ...{}, cx: ("12"), cy: ("12"), r: ("3"), }, ...__VLS_functionalComponentArgsRest(__VLS_53));
+                                    ({}({ ...{}, cx: ("12"), cy: ("12"), r: ("3"), }));
+                                    const __VLS_55 = __VLS_pickFunctionalComponentCtx(__VLS_52, __VLS_54);
+                                }
+                                {
+                                    const __VLS_57 = __VLS_intrinsicElements["path"];
+                                    const __VLS_58 = __VLS_elementAsFunctionalComponent(__VLS_57);
+                                    const __VLS_59 = __VLS_58({ ...{}, d: ("M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"), }, ...__VLS_functionalComponentArgsRest(__VLS_58));
+                                    ({}({ ...{}, d: ("M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"), }));
+                                    const __VLS_60 = __VLS_pickFunctionalComponentCtx(__VLS_57, __VLS_59);
+                                }
+                                (__VLS_50.slots).default;
+                                const __VLS_50 = __VLS_pickFunctionalComponentCtx(__VLS_47, __VLS_49);
+                            }
+                            (__VLS_44.slots).default;
+                            const __VLS_44 = __VLS_pickFunctionalComponentCtx(__VLS_41, __VLS_43);
+                            let __VLS_45;
+                        }
+                        // @ts-ignore
+                        [channelType, handleGroupSettingsClick,];
+                    }
+                    (__VLS_39.slots).default;
+                    const __VLS_39 = __VLS_pickFunctionalComponentCtx(__VLS_36, __VLS_38);
                 }
                 (__VLS_13.slots).default;
                 const __VLS_13 = __VLS_pickFunctionalComponentCtx(__VLS_10, __VLS_12);
-                let __VLS_14;
             }
             {
-                const __VLS_31 = __VLS_intrinsicElements["div"];
-                const __VLS_32 = __VLS_elementAsFunctionalComponent(__VLS_31);
-                const __VLS_33 = __VLS_32({ ...{}, class: ("header-right"), }, ...__VLS_functionalComponentArgsRest(__VLS_32));
-                ({}({ ...{}, class: ("header-right"), }));
-                if (__VLS_ctx.channelType === 2) {
-                    {
-                        const __VLS_36 = __VLS_intrinsicElements["button"];
-                        const __VLS_37 = __VLS_elementAsFunctionalComponent(__VLS_36);
-                        const __VLS_38 = __VLS_37({ ...{ 'onClick': {}, }, class: ("settings-btn"), title: ("群聊设置"), }, ...__VLS_functionalComponentArgsRest(__VLS_37));
-                        ({}({ ...{ 'onClick': {}, }, class: ("settings-btn"), title: ("群聊设置"), }));
-                        let __VLS_41 = { 'click': __VLS_pickEvent(__VLS_40['click'], {}.onClick) };
-                        __VLS_41 = { click: (__VLS_ctx.handleGroupSettingsClick) };
-                        {
-                            const __VLS_42 = __VLS_intrinsicElements["svg"];
-                            const __VLS_43 = __VLS_elementAsFunctionalComponent(__VLS_42);
-                            const __VLS_44 = __VLS_43({ ...{}, viewBox: ("0 0 24 24"), fill: ("none"), stroke: ("currentColor"), "stroke-width": ("2"), class: ("settings-icon"), }, ...__VLS_functionalComponentArgsRest(__VLS_43));
-                            ({}({ ...{}, viewBox: ("0 0 24 24"), fill: ("none"), stroke: ("currentColor"), "stroke-width": ("2"), class: ("settings-icon"), }));
-                            {
-                                const __VLS_47 = __VLS_intrinsicElements["circle"];
-                                const __VLS_48 = __VLS_elementAsFunctionalComponent(__VLS_47);
-                                const __VLS_49 = __VLS_48({ ...{}, cx: ("12"), cy: ("12"), r: ("3"), }, ...__VLS_functionalComponentArgsRest(__VLS_48));
-                                ({}({ ...{}, cx: ("12"), cy: ("12"), r: ("3"), }));
-                                const __VLS_50 = __VLS_pickFunctionalComponentCtx(__VLS_47, __VLS_49);
-                            }
-                            {
-                                const __VLS_52 = __VLS_intrinsicElements["path"];
-                                const __VLS_53 = __VLS_elementAsFunctionalComponent(__VLS_52);
-                                const __VLS_54 = __VLS_53({ ...{}, d: ("M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"), }, ...__VLS_functionalComponentArgsRest(__VLS_53));
-                                ({}({ ...{}, d: ("M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"), }));
-                                const __VLS_55 = __VLS_pickFunctionalComponentCtx(__VLS_52, __VLS_54);
-                            }
-                            (__VLS_45.slots).default;
-                            const __VLS_45 = __VLS_pickFunctionalComponentCtx(__VLS_42, __VLS_44);
-                        }
-                        (__VLS_39.slots).default;
-                        const __VLS_39 = __VLS_pickFunctionalComponentCtx(__VLS_36, __VLS_38);
-                        let __VLS_40;
-                    }
-                    // @ts-ignore
-                    [channelType, handleGroupSettingsClick,];
-                }
-                (__VLS_34.slots).default;
-                const __VLS_34 = __VLS_pickFunctionalComponentCtx(__VLS_31, __VLS_33);
+                const __VLS_62 = {}.MessageList;
+                const __VLS_63 = __VLS_asFunctionalComponent(__VLS_62, new __VLS_62({ ...{ 'onOpenPreview': {}, }, channelId: ((__VLS_ctx.channelId)), channelType: ((__VLS_ctx.channelType)), }));
+                ({}.MessageList);
+                const __VLS_64 = __VLS_63({ ...{ 'onOpenPreview': {}, }, channelId: ((__VLS_ctx.channelId)), channelType: ((__VLS_ctx.channelType)), }, ...__VLS_functionalComponentArgsRest(__VLS_63));
+                ({}({ ...{ 'onOpenPreview': {}, }, channelId: ((__VLS_ctx.channelId)), channelType: ((__VLS_ctx.channelType)), }));
+                let __VLS_67 = { 'open-preview': __VLS_pickEvent(__VLS_66['open-preview'], {}.onOpenPreview) };
+                __VLS_67 = { "open-preview": (__VLS_ctx.handleOpenPreview) };
+                const __VLS_65 = __VLS_pickFunctionalComponentCtx(__VLS_62, __VLS_64);
+                let __VLS_66;
+            }
+            {
+                const __VLS_68 = {}.MessageInput;
+                const __VLS_69 = __VLS_asFunctionalComponent(__VLS_68, new __VLS_68({ ...{}, channelId: ((__VLS_ctx.channelId)), channelType: ((__VLS_ctx.channelType)), }));
+                ({}.MessageInput);
+                const __VLS_70 = __VLS_69({ ...{}, channelId: ((__VLS_ctx.channelId)), channelType: ((__VLS_ctx.channelType)), }, ...__VLS_functionalComponentArgsRest(__VLS_69));
+                ({}({ ...{}, channelId: ((__VLS_ctx.channelId)), channelType: ((__VLS_ctx.channelType)), }));
+                const __VLS_71 = __VLS_pickFunctionalComponentCtx(__VLS_68, __VLS_70);
             }
             (__VLS_8.slots).default;
             const __VLS_8 = __VLS_pickFunctionalComponentCtx(__VLS_5, __VLS_7);
         }
         {
-            const __VLS_57 = {}.MessageList;
-            const __VLS_58 = __VLS_asFunctionalComponent(__VLS_57, new __VLS_57({ ...{}, channelId: ((__VLS_ctx.channelId)), channelType: ((__VLS_ctx.channelType)), }));
-            ({}.MessageList);
-            const __VLS_59 = __VLS_58({ ...{}, channelId: ((__VLS_ctx.channelId)), channelType: ((__VLS_ctx.channelType)), }, ...__VLS_functionalComponentArgsRest(__VLS_58));
-            ({}({ ...{}, channelId: ((__VLS_ctx.channelId)), channelType: ((__VLS_ctx.channelType)), }));
-            const __VLS_60 = __VLS_pickFunctionalComponentCtx(__VLS_57, __VLS_59);
-        }
-        {
-            const __VLS_62 = {}.MessageInput;
-            const __VLS_63 = __VLS_asFunctionalComponent(__VLS_62, new __VLS_62({ ...{}, channelId: ((__VLS_ctx.channelId)), channelType: ((__VLS_ctx.channelType)), }));
-            ({}.MessageInput);
-            const __VLS_64 = __VLS_63({ ...{}, channelId: ((__VLS_ctx.channelId)), channelType: ((__VLS_ctx.channelType)), }, ...__VLS_functionalComponentArgsRest(__VLS_63));
-            ({}({ ...{}, channelId: ((__VLS_ctx.channelId)), channelType: ((__VLS_ctx.channelType)), }));
-            const __VLS_65 = __VLS_pickFunctionalComponentCtx(__VLS_62, __VLS_64);
+            const __VLS_73 = {}.ChatSidePreview;
+            const __VLS_74 = __VLS_asFunctionalComponent(__VLS_73, new __VLS_73({ ...{ 'onClose': {}, }, visible: ((__VLS_ctx.sidePreview.visible)), type: ((__VLS_ctx.sidePreview.type)), title: ((__VLS_ctx.sidePreview.title)), subtitle: ((__VLS_ctx.sidePreview.subtitle)), sourceUrl: ((__VLS_ctx.sidePreview.sourceUrl)), sourceText: ((__VLS_ctx.sidePreview.sourceText)), extension: ((__VLS_ctx.sidePreview.extension)), loading: ((__VLS_ctx.sidePreview.loading)), error: ((__VLS_ctx.sidePreview.error)), }));
+            ({}.ChatSidePreview);
+            const __VLS_75 = __VLS_74({ ...{ 'onClose': {}, }, visible: ((__VLS_ctx.sidePreview.visible)), type: ((__VLS_ctx.sidePreview.type)), title: ((__VLS_ctx.sidePreview.title)), subtitle: ((__VLS_ctx.sidePreview.subtitle)), sourceUrl: ((__VLS_ctx.sidePreview.sourceUrl)), sourceText: ((__VLS_ctx.sidePreview.sourceText)), extension: ((__VLS_ctx.sidePreview.extension)), loading: ((__VLS_ctx.sidePreview.loading)), error: ((__VLS_ctx.sidePreview.error)), }, ...__VLS_functionalComponentArgsRest(__VLS_74));
+            ({}({ ...{ 'onClose': {}, }, visible: ((__VLS_ctx.sidePreview.visible)), type: ((__VLS_ctx.sidePreview.type)), title: ((__VLS_ctx.sidePreview.title)), subtitle: ((__VLS_ctx.sidePreview.subtitle)), sourceUrl: ((__VLS_ctx.sidePreview.sourceUrl)), sourceText: ((__VLS_ctx.sidePreview.sourceText)), extension: ((__VLS_ctx.sidePreview.extension)), loading: ((__VLS_ctx.sidePreview.loading)), error: ((__VLS_ctx.sidePreview.error)), }));
+            let __VLS_78 = { 'close': __VLS_pickEvent(__VLS_77['close'], {}.onClose) };
+            __VLS_78 = { close: (__VLS_ctx.closeSidePreview) };
+            const __VLS_76 = __VLS_pickFunctionalComponentCtx(__VLS_73, __VLS_75);
+            let __VLS_77;
         }
         if (__VLS_ctx.channelType === 2) {
             {
-                const __VLS_67 = {}.GroupSettingsDrawer;
-                const __VLS_68 = __VLS_asFunctionalComponent(__VLS_67, new __VLS_67({ ...{ 'onClose': {}, 'onMembersClick': {}, }, groupNo: ((__VLS_ctx.channelId)), visible: ((__VLS_ctx.showGroupSettings)), }));
+                const __VLS_79 = {}.GroupSettingsDrawer;
+                const __VLS_80 = __VLS_asFunctionalComponent(__VLS_79, new __VLS_79({ ...{ 'onClose': {}, 'onMembersClick': {}, }, groupNo: ((__VLS_ctx.channelId)), visible: ((__VLS_ctx.showGroupSettings)), }));
                 ({}.GroupSettingsDrawer);
-                const __VLS_69 = __VLS_68({ ...{ 'onClose': {}, 'onMembersClick': {}, }, groupNo: ((__VLS_ctx.channelId)), visible: ((__VLS_ctx.showGroupSettings)), }, ...__VLS_functionalComponentArgsRest(__VLS_68));
+                const __VLS_81 = __VLS_80({ ...{ 'onClose': {}, 'onMembersClick': {}, }, groupNo: ((__VLS_ctx.channelId)), visible: ((__VLS_ctx.showGroupSettings)), }, ...__VLS_functionalComponentArgsRest(__VLS_80));
                 ({}({ ...{ 'onClose': {}, 'onMembersClick': {}, }, groupNo: ((__VLS_ctx.channelId)), visible: ((__VLS_ctx.showGroupSettings)), }));
-                let __VLS_72 = { 'close': __VLS_pickEvent(__VLS_71['close'], {}.onClose) };
-                __VLS_72 = { close: $event => {
+                let __VLS_84 = { 'close': __VLS_pickEvent(__VLS_83['close'], {}.onClose) };
+                __VLS_84 = { close: $event => {
                         if (!((__VLS_ctx.channelType === 2)))
                             return;
                         __VLS_ctx.showGroupSettings = false;
                         // @ts-ignore
-                        [channelId, channelType, channelId, channelType, channelId, channelType, channelId, channelType, channelId, channelType, channelId, channelType, channelType, channelId, showGroupSettings, channelId, showGroupSettings, channelId, showGroupSettings, showGroupSettings,];
+                        [channelId, channelType, channelId, channelType, channelId, channelType, handleOpenPreview, channelId, channelType, channelId, channelType, channelId, channelType, sidePreview, sidePreview, sidePreview, sidePreview, sidePreview, sidePreview, sidePreview, sidePreview, sidePreview, sidePreview, sidePreview, sidePreview, sidePreview, sidePreview, sidePreview, sidePreview, sidePreview, sidePreview, sidePreview, sidePreview, sidePreview, sidePreview, sidePreview, sidePreview, sidePreview, sidePreview, sidePreview, closeSidePreview, channelType, channelId, showGroupSettings, channelId, showGroupSettings, channelId, showGroupSettings, showGroupSettings,];
                     }
                 };
-                let __VLS_73 = { 'members-click': __VLS_pickEvent(__VLS_71['members-click'], {}.onMembersClick) };
-                __VLS_73 = { "members-click": (__VLS_ctx.handleMembersClick) };
-                const __VLS_70 = __VLS_pickFunctionalComponentCtx(__VLS_67, __VLS_69);
-                let __VLS_71;
+                let __VLS_85 = { 'members-click': __VLS_pickEvent(__VLS_83['members-click'], {}.onMembersClick) };
+                __VLS_85 = { "members-click": (__VLS_ctx.handleMembersClick) };
+                const __VLS_82 = __VLS_pickFunctionalComponentCtx(__VLS_79, __VLS_81);
+                let __VLS_83;
             }
             // @ts-ignore
             [handleMembersClick,];
         }
         if (__VLS_ctx.channelType === 1) {
             {
-                const __VLS_74 = {}.UserProfileDrawer;
-                const __VLS_75 = __VLS_asFunctionalComponent(__VLS_74, new __VLS_74({ ...{ 'onClose': {}, }, uid: ((__VLS_ctx.channelId)), visible: ((__VLS_ctx.showUserProfile)), }));
+                const __VLS_86 = {}.UserProfileDrawer;
+                const __VLS_87 = __VLS_asFunctionalComponent(__VLS_86, new __VLS_86({ ...{ 'onClose': {}, }, uid: ((__VLS_ctx.channelId)), visible: ((__VLS_ctx.showUserProfile)), }));
                 ({}.UserProfileDrawer);
-                const __VLS_76 = __VLS_75({ ...{ 'onClose': {}, }, uid: ((__VLS_ctx.channelId)), visible: ((__VLS_ctx.showUserProfile)), }, ...__VLS_functionalComponentArgsRest(__VLS_75));
+                const __VLS_88 = __VLS_87({ ...{ 'onClose': {}, }, uid: ((__VLS_ctx.channelId)), visible: ((__VLS_ctx.showUserProfile)), }, ...__VLS_functionalComponentArgsRest(__VLS_87));
                 ({}({ ...{ 'onClose': {}, }, uid: ((__VLS_ctx.channelId)), visible: ((__VLS_ctx.showUserProfile)), }));
-                let __VLS_79 = { 'close': __VLS_pickEvent(__VLS_78['close'], {}.onClose) };
-                __VLS_79 = { close: $event => {
+                let __VLS_91 = { 'close': __VLS_pickEvent(__VLS_90['close'], {}.onClose) };
+                __VLS_91 = { close: $event => {
                         if (!((__VLS_ctx.channelType === 1)))
                             return;
                         __VLS_ctx.showUserProfile = false;
@@ -267,8 +394,8 @@ function __VLS_template() {
                         [channelType, channelId, showUserProfile, channelId, showUserProfile, channelId, showUserProfile, showUserProfile,];
                     }
                 };
-                const __VLS_77 = __VLS_pickFunctionalComponentCtx(__VLS_74, __VLS_76);
-                let __VLS_78;
+                const __VLS_89 = __VLS_pickFunctionalComponentCtx(__VLS_86, __VLS_88);
+                let __VLS_90;
             }
         }
         (__VLS_3.slots).default;
@@ -276,6 +403,7 @@ function __VLS_template() {
     }
     if (typeof __VLS_styleScopedClasses === 'object' && !Array.isArray(__VLS_styleScopedClasses)) {
         __VLS_styleScopedClasses["chat-view-container"];
+        __VLS_styleScopedClasses["chat-main-column"];
         __VLS_styleScopedClasses["chat-header"];
         __VLS_styleScopedClasses["header-left"];
         __VLS_styleScopedClasses["channel-name"];
@@ -294,9 +422,11 @@ const __VLS_internalComponent = (await import('vue')).defineComponent({
             GroupSettingsDrawer: GroupSettingsDrawer,
             MessageList: MessageList,
             MessageInput: MessageInput,
+            ChatSidePreview: ChatSidePreview,
             UserProfileDrawer: UserProfileDrawer,
             showGroupSettings: showGroupSettings,
             showUserProfile: showUserProfile,
+            sidePreview: sidePreview,
             channelId: channelId,
             channelType: channelType,
             channelInfo: channelInfo,
@@ -304,6 +434,8 @@ const __VLS_internalComponent = (await import('vue')).defineComponent({
             handleHeaderClick: handleHeaderClick,
             handleGroupSettingsClick: handleGroupSettingsClick,
             handleMembersClick: handleMembersClick,
+            closeSidePreview: closeSidePreview,
+            handleOpenPreview: handleOpenPreview,
         };
     },
     emits: {},

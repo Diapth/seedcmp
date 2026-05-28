@@ -1,7 +1,8 @@
 <script setup lang="ts">
-import { ref, computed, watch, onBeforeUnmount } from 'vue';
+import { ref, computed, watch, onBeforeUnmount, nextTick } from 'vue';
 import { Message as ArcoMessage } from '@arco-design/web-vue';
-import { useMessageStore, useConversationStore, useGroupStore, useUserStore } from '@tsdaodao/datasource-vue';
+import { commonApi, useMessageStore, useConversationStore, useGroupStore, useUserStore } from '@tsdaodao/datasource-vue';
+import { useRobotConfigStore } from '@tsdaodao/contacts-vue';
 import WKSDK, { CMDContent } from 'wukongimjssdk';
 
 const props = defineProps<{
@@ -13,13 +14,27 @@ const messageStore = useMessageStore();
 const conversationStore = useConversationStore();
 const groupStore = useGroupStore();
 const userStore = useUserStore();
+const robotConfigStore = useRobotConfigStore();
 
 const inputText = ref('');
 const textareaRef = ref<HTMLTextAreaElement | null>(null);
 const imageInputRef = ref<HTMLInputElement | null>(null);
 const fileInputRef = ref<HTMLInputElement | null>(null);
 const uploadHint = ref('');
+const robotMenuState = ref<'idle' | 'loading' | 'ready' | 'unavailable' | 'failed'>('idle');
+const robotMenus = ref<Array<{ id: string; title: string; command: string; robotId: string }>>([]);
+const robotAck = ref('');
+const aiState = ref<'idle' | 'loading' | 'failed'>('idle');
+const voiceState = ref<'idle' | 'recording' | 'sending' | 'unsupported'>('idle');
+const voiceDuration = ref(0);
 let typingTimeout: any = null;
+let voiceRecorder: MediaRecorder | null = null;
+let voiceStream: MediaStream | null = null;
+let voiceChunks: Blob[] = [];
+let voiceTimer: number | undefined;
+let aiAbortController: AbortController | null = null;
+const SYSTEM_ROBOT_ID = 'u_10000';
+const DEEPSEEK_AI_ROBOT_ID = 'deepseek_ai_robot';
 
 // Mention state
 const showMentionPopup = ref(false);
@@ -39,20 +54,31 @@ const replyDigest = computed(() => {
   return target.content?.text || '[消息]';
 });
 
+const activeRobotConfig = computed(() => robotConfigStore.enabledConfigs[0]);
+const isAiRobotConversation = computed(() => {
+  return props.channelType === 1 &&
+    props.channelId === DEEPSEEK_AI_ROBOT_ID;
+});
+
 // Group members list
 const currentGroupMembers = computed(() => {
   return groupStore.groupMembers[props.channelId] || [];
 });
 
+function getMemberUid(member: any): string {
+  return String(member?.member_uid || member?.uid || '');
+}
+
+function getMemberDisplayName(member: any): string {
+  return String(member?.display_name || member?.member_name || member?.name || getMemberUid(member));
+}
+
 const filteredGroupMembers = computed(() => {
   const query = mentionQuery.value.toLowerCase();
   if (!query) return currentGroupMembers.value;
   return currentGroupMembers.value.filter(m => 
-    (m.display_name || '').toLowerCase().includes(query) ||
-    (m.name || '').toLowerCase().includes(query) ||
-    (m.member_name || '').toLowerCase().includes(query) ||
-    (m.uid || '').toLowerCase().includes(query) ||
-    (m.member_uid || '').toLowerCase().includes(query)
+    getMemberDisplayName(m).toLowerCase().includes(query) ||
+    getMemberUid(m).toLowerCase().includes(query)
   );
 });
 
@@ -63,6 +89,9 @@ watch(() => props.channelId, (newId) => {
   inputText.value = conv?.draft || '';
   messageStore.setReplyTarget(null);
   showMentionPopup.value = false;
+  if (props.channelType === 2 && newId && currentGroupMembers.value.length === 0) {
+    void groupStore.fetchGroupMembers(newId);
+  }
 }, { immediate: true });
 
 watch(inputText, (newVal) => {
@@ -107,11 +136,12 @@ function selectMember(member: any) {
   const lastAtIdx = textBeforeCaret.lastIndexOf('@');
 
   if (lastAtIdx !== -1) {
-    const name = member.display_name || member.member_name || member.name || member.member_uid;
+    const uid = getMemberUid(member);
+    const name = getMemberDisplayName(member);
     const newText = textBeforeCaret.substring(0, lastAtIdx) + `@${name} ` + textAfterCaret;
     inputText.value = newText;
-    if (!mentionedUids.value.includes(member.member_uid)) {
-      mentionedUids.value.push(member.member_uid);
+    if (uid && !mentionedUids.value.includes(uid)) {
+      mentionedUids.value.push(uid);
     }
   }
   showMentionPopup.value = false;
@@ -126,20 +156,310 @@ function openFilePicker() {
   fileInputRef.value?.click();
 }
 
-function insertMentionTrigger() {
+function createVoiceFile(blob: Blob) {
+  const extension = blob.type.includes('mp4') ? 'm4a' : blob.type.includes('ogg') ? 'ogg' : 'webm';
+  return new File([blob], `voice-${Date.now()}.${extension}`, {
+    type: blob.type || 'audio/webm'
+  });
+}
+
+function cleanupVoiceRecording() {
+  if (voiceTimer) {
+    window.clearInterval(voiceTimer);
+    voiceTimer = undefined;
+  }
+  voiceStream?.getTracks().forEach(track => track.stop());
+  voiceStream = null;
+  voiceRecorder = null;
+  voiceChunks = [];
+}
+
+async function startVoiceRecording() {
+  if (!navigator.mediaDevices?.getUserMedia || typeof MediaRecorder === 'undefined') {
+    voiceState.value = 'unsupported';
+    ArcoMessage.warning('当前浏览器不支持语音录制');
+    return;
+  }
+  if (voiceState.value === 'recording') return;
+  try {
+    voiceStream = await navigator.mediaDevices.getUserMedia({ audio: true });
+    voiceChunks = [];
+    voiceDuration.value = 0;
+    voiceRecorder = new MediaRecorder(voiceStream);
+    voiceRecorder.addEventListener('dataavailable', event => {
+      if (event.data.size > 0) voiceChunks.push(event.data);
+    });
+    voiceRecorder.start();
+    voiceState.value = 'recording';
+    voiceTimer = window.setInterval(() => {
+      voiceDuration.value += 1;
+    }, 1000);
+  } catch (err) {
+    cleanupVoiceRecording();
+    voiceState.value = 'idle';
+    ArcoMessage.error('无法开始录音，请检查麦克风权限');
+  }
+}
+
+async function stopVoiceRecording() {
+  if (!voiceRecorder || voiceState.value !== 'recording') return;
+  const recorder = voiceRecorder;
+  const finalDuration = Math.max(1, voiceDuration.value);
+  voiceState.value = 'sending';
+  await new Promise<void>((resolve) => {
+    recorder.addEventListener('stop', () => resolve(), { once: true });
+    recorder.stop();
+  });
+  const blob = new Blob(voiceChunks, { type: recorder.mimeType || 'audio/webm' });
+  cleanupVoiceRecording();
+  try {
+    await messageStore.sendVoiceMessage(props.channelId, props.channelType, createVoiceFile(blob), finalDuration);
+    ArcoMessage.success('语音已发送');
+  } catch (err) {
+    console.error('Failed to send voice message', err);
+    ArcoMessage.error('语音发送失败，请稍后重试');
+  } finally {
+    voiceState.value = 'idle';
+    voiceDuration.value = 0;
+  }
+}
+
+function cancelVoiceRecording() {
+  if (voiceRecorder && voiceState.value === 'recording') {
+    voiceRecorder.stop();
+  }
+  cleanupVoiceRecording();
+  voiceState.value = 'idle';
+  voiceDuration.value = 0;
+}
+
+function buildAiHistory() {
+  return messageStore.getChannelMessages(props.channelId, props.channelType)
+    .filter(item => item.content?.type === 1 && (item.content?.text || item.content?.content))
+    .slice(-8)
+    .map(item => ({
+      role: item.fromUID === DEEPSEEK_AI_ROBOT_ID ? 'assistant' as const : 'user' as const,
+      content: String(item.content?.text || item.content?.content || '')
+    }));
+}
+
+function createAiReplyMessage(text = '') {
+  const clientMsgNo = `ai-stream-${Date.now()}-${Math.random().toString(16).slice(2)}`;
+  messageStore.addMessage(props.channelId, props.channelType, {
+    messageID: clientMsgNo,
+    messageSeq: 0,
+    clientMsgNo,
+    fromUID: DEEPSEEK_AI_ROBOT_ID,
+    timestamp: Math.floor(Date.now() / 1000),
+    content: {
+      type: 1,
+      text,
+      content: text,
+      format: 'markdown',
+      markdown: true,
+      ai: true,
+      streaming: true
+    },
+    isRevoked: false,
+    status: 'sending'
+  });
+  return clientMsgNo;
+}
+
+function appendAiReplyStreamChunk(clientMsgNo: string, delta: string) {
+  const existing = messageStore.getChannelMessages(props.channelId, props.channelType)
+    .find(item => item.clientMsgNo === clientMsgNo);
+  const current = String(existing?.content?.text || existing?.content?.content || '');
+  const nextText = `${current}${delta}`;
+  messageStore.updateMessageStatus(clientMsgNo, {
+    content: {
+      ...(existing?.content || {}),
+      type: 1,
+      text: nextText,
+      content: nextText,
+      format: 'markdown',
+      markdown: true,
+      ai: true,
+      streaming: true
+    },
+    status: 'sending'
+  });
+}
+
+async function sendAiAssistant(promptText?: string) {
+  const prompt = (promptText ?? inputText.value).trim();
+  if (!prompt || aiState.value === 'loading') return;
+
+  aiState.value = 'loading';
+  inputText.value = '';
+  conversationStore.updateDraft(props.channelId, props.channelType, '');
+  let aiMessageClientMsgNo = '';
+  try {
+    const history = buildAiHistory();
+    await messageStore.sendMessage(props.channelId, props.channelType, prompt);
+    const config = activeRobotConfig.value;
+    aiMessageClientMsgNo = createAiReplyMessage('');
+    aiAbortController = new AbortController();
+    const finalEvent = await commonApi.requestAiReplyStream({
+      channel_id: props.channelId,
+      channel_type: props.channelType,
+      prompt,
+      system_prompt: config?.prompt || '',
+      model: config?.model || 'deepseek-chat',
+      history
+    }, {
+      signal: aiAbortController.signal,
+      onDelta: delta => appendAiReplyStreamChunk(aiMessageClientMsgNo, delta)
+    });
+    const existing = messageStore.getChannelMessages(props.channelId, props.channelType)
+      .find(item => item.clientMsgNo === aiMessageClientMsgNo);
+    const finalText = String(existing?.content?.text || existing?.content?.content || 'AI 暂时没有返回内容。');
+    if (Number(finalEvent?.message_id || 0) > 0) {
+      messageStore.updateMessageStatus(aiMessageClientMsgNo, {
+        messageID: String(finalEvent.message_id),
+        messageSeq: Number(finalEvent?.message_seq || existing?.messageSeq || 0),
+        timestamp: Number(finalEvent?.timestamp || existing?.timestamp || Math.floor(Date.now() / 1000)),
+        content: {
+          ...(existing?.content || {}),
+          type: 1,
+          text: finalText,
+          content: finalText,
+          format: 'markdown',
+          markdown: true,
+          ai: true,
+          streaming: false
+        },
+        status: 'success'
+      });
+    } else {
+      const persistedAiReply = messageStore.getChannelMessages(props.channelId, props.channelType)
+        .find(item =>
+          item.clientMsgNo !== aiMessageClientMsgNo &&
+          item.fromUID === DEEPSEEK_AI_ROBOT_ID &&
+          Number(item.messageSeq || 0) > 0 &&
+          String(item.content?.text || item.content?.content || '') === finalText
+        );
+      if (persistedAiReply) {
+        messageStore.removeMessageByClientMsgNo(aiMessageClientMsgNo);
+      } else {
+        messageStore.updateMessageStatus(aiMessageClientMsgNo, {
+          messageID: existing?.messageID || aiMessageClientMsgNo,
+          messageSeq: Number(existing?.messageSeq || 0),
+          timestamp: Number(finalEvent?.timestamp || existing?.timestamp || Math.floor(Date.now() / 1000)),
+          content: {
+            ...(existing?.content || {}),
+            type: 1,
+            text: finalText,
+            content: finalText,
+            format: 'markdown',
+            markdown: true,
+            ai: true,
+            streaming: false
+          },
+          status: 'success'
+        });
+      }
+    }
+    ArcoMessage.success('AI 已回复');
+    aiState.value = 'idle';
+  } catch (err) {
+    console.error('Failed to request AI assistant', err);
+    if (aiMessageClientMsgNo) {
+      messageStore.updateMessageStatus(aiMessageClientMsgNo, {
+        content: {
+          type: 1,
+          text: 'AI 助手暂不可用，请稍后重试。',
+          content: 'AI 助手暂不可用，请稍后重试。',
+          format: 'markdown',
+          markdown: true,
+          ai: true,
+          streaming: false
+        },
+        status: 'fail',
+        retryable: false
+      });
+    }
+    aiState.value = 'failed';
+    inputText.value = prompt;
+    ArcoMessage.error('AI 助手暂不可用，请稍后重试');
+  } finally {
+    aiAbortController = null;
+  }
+}
+
+async function insertMentionTrigger() {
   inputText.value = `${inputText.value}${inputText.value && !inputText.value.endsWith(' ') ? ' ' : ''}@`;
+  await nextTick();
+  const caretPos = inputText.value.length;
+  textareaRef.value?.setSelectionRange(caretPos, caretPos);
+  if (props.channelType === 2) {
+    mentionQuery.value = '';
+    showMentionPopup.value = true;
+    if (currentGroupMembers.value.length === 0) {
+      void groupStore.fetchGroupMembers(props.channelId);
+    }
+  }
   textareaRef.value?.focus();
+}
+
+async function openRobotMenu() {
+  if (robotMenuState.value === 'ready') {
+    robotMenuState.value = 'idle';
+    return;
+  }
+  robotMenuState.value = 'loading';
+  robotAck.value = '';
+  try {
+    const res: any = await commonApi.getRobotMenus(props.channelId, props.channelType);
+    let robotId = props.channelId;
+    let list = Array.isArray(res) ? (res[0]?.menus || res) : (res?.menus || res?.items || []);
+    if (!list.length && props.channelId !== SYSTEM_ROBOT_ID) {
+      const fallbackRes: any = await commonApi.getRobotMenus(SYSTEM_ROBOT_ID, 1);
+      robotId = SYSTEM_ROBOT_ID;
+      list = Array.isArray(fallbackRes) ? (fallbackRes[0]?.menus || fallbackRes) : (fallbackRes?.menus || fallbackRes?.items || []);
+    }
+    robotMenus.value = list.map((item: any, index: number) => ({
+      id: String(item.id || item.cmd || item.command || index),
+      title: String(item.title || item.remark || item.name || item.cmd || item.command || '机器人指令'),
+      command: String(item.cmd || item.command || item.payload || item.name || ''),
+      robotId: String(item.robot_id || item.robotId || robotId)
+    })).filter((item: any) => item.command);
+    robotMenuState.value = robotMenus.value.length ? 'ready' : 'unavailable';
+  } catch {
+    robotMenuState.value = 'unavailable';
+  }
+}
+
+async function sendRobotCommand(command: string) {
+  robotMenuState.value = 'loading';
+  robotAck.value = '';
+  const menu = robotMenus.value.find(item => item.command === command);
+  const robotId = menu?.robotId || SYSTEM_ROBOT_ID;
+  try {
+    await messageStore.sendMessage(props.channelId, props.channelType, command, {
+      robot: {
+        robotId,
+        command
+      }
+    });
+    robotAck.value = 'robot ack';
+    robotMenuState.value = 'idle';
+    ArcoMessage.success('机器人指令已发送');
+  } catch {
+    robotMenuState.value = 'failed';
+    robotAck.value = '机器人暂不可用';
+  }
 }
 
 async function sendSelectedFile(file: File) {
   if (!file) return;
   try {
     uploadHint.value = file.type.startsWith('image/') ? `正在发送图片: ${file.name}` : `正在发送文件: ${file.name}`;
-    if (file.type.startsWith('image/')) {
-      ArcoMessage.info('图片发送能力正在完善，当前先保留显式入口与文件检测');
-      return;
-    }
-    ArcoMessage.info('文件发送能力正在完善，当前先保留显式入口与文件检测');
+    await messageStore.sendMediaMessage(props.channelId, props.channelType, file);
+    ArcoMessage.success(file.type.startsWith('image/') ? '图片已发送' : '文件已发送');
+  } catch (err) {
+    console.error('Failed to send selected file', err);
+    ArcoMessage.error(file.type.startsWith('image/') ? '图片发送失败，请稍后重试' : '文件发送失败，请稍后重试');
   } finally {
     uploadHint.value = '';
   }
@@ -181,6 +501,11 @@ async function handleSend() {
   const text = inputText.value.trim();
   if (!text) return;
 
+  if (isAiRobotConversation.value) {
+    await sendAiAssistant(text);
+    return;
+  }
+
   inputText.value = '';
   conversationStore.updateDraft(props.channelId, props.channelType, '');
 
@@ -192,9 +517,9 @@ async function handleSend() {
       options.mention = { all: true, uids: [] };
     } else if (mentionedUids.value.length > 0) {
       const activeMentions = mentionedUids.value.filter(uid => {
-        const member = currentGroupMembers.value.find(m => m.member_uid === uid || m.uid === uid);
-        const name = member?.display_name || member?.member_name || member?.name || uid;
-        return text.includes(`@${name}`);
+        const member = currentGroupMembers.value.find(m => getMemberUid(m) === uid);
+        const name = member ? getMemberDisplayName(member) : uid;
+        return text.includes(`@${name}`) || text.includes(`@${uid}`);
       });
       if (activeMentions.length > 0) {
         options.mention = { all: false, uids: activeMentions };
@@ -235,6 +560,8 @@ function handleKeyDown(e: KeyboardEvent) {
 
 onBeforeUnmount(() => {
   if (typingTimeout) clearTimeout(typingTimeout);
+  aiAbortController?.abort();
+  cleanupVoiceRecording();
 });
 </script>
 
@@ -244,11 +571,11 @@ onBeforeUnmount(() => {
     <div v-if="showMentionPopup && filteredGroupMembers.length > 0" class="mention-popup">
       <div 
         v-for="member in filteredGroupMembers" 
-        :key="member.member_uid" 
+        :key="getMemberUid(member)" 
         class="mention-item"
         @click="selectMember(member)"
       >
-        <span class="mention-name">{{ member.display_name || member.member_name || member.name || member.member_uid }}</span>
+        <span class="mention-name">{{ getMemberDisplayName(member) }}</span>
         <span v-if="member.role_label !== '成员'" class="mention-role">{{ member.role_label }}</span>
       </div>
     </div>
@@ -267,6 +594,36 @@ onBeforeUnmount(() => {
     </div>
 
     <div class="input-actions">
+      <button class="action-btn" title="机器人菜单" @click="openRobotMenu">
+        Bot
+      </button>
+      <button
+        v-if="!isAiRobotConversation"
+        class="action-btn"
+        :class="{ active: aiState === 'loading' }"
+        :disabled="!inputText.trim() || aiState === 'loading'"
+        title="AI 助手回复"
+        @click="() => sendAiAssistant()"
+      >
+        AI
+      </button>
+      <button
+        v-if="voiceState !== 'recording'"
+        class="action-btn"
+        :disabled="voiceState === 'sending'"
+        title="开始录音"
+        @click="startVoiceRecording"
+      >
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" class="action-svg">
+          <path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z" />
+          <path d="M19 10v1a7 7 0 0 1-14 0v-1M12 19v4M8 23h8" />
+        </svg>
+      </button>
+      <div v-else class="voice-recording-bar">
+        <span>录音中 {{ voiceDuration }}s</span>
+        <button class="voice-mini-btn" @click="stopVoiceRecording">发送</button>
+        <button class="voice-mini-btn" @click="cancelVoiceRecording">取消</button>
+      </div>
       <button class="action-btn" title="选择图片" @click="openImagePicker">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" class="action-svg">
           <rect x="3" y="3" width="18" height="18" rx="2" ry="2" />
@@ -283,6 +640,42 @@ onBeforeUnmount(() => {
       <button v-if="channelType === 2" class="action-btn" title="插入@成员" @click="insertMentionTrigger">
         @
       </button>
+    </div>
+
+    <div v-if="robotMenuState !== 'idle'" class="robot-panel">
+      <div class="robot-panel-header">
+        <span class="robot-panel-title">机器人菜单</span>
+        <span v-if="robotMenuState === 'ready'" class="robot-panel-hint">点击菜单即可发送指令</span>
+      </div>
+      <div v-if="robotMenuState === 'loading'" class="robot-state">机器人响应中...</div>
+      <div v-else-if="robotMenuState === 'unavailable' || robotMenuState === 'failed'" class="robot-state">
+        <span class="robot-state-title">机器人未配置</span>
+        <span>请在服务端机器人管理中配置后使用</span>
+      </div>
+      <template v-else>
+        <div class="robot-menu">
+          <button
+            v-for="item in robotMenus"
+            :key="item.id"
+            class="robot-command"
+            @click="sendRobotCommand(item.command)"
+          >
+            {{ item.title }}
+          </button>
+        </div>
+      </template>
+      <div v-if="robotAck" class="robot-ack">{{ robotAck }}</div>
+    </div>
+
+    <div v-if="isAiRobotConversation" class="robot-panel ai-contact-panel">
+      <div class="robot-panel-header">
+        <span class="robot-panel-title">DeepSeek AI</span>
+        <span class="robot-panel-hint">发送消息后自动由 AI 回复</span>
+      </div>
+      <div class="robot-state">
+        <span class="robot-state-title">AI 联系人已启用</span>
+        <span>使用系统环境变量中的 DeepSeek Key，回复会按 Markdown 显示。</span>
+      </div>
     </div>
 
     <div class="input-area-wrapper">
@@ -314,7 +707,7 @@ onBeforeUnmount(() => {
 
     <div class="input-footer">
       <div class="input-hint">
-        {{ uploadHint || '输入自动同步草稿，Enter 发送，Ctrl+Enter 换行' }}
+        {{ uploadHint || (aiState === 'loading' ? 'AI 正在生成回复...' : voiceState === 'sending' ? '正在发送语音...' : '输入自动同步草稿，Enter 发送，Ctrl+Enter 换行') }}
       </div>
       <button 
         class="send-btn" 
@@ -338,11 +731,16 @@ onBeforeUnmount(() => {
 .message-input-container {
   display: flex;
   flex-direction: column;
+  min-width: 0;
   background-color: var(--bg-primary);
   border-top: var(--border-hairline);
   padding: 12px 16px;
   position: relative;
-  flex-shrink: 0;
+  z-index: 30;
+  /* In the grid layout this cell is 'auto' sized — content determines height.
+     max-height caps it so robot-panel or reply-bar cannot push it too tall. */
+  max-height: 40vh;
+  overflow: visible;
 }
 
 /* Mention Popup */
@@ -357,7 +755,7 @@ onBeforeUnmount(() => {
   border: var(--border-hairline);
   border-radius: var(--radius-sm);
   box-shadow: 0 -4px 12px rgba(0, 0, 0, 0.08);
-  z-index: 100;
+  z-index: 3200;
   margin-bottom: 8px;
 }
 
@@ -434,6 +832,7 @@ onBeforeUnmount(() => {
 
 .input-actions {
   display: flex;
+  flex-wrap: wrap;
   gap: 12px;
   margin-bottom: 8px;
 }
@@ -456,9 +855,106 @@ onBeforeUnmount(() => {
   color: var(--text-primary);
 }
 
+.action-btn:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
+.action-btn.active {
+  background-color: rgba(22, 93, 255, 0.1);
+  color: var(--primary-color, #165dff);
+}
+
 .action-svg {
   width: 20px;
   height: 20px;
+}
+
+.voice-recording-bar {
+  min-height: 28px;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 0 8px;
+  border: var(--border-hairline);
+  border-radius: var(--radius-sm);
+  background: var(--bg-secondary);
+  color: var(--text-primary);
+  font-size: 12px;
+}
+
+.voice-mini-btn {
+  height: 22px;
+  padding: 0 8px;
+  border: var(--border-hairline);
+  border-radius: var(--radius-sm);
+  background: var(--bg-primary);
+  color: var(--text-primary);
+  cursor: pointer;
+  font-size: 12px;
+}
+
+.robot-panel {
+  margin-bottom: 8px;
+  padding: 8px;
+  border: var(--border-hairline);
+  border-radius: var(--radius-sm);
+  background-color: var(--bg-secondary);
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.robot-panel-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.robot-panel-title {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--text-primary);
+}
+
+.robot-panel-hint {
+  font-size: 11px;
+  color: var(--text-secondary);
+}
+
+.robot-state,
+.robot-ack {
+  font-size: 12px;
+  color: var(--text-secondary);
+}
+
+.robot-state {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.robot-state-title {
+  color: var(--text-primary);
+  font-weight: 600;
+}
+
+.robot-menu {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.robot-command {
+  height: 28px;
+  padding: 0 10px;
+  border: var(--border-hairline);
+  border-radius: var(--radius-sm);
+  background-color: var(--bg-primary);
+  color: var(--text-primary);
+  font-size: 12px;
+  cursor: pointer;
 }
 
 .hidden-input {
@@ -467,6 +963,8 @@ onBeforeUnmount(() => {
 
 .input-area-wrapper {
   flex: 1;
+  min-height: 0;
+  overflow: hidden;
 }
 
 .input-textarea {
@@ -484,6 +982,7 @@ onBeforeUnmount(() => {
 
 .input-footer {
   display: flex;
+  flex-wrap: wrap;
   align-items: center;
   justify-content: space-between;
   gap: 16px;
@@ -491,6 +990,7 @@ onBeforeUnmount(() => {
 }
 
 .input-hint {
+  min-width: 0;
   font-size: 11px;
   color: var(--text-secondary);
   overflow: hidden;

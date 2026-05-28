@@ -1,0 +1,224 @@
+{
+  "runId": "manual-visual-audit-2026-05-24T13-07-08-392Z",
+  "targetUrl": "http://100.79.157.76:3000",
+  "startedAt": "2026-05-24T13:07:18.726Z",
+  "accounts": [
+    "18337488675"
+  ],
+  "checks": [
+    {
+      "name": "US4 基础登录成功",
+      "status": "pass",
+      "url": "http://100.79.157.76:3000/chat"
+    },
+    {
+      "name": "US1 打开首个会话",
+      "status": "pass"
+    },
+    {
+      "name": "US1 文本消息发送并显示",
+      "status": "pass",
+      "text": "manual-audit-text-1779628029369"
+    },
+    {
+      "name": "US1 文件消息发送并显示",
+      "status": "pass"
+    },
+    {
+      "name": "V2-14 文件消息卡片布局稳定",
+      "status": "pass",
+      "count": 6
+    },
+    {
+      "name": "US2 群聊设置抽屉打开",
+      "status": "pass"
+    },
+    {
+      "name": "US2 邀请成员弹窗打开",
+      "status": "pass"
+    },
+    {
+      "name": "US5 全局搜索框可输入",
+      "status": "pass"
+    },
+    {
+      "name": "US5 工作台入口可访问",
+      "status": "pass"
+    },
+    {
+      "name": "US6 680px 响应式核心界面可见",
+      "status": "pass",
+      "inputVisible": false,
+      "convVisible": true
+    },
+    {
+      "name": "控制台严重错误检查",
+      "status": "pass",
+      "count": 0
+    },
+    {
+      "name": "网络错误检查",
+      "status": "pass",
+      "count": 0
+    }
+  ],
+  "screenshots": [
+    "/media/leng/DiskB1/exp/seedcmp/sections/im_web/.ai/V2.0/issues/imgs/manual-visual-audit-2026-05-24T13-07-08-392Z/01-login-page.png",
+    "/media/leng/DiskB1/exp/seedcmp/sections/im_web/.ai/V2.0/issues/imgs/manual-visual-audit-2026-05-24T13-07-08-392Z/02-chat-home.png",
+    "/media/leng/DiskB1/exp/seedcmp/sections/im_web/.ai/V2.0/issues/imgs/manual-visual-audit-2026-05-24T13-07-08-392Z/03-first-conversation.png",
+    "/media/leng/DiskB1/exp/seedcmp/sections/im_web/.ai/V2.0/issues/imgs/manual-visual-audit-2026-05-24T13-07-08-392Z/04-text-message-sent.png",
+    "/media/leng/DiskB1/exp/seedcmp/sections/im_web/.ai/V2.0/issues/imgs/manual-visual-audit-2026-05-24T13-07-08-392Z/05-file-message-sent.png",
+    "/media/leng/DiskB1/exp/seedcmp/sections/im_web/.ai/V2.0/issues/imgs/manual-visual-audit-2026-05-24T13-07-08-392Z/06-group-settings-drawer.png",
+    "/media/leng/DiskB1/exp/seedcmp/sections/im_web/.ai/V2.0/issues/imgs/manual-visual-audit-2026-05-24T13-07-08-392Z/07-group-invite-modal.png",
+    "/media/leng/DiskB1/exp/seedcmp/sections/im_web/.ai/V2.0/issues/imgs/manual-visual-audit-2026-05-24T13-07-08-392Z/08-global-search.png",
+    "/media/leng/DiskB1/exp/seedcmp/sections/im_web/.ai/V2.0/issues/imgs/manual-visual-audit-2026-05-24T13-07-08-392Z/09-workplace.png",
+    "/media/leng/DiskB1/exp/seedcmp/sections/im_web/.ai/V2.0/issues/imgs/manual-visual-audit-2026-05-24T13-07-08-392Z/10-responsive-680.png"
+  ],
+  "consoleEntries": [
+    {
+      "type": "debug",
+      "text": "[vite] connecting..."
+    },
+    {
+      "type": "debug",
+      "text": "[vite] connected."
+    },
+    {
+      "type": "log",
+      "text": "web运行环境"
+    },
+    {
+      "type": "log",
+      "text": "使用原生websocket"
+    },
+    {
+      "type": "log",
+      "text": "websocket WebSocket"
+    },
+    {
+      "type": "log",
+      "text": "onopen..."
+    },
+    {
+      "type": "log",
+      "text": "服务器协议版本: 5"
+    },
+    {
+      "type": "log",
+      "text": "成功连接到节点[1]"
+    },
+    {
+      "type": "log",
+      "text": "[SDK] Connected successfully."
+    },
+    {
+      "type": "debug",
+      "text": "[vite] connecting..."
+    },
+    {
+      "type": "debug",
+      "text": "[vite] connected."
+    },
+    {
+      "type": "log",
+      "text": "web运行环境"
+    },
+    {
+      "type": "log",
+      "text": "使用原生websocket"
+    },
+    {
+      "type": "log",
+      "text": "websocket WebSocket"
+    },
+    {
+      "type": "log",
+      "text": "onopen..."
+    },
+    {
+      "type": "log",
+      "text": "服务器协议版本: 5"
+    },
+    {
+      "type": "log",
+      "text": "成功连接到节点[1]"
+    },
+    {
+      "type": "log",
+      "text": "[SDK] Connected successfully."
+    },
+    {
+      "type": "debug",
+      "text": "[vite] connecting..."
+    },
+    {
+      "type": "debug",
+      "text": "[vite] connected."
+    },
+    {
+      "type": "log",
+      "text": "web运行环境"
+    },
+    {
+      "type": "log",
+      "text": "使用原生websocket"
+    },
+    {
+      "type": "log",
+      "text": "websocket WebSocket"
+    },
+    {
+      "type": "log",
+      "text": "onopen..."
+    },
+    {
+      "type": "log",
+      "text": "服务器协议版本: 5"
+    },
+    {
+      "type": "log",
+      "text": "成功连接到节点[1]"
+    },
+    {
+      "type": "log",
+      "text": "[SDK] Connected successfully."
+    },
+    {
+      "type": "debug",
+      "text": "[vite] connecting..."
+    },
+    {
+      "type": "debug",
+      "text": "[vite] connected."
+    },
+    {
+      "type": "log",
+      "text": "web运行环境"
+    },
+    {
+      "type": "log",
+      "text": "使用原生websocket"
+    },
+    {
+      "type": "log",
+      "text": "websocket WebSocket"
+    },
+    {
+      "type": "log",
+      "text": "onopen..."
+    },
+    {
+      "type": "log",
+      "text": "服务器协议版本: 5"
+    },
+    {
+      "type": "log",
+      "text": "成功连接到节点[1]"
+    },
+    {
+      "type": "log",
+      "text": "[SDK] Connected successfully."
+    }
+  ],
+  "networkErrors": []
+}

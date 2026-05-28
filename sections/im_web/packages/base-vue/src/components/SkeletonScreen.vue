@@ -8,44 +8,47 @@ defineProps<{
 <template>
   <div class="skeleton-container">
     <!-- 1. Conversation Item Preset -->
-    <div 
-      v-if="type === 'conversation-item'" 
-      v-for="i in (count || 5)" 
-      :key="'conv-' + i" 
-      class="skeleton-item conv-item"
-    >
-      <div class="skeleton-avatar skeleton-pulse"></div>
-      <div class="skeleton-content">
-        <div class="skeleton-row top-row">
-          <div class="skeleton-bar title-bar skeleton-pulse"></div>
-          <div class="skeleton-bar time-bar skeleton-pulse"></div>
+    <template v-if="type === 'conversation-item'">
+      <div
+        v-for="i in (count || 5)"
+        :key="'conv-' + i"
+        class="skeleton-item conv-item"
+      >
+        <div class="skeleton-avatar skeleton-pulse"></div>
+        <div class="skeleton-content">
+          <div class="skeleton-row top-row">
+            <div class="skeleton-bar title-bar skeleton-pulse"></div>
+            <div class="skeleton-bar time-bar skeleton-pulse"></div>
+          </div>
+          <div class="skeleton-bar msg-bar skeleton-pulse"></div>
         </div>
-        <div class="skeleton-bar msg-bar skeleton-pulse"></div>
       </div>
-    </div>
+    </template>
 
     <!-- 2. Message Bubble Preset -->
-    <div 
-      v-else-if="type === 'message-bubble'" 
-      v-for="i in (count || 4)" 
-      :key="'msg-' + i" 
-      class="skeleton-item msg-bubble-item"
-      :class="{ 'align-right': i % 2 === 0 }"
-    >
-      <div class="skeleton-avatar skeleton-pulse"></div>
-      <div class="skeleton-bubble skeleton-pulse"></div>
-    </div>
+    <template v-else-if="type === 'message-bubble'">
+      <div
+        v-for="i in (count || 4)"
+        :key="'msg-' + i"
+        class="skeleton-item msg-bubble-item"
+        :class="{ 'align-right': i % 2 === 0 }"
+      >
+        <div class="skeleton-avatar skeleton-pulse"></div>
+        <div class="skeleton-bubble skeleton-pulse"></div>
+      </div>
+    </template>
 
     <!-- 3. Contact List Preset -->
-    <div 
-      v-else-if="type === 'contact-list'" 
-      v-for="i in (count || 6)" 
-      :key="'contact-' + i" 
-      class="skeleton-item contact-item"
-    >
-      <div class="skeleton-avatar skeleton-pulse"></div>
-      <div class="skeleton-bar name-bar skeleton-pulse"></div>
-    </div>
+    <template v-else-if="type === 'contact-list'">
+      <div
+        v-for="i in (count || 6)"
+        :key="'contact-' + i"
+        class="skeleton-item contact-item"
+      >
+        <div class="skeleton-avatar skeleton-pulse"></div>
+        <div class="skeleton-bar name-bar skeleton-pulse"></div>
+      </div>
+    </template>
   </div>
 </template>
 

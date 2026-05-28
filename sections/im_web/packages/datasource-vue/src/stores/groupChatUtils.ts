@@ -99,8 +99,8 @@ export function canManageGroup(group: any): boolean {
   return isGroupOwner(group) || isGroupAdmin(group);
 }
 
-export function canManageGroupMember(group: any, member: any): boolean {
-  const myRole = getMyGroupRole(group);
+export function canManageGroupMember(group: any, member: any, uid?: string): boolean {
+  const myRole = getMyGroupRole(group, uid);
   const memberRole = Number(member?.role || 0);
   if (myRole === GROUP_ROLE_OWNER) {
     return memberRole !== GROUP_ROLE_OWNER;

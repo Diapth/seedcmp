@@ -43,8 +43,35 @@ export function buildLoginDevice() {
   };
 }
 
+export type LoginState =
+  | 'idle'
+  | 'loading'
+  | 'sms_sent'
+  | 'qr_waiting'
+  | 'qr_scanned'
+  | 'qr_confirmed'
+  | 'qr_expired'
+  | 'qr_rejected'
+  | 'qr_failed'
+  | 'logged_in';
+
+export function normalizeQrLoginStatus(payload: any): LoginState {
+  const raw = String(payload?.status ?? payload?.state ?? payload?.code ?? '').toLowerCase();
+  if (['waiting', 'wait', '0', 'qr_waiting'].includes(raw)) return 'qr_waiting';
+  if (['scanned', 'scan', '1', 'qr_scanned'].includes(raw)) return 'qr_scanned';
+  if (['confirmed', 'confirm', 'authorized', 'success', '2', 'qr_confirmed'].includes(raw) || payload?.auth_code || payload?.authCode) {
+    return 'qr_confirmed';
+  }
+  if (['expired', 'timeout', '3', 'qr_expired'].includes(raw)) return 'qr_expired';
+  if (['rejected', 'cancel', 'cancelled', '4', 'qr_rejected'].includes(raw)) return 'qr_rejected';
+  return 'qr_failed';
+}
+
 export const useLoginStore = defineStore('loginState', () => {
-  const state = ref<'idle' | 'loading' | 'sms_sent' | 'qr_waiting' | 'logged_in'>('idle');
+  const state = ref<LoginState>('idle');
+  const qrUuid = ref('');
+  const qrAuthCode = ref('');
+  const qrError = ref('');
   const userStore = useUserStore();
 
   function normalizeUsername(value: string) {
@@ -87,10 +114,79 @@ export const useLoginStore = defineStore('loginState', () => {
     }
   }
 
+  async function startQrLogin() {
+    state.value = 'loading';
+    qrError.value = '';
+    qrAuthCode.value = '';
+    try {
+      const res: any = await authApi.getLoginUUID();
+      qrUuid.value = res?.uuid || res?.login_uuid || res?.data?.uuid || String(res || '');
+      if (!qrUuid.value) {
+        throw new Error('QR login UUID missing');
+      }
+      state.value = 'qr_waiting';
+      return qrUuid.value;
+    } catch (err: any) {
+      state.value = 'qr_failed';
+      qrError.value = err?.msg || err?.message || 'QR login unavailable';
+      throw err;
+    }
+  }
+
+  async function pollQrLoginStatus() {
+    if (!qrUuid.value) {
+      state.value = 'qr_failed';
+      qrError.value = 'QR login UUID missing';
+      return state.value;
+    }
+    try {
+      const res: any = await authApi.getLoginStatus(qrUuid.value);
+      const nextState = normalizeQrLoginStatus(res);
+      state.value = nextState;
+      const authCode = res?.auth_code || res?.authCode || res?.code;
+      if (nextState === 'qr_confirmed' && authCode) {
+        qrAuthCode.value = authCode;
+      }
+      return nextState;
+    } catch (err: any) {
+      state.value = 'qr_failed';
+      qrError.value = err?.msg || err?.message || 'QR login status failed';
+      throw err;
+    }
+  }
+
+  async function confirmQrLogin() {
+    if (!qrAuthCode.value) {
+      await pollQrLoginStatus();
+    }
+    if (!qrAuthCode.value) {
+      throw new Error('QR login not confirmed');
+    }
+    state.value = 'loading';
+    try {
+      const res = await authApi.loginWithAuthCode(qrAuthCode.value);
+      userStore.applyLoginResult({
+        ...(res as any),
+        device: buildLoginDevice()
+      });
+      state.value = 'logged_in';
+      return res;
+    } catch (err) {
+      state.value = 'qr_failed';
+      throw err;
+    }
+  }
+
   return {
     state,
+    qrUuid,
+    qrAuthCode,
+    qrError,
     loginWithPassword,
     sendSmsCode,
+    startQrLogin,
+    pollQrLoginStatus,
+    confirmQrLogin,
     normalizeUsername
   };
 });

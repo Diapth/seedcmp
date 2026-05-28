@@ -1,10 +1,10 @@
 import { execSync } from 'node:child_process';
-import { join, resolve } from 'node:path';
+import { join } from 'node:path';
 import { existsSync, rmSync, readdirSync } from 'node:fs';
+import { imWebRoot, v1ChecksDir } from './paths.mjs';
 
-const repoRoot = resolve(import.meta.dirname, '..', '..');
-const checksDir = join(repoRoot, '.ai', 'checks');
-const imWebDir = repoRoot;
+const checksDir = v1ChecksDir;
+const imWebDir = imWebRoot;
 
 console.log('===========================================================');
 console.log('🚀 Running Complete Automated Regression Suite for All Issues...');
@@ -40,18 +40,8 @@ tests.push({
 
 tests.push({
   name: 'Unit Test: conversationPresentation.test.ts',
-  command: 'npx tsc apps/chat/tests/conversationPresentation.test.ts --module NodeNext --moduleResolution NodeNext --target ES2022 --skipLibCheck --esModuleInterop --allowSyntheticDefaultImports --outDir ./scratch/seedcmp-im-tests && node ./scratch/seedcmp-im-tests/tests/conversationPresentation.test.js',
-  cwd: imWebDir,
-  cleanup: () => {
-    const outDir = join(imWebDir, 'scratch', 'seedcmp-im-tests');
-    if (existsSync(outDir)) {
-      try {
-        rmSync(outDir, { recursive: true, force: true });
-      } catch (e) {
-        // ignore
-      }
-    }
-  }
+  command: 'pnpm --filter chat test:unit -- tests/conversationPresentation.test.ts',
+  cwd: imWebDir
 });
 
 let passedCount = 0;

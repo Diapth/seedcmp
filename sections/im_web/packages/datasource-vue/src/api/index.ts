@@ -1,4 +1,49 @@
-import { apiClient, apiDelete } from '@tsdaodao/base-vue';
+import { apiClient, apiDelete, normalizeMediaUrl, StorageService } from '@tsdaodao/base-vue';
+
+export type AiStreamEvent = {
+  delta?: string;
+  done?: boolean;
+  error?: string;
+  message_id?: string;
+  message_seq?: number;
+  timestamp?: number;
+  model?: string;
+};
+
+export function parseAiStreamLine(line: string): AiStreamEvent | null {
+  const trimmed = line.trim();
+  if (!trimmed || trimmed.startsWith(':')) return null;
+  if (!trimmed.startsWith('data:')) return null;
+
+  const data = trimmed.slice(5).trim();
+  if (!data) return null;
+  if (data === '[DONE]') return { done: true };
+
+  try {
+    const payload = JSON.parse(data);
+    if (payload?.error || payload?.msg) {
+      return { error: String(payload.error || payload.msg) };
+    }
+    if (payload?.done === true) {
+      return {
+        done: true,
+        message_id: payload.message_id === undefined ? undefined : String(payload.message_id),
+        message_seq: payload.message_seq === undefined ? undefined : Number(payload.message_seq),
+        timestamp: payload.timestamp === undefined ? undefined : Number(payload.timestamp),
+        model: payload.model === undefined ? undefined : String(payload.model)
+      };
+    }
+
+    const delta = payload?.delta ?? payload?.content ?? payload?.choices?.[0]?.delta?.content;
+    if (delta !== undefined) {
+      return { delta: String(delta) };
+    }
+  } catch {
+    return { delta: data };
+  }
+
+  return null;
+}
 
 // 1. 身份认证与登录设备管理 API (Auth & Device)
 export const authApi = {
@@ -161,6 +206,18 @@ export const groupApi = {
   inviteMembers(groupNo: string, members: string[]) {
     return apiClient.post(`groups/${groupNo}/members`, { members });
   },
+  // 需要管理员确认的群成员邀请
+  inviteMembersForApproval(groupNo: string, uids: string[], remark = '') {
+    return apiClient.post(`groups/${groupNo}/member/invite`, { uids, remark });
+  },
+  // 获取群邀请详情
+  getInviteDetail(inviteNo: string) {
+    return apiClient.get(`group/invites/${inviteNo}`);
+  },
+  // 确认群邀请
+  confirmInvite(authCode: string) {
+    return apiClient.post(`group/invite/sure?auth_code=${authCode}`);
+  },
   // 移除群成员
   removeMembers(groupNo: string, members: string[]) {
     return apiDelete(`groups/${groupNo}/members`, { members });
@@ -194,6 +251,14 @@ export const groupApi = {
   transferOwner(groupNo: string, toUid: string) {
     return apiClient.post(`groups/${groupNo}/transfer/${toUid}`);
   },
+  // 获取群二维码
+  getGroupQRCode(groupNo: string) {
+    return apiClient.get(`groups/${groupNo}/qrcode`);
+  },
+  // 扫码入群
+  scanJoinGroup(groupNo: string, authCode: string) {
+    return apiClient.get(`groups/${groupNo}/scanjoin?auth_code=${authCode}`);
+  },
   // 退群
   exitGroup(groupNo: string) {
     return apiClient.post(`groups/${groupNo}/exit`);
@@ -209,6 +274,10 @@ export const groupApi = {
   // 个别成员禁言/解禁
   muteMember(groupNo: string, data: { member_uid: string; action: number; key: number }) {
     return apiClient.post(`groups/${groupNo}/forbidden_with_member`, data);
+  },
+  // 添加或移除群黑名单
+  blacklistMember(groupNo: string, action: 0 | 1, uids: string[]) {
+    return apiClient.post(`groups/${groupNo}/blacklist/${action}`, { uids });
   }
 };
 
@@ -249,13 +318,35 @@ export const syncApi = {
   revokeMessage(params: { channel_id: string; channel_type: number; message_id: string; client_msg_no: string }) {
     return apiClient.post('message/revoke', null, { params });
   },
+  // 编辑消息
+  editMessage(data: { channel_id: string; channel_type: number; message_id: string; message_seq: number; content_edit: string }) {
+    return apiClient.post('message/edit', data);
+  },
+  // 本地删除消息
+  deleteMessage(data: Array<{ channel_id: string; channel_type: number; message_id: string; message_seq: number }>) {
+    return apiDelete('message', data);
+  },
+  // 双向删除消息
+  mutualDeleteMessage(data: { channel_id: string; channel_type: number; message_id: string; message_seq: number }) {
+    return apiDelete('message/mutual', data);
+  },
   // 消息标记已读
   markReaded(data: { channel_id: string; channel_type: number; message_ids: string[] }) {
     return apiClient.post('message/readed', data);
   },
+  // 消息回执详情
+  getMessageReceipt(messageId: string, readed?: 0 | 1) {
+    const params = readed === undefined ? undefined : { readed };
+    return apiClient.get(`messages/${messageId}/receipt`, { params });
+  },
   // 清除未读计数 (typo 拼写 coversation 保持一致，与后端路由匹配)
-  clearUnread(channelId: string, channelType: number) {
-    return apiClient.put('coversation/clearUnread', { channel_id: channelId, channel_type: channelType });
+  clearUnread(channelId: string, channelType: number, messageSeq = 0) {
+    return apiClient.put('coversation/clearUnread', {
+      channel_id: channelId,
+      channel_type: channelType,
+      unread: 0,
+      message_seq: messageSeq
+    });
   },
   // 消息回应/表态
   addReaction(data: { channel_id: string; channel_type: number; message_id: string; emoji: string }) {
@@ -264,6 +355,26 @@ export const syncApi = {
   // 增量同步消息回应
   syncReactions(data: { channel_id: string; channel_type: number; version: number }) {
     return apiClient.post('reaction/sync', data);
+  },
+  // 置顶或取消置顶消息
+  pinMessage(data: { channel_id: string; channel_type: number; message_id: string; message_seq: number }) {
+    return apiClient.post('message/pinned', data);
+  },
+  // 增量同步置顶消息
+  syncPinnedMessages(data: { channel_id: string; channel_type: number; version: number }) {
+    return apiClient.post('message/pinned/sync', data);
+  },
+  // 清空置顶消息
+  clearPinnedMessages(data: { channel_id: string; channel_type: number }) {
+    return apiClient.post('message/pinned/clear', data);
+  },
+  // 同步提醒
+  syncReminders(data: { version: number; limit: number; channel_ids?: string[] }) {
+    return apiClient.post('message/reminder/sync', data);
+  },
+  // 完成提醒
+  doneReminders(ids: number[]) {
+    return apiClient.post('message/reminder/done', ids);
   }
 };
 
@@ -290,5 +401,108 @@ export const commonApi = {
   // 全局搜索
   globalSearch(data: any) {
     return apiClient.post('search/global', data);
+  },
+  // 举报用户、群组或消息
+  submitReport(data: any) {
+    return apiClient.post('reports', data);
+  },
+  // 机器人菜单或快捷指令
+  getRobotMenus(channelId: string, channelType: number) {
+    return apiClient.post('robot/sync', [{
+      robot_id: channelId,
+      version: 0
+    }]);
+  },
+  requestAiReply(data: {
+    channel_id: string;
+    channel_type: number;
+    prompt: string;
+    system_prompt?: string;
+    model?: string;
+    history?: Array<{ role: 'user' | 'assistant' | 'system'; content: string }>;
+  }) {
+    return apiClient.post('robot/ai_reply', data, { timeout: 45000 });
+  },
+  async requestAiReplyStream(
+    data: {
+      channel_id: string;
+      channel_type: number;
+      prompt: string;
+      system_prompt?: string;
+      model?: string;
+      history?: Array<{ role: 'user' | 'assistant' | 'system'; content: string }>;
+      stream?: boolean;
+    },
+    handlers: {
+      onDelta?: (delta: string) => void;
+      onDone?: (event: AiStreamEvent) => void;
+      onError?: (message: string) => void;
+      signal?: AbortSignal;
+    } = {}
+  ) {
+    const token = StorageService.get('token');
+    const url = `${String(apiClient.defaults?.baseURL || '/v1/').replace(/\/$/, '')}/robot/ai_reply`;
+    const response = await fetch(url, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        Accept: 'text/event-stream',
+        ...(token ? { token } : {})
+      },
+      body: JSON.stringify({ ...data, stream: true }),
+      signal: handlers.signal
+    });
+
+    if (!response.ok || !response.body) {
+      const payload = await response.json().catch(() => ({}));
+      throw {
+        msg: payload?.msg || `AI 助手暂不可用 (${response.status})`,
+        status: response.status
+      };
+    }
+
+    const reader = response.body.getReader();
+    const decoder = new TextDecoder();
+    let buffer = '';
+    let finalEvent: AiStreamEvent = {};
+
+    while (true) {
+      const { value, done } = await reader.read();
+      if (done) break;
+      buffer += decoder.decode(value, { stream: true });
+      const lines = buffer.split(/\r?\n/);
+      buffer = lines.pop() || '';
+
+      for (const line of lines) {
+        const event = parseAiStreamLine(line);
+        if (!event) continue;
+        if (event.error) {
+          handlers.onError?.(event.error);
+          throw { msg: event.error };
+        }
+        if (event.delta) {
+          handlers.onDelta?.(event.delta);
+        }
+        if (event.done) {
+          finalEvent = event;
+          handlers.onDone?.(event);
+        }
+      }
+    }
+
+    const tail = parseAiStreamLine(buffer);
+    if (tail?.delta) handlers.onDelta?.(tail.delta);
+    if (tail?.done) {
+      finalEvent = tail;
+      handlers.onDone?.(tail);
+    }
+    return finalEvent;
   }
 };
+
+export function resolveApiAssetUrl(pathOrUrl: string, referenceUrl?: string) {
+  return normalizeMediaUrl(pathOrUrl, {
+    baseUrl: String(apiClient.defaults?.baseURL || '/'),
+    referenceUrl
+  });
+}

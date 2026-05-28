@@ -13,6 +13,7 @@ const groupStore = useGroupStore();
 const groupName = ref('');
 const selectedUids = ref<string[]>([]);
 const creating = ref(false);
+const inviteMode = ref<'direct' | 'approval'>('direct');
 
 onMounted(() => {
   contactStore.syncContacts();
@@ -48,6 +49,9 @@ async function handleCreate() {
     const groupNo = res.data?.group_no || res.group_no;
     if (groupNo) {
       groupStore.upsertGroup(res.data || res);
+      if (inviteMode.value === 'approval') {
+        await groupStore.updateGroupSetting(groupNo, { invite: 1 });
+      }
       Message.success('群组创建成功');
       router.push(`/chat/conversation/${groupNo}/2`);
     } else {
@@ -93,6 +97,29 @@ function handleGoBack() {
       <!-- Friend Selector -->
       <div class="selector-section">
         <label class="section-label">选择联系人 (已选 {{ selectedUids.length }}人)</label>
+        <div class="invite-mode-row">
+          <button
+            class="mode-btn"
+            :class="{ active: inviteMode === 'direct' }"
+            type="button"
+            @click="inviteMode = 'direct'"
+          >
+            直接邀请
+          </button>
+          <button
+            class="mode-btn"
+            :class="{ active: inviteMode === 'approval' }"
+            type="button"
+            @click="inviteMode = 'approval'"
+          >
+            邀请确认
+          </button>
+        </div>
+        <div class="flow-state-row">
+          <span v-if="inviteMode === 'approval'">待审批</span>
+          <span v-else>群二维码暂不可用，创建后可在群设置查看</span>
+          <span class="muted-state">已过期状态会在二维码失效后显示</span>
+        </div>
         
         <div class="friends-list-wrapper">
           <div v-if="contactStore.contacts.length === 0" class="empty-state">
@@ -225,6 +252,39 @@ function handleGoBack() {
   flex-direction: column;
   gap: 8px;
   min-height: 200px;
+}
+
+.invite-mode-row {
+  display: flex;
+  gap: 8px;
+}
+
+.mode-btn {
+  height: 30px;
+  padding: 0 10px;
+  border: var(--border-hairline);
+  border-radius: var(--radius-sm);
+  background: var(--bg-secondary);
+  color: var(--text-secondary);
+  cursor: pointer;
+}
+
+.mode-btn.active {
+  color: var(--primary-color, #165dff);
+  border-color: var(--primary-color, #165dff);
+  background: rgba(22, 93, 255, 0.08);
+}
+
+.flow-state-row {
+  display: flex;
+  gap: 10px;
+  flex-wrap: wrap;
+  font-size: 12px;
+  color: var(--text-secondary);
+}
+
+.muted-state {
+  color: var(--text-disabled, #9ca3af);
 }
 
 .friends-list-wrapper {

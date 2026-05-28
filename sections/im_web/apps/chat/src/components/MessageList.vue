@@ -3,11 +3,11 @@ import { ref, onMounted, watch, nextTick, computed } from 'vue';
 import { useMessageStore } from '@tsdaodao/datasource-vue';
 import { useUserStore } from '@tsdaodao/datasource-vue';
 import { useRemoteConfig } from '@tsdaodao/base-vue';
-import { 
-  TextCell, 
-  ImageCell, 
-  SystemCell, 
-  TimeCell, 
+import {
+  TextCell,
+  ImageCell,
+  SystemCell,
+  TimeCell,
   VoiceCell,
   FileCell,
   VideoCell,
@@ -16,8 +16,9 @@ import {
   LocationCell,
   CardCell,
   MergeCell,
-  ChannelAvatar, 
-  ContextMenu 
+  ChannelAvatar,
+  ContextMenu,
+  AppDialog
 } from '@tsdaodao/base-vue';
 import { Message } from '@arco-design/web-vue';
 
@@ -26,16 +27,25 @@ const props = defineProps<{
   channelType: number;
 }>();
 
+const emit = defineEmits<{
+  (event: 'open-preview', payload: any): void;
+}>();
+
 const messageStore = useMessageStore();
 const userStore = useUserStore();
 const { remoteConfig } = useRemoteConfig();
 
 const scrollContainer = ref<HTMLDivElement | null>(null);
+const scrollTop = ref(0);
+const historyWindowSize = ref(300);
+const estimatedRowHeight = 72;
 
 const showMenu = ref(false);
 const menuX = ref(0);
 const menuY = ref(0);
 const selectedMsg = ref<any>(null);
+const editDialogVisible = ref(false);
+const editDialogText = ref('');
 const channelKey = computed(() => `${props.channelId}-${props.channelType}`);
 
 const messages = computed(() => {
@@ -55,10 +65,37 @@ const renderableMessages = computed(() => {
   return messages.value.filter(isRenderableMessage);
 });
 
+const visibleStart = computed(() => {
+  if (renderableMessages.value.length <= historyWindowSize.value) return 0;
+  const estimatedStart = Math.floor(scrollTop.value / estimatedRowHeight) - 20;
+  return Math.max(0, Math.min(estimatedStart, renderableMessages.value.length - historyWindowSize.value));
+});
+
+const visibleEnd = computed(() => {
+  // Always render to the end of the list to avoid bottomSpacer inaccuracy
+  return renderableMessages.value.length;
+});
+
+const visibleMessages = computed(() => {
+  return renderableMessages.value.slice(visibleStart.value, visibleEnd.value).map((msg, index) => ({
+    msg,
+    index: visibleStart.value + index
+  }));
+});
+
+const topSpacerHeight = computed(() => visibleStart.value * estimatedRowHeight);
+// NOTE: No bottomSpacer — estimated heights are inaccurate for mixed-content messages
+// and cause large blank areas at the bottom. We always render to the end of the list.
+
+function handleScroll() {
+  scrollTop.value = scrollContainer.value?.scrollTop || 0;
+}
+
 function scrollToBottom(behavior: 'auto' | 'smooth' = 'auto') {
   nextTick(() => {
     if (scrollContainer.value) {
       scrollContainer.value.scrollTop = scrollContainer.value.scrollHeight;
+      scrollTop.value = scrollContainer.value.scrollTop;
     }
   });
 }
@@ -75,7 +112,7 @@ watch(messages, (newMsgs) => {
   const missingUids = newMsgs
     .map(m => m.fromUID)
     .filter(uid => uid && !userStore.userCache[uid]);
-  
+
   if (missingUids.length > 0) {
     userStore.getUsersByIds([...new Set(missingUids)]);
   }
@@ -119,8 +156,24 @@ async function handleSendReaction(msg: any, emoji: string) {
 const menuItems = computed(() => {
   if (!selectedMsg.value) return [];
   const items = [];
-  
-  const isText = selectedMsg.value.content?.type === 1;
+  const msg = selectedMsg.value;
+  const canUseBackendAction = Boolean(msg.messageID && msg.messageSeq);
+
+  if (msg.status === 'fail' && msg.retryable) {
+    items.push({
+      label: '重试发送',
+      action: async () => {
+        try {
+          await messageStore.retryMessage(props.channelId, props.channelType, msg.clientMsgNo);
+          Message.success('已重新发送');
+        } catch (err: any) {
+          Message.error(err.message || err.msg || '重试失败');
+        }
+      }
+    });
+  }
+
+  const isText = msg.content?.type === 1;
   if (isText) {
     items.push({
       label: '复制文本',
@@ -132,10 +185,21 @@ const menuItems = computed(() => {
     });
   }
 
-  const isMine = isMe(selectedMsg.value);
+  const isMine = isMe(msg);
   const now = Math.floor(Date.now() / 1000);
-  const isWithinWindow = (now - selectedMsg.value.timestamp) < remoteConfig.value.revoke_second;
-  
+  const isWithinWindow = (now - msg.timestamp) < remoteConfig.value.revoke_second;
+
+  if (isMine && isText && isWithinWindow) {
+    items.push({
+      label: '编辑消息',
+      disabled: !canUseBackendAction,
+      action: () => {
+        editDialogText.value = msg.content?.text || '';
+        editDialogVisible.value = true;
+      }
+    });
+  }
+
   if (isMine && isWithinWindow) {
     items.push({
       label: '撤回消息',
@@ -157,114 +221,212 @@ const menuItems = computed(() => {
   }
 
   items.push({
-    label: '回复',
-    action: () => {
-      messageStore.setReplyTarget(selectedMsg.value);
+    label: msg.remoteExtra?.isPinned ? '取消置顶' : '设为置顶',
+    disabled: !canUseBackendAction,
+    action: async () => {
+      try {
+        await messageStore.togglePinnedMessage(props.channelId, props.channelType, msg);
+        Message.success(msg.remoteExtra?.isPinned ? '已置顶消息' : '已取消置顶');
+      } catch (err: any) {
+        Message.error(err.message || err.msg || '置顶操作失败');
+      }
     }
   });
 
+  items.push({
+    label: '查看回执',
+    disabled: !canUseBackendAction,
+    action: async () => {
+      try {
+        const receipt = await messageStore.fetchReceipt(msg.messageID);
+        const readed = receipt.readed?.length || 0;
+        const unread = receipt.unread?.length || 0;
+        Message.info(`已读 ${readed} 人，未读 ${unread} 人`);
+      } catch (err: any) {
+        Message.warning(err.message || err.msg || '回执暂不可用');
+      }
+    }
+  });
+
+  items.push({
+    label: '提醒暂不可用',
+    disabled: true,
+    action: () => {}
+  });
+
+  items.push({
+    label: '回复',
+    action: () => {
+      messageStore.setReplyTarget(msg);
+    }
+  });
+
+  items.push({
+    label: '本地删除',
+    danger: true,
+    disabled: !canUseBackendAction,
+    action: async () => {
+      try {
+        await messageStore.deleteLocalMessage(props.channelId, props.channelType, msg);
+        Message.success('已在本地删除');
+      } catch (err: any) {
+        Message.error(err.message || err.msg || '删除失败');
+      }
+    }
+  });
+
+  if (isMine || props.channelType === 2) {
+    items.push({
+      label: '双向删除',
+      danger: true,
+      disabled: !canUseBackendAction,
+      action: async () => {
+        try {
+          await messageStore.deleteMutualMessage(props.channelId, props.channelType, msg);
+          Message.success('已双向删除');
+        } catch (err: any) {
+          Message.error(err.message || err.msg || '双向删除失败');
+        }
+      }
+    });
+  }
+
   return items;
 });
+
+async function handleConfirmEdit(value?: string) {
+  if (!selectedMsg.value) return;
+  const nextText = String(value || '').trim();
+  if (!nextText || nextText === selectedMsg.value.content?.text) {
+    editDialogVisible.value = false;
+    return;
+  }
+  try {
+    await messageStore.editMessage(props.channelId, props.channelType, selectedMsg.value, nextText);
+    Message.success('已编辑消息');
+    editDialogVisible.value = false;
+  } catch (err: any) {
+    Message.error(err.message || err.msg || '编辑失败');
+  }
+}
+
+function handleFilePreview(payload: any) {
+  emit('open-preview', {
+    source: 'file',
+    ...payload
+  });
+}
+
+function handleCodePreview(payload: any) {
+  emit('open-preview', {
+    source: 'ai-code',
+    kind: 'ai-html',
+    ...payload
+  });
+}
 </script>
 
 <template>
-  <div ref="scrollContainer" class="message-list">
-    <div v-for="(msg, idx) in renderableMessages" :key="msg.clientMsgNo || msg.messageID" class="message-row-wrapper">
-      <TimeCell v-if="shouldShowTime(msg, idx)" :timestamp="msg.timestamp" />
+  <div ref="scrollContainer" class="message-list" @scroll="handleScroll">
+    <div v-if="topSpacerHeight > 0" class="history-spacer" :style="{ height: `${topSpacerHeight}px` }"></div>
 
-      <div 
-        v-if="msg.content?.type === 1000 || msg.isRevoked" 
+    <div v-for="item in visibleMessages" :key="item.msg.clientMsgNo || item.msg.messageID" class="message-row-wrapper">
+      <TimeCell v-if="shouldShowTime(item.msg, item.index)" :timestamp="item.msg.timestamp" />
+
+      <div
+        v-if="item.msg.content?.type === 1000 || item.msg.isRevoked"
         class="sys-msg-row"
       >
-        <SystemCell :message="msg" />
+        <SystemCell :message="item.msg" />
       </div>
 
-      <div 
-        v-else 
-        class="msg-row" 
-        :class="{ 'is-me': isMe(msg) }"
-        @contextmenu="handleRightClick($event, msg)"
+      <div
+        v-else
+        class="msg-row"
+        :class="{ 'is-me': isMe(item.msg) }"
+        @contextmenu="handleRightClick($event, item.msg)"
       >
-        <ChannelAvatar 
-          v-if="!isMe(msg)"
-          :name="userStore.userCache[msg.fromUID]?.name || '加载中'"
-          :avatar="userStore.userCache[msg.fromUID]?.avatar"
+        <ChannelAvatar
+          v-if="!isMe(item.msg)"
+          :name="userStore.userCache[item.msg.fromUID]?.name || '加载中'"
+          :avatar="userStore.userCache[item.msg.fromUID]?.avatar"
           :size="36"
           class="msg-avatar"
         />
 
         <div class="msg-bubble-container">
-          <div 
-            v-if="channelType === 2 && !isMe(msg)" 
+          <div
+            v-if="channelType === 2 && !isMe(item.msg)"
             class="user-name-label"
           >
-            {{ userStore.userCache[msg.fromUID]?.name || msg.fromUID }}
+            {{ userStore.userCache[item.msg.fromUID]?.name || item.msg.fromUID }}
           </div>
 
           <!-- Quote / Reply Reference Box -->
-          <div v-if="msg.content?.reply" class="quote-reference-box" :class="{ 'is-me': isMe(msg) }">
-            <span class="quote-author">@{{ msg.content.reply.fromName || msg.content.reply.fromUID }}:</span>
-            <span class="quote-text">{{ msg.content.reply.content?.text || '[消息]' }}</span>
+          <div v-if="item.msg.content?.reply" class="quote-reference-box" :class="{ 'is-me': isMe(item.msg) }">
+            <span class="quote-author">@{{ item.msg.content.reply.fromName || item.msg.content.reply.fromUID }}:</span>
+            <span class="quote-text">{{ item.msg.content.reply.content?.text || '[消息]' }}</span>
           </div>
 
-          <TextCell 
-            v-slot:default
-            v-if="msg.content?.type === 1" 
-            :message="msg" 
-            :is-me="isMe(msg)" 
+          <TextCell
+            v-if="item.msg.content?.type === 1"
+            :message="item.msg"
+            :is-me="isMe(item.msg)"
+            @preview-code="handleCodePreview"
           />
-          <ImageCell 
-            v-else-if="msg.content?.type === 2" 
-            :message="msg" 
-            :is-me="isMe(msg)" 
+          <ImageCell
+            v-else-if="item.msg.content?.type === 2"
+            :message="item.msg"
+            :is-me="isMe(item.msg)"
           />
-          <GifCell 
-            v-else-if="msg.content?.type === 3" 
-            :message="msg" 
-            :is-me="isMe(msg)" 
+          <GifCell
+            v-else-if="item.msg.content?.type === 3"
+            :message="item.msg"
+            :is-me="isMe(item.msg)"
           />
-          <VoiceCell 
-            v-else-if="msg.content?.type === 4" 
-            :message="msg" 
-            :is-me="isMe(msg)" 
+          <VoiceCell
+            v-else-if="item.msg.content?.type === 4"
+            :message="item.msg"
+            :is-me="isMe(item.msg)"
           />
-          <VideoCell 
-            v-else-if="msg.content?.type === 5" 
-            :message="msg" 
-            :is-me="isMe(msg)" 
+          <VideoCell
+            v-else-if="item.msg.content?.type === 5"
+            :message="item.msg"
+            :is-me="isMe(item.msg)"
           />
-          <LocationCell 
-            v-else-if="msg.content?.type === 6" 
-            :message="msg" 
-            :is-me="isMe(msg)" 
+          <LocationCell
+            v-else-if="item.msg.content?.type === 6"
+            :message="item.msg"
+            :is-me="isMe(item.msg)"
           />
-          <CardCell 
-            v-else-if="msg.content?.type === 7" 
-            :message="msg" 
-            :is-me="isMe(msg)" 
+          <CardCell
+            v-else-if="item.msg.content?.type === 7"
+            :message="item.msg"
+            :is-me="isMe(item.msg)"
           />
-          <FileCell 
-            v-else-if="msg.content?.type === 8" 
-            :message="msg" 
-            :is-me="isMe(msg)" 
+          <FileCell
+            v-else-if="item.msg.content?.type === 8"
+            :message="item.msg"
+            :is-me="isMe(item.msg)"
+            @preview="handleFilePreview"
           />
-          <MergeCell 
-            v-else-if="msg.content?.type === 11" 
-            :message="msg" 
-            :is-me="isMe(msg)" 
+          <MergeCell
+            v-else-if="item.msg.content?.type === 11"
+            :message="item.msg"
+            :is-me="isMe(item.msg)"
           />
-          <StickerCell 
-            v-else-if="msg.content?.type === 12 || msg.content?.type === 13" 
-            :message="msg" 
-            :is-me="isMe(msg)" 
+          <StickerCell
+            v-else-if="item.msg.content?.type === 12 || item.msg.content?.type === 13"
+            :message="item.msg"
+            :is-me="isMe(item.msg)"
           />
           <!-- Reactions Bar -->
-          <div v-if="msg.reactions && msg.reactions.length > 0" class="reactions-bar">
-            <div 
-              v-for="reaction in msg.reactions" 
-              :key="reaction.emoji" 
+          <div v-if="item.msg.reactions && item.msg.reactions.length > 0" class="reactions-bar">
+            <div
+              v-for="reaction in item.msg.reactions"
+              :key="reaction.emoji"
               class="reaction-badge"
-              @click="handleSendReaction(msg, reaction.emoji)"
+              @click="handleSendReaction(item.msg, reaction.emoji)"
             >
               <span class="reaction-emoji">{{ reaction.emoji }}</span>
               <span class="reaction-count">{{ reaction.count }}</span>
@@ -275,31 +437,54 @@ const menuItems = computed(() => {
       </div>
     </div>
 
-    <ContextMenu 
-      v-if="showMenu && menuItems.length > 0" 
-      :x="menuX" 
-      :y="menuY" 
-      :items="menuItems" 
+
+    <ContextMenu
+      v-if="showMenu && menuItems.length > 0"
+      :x="menuX"
+      :y="menuY"
+      :items="menuItems"
       :reactions="menuReactions"
-      @close="showMenu = false" 
+      @close="showMenu = false"
+    />
+
+    <AppDialog
+      v-model="editDialogText"
+      :visible="editDialogVisible"
+      title="编辑消息"
+      mode="input"
+      placeholder="输入新的消息内容"
+      confirm-text="保存"
+      @confirm="handleConfirmEdit"
+      @close="editDialogVisible = false"
     />
   </div>
 </template>
 
 <style scoped>
 .message-list {
-  flex: 1;
+  /* Fills the grid 1fr row. Must have overflow-y:auto for scrolling.
+     height:100% + overflow-y:auto is the minimal correct pattern in a grid cell. */
+  height: 100%;
   overflow-y: auto;
+  overflow-x: hidden;
   padding: 16px;
   display: flex;
   flex-direction: column;
-  gap: 16px;
+  gap: 8px;
   background-color: var(--bg-primary);
+  box-sizing: border-box;
 }
 
 .message-row-wrapper {
   display: flex;
   flex-direction: column;
+  overflow-anchor: none;
+  flex-shrink: 0;
+}
+
+.history-spacer {
+  flex: 0 0 auto;
+  pointer-events: none;
 }
 
 .msg-row {
@@ -315,13 +500,16 @@ const menuItems = computed(() => {
 
 .msg-avatar {
   margin-top: 4px;
+  flex-shrink: 0;
 }
 
 .msg-bubble-container {
   display: flex;
   flex-direction: column;
   gap: 4px;
-  max-width: 70%;
+  min-width: 0;
+  max-width: min(70%, 720px);
+  overflow-wrap: anywhere;
 }
 
 .msg-row.is-me .msg-bubble-container {

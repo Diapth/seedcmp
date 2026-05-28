@@ -106,6 +106,22 @@ export function registerCMDListeners() {
       case 'syncReminders':
         break;
 
+      case 'groupMemberAdd':
+      case 'groupMemberRemove':
+      case 'groupMemberUpdate':
+      case 'groupManagerUpdate':
+      case 'groupTransferOwner':
+      case 'groupBlacklistUpdate':
+      case 'groupForbiddenUpdate':
+        if (channel && channel.channelType === 2) {
+          delete groupStore.groups[channel.channelID];
+          groupStore.getGroupInfo(channel.channelID);
+          groupStore.fetchGroupMembers(channel.channelID);
+          channelStore.fetchGroupMembers(channel.channelID);
+          conversationStore.ensureGroupConversations();
+        }
+        break;
+
       case 'messageRevoke':
         if (channel && param.client_msg_no) {
           messageStore.handleMessageRevoked(channel.channelID, channel.channelType, param.client_msg_no);
@@ -136,8 +152,8 @@ export function registerMessageListeners() {
 
     const channelId = message.channel.channelID;
     const channelType = message.channel.channelType;
-    const currentUid = userStore.currentUser?.uid || '';
-    const isOwnMessage = message.fromUID === currentUid;
+    const currentUid = String(userStore.currentUser?.uid || '');
+    const isOwnMessage = String(message.fromUID || '') === currentUid;
     const currentPath = typeof window !== 'undefined' ? window.location.pathname : '';
     const isViewingChannel = currentPath.includes(`/chat/conversation/${channelId}/${channelType}`);
 
@@ -145,11 +161,19 @@ export function registerMessageListeners() {
       pendingClientMsgNoBySeq.set(message.clientSeq, message.clientMsgNo);
     }
 
+    // Own messages are skipped here entirely.
+    // sendMessage / sendMediaMessage call addRealtimeMessage themselves after
+    // WKSDK.send() resolves, merging the pending entry via our clientMsgNo.
+    // The SDK also pushes the same message back through this listener, but with
+    // a different clientMsgNo, which would create a duplicate — so we skip it.
+    // Multi-device sync is handled by syncMessages on reconnect, not this path.
+    if (isOwnMessage) return;
+
     messageStore.addRealtimeMessage(channelId, channelType, message, {
-      isUnreadCleared: !isOwnMessage && isViewingChannel
+      isUnreadCleared: isViewingChannel
     });
 
-    if (!isOwnMessage && isViewingChannel) {
+    if (isViewingChannel) {
       conversationStore.clearUnread(channelId, channelType);
     }
   });

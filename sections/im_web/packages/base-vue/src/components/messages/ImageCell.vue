@@ -1,5 +1,6 @@
 <script setup lang="ts">
-import { computed } from 'vue';
+import { computed, ref, watch } from 'vue';
+import { normalizeMediaUrl } from '../../service/mediaUrl';
 
 const props = defineProps<{
   message: {
@@ -13,15 +14,33 @@ const props = defineProps<{
 }>();
 
 const imageUrl = computed(() => {
-  return props.message.content?.url || props.message.payload?.url || '';
+  return normalizeMediaUrl(props.message.content?.url || props.message.payload?.url || '');
 });
+
+const imageLoadState = ref<'idle' | 'loading' | 'loaded' | 'error'>('idle');
+
+watch(
+  imageUrl,
+  url => {
+    imageLoadState.value = url ? 'loading' : 'idle';
+  },
+  { immediate: true }
+);
 </script>
 
 <template>
   <div class="image-cell" :class="{ 'is-me': isMe }">
     <div class="image-wrapper">
-      <img v-if="imageUrl" :src="imageUrl" class="bubble-image" alt="Image" />
+      <img
+        v-if="imageUrl && imageLoadState !== 'error'"
+        :src="imageUrl"
+        class="bubble-image"
+        alt="Image"
+        @load="imageLoadState = 'loaded'"
+        @error="imageLoadState = 'error'"
+      />
       <div v-else class="image-placeholder">加载中...</div>
+      <div v-if="imageLoadState === 'error'" class="image-placeholder">图片不可用</div>
     </div>
   </div>
 </template>
@@ -33,6 +52,8 @@ const imageUrl = computed(() => {
 }
 
 .image-wrapper {
+  width: min(240px, 56vw);
+  aspect-ratio: 4 / 3;
   max-width: 240px;
   max-height: 320px;
   overflow: hidden;

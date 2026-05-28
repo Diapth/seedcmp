@@ -8,6 +8,8 @@ import { ChannelAvatar } from '@tsdaodao/base-vue';
 const router = useRouter();
 const contactStore = useContactStore();
 const groupStore = useGroupStore();
+const SYSTEM_ROBOT_ID = 'u_10000';
+const DEEPSEEK_AI_ROBOT_ID = 'deepseek_ai_robot';
 
 onMounted(() => {
   contactStore.syncContacts();
@@ -33,6 +35,18 @@ function handleGroupClick(groupNo: string) {
 
 function handleFriendRequests() {
   router.push('/chat/friend-requests');
+}
+
+function handleConfigureRobot() {
+  router.push('/chat/robots');
+}
+
+function handleSystemRobot() {
+  router.push(`/chat/conversation/${SYSTEM_ROBOT_ID}/1`);
+}
+
+function handleDeepSeekRobot() {
+  router.push(`/chat/conversation/${DEEPSEEK_AI_ROBOT_ID}/1`);
 }
 
 function scrollToGroupList() {
@@ -108,6 +122,49 @@ function scrollToLetter(letter: string) {
         <span v-if="groupStore.savedGroups.length > 0" class="action-count">
           {{ groupStore.savedGroups.length }}
         </span>
+      </div>
+
+      <div class="action-item robot-config-action" @click="handleConfigureRobot">
+        <div class="action-icon robot-icon">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" class="svg-icon">
+            <rect x="5" y="7" width="14" height="12" rx="3" />
+            <path d="M12 3v4" />
+            <path d="M9 13h.01" />
+            <path d="M15 13h.01" />
+            <path d="M9 17h6" />
+          </svg>
+        </div>
+        <div class="action-label">新增机器人</div>
+      </div>
+
+      <div class="action-item" @click="handleSystemRobot">
+        <div class="action-icon system-robot-icon">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" class="svg-icon">
+            <path d="M12 3v3" />
+            <rect x="4" y="6" width="16" height="14" rx="3" />
+            <path d="M9 12h.01" />
+            <path d="M15 12h.01" />
+            <path d="M8 16h8" />
+          </svg>
+        </div>
+        <div class="action-label">系统机器人</div>
+        <span class="action-count">u_10000</span>
+      </div>
+
+      <div class="action-item ai-robot-action" @click="handleDeepSeekRobot">
+        <div class="action-icon deepseek-icon">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" class="svg-icon">
+            <path d="M12 3v3" />
+            <rect x="4" y="6" width="16" height="14" rx="3" />
+            <path d="M8 13h.01" />
+            <path d="M16 13h.01" />
+            <path d="M9 17c1.5 1 4.5 1 6 0" />
+            <path d="M3 11h2" />
+            <path d="M19 11h2" />
+          </svg>
+        </div>
+        <div class="action-label">DeepSeek AI</div>
+        <span class="action-count robot-tag">机器人</span>
       </div>
     </div>
 
@@ -238,6 +295,26 @@ function scrollToLetter(letter: string) {
 
 .group-icon {
   background-color: #722ed1;
+}
+
+.robot-icon {
+  background-color: #0f766e;
+}
+
+.system-robot-icon {
+  background-color: #2563eb;
+}
+
+.deepseek-icon {
+  background-color: #7c3aed;
+}
+
+.robot-config-action {
+  border-top: var(--border-hairline);
+}
+
+.ai-robot-action {
+  border-top: var(--border-hairline);
 }
 
 .svg-icon {

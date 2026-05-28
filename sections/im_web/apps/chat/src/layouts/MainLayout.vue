@@ -1,10 +1,11 @@
 <script setup lang="ts">
-import { ref, onMounted } from 'vue';
+import { computed, ref, onMounted } from 'vue';
 import { useRouter } from 'vue-router';
 import { useUserStore } from '@tsdaodao/datasource-vue';
 import { useConversationStore } from '@tsdaodao/datasource-vue';
 import { useKickoutStore } from '@tsdaodao/datasource-vue';
 import { useGroupStore } from '@tsdaodao/datasource-vue';
+import { useSdkStore } from '@tsdaodao/datasource-vue';
 import { KickoutOverlay, ChannelAvatar } from '@tsdaodao/base-vue';
 import ConversationList from '../views/ConversationList.vue';
 import { ContactList } from '@tsdaodao/contacts-vue';
@@ -15,20 +16,48 @@ import MyProfileDrawer from '../views/MyProfileDrawer.vue';
 const activeTab = ref<'chats' | 'contacts'>('chats');
 const searchQuery = ref('');
 const showMyProfileDrawer = ref(false);
+const themeMode = ref<'light' | 'dark'>((localStorage.getItem('theme-mode') as 'light' | 'dark') || 'light');
 
 const router = useRouter();
 const userStore = useUserStore();
 const conversationStore = useConversationStore();
 const kickoutStore = useKickoutStore();
 const groupStore = useGroupStore();
+const sdkStore = useSdkStore();
+
+const connectionStateLabel = computed(() => {
+  if (sdkStore.connectionState === 'connected' && sdkStore.recoveryState === 'syncing') return '恢复同步中';
+  if (sdkStore.connectionState === 'connected') return '在线';
+  if (sdkStore.connectionState === 'connecting') return '连接中';
+  if (sdkStore.connectionState === 'reconnecting') return '正在重连';
+  if (sdkStore.connectionState === 'kicked') return '已被踢出';
+  return '离线';
+});
+
+const connectionBanner = computed(() => {
+  return sdkStore.connectionState !== 'connected' || sdkStore.recoveryState === 'syncing' || sdkStore.recoveryState === 'failed';
+});
+
+const recoveryState = computed(() => sdkStore.recoveryState);
 
 onMounted(async () => {
+  applyThemeMode();
   if (userStore.isLoggedIn && userStore.currentUser) {
     await groupStore.fetchMyGroups();
     conversationStore.ensureGroupConversations();
     await conversationStore.syncConversations();
   }
 });
+
+function applyThemeMode() {
+  document.documentElement.setAttribute('theme-mode', themeMode.value);
+}
+
+function toggleTheme() {
+  themeMode.value = themeMode.value === 'dark' ? 'light' : 'dark';
+  localStorage.setItem('theme-mode', themeMode.value);
+  applyThemeMode();
+}
 
 function handleLogout() {
   userStore.logout();
@@ -44,6 +73,11 @@ function handleKickoutRelogin() {
 
 <template>
   <div class="main-layout">
+    <div v-if="connectionBanner" class="connection-banner" :class="`state-${sdkStore.connectionState}`">
+      <span>{{ connectionStateLabel }}</span>
+      <span v-if="recoveryState === 'syncing'">恢复同步</span>
+      <span v-else-if="sdkStore.lastError">{{ sdkStore.lastError }}</span>
+    </div>
     <!-- Left Sidebar -->
     <div class="sidebar">
       <!-- Profile & Top Bar -->
@@ -64,6 +98,9 @@ function handleKickoutRelogin() {
             <polyline points="16 17 21 12 16 7" />
             <line x1="21" y1="12" x2="9" y2="12" />
           </svg>
+        </button>
+        <button class="theme-btn" @click="toggleTheme" :title="themeMode === 'dark' ? '切换浅色' : '切换深色'">
+          {{ themeMode === 'dark' ? '☀' : '◐' }}
         </button>
       </div>
 
@@ -134,6 +171,36 @@ function handleKickoutRelogin() {
   width: 100vw;
   overflow: hidden;
   background-color: var(--bg-primary);
+  position: relative;
+}
+
+.connection-banner {
+  position: absolute;
+  top: 8px;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 20;
+  min-height: 28px;
+  max-width: min(520px, calc(100vw - 32px));
+  padding: 0 12px;
+  border: var(--border-hairline);
+  border-radius: var(--radius-sm);
+  background: var(--bg-primary);
+  color: var(--text-primary);
+  font-size: 12px;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.08);
+}
+
+.connection-banner.state-reconnecting,
+.connection-banner.state-offline {
+  color: #d46b08;
+}
+
+.connection-banner.state-kicked {
+  color: #cf1322;
 }
 
 .sidebar {
@@ -204,6 +271,17 @@ function handleKickoutRelogin() {
   transition: background-color 0.2s, color 0.2s;
 }
 
+.theme-btn {
+  width: 30px;
+  height: 30px;
+  border: var(--border-hairline);
+  border-radius: var(--radius-sm);
+  background-color: var(--bg-secondary);
+  color: var(--text-primary);
+  cursor: pointer;
+  font-size: 14px;
+}
+
 .logout-btn:hover {
   background-color: var(--bg-hover);
   color: var(--text-primary);
@@ -251,7 +329,10 @@ function handleKickoutRelogin() {
 
 .chat-viewport {
   flex: 1;
+  min-width: 0;
+  min-height: 0;
   height: 100%;
+  overflow: hidden;
   background-color: var(--bg-primary);
 }
 
@@ -329,5 +410,32 @@ function handleKickoutRelogin() {
 .clear-search-btn:hover {
   background-color: var(--bg-hover);
   color: var(--text-primary);
+}
+
+@media (max-width: 720px) {
+  .main-layout {
+    display: grid;
+    grid-template-columns: minmax(88px, 36vw) minmax(0, 1fr);
+  }
+
+  .sidebar {
+    width: auto;
+    min-width: 88px;
+  }
+
+  .user-info,
+  .tab-btn {
+    font-size: 12px;
+  }
+
+  .sidebar-search {
+    padding: 8px;
+  }
+
+  .chat-viewport {
+    min-width: 0;
+    min-height: 0;
+    overflow: hidden;
+  }
 }
 </style>

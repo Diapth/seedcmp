@@ -22,9 +22,26 @@ export class MessageVoice extends MessageContent {
   url!: string;
   time!: number;
 
+  constructor(url?: string, time?: number) {
+    super();
+    this.url = url || '';
+    this.time = time || 0;
+  }
+
+  get contentType(): number {
+    return 4;
+  }
+
   decodeJSON(content: any) {
     this.url = content.url || '';
     this.time = content.time || 0;
+  }
+
+  encodeJSON() {
+    return {
+      url: this.url || '',
+      time: this.time || 0
+    };
   }
 
   get conversationDigest(): string {
@@ -93,10 +110,29 @@ export class MessageFile extends MessageContent {
   name!: string;
   size!: number;
 
+  constructor(url?: string, name?: string, size?: number) {
+    super();
+    this.url = url || '';
+    this.name = name || '';
+    this.size = size || 0;
+  }
+
+  get contentType(): number {
+    return 8;
+  }
+
   decodeJSON(content: any) {
     this.url = content.url || '';
     this.name = content.name || '';
     this.size = content.size || 0;
+  }
+
+  encodeJSON() {
+    return {
+      url: this.url || '',
+      name: this.name || '',
+      size: this.size || 0
+    };
   }
 
   get conversationDigest(): string {
@@ -134,6 +170,36 @@ export class MessageSticker extends MessageContent {
   get conversationDigest(): string {
     return '[贴图]';
   }
+}
+
+export class UnsupportedMessageContent extends MessageContent {
+  type!: number;
+  raw!: any;
+  text = '[暂不支持的消息]';
+
+  constructor(type = 0, raw?: any) {
+    super();
+    this.type = type;
+    this.raw = raw;
+  }
+
+  decodeJSON(content: any) {
+    this.raw = content;
+    this.type = Number(content?.type || this.type || 0);
+  }
+
+  get conversationDigest(): string {
+    return '[暂不支持的消息]';
+  }
+}
+
+export function createUnavailableMessage(type: number, raw?: any) {
+  return {
+    type,
+    text: '[暂不支持的消息]',
+    raw,
+    unavailable: true
+  };
 }
 
 export function registerMessageContentTypes() {

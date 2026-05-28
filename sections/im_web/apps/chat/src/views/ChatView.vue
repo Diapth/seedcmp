@@ -7,6 +7,7 @@ import { useConversationStore } from '@tsdaodao/datasource-vue';
 import { GroupSettingsDrawer } from '@tsdaodao/base-vue';
 import MessageList from '../components/MessageList.vue';
 import MessageInput from '../components/MessageInput.vue';
+import ChatSidePreview, { type ChatSidePreviewKind } from '../components/ChatSidePreview.vue';
 import UserProfileDrawer from './UserProfileDrawer.vue';
 
 const route = useRoute();
@@ -17,6 +18,18 @@ const conversationStore = useConversationStore();
 
 const showGroupSettings = ref(false);
 const showUserProfile = ref(false);
+const sidePreviewRequestId = ref(0);
+const sidePreview = ref({
+  visible: false,
+  type: 'file-text' as ChatSidePreviewKind,
+  title: '',
+  subtitle: '',
+  sourceUrl: '',
+  sourceText: '',
+  extension: '',
+  loading: false,
+  error: ''
+});
 
 const channelId = computed(() => route.params.channelId as string);
 const channelType = computed(() => Number(route.params.channelType || 1));
@@ -32,6 +45,12 @@ const isTyping = computed(() => {
   return messageStore.typingState[key]?.isTyping === true;
 });
 
+function isChatViewActive(cid: string, ctype: number) {
+  return route.name === 'Conversation' &&
+    String(route.params.channelId || '') === String(cid) &&
+    Number(route.params.channelType || 0) === Number(ctype);
+}
+
 async function loadChannelDetails() {
   const cid = channelId.value;
   const ctype = channelType.value;
@@ -42,7 +61,9 @@ async function loadChannelDetails() {
   }
 
   await messageStore.syncMessages(cid, ctype);
-  await conversationStore.clearUnread(cid, ctype);
+  if (isChatViewActive(cid, ctype)) {
+    await conversationStore.clearUnread(cid, ctype);
+  }
 }
 
 onMounted(() => {
@@ -50,11 +71,14 @@ onMounted(() => {
 });
 
 watch([channelId, channelType], () => {
+  closeSidePreview();
   loadChannelDetails();
 });
 
 watch(() => messageStore.messages[channelKey.value]?.length, () => {
-  void conversationStore.clearUnread(channelId.value, channelType.value);
+  if (isChatViewActive(channelId.value, channelType.value)) {
+    void conversationStore.clearUnread(channelId.value, channelType.value);
+  }
 });
 
 function handleHeaderClick() {
@@ -71,38 +95,131 @@ function handleMembersClick() {
   showGroupSettings.value = false;
   router.push(`/chat/group-members/${channelId.value}`);
 }
+
+function filePreviewType(kind: string): ChatSidePreviewKind {
+  const map: Record<string, ChatSidePreviewKind> = {
+    markdown: 'file-markdown',
+    text: 'file-text',
+    html: 'file-html',
+    pdf: 'file-pdf',
+    office: 'file-office'
+  };
+  return map[kind] || 'file-text';
+}
+
+function filePreviewTitle(kind: string) {
+  const labels: Record<string, string> = {
+    markdown: 'Markdown 预览',
+    text: '文本预览',
+    html: 'HTML 预览',
+    pdf: 'PDF 预览',
+    office: 'Office 文件预览'
+  };
+  return labels[kind] || '文件预览';
+}
+
+function closeSidePreview() {
+  sidePreviewRequestId.value += 1;
+  sidePreview.value.visible = false;
+  sidePreview.value.loading = false;
+  sidePreview.value.error = '';
+}
+
+async function handleOpenPreview(payload: any) {
+  const requestId = sidePreviewRequestId.value + 1;
+  sidePreviewRequestId.value = requestId;
+
+  if (payload?.source === 'ai-code') {
+    sidePreview.value = {
+      visible: true,
+      type: 'ai-html',
+      title: 'AI HTML 预览',
+      subtitle: payload.language ? `${payload.language} 代码块` : 'HTML 代码块',
+      sourceUrl: '',
+      sourceText: payload.code || '',
+      extension: 'html',
+      loading: false,
+      error: payload.code ? '' : '代码块内容为空'
+    };
+    return;
+  }
+
+  const type = filePreviewType(payload?.kind || '');
+  sidePreview.value = {
+    visible: true,
+    type,
+    title: filePreviewTitle(payload?.kind || ''),
+    subtitle: payload?.name || '',
+    sourceUrl: payload?.url || '',
+    sourceText: '',
+    extension: payload?.extension || '',
+    loading: ['file-markdown', 'file-text', 'file-html'].includes(type),
+    error: ''
+  };
+
+  if (!['file-markdown', 'file-text', 'file-html'].includes(type)) return;
+
+  try {
+    const res = await fetch(payload.url);
+    if (!res.ok) throw new Error(`HTTP ${res.status}`);
+    if (sidePreviewRequestId.value !== requestId) return;
+    sidePreview.value.sourceText = await res.text();
+  } catch (err: any) {
+    if (sidePreviewRequestId.value !== requestId) return;
+    sidePreview.value.error = err?.message || '预览加载失败';
+  } finally {
+    if (sidePreviewRequestId.value !== requestId) return;
+    sidePreview.value.loading = false;
+  }
+}
 </script>
 
 <template>
   <div class="chat-view-container">
-    <div class="chat-header">
-      <div class="header-left" @click="handleHeaderClick" :style="{ cursor: channelType === 1 ? 'pointer' : 'default' }">
-        <h3 class="channel-name">{{ channelInfo?.name || '正在加载...' }}</h3>
-        <span v-if="isTyping" class="typing-indicator">对方正在输入...</span>
-        <span v-else class="status-indicator">{{ channelType === 2 ? '群聊' : '在线' }}</span>
+    <div class="chat-main-column">
+      <div class="chat-header">
+        <div class="header-left" @click="handleHeaderClick" :style="{ cursor: channelType === 1 ? 'pointer' : 'default' }">
+          <h3 class="channel-name">{{ channelInfo?.name || '正在加载...' }}</h3>
+          <span v-if="isTyping" class="typing-indicator">对方正在输入...</span>
+          <span v-else class="status-indicator">{{ channelType === 2 ? '群聊' : '在线' }}</span>
+        </div>
+
+        <div class="header-right">
+          <button v-if="channelType === 2" class="settings-btn" @click="handleGroupSettingsClick" title="群聊设置">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" class="settings-icon">
+              <circle cx="12" cy="12" r="3" />
+              <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z" />
+            </svg>
+          </button>
+        </div>
       </div>
 
-      <div class="header-right">
-        <button v-if="channelType === 2" class="settings-btn" @click="handleGroupSettingsClick" title="群聊设置">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" class="settings-icon">
-            <circle cx="12" cy="12" r="3" />
-            <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z" />
-          </svg>
-        </button>
-      </div>
+      <MessageList
+        :channel-id="channelId"
+        :channel-type="channelType"
+        @open-preview="handleOpenPreview"
+      />
+
+      <MessageInput
+        :channel-id="channelId"
+        :channel-type="channelType"
+      />
     </div>
 
-    <MessageList 
-      :channel-id="channelId" 
-      :channel-type="channelType" 
+    <ChatSidePreview
+      :visible="sidePreview.visible"
+      :type="sidePreview.type"
+      :title="sidePreview.title"
+      :subtitle="sidePreview.subtitle"
+      :source-url="sidePreview.sourceUrl"
+      :source-text="sidePreview.sourceText"
+      :extension="sidePreview.extension"
+      :loading="sidePreview.loading"
+      :error="sidePreview.error"
+      @close="closeSidePreview"
     />
 
-    <MessageInput 
-      :channel-id="channelId" 
-      :channel-type="channelType" 
-    />
-
-    <GroupSettingsDrawer 
+    <GroupSettingsDrawer
       v-if="channelType === 2"
       :group-no="channelId"
       :visible="showGroupSettings"
@@ -110,7 +227,7 @@ function handleMembersClick() {
       @members-click="handleMembersClick"
     />
 
-    <UserProfileDrawer 
+    <UserProfileDrawer
       v-if="channelType === 1"
       :uid="channelId"
       :visible="showUserProfile"
@@ -121,10 +238,21 @@ function handleMembersClick() {
 
 <style scoped>
 .chat-view-container {
-  display: flex;
-  flex-direction: column;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
   height: 100%;
+  width: 100%;
+  position: relative;
+  overflow: hidden;
   background-color: var(--bg-primary);
+}
+
+.chat-main-column {
+  display: grid;
+  grid-template-rows: 64px minmax(0, 1fr) auto;
+  min-width: 0;
+  height: 100%;
+  overflow: hidden;
 }
 
 .chat-header {
@@ -189,5 +317,11 @@ function handleMembersClick() {
 .settings-icon {
   width: 20px;
   height: 20px;
+}
+
+@media (max-width: 760px) {
+  .chat-view-container {
+    grid-template-columns: minmax(0, 1fr);
+  }
 }
 </style>

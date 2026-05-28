@@ -1,9 +1,9 @@
 <script setup lang="ts">
-import { computed, ref, onMounted } from 'vue';
+import { computed, ref, watch } from 'vue';
 import { useRouter } from 'vue-router';
 import { useUserStore } from '@tsdaodao/datasource-vue';
 import { useContactStore } from '@tsdaodao/contacts-vue';
-import { friendApi } from '@tsdaodao/datasource-vue';
+import { commonApi, friendApi } from '@tsdaodao/datasource-vue';
 import { ChannelAvatar } from '@tsdaodao/base-vue';
 import { Message } from '@arco-design/web-vue';
 
@@ -21,16 +21,34 @@ const contactStore = useContactStore();
 const userDetails = computed(() => {
   return userStore.userCache[props.uid] || { uid: props.uid, name: '加载中...', avatar: '' };
 });
+const reportState = ref<'idle' | 'editing' | 'submitting' | 'submitted' | 'failed'>('idle');
+const reportCategory = ref('spam');
+const reportDescription = ref('');
+const reportAttachment = ref('');
+const reportTarget = computed(() => ({
+  target_type: 'user',
+  target_id: props.uid
+}));
 
 const isFriend = computed(() => {
-  return contactStore.contacts.some(c => c.uid === props.uid);
+  return contactStore.contacts.some(c => String(c.uid) === String(props.uid));
 });
 
-onMounted(() => {
-  if (props.uid && !userStore.userCache[props.uid]) {
-    userStore.getUsersByIds([props.uid]);
-  }
-});
+watch(
+  () => [props.visible, props.uid] as const,
+  ([visible, uid]) => {
+    if (!visible || !uid) return;
+    if (!userStore.userCache[uid]) {
+      void userStore.getUsersByIds([uid]);
+    }
+    void contactStore.syncContacts();
+  },
+  { immediate: true }
+);
+
+function removeLocalContact(uid: string) {
+  contactStore.contacts = contactStore.contacts.filter(c => String(c.uid) !== String(uid));
+}
 
 async function handleSendMessage() {
   emit('close');
@@ -42,12 +60,12 @@ async function handleDeleteFriend() {
     await friendApi.deleteFriend(props.uid);
     Message.success('已删除好友');
     // 乐观更新，立刻移除
-    contactStore.contacts = contactStore.contacts.filter(c => c.uid !== props.uid);
+    removeLocalContact(props.uid);
     contactStore.syncContacts();
     emit('close');
   } catch (err: any) {
     // 后端如果报400或者路由问题，也强制乐观更新以避免界面卡死
-    contactStore.contacts = contactStore.contacts.filter(c => c.uid !== props.uid);
+    removeLocalContact(props.uid);
     Message.success('已删除好友');
     emit('close');
   }
@@ -67,6 +85,31 @@ async function handleAddBlacklist() {
 function handleAddFriend() {
   emit('close');
   router.push({ path: '/chat/add-friend', query: { uid: props.uid } });
+}
+
+function openReportForm() {
+  reportState.value = 'editing';
+}
+
+async function submitReport() {
+  if (!reportDescription.value.trim()) {
+    Message.warning('请填写举报说明');
+    return;
+  }
+  reportState.value = 'submitting';
+  try {
+    await commonApi.submitReport({
+      ...reportTarget.value,
+      category: reportCategory.value,
+      description: reportDescription.value.trim(),
+      attachments: reportAttachment.value ? [reportAttachment.value] : []
+    });
+    reportState.value = 'submitted';
+    Message.success('举报已提交');
+  } catch (err: any) {
+    reportState.value = 'failed';
+    Message.error(err.msg || '举报提交失败');
+  }
 }
 </script>
 
@@ -114,12 +157,34 @@ function handleAddFriend() {
           </button>
 
           <div v-if="isFriend" class="danger-zone">
+            <button class="action-btn secondary-btn" @click="openReportForm">
+              举报用户
+            </button>
             <button class="action-btn secondary-btn" @click="handleAddBlacklist">
               加入黑名单
             </button>
             <button class="action-btn danger-btn" @click="handleDeleteFriend">
               删除好友
             </button>
+          </div>
+
+          <div v-if="reportState !== 'idle'" class="report-panel">
+            <label class="report-label">举报类型</label>
+            <select v-model="reportCategory" class="report-input">
+              <option value="spam">垃圾骚扰</option>
+              <option value="abuse">辱骂攻击</option>
+              <option value="fraud">欺诈风险</option>
+              <option value="other">其他</option>
+            </select>
+            <label class="report-label">举报说明</label>
+            <textarea v-model="reportDescription" class="report-textarea" placeholder="描述你遇到的问题"></textarea>
+            <label class="report-label">附件链接</label>
+            <input v-model="reportAttachment" class="report-input" placeholder="可选，填写截图或文件链接" />
+            <button class="action-btn primary-btn" :disabled="reportState === 'submitting'" @click="submitReport">
+              {{ reportState === 'submitting' ? '提交中...' : '提交举报' }}
+            </button>
+            <div v-if="reportState === 'submitted'" class="report-state">举报已提交</div>
+            <div v-else-if="reportState === 'failed'" class="report-state">举报提交失败，请稍后重试</div>
           </div>
         </div>
       </div>
@@ -249,5 +314,36 @@ function handleAddFriend() {
   margin-top: 12px;
   border-top: var(--border-hairline);
   padding-top: 24px;
+}
+
+.report-panel {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 12px;
+  border: var(--border-hairline);
+  border-radius: var(--radius-sm);
+  background-color: var(--bg-secondary);
+}
+
+.report-label,
+.report-state {
+  font-size: 12px;
+  color: var(--text-secondary);
+}
+
+.report-input,
+.report-textarea {
+  border: var(--border-hairline);
+  border-radius: var(--radius-sm);
+  background-color: var(--bg-primary);
+  color: var(--text-primary);
+  font-size: 13px;
+  padding: 8px;
+}
+
+.report-textarea {
+  min-height: 72px;
+  resize: vertical;
 }
 </style>

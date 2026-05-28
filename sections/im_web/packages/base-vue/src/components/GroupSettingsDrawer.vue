@@ -6,7 +6,9 @@ import { useConversationStore } from '@tsdaodao/datasource-vue';
 import { getMyGroupRole } from '@tsdaodao/datasource-vue';
 import { friendApi, groupApi } from '@tsdaodao/datasource-vue';
 import ChannelAvatar from './ChannelAvatar.vue';
+import AppDialog from './AppDialog.vue';
 import { Message } from '@arco-design/web-vue';
+import QRCode from 'qrcode';
 
 const props = defineProps<{
   groupNo: string;
@@ -32,6 +34,21 @@ const inviteKeyword = ref('');
 const inviteSearchResult = ref<any | null>(null);
 const selectedInviteUsers = ref<any[]>([]);
 const inviteSearching = ref(false);
+const showQrModal = ref(false);
+const qrState = ref<'idle' | 'loading' | 'ready' | 'expired' | 'approval' | 'unavailable'>('idle');
+const qrCodeUrl = ref('');
+const qrImageUrl = ref('');
+const pendingDestructiveAction = ref<null | { title: string; message: string; run: () => Promise<void> }>(null);
+const destructiveLoading = ref(false);
+const inviteMode = computed(() => Number(groupInfo.value?.invite || 0) === 1);
+const qrPayload = computed(() => qrCodeUrl.value.trim());
+const qrModules = computed(() => qrPayload.value ? qrPayload.value.length : 0);
+const qrImageSource = computed(() => {
+  if (/^(data:image\/|https?:\/\/.*\.(png|jpe?g|webp|gif|svg)(\?|#|$))/i.test(qrPayload.value)) {
+    return qrPayload.value;
+  }
+  return qrImageUrl.value;
+});
 
 const currentMember = computed(() => {
   const uid = String(userStore.currentUser?.uid || '');
@@ -92,9 +109,8 @@ async function refreshGroupDetails() {
 async function saveGroupName() {
   if (!newName.value.trim()) return;
   try {
-    await groupApi.updateGroupInfo(props.groupNo, { name: newName.value });
+    await groupStore.updateGroupProfile(props.groupNo, { name: newName.value });
     Message.success('群名修改成功');
-    if (groupInfo.value) groupInfo.value.name = newName.value;
     await refreshGroupDetails();
     conversationStore.ensureGroupConversations();
     editingName.value = false;
@@ -105,9 +121,8 @@ async function saveGroupName() {
 
 async function saveGroupNotice() {
   try {
-    await groupApi.updateGroupInfo(props.groupNo, { notice: newNotice.value });
+    await groupStore.updateGroupProfile(props.groupNo, { notice: newNotice.value });
     Message.success('公告修改成功');
-    if (groupInfo.value) groupInfo.value.notice = newNotice.value;
     await refreshGroupDetails();
     editingNotice.value = false;
   } catch (err: any) {
@@ -146,6 +161,55 @@ async function togglePin() {
 async function toggleMute() {
   await conversationStore.toggleMute(props.groupNo, 2, Number(groupInfo.value?.mute || 0) !== 1);
   if (groupInfo.value) groupInfo.value.mute = Number(groupInfo.value.mute || 0) === 1 ? 0 : 1;
+}
+
+async function toggleInviteApproval() {
+  if (!canManageGroup.value) {
+    Message.warning('普通成员不允许修改邀请确认');
+    return;
+  }
+  const next = inviteMode.value ? 0 : 1;
+  await groupStore.updateGroupSetting(props.groupNo, { invite: next });
+  Message.success(next === 1 ? '已开启邀请确认' : '已关闭邀请确认');
+}
+
+async function toggleMuteAll() {
+  if (!canManageGroup.value) {
+    Message.warning('普通成员不允许修改全员禁言');
+    return;
+  }
+  const next = Number(groupInfo.value?.forbidden || 0) !== 1;
+  await groupStore.muteAll(props.groupNo, next);
+  Message.success(next ? '已开启全员禁言' : '已关闭全员禁言');
+}
+
+async function loadQRCode() {
+  showQrModal.value = true;
+  qrState.value = inviteMode.value ? 'approval' : 'loading';
+  qrCodeUrl.value = '';
+  qrImageUrl.value = '';
+  if (inviteMode.value) return;
+
+  try {
+    const res: any = await groupStore.getGroupQRCode(props.groupNo);
+    qrCodeUrl.value = res?.qrcode || res?.url || '';
+    if (qrCodeUrl.value) {
+      qrImageUrl.value = await QRCode.toDataURL(qrPayload.value, {
+        errorCorrectionLevel: 'M',
+        margin: 1,
+        width: 192,
+        color: {
+          dark: '#111827',
+          light: '#ffffff'
+        }
+      });
+      qrState.value = 'ready';
+    } else {
+      qrState.value = 'unavailable';
+    }
+  } catch {
+    qrState.value = 'unavailable';
+  }
 }
 
 function openInviteModal() {
@@ -205,8 +269,8 @@ async function submitInviteMembers() {
   if (membersToInvite.length === 0) return;
 
   try {
-    await groupApi.inviteMembers(props.groupNo, membersToInvite);
-    Message.success('邀请已发送');
+    await groupStore.inviteMembers(props.groupNo, membersToInvite, { approval: inviteMode.value });
+    Message.success(inviteMode.value ? '邀请确认已提交，待审批' : '邀请已发送');
     await groupStore.fetchGroupMembers(props.groupNo);
     showInviteModal.value = false;
     inviteKeyword.value = '';
@@ -218,24 +282,41 @@ async function submitInviteMembers() {
 }
 
 async function handleDisband() {
-  try {
-    await groupApi.disbandGroup(props.groupNo);
-    Message.success('群组已解散');
-    await conversationStore.deleteConversation(props.groupNo, 2);
-    emit('close');
-  } catch (err: any) {
-    Message.error(err.msg || '操作失败');
-  }
+  pendingDestructiveAction.value = {
+    title: '解散群组',
+    message: '确认解散群组？该操作会影响所有成员。',
+    run: async () => {
+      await groupStore.disbandGroup(props.groupNo);
+      Message.success('群组已解散');
+      await conversationStore.deleteConversation(props.groupNo, 2);
+      emit('close');
+    }
+  };
 }
 
 async function handleExit() {
+  pendingDestructiveAction.value = {
+    title: '退出群聊',
+    message: '确认退出群聊？',
+    run: async () => {
+      await groupStore.exitGroup(props.groupNo);
+      Message.success('已退出群聊');
+      await conversationStore.deleteConversation(props.groupNo, 2);
+      emit('close');
+    }
+  };
+}
+
+async function confirmDestructiveAction() {
+  if (!pendingDestructiveAction.value) return;
+  destructiveLoading.value = true;
   try {
-    await groupApi.exitGroup(props.groupNo);
-    Message.success('已退出群聊');
-    await conversationStore.deleteConversation(props.groupNo, 2);
-    emit('close');
+    await pendingDestructiveAction.value.run();
+    pendingDestructiveAction.value = null;
   } catch (err: any) {
     Message.error(err.msg || '操作失败');
+  } finally {
+    destructiveLoading.value = false;
   }
 }
 </script>
@@ -343,6 +424,18 @@ async function handleExit() {
           <button class="secondary-action-btn" @click="openInviteModal">
             邀请成员
           </button>
+          <button class="secondary-action-btn" @click="loadQRCode">
+            群二维码
+          </button>
+          <button class="secondary-action-btn" @click="toggleInviteApproval">
+            {{ inviteMode ? '关闭邀请确认' : '邀请确认' }}
+          </button>
+          <button class="secondary-action-btn" @click="toggleMuteAll">
+            {{ Number(groupInfo?.forbidden || 0) === 1 ? '关闭全员禁言' : '全员禁言' }}
+          </button>
+          <button class="secondary-action-btn disabled-action" disabled>
+            黑名单暂不可用
+          </button>
         </div>
 
         <!-- Group Actions -->
@@ -393,6 +486,33 @@ async function handleExit() {
         </div>
       </div>
     </div>
+    <div v-if="showQrModal" class="modal-mask">
+      <div class="invite-modal" @click.stop>
+        <div class="invite-title">群二维码</div>
+        <div v-if="qrState === 'loading'" class="invite-desc">正在加载群二维码</div>
+        <div v-else-if="qrState === 'ready'" class="qr-box">
+          <img v-if="qrImageSource" class="qr-image" :src="qrImageSource" alt="群二维码" />
+          <div class="qr-grid" aria-hidden="true" :data-module-count="qrModules"></div>
+          <div class="qr-link">{{ qrPayload }}</div>
+        </div>
+        <div v-else-if="qrState === 'approval'" class="invite-desc">邀请确认已开启，扫码入群待审批</div>
+        <div v-else-if="qrState === 'expired'" class="invite-desc">群二维码已过期</div>
+        <div v-else class="invite-desc">群二维码暂不可用</div>
+        <div class="invite-actions">
+          <button class="modal-btn secondary" @click="showQrModal = false">关闭</button>
+        </div>
+      </div>
+    </div>
+    <AppDialog
+      :visible="!!pendingDestructiveAction"
+      :title="pendingDestructiveAction?.title || ''"
+      :message="pendingDestructiveAction?.message || ''"
+      :loading="destructiveLoading"
+      danger
+      confirm-text="确认"
+      @confirm="confirmDestructiveAction"
+      @close="pendingDestructiveAction = null"
+    />
   </div>
 </template>
 
@@ -672,6 +792,13 @@ async function handleExit() {
   cursor: pointer;
 }
 
+.secondary-action-btn:disabled,
+.disabled-action {
+  color: var(--text-disabled, #9ca3af);
+  cursor: not-allowed;
+  opacity: 0.7;
+}
+
 .icon-action-btn {
   display: flex;
   align-items: center;
@@ -727,13 +854,17 @@ async function handleExit() {
   display: flex;
   align-items: center;
   justify-content: center;
-  z-index: 2100;
+  z-index: 3200;
+  padding: 24px;
 }
 
 .invite-modal {
   width: 420px;
+  max-width: min(420px, calc(100vw - 32px));
+  max-height: min(560px, calc(100vh - 48px));
+  overflow: auto;
   background: var(--bg-primary);
-  border-radius: 8px;
+  border-radius: var(--radius-sm);
   padding: 20px;
   box-shadow: 0 16px 48px rgba(0, 0, 0, 0.18);
   display: flex;
@@ -750,6 +881,42 @@ async function handleExit() {
 .invite-desc {
   font-size: 12px;
   color: var(--text-secondary);
+}
+
+.qr-box {
+  align-items: center;
+  min-height: 224px;
+  padding: 16px;
+  border: var(--border-hairline);
+  border-radius: var(--radius-sm);
+  background: var(--bg-secondary);
+  color: var(--text-primary);
+  font-size: 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.qr-image {
+  width: 192px;
+  height: 192px;
+  border: 8px solid #ffffff;
+  border-radius: var(--radius-sm);
+  background: #ffffff;
+  image-rendering: pixelated;
+  box-shadow: 0 1px 4px rgba(15, 23, 42, 0.12);
+}
+
+.qr-grid {
+  display: none;
+}
+
+.qr-link {
+  max-width: 100%;
+  color: var(--text-secondary);
+  font-size: 11px;
+  word-break: break-all;
+  text-align: center;
 }
 
 .invite-search-row {
