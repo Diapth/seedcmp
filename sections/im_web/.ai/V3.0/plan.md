@@ -1,6 +1,6 @@
 # Implementation Plan: IM Web V3.0 Clowder Multi-Agent Connector
 
-**Branch**: `001-im-web-v2` | **Date**: 2026-05-28 | **Spec**: [spec.md](./spec.md)
+**Branch**: `002-im-web-v3-clowder` | **Date**: 2026-05-28 | **Spec**: [spec.md](./spec.md)
 
 **Input**: Feature specification from `sections/im_web/.ai/V3.0/spec.md`
 

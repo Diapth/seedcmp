@@ -1,6 +1,6 @@
 # Feature Specification: IM Web V3.0 Clowder Multi-Agent Connector
 
-**Feature Branch**: `001-im-web-v2`
+**Feature Branch**: `002-im-web-v3-clowder`
 
 **Created**: 2026-05-28
 
