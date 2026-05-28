@@ -1,0 +1,284 @@
+# wkbench
+
+`wkbench` is a black-box benchmark driver for WuKongIM. It talks to a running WuKongIM cluster through public HTTP, benchmark-only HTTP, and WKProto gateway endpoints. It does not import server internals or bypass cluster semantics; a single-node deployment is treated as a single-node cluster.
+
+## Commands
+
+```bash
+go run ./cmd/wkbench <command> [flags]
+```
+
+| Command | Purpose |
+| --- | --- |
+| `worker` | Starts one worker control process. Workers hold WKProto clients and execute assigned workload shards. |
+| `validate` | Loads target, workers, and scenario YAML and validates static config plus deterministic planning. |
+| `doctor` | Validates target and workers, then checks target health, bench API capabilities, worker control APIs, and gateway reachability. |
+| `run` | Runs the full coordinator flow: validate, preflight, assign workers, prepare, connect, warmup, run, cooldown, and report. |
+| `dev-sim` | Runs a long-lived development simulator that keeps users online and emits low-rate person/group messages. |
+| `report` | Reserved for future standalone report rendering. It is not implemented yet. |
+
+Exit codes are stable: `0` success, `1` config validation failure, `2` preflight failure, `3` hard limit failure, `4` worker failure, `5` target unavailable, and `6` internal failure.
+
+## Target Requirements
+
+The target WuKongIM process must expose the normal health/readiness endpoints and the benchmark API:
+
+- `GET /healthz`
+- `GET /readyz`
+- `GET /bench/v1/capabilities`
+- `GET /bench/v1/snapshot`
+- `POST /bench/v1/users/tokens`
+- `POST /bench/v1/channels`
+- `POST /bench/v1/channels/subscribers`
+
+Enable the server-side bench API in `wukongim.conf` before running wkbench:
+
+```ini
+WK_BENCH_API_ENABLE=true
+```
+
+The current bench API is intended for controlled benchmark environments. Do not expose `/bench/v1/*` on public networks.
+
+## Minimal Workflow
+
+Start one or more workers first:
+
+```bash
+WK_BENCH_WORKER_TOKEN=worker-secret \
+  go run ./cmd/wkbench worker \
+  --listen 127.0.0.1:19090 \
+  --work-dir ./tmp/wkbench-worker-a
+```
+
+Validate local files without network checks:
+
+```bash
+go run ./cmd/wkbench validate \
+  --target ./target.yaml \
+  --workers ./workers.yaml \
+  --scenario ./scenario.yaml
+```
+
+Run network preflight checks:
+
+```bash
+go run ./cmd/wkbench doctor \
+  --target ./target.yaml \
+  --workers ./workers.yaml \
+  --scenario ./scenario.yaml
+```
+
+Run the benchmark:
+
+```bash
+go run ./cmd/wkbench run \
+  --target ./target.yaml \
+  --workers ./workers.yaml \
+  --scenario ./scenario.yaml
+```
+
+For a compiled binary, replace `go run ./cmd/wkbench` with the binary path.
+
+## Compose Development Simulator
+
+The Docker Compose development cluster can start an optional simulator service named `wk-sim`:
+
+```bash
+docker compose --profile dev-sim up -d --build
+curl http://127.0.0.1:19091/status
+docker compose logs -f wk-sim
+```
+
+Plain `docker compose up -d` does not start the simulator. The `dev-sim` profile must be enabled explicitly.
+
+To verify the local Compose stack end to end, run:
+
+```bash
+scripts/dev-sim-compose-smoke.sh
+```
+
+The script retries transient `docker compose up --build` failures, waits for
+`wk-sim` to report running traffic, and checks recent node/simulator logs for
+panic markers.
+
+The service runs:
+
+```bash
+wkbench dev-sim --config /etc/wkbench/dev-sim.yaml
+```
+
+For local non-Docker runs:
+
+```bash
+GOWORK=off go run ./cmd/wkbench dev-sim --config ./docker/sim/dev-sim.yaml
+```
+
+Status endpoints:
+
+- `GET http://127.0.0.1:19091/healthz`
+- `GET http://127.0.0.1:19091/status`
+
+Safe tuning environment variables:
+
+| Variable | Meaning |
+| --- | --- |
+| `WK_SIM_USERS` | Total generated online user pool. |
+| `WK_SIM_PERSON_CHANNELS` | Number of one-to-one channels. |
+| `WK_SIM_GROUP_CHANNELS` | Number of group channels. |
+| `WK_SIM_GROUP_MEMBERS` | Members per group channel. |
+| `WK_SIM_RATE` | Per-channel person and group send rate, for example `0.5/s`. |
+| `WK_SIM_VERIFY_RECV` | Receive verification mode, for example `none` or `sampled`. |
+| `WK_SIM_UID_PREFIX` | Prefix for generated simulator user IDs. |
+
+The Compose profile sets high local-debug defaults: `500` users, `100` person
+channels, `100` group channels, `10` members per group, and `5/s` per channel.
+That targets roughly `1000` ingress messages per second before group fanout and
+sets `WK_SIM_VERIFY_RECV=none` to avoid receive checks throttling local send
+pressure. Override the same `WK_SIM_*` variables to lower or raise the workload;
+use `WK_SIM_VERIFY_RECV=sampled` when sampled receive verification is needed.
+
+The simulator stays within wkbench's black-box boundary: it prepares data through `/bench/v1/*` and sends messages through WKProto gateways. It does not import server internals or bypass cluster paths.
+
+The opt-in e2e smoke starts a real three-node cluster and checks that `dev-sim`
+reaches `running` with connected users and non-zero traffic:
+
+```bash
+GOWORK=off go test -tags=e2e ./test/e2e/bench/devsim_smoke -count=1
+```
+
+## Example `target.yaml`
+
+```yaml
+name: local-single-node-cluster
+api:
+  addrs:
+    - http://127.0.0.1:5001
+gateway:
+  tcp:
+    addrs:
+      - 127.0.0.1:5100
+bench_api:
+  enabled: true
+  addrs:
+    - http://127.0.0.1:5001
+  token: bench-secret
+metrics:
+  enabled: false
+  addrs: []
+```
+
+`bench_api.addrs` is optional. When it is empty, wkbench uses `api.addrs` for bench API requests.
+
+## Example `workers.yaml`
+
+```yaml
+workers:
+  - id: worker-a
+    addr: http://127.0.0.1:19090
+    weight: 1
+    control_token: worker-secret
+```
+
+For local experiments only, a worker may be started with `--insecure-control`; then set `insecure_control: true` and omit `control_token` in `workers.yaml`.
+
+## Example `scenario.yaml`
+
+```yaml
+version: wkbench/v1
+run:
+  id: smoke-001
+  warmup: 1s
+  duration: 5s
+  cooldown: 1s
+  fail_fast: true
+  report_dir: ./tmp/wkbench-reports/smoke-001
+identity:
+  uid_prefix: bench-u
+  device_prefix: bench-d
+  client_msg_prefix: bench-msg
+  token:
+    mode: bench_api
+online:
+  total_users: 100
+  connect_rate: 50/s
+  gateway_balance: round_robin
+channels:
+  profiles:
+    - name: person-chat
+      channel_type: person
+      count: 10
+    - name: small-group
+      channel_type: group
+      count: 5
+      members:
+        count: 20
+        overlap: allowed
+      online:
+        member_ratio: 1
+      shard:
+        mode: hash
+      prepare:
+        subscribers_batch_size: 1000
+messages:
+  payload:
+    size_bytes: 128
+    mode: deterministic
+  traffic:
+    - name: person-send
+      channel_ref: person-chat
+      rate_per_channel: 1/s
+      recv_ack: true
+      verify:
+        recv:
+          mode: full
+    - name: group-send
+      channel_ref: small-group
+      rate_per_channel: 1/s
+      recv_ack: true
+      verify:
+        recv:
+          mode: sampled
+          sample_size_per_message: 1
+limits:
+  hard:
+    max_worker_failed: 0
+    max_connect_error_rate: 0
+    max_sendack_error_rate: 0
+    max_recv_verify_error_rate: 0
+cleanup:
+  enabled: false
+```
+
+Durations use Go duration syntax such as `500ms`, `1s`, or `2m`. Rates use `<number>/s`, for example `100/s` or `12.5/s`.
+
+## Scenario Notes
+
+- `online.total_users` is the generated identity pool. Person channels reserve two users per channel. Group member ranges may share this pool when `members.overlap: allowed`.
+- Person profiles generate deterministic one-to-one channel IDs from the sender and recipient UID pair.
+- Group profiles support normal hashed channel ranges and the `split_members_and_traffic` mode for one very large group. In split mode, exactly one logical group channel is split across workers by member ranges and traffic partitions.
+- Multiple `messages.traffic` entries may target the same channel profile. Each traffic entry uses its own `rate_per_channel`.
+- `verify.recv.mode: full` verifies every expected recipient in the workload shard. `sampled` verifies a deterministic recipient sample. Empty mode disables receive verification.
+- `identity.token.mode: bench_api` prepares benchmark user tokens through `/bench/v1/users/tokens`. Empty or `none` uses empty tokens.
+
+## Report Output
+
+When `run.report_dir` is set, wkbench writes a report directory containing:
+
+- `scenario.yaml`, `target.yaml`, and `workers.yaml`: copied effective inputs.
+- `plan.json`: deterministic worker assignment.
+- `report.json`: machine-readable verdict, summary, limits, metrics, and errors.
+- `summary.md`: human-readable summary.
+- `workers/`: raw worker reports.
+- `metrics/` and `errors/`: jsonl details for metrics and error samples.
+
+## Development Checks
+
+Useful commands while changing wkbench:
+
+```bash
+GOWORK=off go test ./internal/bench/... ./cmd/wkbench -count=1
+GOWORK=off go test ./cmd/wkbench -run TestWkbenchDoesNotImportServerInternals -count=1
+GOWORK=off go test -tags=e2e ./test/e2e/bench/wkbench_smoke -count=1
+```
+
+Keep `cmd/wkbench` as a thin CLI over `internal/bench`. Do not import WuKongIM server internals into wkbench; use `internal/bench/target` and WKProto clients as black-box boundaries.
