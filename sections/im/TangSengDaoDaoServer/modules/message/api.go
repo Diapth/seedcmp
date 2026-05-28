@@ -127,6 +127,7 @@ func (m *Message) Route(r *wkhttp.WKHttp) {
 		msg.POST("/send", m.sendMsg) // 代发消息
 	}
 	m.ctx.AddMessagesListener(m.listenerMessages) // 监听消息
+	m.registerClowderBridgeListener()
 	m.syncMessageReadedCount()
 }
 

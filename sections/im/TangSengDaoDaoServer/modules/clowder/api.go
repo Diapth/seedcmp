@@ -21,8 +21,12 @@ func New(ctx *config.Context) *Clowder {
 	return &Clowder{
 		ctx:    ctx,
 		Log:    log.NewTLog("clowder"),
-		config: commonmodule.DefaultClowderBridgeConfig(),
+		config: commonmodule.ClowderBridgeConfigFromEnv(),
 	}
+}
+
+func (c *Clowder) SetConfig(config commonmodule.ClowderBridgeConfig) {
+	c.config = config
 }
 
 func (c *Clowder) Route(r *wkhttp.WKHttp) {

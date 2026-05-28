@@ -63,7 +63,7 @@
 - [X] T024 [P] [US1] Implement TangSeng IM connector binding model and persistence facade for FR-002 in `sections/im/TangSengDaoDaoServer/modules/clowder/model.go`
 - [X] T025 [P] [US1] Implement TangSeng inbound message normalization for FR-003, FR-004, FR-012 in `sections/im/TangSengDaoDaoServer/modules/clowder/normalize.go`
 - [X] T026 [US1] Implement TangSeng signed inbound forwarder to Clowder for FR-001, FR-003, FR-017 in `sections/im/TangSengDaoDaoServer/modules/clowder/client.go`
-- [ ] T027 [US1] Wire TangSeng message events into the Clowder bridge for FR-009 in `sections/im/TangSengDaoDaoServer/modules/message/event.go`
+- [X] T027 [US1] Wire TangSeng message events into the Clowder bridge for FR-009 in `sections/im/TangSengDaoDaoServer/modules/message/event.go`
 - [X] T028 [US1] Implement Clowder inbound route handling for `im-web` payloads in `/media/leng/DiskB1/exp/clowder-ai/packages/api/src/routes/connector-webhooks.ts`
 - [X] T029 [US1] Implement Clowder binding lookup and creation through `ConnectorThreadBindingStore` in `/media/leng/DiskB1/exp/clowder-ai/packages/api/src/infrastructure/connectors/ImWebInboundHandler.ts`
 - [X] T030 [US1] Implement Clowder dedup integration using connector ID, external chat ID, message ID, and client message number in `/media/leng/DiskB1/exp/clowder-ai/packages/api/src/infrastructure/connectors/InboundMessageDedup.ts`

@@ -38,6 +38,11 @@ Baseline command inventory captured during Phase 1 setup. Execution remains pend
   - Pass - `cd sections/im_web/apps/chat && pnpm exec vitest run tests/clowderBridgeContracts.test.ts tests/clowderMessageStore.test.ts tests/messageActions.test.ts --pool=threads --poolOptions.threads.singleThread=true` passed 24 tests
   - Pass - `cd sections/im/TangSengDaoDaoServer && go test ./modules/clowder ./modules/common -run 'Test(Normalize|Sign|Verify|DefaultClowder)'`
   - Pass - `cd /media/leng/DiskB1/exp/clowder-ai/packages/api && pnpm build && node --test test/im-web-outbound-adapter.test.js test/im-web-inbound-bridge.test.js` passed 5 tests
+- TangSeng message event wiring TDD RED: `go test ./modules/common ./modules/clowder -run 'TestClowderBridgeConfigFromEnv|TestMessagesListenForwardsConfiguredMessages'` failed because `ClowderBridgeConfigFromEnv` was missing.
+- TangSeng message event wiring GREEN:
+  - Pass - `go test ./modules/common ./modules/clowder -run 'TestClowderBridgeConfigFromEnv|TestMessagesListenForwardsConfiguredMessages|Test(Normalize|Sign|Verify|DefaultClowder)'`
+  - Pass - `go test ./modules/message -run '^$'` compiled message package and Clowder listener wiring.
+- TangSeng message test blocked by local DB: `go test ./modules/message -run 'TestMessageSync$'` reached route registration and logged the Clowder bridge as disabled/unconfigured, then failed on existing MySQL root access (`Access denied for user 'root'@'localhost'`) while querying offsets.
 - Contract tests: Pass - `node --test test/im-web-inbound-bridge.test.js`
 - Outbound adapter TDD RED: `pnpm build && node --test test/im-web-outbound-adapter.test.js` built successfully, then failed because no HTTP callback was sent and non-2xx callbacks were not surfaced.
 - Outbound adapter GREEN: Pass - `cd /media/leng/DiskB1/exp/clowder-ai/packages/api && pnpm build && node --test test/im-web-outbound-adapter.test.js test/im-web-inbound-bridge.test.js` passed 5 tests across inbound and outbound suites.

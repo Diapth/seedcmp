@@ -6,11 +6,28 @@ import (
 	"fmt"
 	"time"
 
+	"github.com/TangSengDaoDao/TangSengDaoDaoServer/modules/clowder"
+	commonmodule "github.com/TangSengDaoDao/TangSengDaoDaoServer/modules/common"
 	"github.com/TangSengDaoDao/TangSengDaoDaoServerLib/common"
 	"github.com/TangSengDaoDao/TangSengDaoDaoServerLib/config"
 	"github.com/TangSengDaoDao/TangSengDaoDaoServerLib/pkg/util"
 	"go.uber.org/zap"
 )
+
+func (m *Message) registerClowderBridgeListener() {
+	bridge := clowder.New(m.ctx)
+	bridgeConfig := commonmodule.ClowderBridgeConfigFromEnv()
+	if !bridgeConfig.IsConfigured() {
+		m.Info("Clowder bridge listener disabled or unconfigured")
+		return
+	}
+	bridge.SetConfig(bridgeConfig)
+	client := clowder.NewClient(bridgeConfig.APIBaseURL, bridgeConfig.ConnectorSecret, bridgeConfig.RequestTimeout)
+	m.ctx.AddMessagesListener(func(messages []*config.MessageResp) {
+		bridge.MessagesListen(messages, client)
+	})
+	m.Info("Clowder bridge listener registered")
+}
 
 func (m *Message) syncMessageReadedCount() {
 	go m.startTimer()
