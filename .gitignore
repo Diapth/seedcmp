@@ -10,8 +10,36 @@ __pycache__/
 .agents/
 .specify/
 
-# other models
-sections/im/
+# IM backend sources are tracked for V2/V3 integration.
+sections/im/*
+!sections/im/TangSengDaoDaoServer/
+!sections/im/TangSengDaoDaoServer/**
+!sections/im/WuKongIM/
+!sections/im/WuKongIM/**
+sections/im/**/.git/
+sections/im/**/.claude/
+sections/im/**/.vscode/
+sections/im/**/node_modules/
+sections/im/**/logs/
+sections/im/**/data/
+sections/im/**/tsdddata/
+sections/im/**/tmp/
+sections/im/**/dist/
+sections/im/**/build/
+sections/im/**/vendor/
+sections/im/**/target/
+sections/im/**/bin/
+sections/im/**/*.log
+sections/im/**/*.db
+sections/im/**/*.sqlite
+sections/im/**/*.so
+sections/im/**/*.exe
+sections/im/**/wukongim
+sections/im/**/tangsengdaodaoserver
+sections/im/**/*.p12
+sections/im/**/*.pem
+sections/im/**/*.key
+sections/im/**/*.crt
 
 
 # C extensions

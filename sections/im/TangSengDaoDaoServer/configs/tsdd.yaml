@@ -1,0 +1,46 @@
+# #################### 基础配置 ####################
+mode: "debug"
+addr: ":8090"
+grpcAddr: "0.0.0.0:6979" # webhook grpc监听地址，给悟空IM提供的
+appName: "唐僧叨叨"
+rootDir: "tsdddata"
+messageSaveAcrossDevice: true
+onlineStatusOn: true
+smsCode: "123456" # 测试短信验证码
+
+##################### 悟空IM配置 ####################
+wukongIM:
+  apiURL: "http://127.0.0.1:5001" # 悟空IM的api地址
+
+##################### db ####################
+db:
+  mysqlAddr: "tsdd_user:tsdd_password@tcp(127.0.0.1:3306)/im?charset=utf8mb4&parseTime=true&loc=Local"
+  redisAddr: "127.0.0.1:6379"
+
+##################### 外网配置 ####################
+external:
+  ip: "127.0.0.1"
+  baseURL: "http://127.0.0.1:8090"
+
+##################### 日志配置 ####################
+logger:
+  level: 1
+  dir: "./logs"
+
+##################### 文件服务 ####################
+fileService: "minio"
+minio:
+  url: "http://127.0.0.1:9000"
+  accessKeyID: "minio"
+  secretAccessKey: "minio123"
+
+##################### 内置账户配置 ####################
+account:
+  systemUID: "u_10000"
+  fileHelperUID: "fileHelper"
+  systemGroupID: "g_10000"
+  adminUID: "admin"
+
+##################### 头像 ####################
+avatar:
+  defaultBaseURL: "https://api.multiavatar.com/{avatar}.png"
