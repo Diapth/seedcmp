@@ -89,25 +89,25 @@
 
 ### Tests for User Story 2
 
-- [ ] T040 [P] [US2] Add Clowder permission store tests for `im-web` group whitelist and admin-only commands in `/media/leng/DiskB1/exp/clowder-ai/packages/api/test/im-web-permissions.test.js`
-- [ ] T041 [P] [US2] Add TangSeng group role mapping tests for owner, manager, member, and departed member in `sections/im/TangSengDaoDaoServer/modules/clowder/permissions_test.go`
-- [ ] T042 [P] [US2] Add IM Web permission UI state tests for denied, disabled, admin-only, and loading states in `sections/im_web/apps/chat/tests/clowderPermissionState.test.ts`
-- [ ] T043 [US2] Add Playwright group permission smoke for SC-004 in `sections/im_web/apps/chat/tests-e2e/smoke-v3-clowder-permissions.spec.ts`
+- [X] T040 [P] [US2] Add Clowder permission store tests for `im-web` group whitelist and admin-only commands in `/media/leng/DiskB1/exp/clowder-ai/packages/api/test/im-web-permissions.test.js`
+- [X] T041 [P] [US2] Add TangSeng group role mapping tests for owner, manager, member, and departed member in `sections/im/TangSengDaoDaoServer/modules/clowder/permissions_test.go`
+- [X] T042 [P] [US2] Add IM Web permission UI state tests for denied, disabled, admin-only, and loading states in `sections/im_web/apps/chat/tests/clowderPermissionState.test.ts`
+- [X] T043 [US2] Add Playwright group permission smoke for SC-004 in `sections/im_web/apps/chat/tests-e2e/smoke-v3-clowder-permissions.spec.ts`
 
 ### Implementation for User Story 2
 
-- [ ] T044 [P] [US2] Implement TangSeng group role snapshot adapter for FR-007 in `sections/im/TangSengDaoDaoServer/modules/clowder/permissions.go`
+- [X] T044 [P] [US2] Implement TangSeng group role snapshot adapter for FR-007 in `sections/im/TangSengDaoDaoServer/modules/clowder/permissions.go`
 - [ ] T045 [US2] Wire group owner and manager role checks into Clowder bridge forwarding in `sections/im/TangSengDaoDaoServer/modules/group/service.go`
-- [ ] T046 [US2] Implement Clowder `im-web` permission mapping with `ConnectorPermissionStore` in `/media/leng/DiskB1/exp/clowder-ai/packages/api/src/infrastructure/connectors/ImWebPermissionPolicy.ts`
+- [X] T046 [US2] Implement Clowder `im-web` permission mapping with `ConnectorPermissionStore` in `/media/leng/DiskB1/exp/clowder-ai/packages/api/src/infrastructure/connectors/ImWebPermissionPolicy.ts`
 - [ ] T047 [US2] Implement `/allow-group` and `/deny-group` behavior for `im-web` in `/media/leng/DiskB1/exp/clowder-ai/packages/api/src/infrastructure/connectors/ConnectorCommandLayer.ts`
 - [ ] T048 [US2] Add permission-denied, command-admin-only, and group-not-allowed response mapping in `/media/leng/DiskB1/exp/clowder-ai/packages/api/src/routes/connector-webhooks.ts`
-- [ ] T049 [US2] Add datasource methods for group authorization and admin-only state in `sections/im_web/packages/datasource-vue/src/api/clowder.ts`
-- [ ] T050 [US2] Extend Clowder store with permission state and role-aware disabled reasons in `sections/im_web/packages/datasource-vue/src/stores/clowderStore.ts`
+- [X] T049 [US2] Add datasource methods for group authorization and admin-only state in `sections/im_web/packages/datasource-vue/src/api/clowder.ts`
+- [X] T050 [US2] Extend Clowder store with permission state and role-aware disabled reasons in `sections/im_web/packages/datasource-vue/src/stores/clowderStore.ts`
 - [ ] T051 [US2] Render denied and admin-only states in the status badge and settings entry point in `sections/im_web/apps/chat/src/components/ClowderStatusBadge.vue`
-- [ ] T052 [US2] Preserve sender ID and display name in message metadata across group history refresh in `sections/im_web/packages/datasource-vue/src/stores/messageStore.ts`
-- [ ] T053 [US2] Run IM Web targeted tests and group permission smoke output for US2 in `sections/im_web/.ai/V3.0/evidence.md`
-- [ ] T054 [US2] Run Clowder targeted permission tests output for US2 in `sections/im_web/.ai/V3.0/evidence.md`
-- [ ] T055 [US2] Complete permissions and unauthorized mutation review notes for US2 in `sections/im_web/.ai/V3.0/review-log.md`
+- [X] T052 [US2] Preserve sender ID and display name in message metadata across group history refresh in `sections/im_web/packages/datasource-vue/src/stores/messageStore.ts`
+- [X] T053 [US2] Run IM Web targeted tests and group permission smoke output for US2 in `sections/im_web/.ai/V3.0/evidence.md`
+- [X] T054 [US2] Run Clowder targeted permission tests output for US2 in `sections/im_web/.ai/V3.0/evidence.md`
+- [X] T055 [US2] Complete permissions and unauthorized mutation review notes for US2 in `sections/im_web/.ai/V3.0/review-log.md`
 
 **Checkpoint**: Group access is explicit, auditable, and role-aware.
 

@@ -21,6 +21,7 @@ func TestNormalizeInboundMessageBuildsExternalChatAndSender(t *testing.T) {
 		Timestamp:   1780000000000,
 		Payload:     payload,
 		ChatName:    "Product Group",
+		Role:        &GroupRoleSnapshot{GroupNo: "group_123", UID: "u_10001", Role: GroupRoleManager, Admin: true},
 	}
 
 	normalized, err := NormalizeInboundMessage(msg)
@@ -33,6 +34,9 @@ func TestNormalizeInboundMessageBuildsExternalChatAndSender(t *testing.T) {
 	assert.Equal(t, []string{"codex"}, normalized.Mentions)
 	assert.Equal(t, "u_10001", normalized.Sender.ID)
 	assert.Equal(t, "Alice", normalized.Sender.Name)
+	require.NotNil(t, normalized.Role)
+	assert.Equal(t, GroupRoleManager, normalized.Role.Role)
+	assert.True(t, normalized.Role.Admin)
 	assert.Equal(t, "987654321", normalized.MessageID)
 	assert.Equal(t, "client-abc", normalized.ClientMsgNo)
 }

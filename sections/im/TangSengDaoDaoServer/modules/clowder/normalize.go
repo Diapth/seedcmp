@@ -18,6 +18,7 @@ type RawIMMessage struct {
 	Timestamp   int64
 	Payload     []byte
 	ChatName    string
+	Role        *GroupRoleSnapshot
 }
 
 type Sender struct {
@@ -47,6 +48,7 @@ type InboundMessage struct {
 	Sender         Sender       `json:"sender"`
 	Attachments    []Attachment `json:"attachments,omitempty"`
 	Mentions       []string     `json:"mentions,omitempty"`
+	Role           *GroupRoleSnapshot `json:"sourceRoleSnapshot,omitempty"`
 }
 
 func NormalizeInboundMessage(raw RawIMMessage) (InboundMessage, error) {
@@ -77,6 +79,7 @@ func NormalizeInboundMessage(raw RawIMMessage) (InboundMessage, error) {
 		},
 		Mentions:    extractMentions(content),
 		Attachments: extractAttachments(content),
+		Role:        raw.Role,
 	}
 	return msg, nil
 }

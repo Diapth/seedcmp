@@ -60,12 +60,14 @@ Baseline command inventory captured during Phase 1 setup. Execution remains pend
 
 ### US2 - Manage Multi-User Group Access and Permissions
 
-- Permission tests: Pending
-- IM Web tests: Pending
-- TangSeng tests: Pending
-- Clowder tests: Pending
-- Smoke: Pending
-- Review: Pending
+- Recorded: 2026-05-28 14:48 CST
+- Permission policy TDD RED: `cd /media/leng/DiskB1/exp/clowder-ai/packages/api && pnpm build && node --test test/im-web-permissions.test.js` failed because `ImWebPermissionPolicy` did not exist.
+- Clowder tests: Pass - `cd /media/leng/DiskB1/exp/clowder-ai/packages/api && pnpm build && node --test test/im-web-inbound-bridge.test.js test/im-web-permissions.test.js` passed 6 tests.
+- TangSeng role tests: Pass - `cd sections/im/TangSengDaoDaoServer && go test ./modules/clowder -run 'TestNormalizeInboundMessageBuildsExternalChatAndSender|TestNormalizeGroupRoleSnapshot'`.
+- IM Web permission TDD RED: `cd sections/im_web/apps/chat && pnpm exec vitest run tests/clowderPermissionState.test.ts --pool=threads --poolOptions.threads.singleThread=true` failed because `allowGroup`/`denyGroup` actions and denied disabled reasons were missing.
+- IM Web tests: Pass - `cd sections/im_web/apps/chat && pnpm exec vitest run tests/clowderPermissionState.test.ts --pool=threads --poolOptions.threads.singleThread=true` passed 2 tests.
+- Smoke: Added environment-gated Playwright spec `tests-e2e/smoke-v3-clowder-permissions.spec.ts`; not executed because `RUN_V3_CLOWDER_SMOKE` and the multi-service environment are not available.
+- Review: Pass for tested permission policy/store/UI state scope; deeper group-service enforcement and command-layer mutation audit remain tracked as T045/T047/T048/T051.
 
 ### US3 - Connect Multiple Clowder Agents From One IM Conversation
 

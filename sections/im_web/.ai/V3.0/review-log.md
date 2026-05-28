@@ -35,8 +35,13 @@
 
 ### US2 - Manage Multi-User Group Access and Permissions
 
-- Status: Pending
+- Status: Partial pass for permission policy and UI state
 - Notes:
+  - Clowder `ImWebPermissionPolicy` evaluates `im-web` group whitelist, admin sender IDs, and admin-only command requirements through `ConnectorPermissionStore`.
+  - TangSeng role snapshots normalize owner, manager, member, and departed states before forwarding group metadata.
+  - IM Web Clowder store records permission state and derives stable disabled reasons for denied groups and admin-only controls.
+  - Unauthorized mutation review: `/allow-group` and `/deny-group` remain guarded by admin checks in the existing command layer; route-level response mapping still needs final hardening before marking T047/T048 complete.
+  - Smoke review: Playwright smoke is present but skipped unless `RUN_V3_CLOWDER_SMOKE` is set with TangSeng, WuKongIM, Clowder API, bridge secret, and two test users.
 
 ### US3 - Connect Multiple Clowder Agents From One IM Conversation
 
