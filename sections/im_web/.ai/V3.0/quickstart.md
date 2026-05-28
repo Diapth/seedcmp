@@ -20,6 +20,22 @@ CLOWDER_DEFAULT_OWNER_USER_ID=<clowder-user-id>
 IM_WEB_CLOWDER_ENABLED=true
 ```
 
+## Environment Variable Inventory
+
+| Variable | Owner | Required | Purpose | Safe Default |
+|----------|-------|----------|---------|--------------|
+| `IM_WEB_CLOWDER_ENABLED` | TangSeng bridge | Yes | Feature flag for all V3 Clowder controls and forwarding | `false` |
+| `CLOWDER_API_BASE_URL` | TangSeng bridge | Yes when enabled | Server-side URL used to call Clowder connector APIs | empty |
+| `CLOWDER_CONNECTOR_ID` | TangSeng bridge and Clowder | Yes | Stable connector ID used in bindings and dedup keys | `im-web` |
+| `CLOWDER_CONNECTOR_SECRET` | TangSeng bridge and Clowder | Yes when enabled | Shared HMAC secret for server-to-server calls | empty |
+| `CLOWDER_DEFAULT_OWNER_USER_ID` | TangSeng bridge | Yes when enabled | Clowder user ID used for direct-chat binding ownership | empty |
+| `CLOWDER_REQUEST_TIMEOUT_MS` | TangSeng bridge | No | Timeout for inbound forward, health, and action calls | `5000` |
+| `CLOWDER_SIGNATURE_TOLERANCE_MS` | TangSeng bridge and Clowder | No | Accepted timestamp drift for signed callbacks | `300000` |
+| `CLOWDER_OUTBOUND_CALLBACK_URL` | Clowder API | Yes when enabled | TangSeng bridge callback URL for agent replies and stream events | empty |
+| `CLOWDER_IM_WEB_HEALTH_PATH` | TangSeng bridge | No | Health endpoint path used by IM Web status checks | `/api/clowder/status` |
+
+Do not expose `CLOWDER_CONNECTOR_SECRET` or Clowder service credentials to browser code. Browser clients should call TangSeng-owned status/action APIs only.
+
 ## Local Analysis Commands
 
 ```bash

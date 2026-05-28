@@ -12,12 +12,12 @@
 
 **Purpose**: Prepare the two-project integration workspace and evidence locations.
 
-- [ ] T001 Confirm V3 feature pointer and branch metadata in `.specify/feature.json`, `sections/im_web/.ai/V3.0/spec.md`, and `sections/im_web/.ai/V3.0/plan.md`
-- [ ] T002 [P] Create V3 evidence log skeleton in `sections/im_web/.ai/V3.0/evidence.md`
-- [ ] T003 [P] Add environment variable inventory for Clowder bridge settings in `sections/im_web/.ai/V3.0/quickstart.md`
-- [ ] T004 [P] Map existing IM Web message/recovery test fixtures for reuse in `sections/im_web/apps/chat/tests/setup.ts`
-- [ ] T005 [P] Map existing Clowder connector test helpers for reuse in `/media/leng/DiskB1/exp/clowder-ai/packages/api/test/im-web-connector-test-helpers.js`
-- [ ] T006 Record baseline build and test commands in `sections/im_web/.ai/V3.0/evidence.md`
+- [X] T001 Confirm V3 feature pointer and branch metadata in `.specify/feature.json`, `sections/im_web/.ai/V3.0/spec.md`, and `sections/im_web/.ai/V3.0/plan.md`
+- [X] T002 [P] Create V3 evidence log skeleton in `sections/im_web/.ai/V3.0/evidence.md`
+- [X] T003 [P] Add environment variable inventory for Clowder bridge settings in `sections/im_web/.ai/V3.0/quickstart.md`
+- [X] T004 [P] Map existing IM Web message/recovery test fixtures for reuse in `sections/im_web/apps/chat/tests/setup.ts`
+- [X] T005 [P] Map existing Clowder connector test helpers for reuse in `/media/leng/DiskB1/exp/clowder-ai/packages/api/test/im-web-connector-test-helpers.js`
+- [X] T006 Record baseline build and test commands in `sections/im_web/.ai/V3.0/evidence.md`
 
 ---
 
@@ -27,18 +27,18 @@
 
 **CRITICAL**: No user story implementation should start until this phase is complete.
 
-- [ ] T007 Add shared IM Web Clowder API types and DTOs for FR-001, FR-002, FR-008, FR-013 in `sections/im_web/packages/datasource-vue/src/api/clowder.ts`
-- [ ] T008 Add Clowder UI/store domain types for bindings, agents, permissions, replies, and delivery state in `sections/im_web/packages/datasource-vue/src/stores/clowderTypes.ts`
-- [ ] T009 Add TangSeng bridge configuration model for base URL, feature flag, secret presence, and owner mapping in `sections/im/TangSengDaoDaoServer/modules/common/clowder_config.go`
-- [ ] T010 Add bridge HMAC signing and timestamp verification helper for FR-017 in `sections/im/TangSengDaoDaoServer/modules/common/clowder_signature.go`
-- [ ] T011 Add bridge HMAC verification tests for invalid, stale, and valid signatures in `sections/im/TangSengDaoDaoServer/modules/common/clowder_signature_test.go`
-- [ ] T012 Add Clowder `im-web` connector shared type entry for FR-001 in `/media/leng/DiskB1/exp/clowder-ai/packages/shared/src/types/connector.ts`
-- [ ] T013 Add Clowder `im-web` connector definition scaffold for FR-001 in `/media/leng/DiskB1/exp/clowder-ai/packages/api/src/infrastructure/connectors/adapters/ImWebAdapter.ts`
-- [ ] T014 Add Clowder connector registration wiring for `im-web` in `/media/leng/DiskB1/exp/clowder-ai/packages/api/src/infrastructure/connectors/connector-gateway-bootstrap.ts`
-- [ ] T015 Add Clowder bridge route scaffold for inbound and health/status endpoints in `/media/leng/DiskB1/exp/clowder-ai/packages/api/src/routes/connector-webhooks.ts`
-- [ ] T016 Add package boundary and secret exposure review checklist in `sections/im_web/.ai/V3.0/review-log.md`
-- [ ] T017 Run baseline IM Web type-check command and record output in `sections/im_web/.ai/V3.0/evidence.md`
-- [ ] T018 Run baseline Clowder API build command and record output in `sections/im_web/.ai/V3.0/evidence.md`
+- [X] T007 Add shared IM Web Clowder API types and DTOs for FR-001, FR-002, FR-008, FR-013 in `sections/im_web/packages/datasource-vue/src/api/clowder.ts`
+- [X] T008 Add Clowder UI/store domain types for bindings, agents, permissions, replies, and delivery state in `sections/im_web/packages/datasource-vue/src/stores/clowderTypes.ts`
+- [X] T009 Add TangSeng bridge configuration model for base URL, feature flag, secret presence, and owner mapping in `sections/im/TangSengDaoDaoServer/modules/common/clowder_config.go`
+- [X] T010 Add bridge HMAC signing and timestamp verification helper for FR-017 in `sections/im/TangSengDaoDaoServer/modules/common/clowder_signature.go`
+- [X] T011 Add bridge HMAC verification tests for invalid, stale, and valid signatures in `sections/im/TangSengDaoDaoServer/modules/common/clowder_signature_test.go`
+- [X] T012 Add Clowder `im-web` connector shared type entry for FR-001 in `/media/leng/DiskB1/exp/clowder-ai/packages/shared/src/types/connector.ts`
+- [X] T013 Add Clowder `im-web` connector definition scaffold for FR-001 in `/media/leng/DiskB1/exp/clowder-ai/packages/api/src/infrastructure/connectors/adapters/ImWebAdapter.ts`
+- [X] T014 Add Clowder connector registration wiring for `im-web` in `/media/leng/DiskB1/exp/clowder-ai/packages/api/src/infrastructure/connectors/connector-gateway-bootstrap.ts`
+- [X] T015 Add Clowder bridge route scaffold for inbound and health/status endpoints in `/media/leng/DiskB1/exp/clowder-ai/packages/api/src/routes/connector-webhooks.ts`
+- [X] T016 Add package boundary and secret exposure review checklist in `sections/im_web/.ai/V3.0/review-log.md`
+- [X] T017 Run baseline IM Web type-check command and record output in `sections/im_web/.ai/V3.0/evidence.md`
+- [X] T018 Run baseline Clowder API build command and record output in `sections/im_web/.ai/V3.0/evidence.md`
 
 **Checkpoint**: Shared contracts, config, connector identity, and auth helpers are ready.
 

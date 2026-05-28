@@ -1,4 +1,5 @@
 import { apiClient, apiDelete, normalizeMediaUrl, StorageService } from '@tsdaodao/base-vue';
+export * from './clowder';
 
 export type AiStreamEvent = {
   delta?: string;
