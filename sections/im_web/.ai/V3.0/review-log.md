@@ -22,8 +22,16 @@
 
 ### US1 - Route IM Conversations Into Clowder Threads
 
-- Status: Pending
+- Status: Passed for contract/scaffold scope; runnable smoke remains pending
 - Notes:
+  - Clowder inbound handler routes signed `im-web` payloads to `ConnectorRouter` and rejects unsigned payloads.
+  - Clowder outbound adapter sends text/markdown replies to TangSeng callback with `x-clowder-signature` and `x-clowder-timestamp`; non-2xx callback responses surface as delivery failures.
+  - TangSeng bridge has normalization, HMAC signing, and outbound callback signature verification scaffold, keeping bridge secrets server-side.
+  - IM Web has DTO/store types, Clowder state store, status badge scaffold, and message normalization that treats `im-web`/`clowder:*` replies as markdown AI assistant messages while preserving existing DeepSeek merge behavior.
+  - Package boundary check: IM Web browser code contains DTOs and state only; Clowder connector code stays in `/media/leng/DiskB1/exp/clowder-ai`; TangSeng owns HMAC bridge endpoints.
+  - Auth check: inbound IM-to-Clowder payloads use `x-im-web-*` HMAC; outbound Clowder-to-TangSeng payloads use `x-clowder-*` HMAC; no Clowder connector secret is exposed through browser APIs.
+  - Connector contract check: `connectorId` remains `im-web`, `externalChatId` remains `{channelType}:{channelId}`, and dedup uses connector/message/client IDs.
+  - Remaining US1 work: production message listener registration in TangSeng `modules/message/event.go` (T027) and full direct/group Playwright smoke (T023).
 
 ### US2 - Manage Multi-User Group Access and Permissions
 

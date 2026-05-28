@@ -38,6 +38,7 @@ export interface Reaction {
 
 const MEDIA_UPLOAD_TYPE = 'chat';
 const DEEPSEEK_AI_ROBOT_ID = 'deepseek_ai_robot';
+const CLOWDER_CONNECTOR_ID = 'im-web';
 
 interface SendMessageOptions {
   mention?: { all?: boolean; uids?: string[] };
@@ -196,7 +197,7 @@ export const useMessageStore = defineStore('message', () => {
 
   function normalizeAiRobotMessageContent(fromUID: string, content: any, streaming = false) {
     const normalized = normalizeMessageContent(content);
-    if (String(fromUID || '') !== DEEPSEEK_AI_ROBOT_ID || Number(normalized.type || 0) !== 1) {
+    if (!isAiAssistantSource(fromUID, normalized) || Number(normalized.type || 0) !== 1) {
       return normalized;
     }
     return normalizeMessageContent({
@@ -208,19 +209,31 @@ export const useMessageStore = defineStore('message', () => {
     });
   }
 
+  function isAiAssistantSource(fromUID: string, content?: any) {
+    const uid = String(fromUID || '');
+    return uid === DEEPSEEK_AI_ROBOT_ID ||
+      uid.startsWith('clowder:') ||
+      String(content?.connectorId || content?.connector_id || '') === CLOWDER_CONNECTOR_ID;
+  }
+
   function isLocalStreamingAiMessage(msg: Message) {
-    return String(msg.clientMsgNo || '').startsWith('ai-stream-') &&
-      String(msg.fromUID || '') === DEEPSEEK_AI_ROBOT_ID &&
+    const clientMsgNo = String(msg.clientMsgNo || '');
+    const messageID = String(msg.messageID || '');
+    const isLocalStreamKey = clientMsgNo.startsWith('ai-stream-') ||
+      clientMsgNo.startsWith('clowder-stream-') ||
+      messageID.startsWith('ai-stream-') ||
+      messageID.startsWith('clowder-stream-');
+    return isLocalStreamKey &&
+      isAiAssistantSource(msg.fromUID, msg.content) &&
       (
         msg.content?.streaming === true ||
         msg.status === 'sending' ||
-        Number(msg.messageSeq || 0) === 0 ||
-        String(msg.messageID || '').startsWith('ai-stream-')
+        Number(msg.messageSeq || 0) === 0
       );
   }
 
   function findMergeableLocalAiStream(list: Message[], incoming: Message, options?: { protectHistory?: boolean }) {
-    if (String(incoming.fromUID || '') !== DEEPSEEK_AI_ROBOT_ID) return undefined;
+    if (!isAiAssistantSource(incoming.fromUID, incoming.content)) return undefined;
     const candidates = list.filter(isLocalStreamingAiMessage);
     if (!candidates.length) return undefined;
     const incomingSeq = Number(incoming.messageSeq || 0);
@@ -274,7 +287,7 @@ export const useMessageStore = defineStore('message', () => {
     const persistedAiText = new Set(
       list
         .filter(item =>
-          String(item.fromUID || '') === DEEPSEEK_AI_ROBOT_ID &&
+          isAiAssistantSource(item.fromUID, item.content) &&
           !isLocalStreamingAiMessage(item) &&
           Number(item.messageSeq || 0) > 0
         )

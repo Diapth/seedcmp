@@ -31,12 +31,27 @@ Baseline command inventory captured during Phase 1 setup. Execution remains pend
 
 ### US1 - Route IM Conversations Into Clowder Threads
 
-- Contract tests: Pending
-- IM Web tests: Pending
-- TangSeng tests: Pending
-- Clowder tests: Pending
+- Recorded: 2026-05-28 14:12 CST
+- Fresh verification:
+  - Pass - `cd sections/im_web && pnpm type-check`
+  - Pass - `cd sections/im_web && pnpm build` with Vite chunk-size warning only
+  - Pass - `cd sections/im_web/apps/chat && pnpm exec vitest run tests/clowderBridgeContracts.test.ts tests/clowderMessageStore.test.ts tests/messageActions.test.ts --pool=threads --poolOptions.threads.singleThread=true` passed 24 tests
+  - Pass - `cd sections/im/TangSengDaoDaoServer && go test ./modules/clowder ./modules/common -run 'Test(Normalize|Sign|Verify|DefaultClowder)'`
+  - Pass - `cd /media/leng/DiskB1/exp/clowder-ai/packages/api && pnpm build && node --test test/im-web-outbound-adapter.test.js test/im-web-inbound-bridge.test.js` passed 5 tests
+- Contract tests: Pass - `node --test test/im-web-inbound-bridge.test.js`
+- Outbound adapter TDD RED: `pnpm build && node --test test/im-web-outbound-adapter.test.js` built successfully, then failed because no HTTP callback was sent and non-2xx callbacks were not surfaced.
+- Outbound adapter GREEN: Pass - `cd /media/leng/DiskB1/exp/clowder-ai/packages/api && pnpm build && node --test test/im-web-outbound-adapter.test.js test/im-web-inbound-bridge.test.js` passed 5 tests across inbound and outbound suites.
+- IM Web type-check: Pass - `cd sections/im_web && pnpm type-check`
+- IM Web build: Pass - `cd sections/im_web && pnpm build` with Vite chunk-size warning only.
+- IM Web targeted tests: Pass - `cd sections/im_web/apps/chat && pnpm exec vitest run tests/clowderBridgeContracts.test.ts tests/clowderMessageStore.test.ts --pool=threads --poolOptions.threads.singleThread=true`
+- IM Web Clowder message merge TDD RED: `pnpm exec vitest run tests/clowderMessageStore.test.ts --pool=threads --poolOptions.threads.singleThread=true` failed because Clowder durable replies did not merge into local streaming placeholders.
+- IM Web Clowder message merge GREEN: Pass - `pnpm exec vitest run tests/clowderMessageStore.test.ts --pool=threads --poolOptions.threads.singleThread=true` passed 3 tests.
+- IM Web V2 AI regression: Pass - `pnpm exec vitest run tests/messageActions.test.ts --pool=threads --poolOptions.threads.singleThread=true` passed 19 tests.
+- TangSeng tests: Pass - `cd sections/im/TangSengDaoDaoServer && go test ./modules/clowder ./modules/common -run 'Test(Normalize|Sign|Verify|DefaultClowder)'`
+- Clowder tests: Pass - API build, inbound bridge contract, and outbound adapter signed callback tests.
+- Full chat unit residual risk: `cd sections/im_web && pnpm --filter chat test:unit -- clowderBridgeContracts.test.ts` also ran unrelated chat tests; new Clowder tests passed, while existing V2 tests failed in `tests/filePreviewVoiceAiContracts.test.ts` (`sandbox="allow-scripts"`) and `tests/largeHistory.test.ts` (`bottomSpacerHeight`). These were not introduced by the V3 Clowder changes.
 - Smoke: Pending
-- Review: Pending
+- Review: Pass for US1 contract/scaffold scope; production message listener wiring and runnable smoke remain tracked as T027/T023.
 
 ### US2 - Manage Multi-User Group Access and Permissions
 
@@ -72,10 +87,10 @@ Baseline command inventory captured during Phase 1 setup. Execution remains pend
 
 ## Final Verification
 
-- IM Web type-check: Pending
-- IM Web build: Pending
+- IM Web type-check: Pass - current scaffold passes `cd sections/im_web && pnpm type-check`
+- IM Web build: Pass - current scaffold passes `cd sections/im_web && pnpm build` with Vite chunk-size warning only
 - IM Web unit tests: Pending
 - IM Web E2E smoke: Pending
-- Clowder API build: Pending
-- Clowder connector tests: Pending
+- Clowder API build: Pass - current scaffold passes `cd /media/leng/DiskB1/exp/clowder-ai/packages/api && pnpm build`
+- Clowder connector tests: Pass - current targeted `im-web` inbound/outbound connector tests pass
 - TangSeng bridge tests: Pending

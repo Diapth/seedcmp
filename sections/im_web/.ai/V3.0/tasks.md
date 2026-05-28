@@ -52,30 +52,30 @@
 
 ### Tests for User Story 1
 
-- [ ] T019 [P] [US1] Add bridge inbound contract tests for signed payload, binding reuse, duplicate skip, and permission response in `/media/leng/DiskB1/exp/clowder-ai/packages/api/test/im-web-inbound-bridge.test.js`
-- [ ] T020 [P] [US1] Add IM Web datasource API contract tests for binding/status responses in `sections/im_web/apps/chat/tests/clowderBridgeContracts.test.ts`
-- [ ] T021 [P] [US1] Add TangSeng bridge normalization tests for channel IDs, sender fields, dedup keys, and attachments in `sections/im/TangSengDaoDaoServer/modules/clowder/bridge_test.go`
-- [ ] T022 [P] [US1] Add IM Web message store tests for durable Clowder replies and refresh dedup in `sections/im_web/apps/chat/tests/clowderMessageStore.test.ts`
+- [X] T019 [P] [US1] Add bridge inbound contract tests for signed payload, binding reuse, duplicate skip, and permission response in `/media/leng/DiskB1/exp/clowder-ai/packages/api/test/im-web-inbound-bridge.test.js`
+- [X] T020 [P] [US1] Add IM Web datasource API contract tests for binding/status responses in `sections/im_web/apps/chat/tests/clowderBridgeContracts.test.ts`
+- [X] T021 [P] [US1] Add TangSeng bridge normalization tests for channel IDs, sender fields, dedup keys, and attachments in `sections/im/TangSengDaoDaoServer/modules/clowder/bridge_test.go`
+- [X] T022 [P] [US1] Add IM Web message store tests for durable Clowder replies and refresh dedup in `sections/im_web/apps/chat/tests/clowderMessageStore.test.ts`
 - [ ] T023 [US1] Add Playwright direct/group binding smoke for SC-001 in `sections/im_web/apps/chat/tests-e2e/smoke-v3-clowder-binding.spec.ts`
 
 ### Implementation for User Story 1
 
-- [ ] T024 [P] [US1] Implement TangSeng IM connector binding model and persistence facade for FR-002 in `sections/im/TangSengDaoDaoServer/modules/clowder/model.go`
-- [ ] T025 [P] [US1] Implement TangSeng inbound message normalization for FR-003, FR-004, FR-012 in `sections/im/TangSengDaoDaoServer/modules/clowder/normalize.go`
-- [ ] T026 [US1] Implement TangSeng signed inbound forwarder to Clowder for FR-001, FR-003, FR-017 in `sections/im/TangSengDaoDaoServer/modules/clowder/client.go`
+- [X] T024 [P] [US1] Implement TangSeng IM connector binding model and persistence facade for FR-002 in `sections/im/TangSengDaoDaoServer/modules/clowder/model.go`
+- [X] T025 [P] [US1] Implement TangSeng inbound message normalization for FR-003, FR-004, FR-012 in `sections/im/TangSengDaoDaoServer/modules/clowder/normalize.go`
+- [X] T026 [US1] Implement TangSeng signed inbound forwarder to Clowder for FR-001, FR-003, FR-017 in `sections/im/TangSengDaoDaoServer/modules/clowder/client.go`
 - [ ] T027 [US1] Wire TangSeng message events into the Clowder bridge for FR-009 in `sections/im/TangSengDaoDaoServer/modules/message/event.go`
-- [ ] T028 [US1] Implement Clowder inbound route handling for `im-web` payloads in `/media/leng/DiskB1/exp/clowder-ai/packages/api/src/routes/connector-webhooks.ts`
-- [ ] T029 [US1] Implement Clowder binding lookup and creation through `ConnectorThreadBindingStore` in `/media/leng/DiskB1/exp/clowder-ai/packages/api/src/infrastructure/connectors/ImWebInboundHandler.ts`
-- [ ] T030 [US1] Implement Clowder dedup integration using connector ID, external chat ID, message ID, and client message number in `/media/leng/DiskB1/exp/clowder-ai/packages/api/src/infrastructure/connectors/InboundMessageDedup.ts`
-- [ ] T031 [US1] Implement IM outbound adapter text/markdown delivery to TangSeng for FR-009, FR-011 in `/media/leng/DiskB1/exp/clowder-ai/packages/api/src/infrastructure/connectors/adapters/ImWebAdapter.ts`
-- [ ] T032 [US1] Implement TangSeng outbound callback route for signed Clowder replies in `sections/im/TangSengDaoDaoServer/modules/clowder/api.go`
-- [ ] T033 [US1] Add datasource API methods for Clowder binding, status, and delivery state in `sections/im_web/packages/datasource-vue/src/api/clowder.ts`
-- [ ] T034 [US1] Add Clowder state store for connection status, active binding, and delivery state in `sections/im_web/packages/datasource-vue/src/stores/clowderStore.ts`
-- [ ] T035 [US1] Merge Clowder robot/system replies into existing message normalization in `sections/im_web/packages/datasource-vue/src/stores/messageStore.ts`
-- [ ] T036 [US1] Add minimal conversation Clowder status badge for enabled/loading/error states in `sections/im_web/apps/chat/src/components/ClowderStatusBadge.vue`
-- [ ] T037 [US1] Run IM Web `pnpm type-check`, `pnpm build`, and targeted Vitest output for US1 in `sections/im_web/.ai/V3.0/evidence.md`
-- [ ] T038 [US1] Run Clowder API build and targeted connector tests for US1 in `sections/im_web/.ai/V3.0/evidence.md`
-- [ ] T039 [US1] Complete package boundary, connector contract, and auth review notes for US1 in `sections/im_web/.ai/V3.0/review-log.md`
+- [X] T028 [US1] Implement Clowder inbound route handling for `im-web` payloads in `/media/leng/DiskB1/exp/clowder-ai/packages/api/src/routes/connector-webhooks.ts`
+- [X] T029 [US1] Implement Clowder binding lookup and creation through `ConnectorThreadBindingStore` in `/media/leng/DiskB1/exp/clowder-ai/packages/api/src/infrastructure/connectors/ImWebInboundHandler.ts`
+- [X] T030 [US1] Implement Clowder dedup integration using connector ID, external chat ID, message ID, and client message number in `/media/leng/DiskB1/exp/clowder-ai/packages/api/src/infrastructure/connectors/InboundMessageDedup.ts`
+- [X] T031 [US1] Implement IM outbound adapter text/markdown delivery to TangSeng for FR-009, FR-011 in `/media/leng/DiskB1/exp/clowder-ai/packages/api/src/infrastructure/connectors/adapters/ImWebAdapter.ts`
+- [X] T032 [US1] Implement TangSeng outbound callback route for signed Clowder replies in `sections/im/TangSengDaoDaoServer/modules/clowder/api.go`
+- [X] T033 [US1] Add datasource API methods for Clowder binding, status, and delivery state in `sections/im_web/packages/datasource-vue/src/api/clowder.ts`
+- [X] T034 [US1] Add Clowder state store for connection status, active binding, and delivery state in `sections/im_web/packages/datasource-vue/src/stores/clowderStore.ts`
+- [X] T035 [US1] Merge Clowder robot/system replies into existing message normalization in `sections/im_web/packages/datasource-vue/src/stores/messageStore.ts`
+- [X] T036 [US1] Add minimal conversation Clowder status badge for enabled/loading/error states in `sections/im_web/apps/chat/src/components/ClowderStatusBadge.vue`
+- [X] T037 [US1] Run IM Web `pnpm type-check`, `pnpm build`, and targeted Vitest output for US1 in `sections/im_web/.ai/V3.0/evidence.md`
+- [X] T038 [US1] Run Clowder API build and targeted connector tests for US1 in `sections/im_web/.ai/V3.0/evidence.md`
+- [X] T039 [US1] Complete package boundary, connector contract, and auth review notes for US1 in `sections/im_web/.ai/V3.0/review-log.md`
 
 **Checkpoint**: User Story 1 is independently usable as the MVP bridge.
 
