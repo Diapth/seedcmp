@@ -29,6 +29,10 @@ export interface Message {
   isUnreadCleared?: boolean;
 }
 
+interface ConversationSummaryOptions {
+  countUnread?: boolean;
+}
+
 export interface Reaction {
   emoji: string;
   count: number;
@@ -425,7 +429,7 @@ export const useMessageStore = defineStore('message', () => {
     return getLatestConversationDigestMessage(list) || [...list].reverse().find(msg => msg && !msg.isRevoked);
   }
 
-  function updateExistingConversationSummary(channelId: string, channelType: number, lastMessage: Message) {
+  function updateExistingConversationSummary(channelId: string, channelType: number, lastMessage: Message, options: ConversationSummaryOptions = {}) {
     const key = getChannelKey(channelId, channelType);
     const matching = conversationStore.conversations.filter(item =>
       String(item.channel_id) === String(channelId) &&
@@ -448,20 +452,22 @@ export const useMessageStore = defineStore('message', () => {
       item.last_message = summary;
       if (lastMessage.isUnreadCleared) {
         item.unread = 0;
-      } else if (lastMessage.fromUID !== userStore.currentUser?.uid) {
+      } else if (options.countUnread === true && lastMessage.fromUID !== userStore.currentUser?.uid) {
         item.unread = Number(item.unread || 0) + 1;
       }
     }
     if (lastMessage.isUnreadCleared) {
       conversationStore.unreadMap[key] = 0;
-    } else if (lastMessage.fromUID !== userStore.currentUser?.uid) {
+    } else if (options.countUnread === true && lastMessage.fromUID !== userStore.currentUser?.uid) {
+      conversationStore.unreadMap[key] = Number(matching[0]?.unread || 0);
+    } else {
       conversationStore.unreadMap[key] = Number(matching[0]?.unread || 0);
     }
 
     return true;
   }
 
-  async function ensureConversationFromMessages(channelId: string, channelType: number) {
+  async function ensureConversationFromMessages(channelId: string, channelType: number, options: ConversationSummaryOptions = {}) {
     const key = getChannelKey(channelId, channelType);
     const version = (summaryVersions.value[key] || 0) + 1;
     summaryVersions.value[key] = version;
@@ -469,7 +475,7 @@ export const useMessageStore = defineStore('message', () => {
     const lastMessage = getLatestConversationMessage(list);
     if (!lastMessage) return;
     if (summaryVersions.value[key] !== version) return;
-    if (updateExistingConversationSummary(channelId, channelType, lastMessage)) {
+    if (updateExistingConversationSummary(channelId, channelType, lastMessage, options)) {
       return;
     }
     await conversationStore.ensureConversation(channelId, channelType, {
@@ -478,7 +484,7 @@ export const useMessageStore = defineStore('message', () => {
       fromUID: lastMessage.fromUID,
       payload: lastMessage.content,
       isOwnMessage: lastMessage.fromUID === userStore.currentUser?.uid,
-      isUnreadCleared: lastMessage.isUnreadCleared === true
+      isUnreadCleared: lastMessage.isUnreadCleared === true || options.countUnread !== true
     });
   }
 
@@ -557,14 +563,14 @@ export const useMessageStore = defineStore('message', () => {
         const nextList = Array.from(mergedMap.values());
         sortMessagesForChannel(nextList, channelId, channelType);
         messages.value[key] = nextList;
-        await ensureConversationFromMessages(channelId, channelType);
+        await ensureConversationFromMessages(channelId, channelType, { countUnread: false });
       }
     } catch (e) {
       console.error(`[MessageStore] Failed to sync messages for channel ${key}`, e);
     }
   }
 
-  function addMessage(channelId: string, channelType: number, msg: Message) {
+  function addMessage(channelId: string, channelType: number, msg: Message, options: ConversationSummaryOptions = { countUnread: true }) {
     const key = getChannelKey(channelId, channelType);
     if (!messages.value[key]) {
       messages.value[key] = [];
@@ -613,7 +619,7 @@ export const useMessageStore = defineStore('message', () => {
     sortMessagesForChannel(list, channelId, channelType);
 
     if (isConversationDigestMessage(msg)) {
-      ensureConversationFromMessages(channelId, channelType);
+      ensureConversationFromMessages(channelId, channelType, options);
     }
   }
 
@@ -704,7 +710,7 @@ export const useMessageStore = defineStore('message', () => {
       if (next.length === list.length) continue;
       messages.value[key] = next;
       const [channelId, channelType] = key.split('-');
-      void ensureConversationFromMessages(channelId, Number(channelType));
+      void ensureConversationFromMessages(channelId, Number(channelType), { countUnread: false });
       return true;
     }
     return false;
@@ -762,7 +768,7 @@ export const useMessageStore = defineStore('message', () => {
       msg.isRevoked = true;
       const lastMessage = getLatestConversationMessage(list);
       if (lastMessage) {
-        updateExistingConversationSummary(channelId, channelType, lastMessage);
+        updateExistingConversationSummary(channelId, channelType, lastMessage, { countUnread: false });
       }
     }
   }
@@ -1146,7 +1152,7 @@ export const useMessageStore = defineStore('message', () => {
       contentEdit: nextContent,
       editedAt: Math.floor(Date.now() / 1000)
     };
-    await ensureConversationFromMessages(channelId, channelType);
+    await ensureConversationFromMessages(channelId, channelType, { countUnread: false });
   }
 
   async function deleteLocalMessage(channelId: string, channelType: number, msg: Message) {
@@ -1158,7 +1164,7 @@ export const useMessageStore = defineStore('message', () => {
     }]);
     const key = getChannelKey(channelId, channelType);
     messages.value[key] = (messages.value[key] || []).filter(item => item.clientMsgNo !== msg.clientMsgNo);
-    await ensureConversationFromMessages(channelId, channelType);
+    await ensureConversationFromMessages(channelId, channelType, { countUnread: false });
   }
 
   async function deleteMutualMessage(channelId: string, channelType: number, msg: Message) {
@@ -1176,7 +1182,7 @@ export const useMessageStore = defineStore('message', () => {
       type: 1000,
       text: '消息已删除'
     };
-    await ensureConversationFromMessages(channelId, channelType);
+    await ensureConversationFromMessages(channelId, channelType, { countUnread: false });
   }
 
   async function markMessagesRead(channelId: string, channelType: number, messageIds: string[]) {
@@ -1258,7 +1264,7 @@ export const useMessageStore = defineStore('message', () => {
         remoteExtra
       };
       messagesById.set(msg.messageID, msg);
-      addMessage(channelId, channelType, msg);
+      addMessage(channelId, channelType, msg, { countUnread: false });
     }
     pinnedMessages.value[key] = pinnedList
       .filter((item: any) => item.is_deleted !== 1)

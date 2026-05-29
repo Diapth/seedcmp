@@ -366,6 +366,12 @@ export const useConversationStore = defineStore('conversation', () => {
     const clearedSeq = Math.max(Number(clearedUnreadSeqs.value[key] || 0), Number(storedCleared?.seq || 0));
     const itemSeq = Number(item.last_msg_seq || item.message_seq || item.last_message?.message_seq || item.last_message?.messageSeq || 0);
     const itemTime = Number(item.last_msg_time || item.timestamp || item.last_message?.timestamp || 0);
+    const lastMessage = getLastMessageSource(item);
+    const lastMessageFromUID = String(lastMessage?.fromUID || lastMessage?.from_uid || lastMessage?.from || '');
+
+    if (lastMessageFromUID && lastMessageFromUID === String(userStore.currentUser?.uid || '')) {
+      return 0;
+    }
 
     if (clearedSeq > 0 && itemSeq > 0 && itemSeq <= clearedSeq) {
       return 0;

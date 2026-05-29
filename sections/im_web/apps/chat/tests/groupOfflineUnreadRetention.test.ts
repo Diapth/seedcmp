@@ -134,6 +134,73 @@ describe('group offline unread retention', () => {
     expect(secondStore.unreadMap['clowder_ai-1']).toBe(0)
   })
 
+  it('does not show unread from synced conversations whose latest digest is from the current user', async () => {
+    syncConversations.mockResolvedValue({
+      conversations: [{
+        channel_id: 'friend-a',
+        channel_type: 1,
+        unread: 1,
+        last_msg_seq: 42,
+        last_msg_time: 1700000042,
+        recents: [{
+          message_seq: 42,
+          timestamp: 1700000042,
+          from_uid: 'reader-a',
+          payload: { type: 1, text: 'my already-read message' }
+        }]
+      }],
+      users: [{ uid: 'friend-a', name: 'Friend A' }]
+    })
+
+    const { useConversationStore } = await import('../../../packages/datasource-vue/src/stores/conversationStore.ts')
+    const { useUserStore } = await import('../../../packages/datasource-vue/src/stores/userStore.ts')
+    const store = useConversationStore()
+    const userStore = useUserStore()
+    userStore.currentUser = { uid: 'reader-a', name: 'Reader' }
+
+    await store.syncConversations()
+
+    expect(store.conversations.find(item => item.channel_id === 'friend-a')?.unread).toBe(0)
+    expect(store.unreadMap['friend-a-1']).toBe(0)
+  })
+
+  it('does not add unread when syncing historical messages for an existing conversation', async () => {
+    syncMessages.mockResolvedValue({
+      messages: [{
+        message_id: 1001,
+        message_idstr: '1001',
+        message_seq: 12,
+        client_msg_no: 'remote-12',
+        from_uid: 'friend-a',
+        timestamp: 1700000012,
+        payload: { type: 1, text: 'historical unread should not be counted again' },
+        is_deleted: 0
+      }]
+    })
+
+    const { useConversationStore } = await import('../../../packages/datasource-vue/src/stores/conversationStore.ts')
+    const { useMessageStore } = await import('../../../packages/datasource-vue/src/stores/messageStore.ts')
+    const { useUserStore } = await import('../../../packages/datasource-vue/src/stores/userStore.ts')
+    const conversationStore = useConversationStore()
+    const messageStore = useMessageStore()
+    const userStore = useUserStore()
+    userStore.currentUser = { uid: 'reader-a', name: 'Reader' }
+    conversationStore.conversations.push({
+      channel_id: 'friend-a',
+      channel_type: 1,
+      unread: 0,
+      last_msg_seq: 10,
+      last_msg_time: 1700000010,
+      top: 0,
+      mute: 0
+    } as any)
+
+    await messageStore.syncMessages('friend-a', 1)
+
+    expect(conversationStore.conversations.find(item => item.channel_id === 'friend-a')?.unread).toBe(0)
+    expect(conversationStore.unreadMap['friend-a-1']).toBe(0)
+  })
+
   it('does not sync an empty draft when no remote draft has ever been saved', async () => {
     vi.useFakeTimers()
     const { useConversationStore } = await import('@tsdaodao/datasource-vue')

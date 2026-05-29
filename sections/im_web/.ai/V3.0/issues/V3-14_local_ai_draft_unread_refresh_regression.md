@@ -20,11 +20,15 @@ Local-only AI conversations did not sync draft updates back to TangSeng, but the
 
 Unread clear state was kept only in memory. After a full browser refresh, stale remote unread values could win again when the backend returned the same conversation with no useful message sequence.
 
+Follow-up investigation also found that `messageStore.syncMessages()` updated conversation summaries from historical pulls as if they were realtime incoming messages. That could increment unread immediately after the conversation sync layer had already suppressed or cleared it.
+
 ## Fix
 
 - Keep local-only AI drafts scoped to the browser/user and ignore stale remote drafts for those conversations.
 - Persist cleared unread checkpoints per user and conversation so refresh can suppress stale unread sync results.
 - Drop the persisted cleared marker when a new incoming digest message arrives.
+- Treat synced historical message pulls as summary refreshes, not unread-producing realtime messages.
+- Suppress unread when the latest synced conversation digest is from the current user.
 - Align Vitest package aliasing with Vite's runtime TypeScript entrypoints.
 
 ## Evidence
@@ -39,3 +43,6 @@ Unread clear state was kept only in memory. After a full browser refresh, stale 
     - `01-stale-unread-before-open.png`
     - `02-cleared-draft-after-reload.png`
     - `03-no-stale-unread-after-refresh.png`
+- Follow-up browser audit:
+  - result: `sections/im_web/.ai/V3.0/tests-e2e/read-red-dot-audit-20260529165842/result.json`
+  - after reload, the first 15 visible conversations had no unread badge.
