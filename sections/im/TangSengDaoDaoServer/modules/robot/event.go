@@ -6,6 +6,7 @@ import (
 	"strings"
 	"time"
 
+	commonmodule "github.com/TangSengDaoDao/TangSengDaoDaoServer/modules/common"
 	"github.com/TangSengDaoDao/TangSengDaoDaoServerLib/common"
 	"github.com/TangSengDaoDao/TangSengDaoDaoServerLib/config"
 	"github.com/TangSengDaoDao/TangSengDaoDaoServerLib/pkg/util"
@@ -37,7 +38,14 @@ func (rb *Robot) existRobot(robotID string) (bool, error) {
 
 }
 
+func shouldSkipLegacyRobotRoutingForClowder() bool {
+	return commonmodule.ClowderBridgeConfigFromEnv().IsConfigured()
+}
+
 func (rb *Robot) robotMessageListen(messages []*config.MessageResp) {
+	if shouldSkipLegacyRobotRoutingForClowder() {
+		return
+	}
 	for _, message := range messages {
 		payloadValue := gjson.ParseBytes(message.Payload)
 
