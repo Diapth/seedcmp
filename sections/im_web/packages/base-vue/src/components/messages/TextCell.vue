@@ -12,6 +12,7 @@ const props = defineProps<{
       markdown?: boolean;
       ai?: boolean;
       mention?: { all?: boolean; uids?: string[] };
+      [key: string]: any;
     };
     payload?: {
       text?: string;
@@ -20,6 +21,7 @@ const props = defineProps<{
       markdown?: boolean;
       ai?: boolean;
       mention?: { all?: boolean; uids?: string[] };
+      [key: string]: any;
     };
     [key: string]: any;
   };
@@ -34,9 +36,132 @@ const displayText = computed(() => {
   return props.message.content?.text || props.message.content?.content || props.message.payload?.text || props.message.payload?.content || '';
 });
 
+const messageContent = computed(() => props.message.content || props.message.payload || {});
+
 const isMarkdown = computed(() => {
-  const content = props.message.content || props.message.payload || {};
+  const content = messageContent.value;
   return content.format === 'markdown' || content.markdown === true || content.ai === true;
+});
+
+const clowderMeta = computed(() => {
+  const content = messageContent.value;
+  const connectorId = content.connectorId || content.connector_id;
+  const catDisplayName = content.catDisplayName || content.cat_display_name;
+  const catId = content.catId || content.cat_id;
+  if (connectorId !== 'im-web' && !catDisplayName && !catId) return undefined;
+  return {
+    connectorId,
+    catDisplayName: catDisplayName || catId || 'Clowder',
+    catId
+  };
+});
+
+const unsupportedMedia = computed(() => {
+  const content = messageContent.value;
+  return content.unsupportedMedia || content.mediaUnavailable || content.deliveryState === 'media_download_failed';
+});
+
+function asArray(value: unknown) {
+  return Array.isArray(value) ? value : [];
+}
+
+function visibleTextFromItem(item: any): string {
+  if (item === undefined || item === null || item === '') return '';
+  if (typeof item === 'string') return item.trim();
+  if (typeof item === 'number' || typeof item === 'boolean') return String(item);
+  return String(
+    item.text ||
+    item.content ||
+    item.body ||
+    item.message ||
+    item.reasoning ||
+    item.thinking ||
+    item.summary ||
+    ''
+  ).trim();
+}
+
+function visibleTextsFrom(value: unknown): string[] {
+  if (Array.isArray(value)) {
+    return value.map(visibleTextFromItem).filter(Boolean);
+  }
+  const text = visibleTextFromItem(value);
+  return text ? [text] : [];
+}
+
+function displayJson(value: unknown) {
+  if (value === undefined || value === null || value === '') return '';
+  if (typeof value === 'string') return value;
+  try {
+    return JSON.stringify(value, null, 2);
+  } catch (_err) {
+    return String(value);
+  }
+}
+
+function toolName(item: any) {
+  return String(item?.toolName || item?.name || item?.tool || item?.function?.name || 'tool');
+}
+
+function toolInput(item: any) {
+  return displayJson(item?.input ?? item?.arguments ?? item?.argumentsJson ?? item?.args);
+}
+
+function toolOutput(item: any) {
+  return displayJson(item?.output ?? item?.content ?? item?.result ?? item?.error);
+}
+
+function richBlockTitle(block: any) {
+  return String(block?.title || block?.fileName || block?.kind || '富内容');
+}
+
+function richBlockBody(block: any) {
+  if (block?.bodyMarkdown) return String(block.bodyMarkdown);
+  if (block?.diff) return String(block.diff);
+  if (Array.isArray(block?.items)) {
+    return block.items
+      .map((item: any) => item?.text || item?.caption || item?.alt || item?.url)
+      .filter(Boolean)
+      .join('\n');
+  }
+  if (block?.html) return String(block.html);
+  if (block?.url) return String(block.url);
+  return '';
+}
+
+const transcript = computed(() => {
+  const content = messageContent.value;
+  const metadata = content.metadata || {};
+  const thoughtParts = [
+    ...visibleTextsFrom(content.thinking),
+    ...visibleTextsFrom(content.thought),
+    ...visibleTextsFrom(content.thoughts),
+    ...visibleTextsFrom(content.reasoning),
+    ...visibleTextsFrom(content.reasoning_content),
+    ...visibleTextsFrom(content.transcript),
+    ...visibleTextsFrom(content.transcriptBlocks || content.transcript_blocks),
+    ...visibleTextsFrom(metadata.thinking),
+    ...visibleTextsFrom(metadata.thought),
+    ...visibleTextsFrom(metadata.thoughts),
+    ...visibleTextsFrom(metadata.reasoning),
+    ...visibleTextsFrom(metadata.reasoning_content),
+    ...visibleTextsFrom(metadata.transcript),
+    ...visibleTextsFrom(metadata.transcriptBlocks || metadata.transcript_blocks)
+  ];
+  let thinking = [...new Set(thoughtParts)].join('\n').trim();
+  const toolCalls = asArray(content.toolCalls || content.tool_calls || metadata.toolCalls || metadata.tool_calls || metadata.toolEvents || metadata.tool_events);
+  const toolResults = asArray(content.toolResults || content.tool_results || metadata.toolResults || metadata.tool_results);
+  const richBlocks = asArray(content.richBlocks || content.rich_blocks || content.rich?.blocks || metadata.richBlocks || metadata.rich_blocks);
+  if (!thinking && clowderMeta.value && content.streaming === true && !toolCalls.length && !toolResults.length && !richBlocks.length) {
+    thinking = '等待 Clowder 智能体输出';
+  }
+  return {
+    thinking,
+    toolCalls,
+    toolResults,
+    richBlocks,
+    visible: Boolean(thinking || toolCalls.length || toolResults.length || richBlocks.length)
+  };
 });
 
 const markdownHtml = computed(() => {
@@ -53,11 +178,30 @@ const mentionAll = computed(() => {
   return mention?.all === true;
 });
 
-async function copyCode(code: string) {
-  if (!navigator?.clipboard?.writeText) {
-    throw new Error('当前浏览器不支持剪贴板复制');
+function fallbackCopyText(text: string) {
+  const textarea = document.createElement('textarea');
+  textarea.value = text;
+  textarea.setAttribute('readonly', 'true');
+  textarea.style.position = 'fixed';
+  textarea.style.left = '-9999px';
+  textarea.style.top = '0';
+  document.body.appendChild(textarea);
+  textarea.focus();
+  textarea.select();
+  try {
+    const copied = document.execCommand('copy');
+    if (!copied) throw new Error('复制命令未成功');
+  } finally {
+    document.body.removeChild(textarea);
   }
-  await navigator.clipboard.writeText(code);
+}
+
+async function copyCode(code: string) {
+  if (navigator?.clipboard?.writeText && window.isSecureContext) {
+    await navigator.clipboard.writeText(code);
+    return;
+  }
+  fallbackCopyText(code);
 }
 
 async function handleMarkdownClick(event: MouseEvent) {
@@ -97,6 +241,11 @@ async function handleMarkdownClick(event: MouseEvent) {
 <template>
   <div class="text-cell" :class="{ 'is-me': isMe }">
     <div class="bubble">
+      <div v-if="clowderMeta" class="clowder-meta">
+        <span class="clowder-badge">Clowder</span>
+        <span class="clowder-cat">{{ clowderMeta.catDisplayName }}</span>
+      </div>
+      <div v-if="unsupportedMedia" class="unsupported-media">Unsupported media unavailable</div>
       <div
         v-if="isMarkdown"
         class="markdown-body"
@@ -104,6 +253,39 @@ async function handleMarkdownClick(event: MouseEvent) {
         v-html="markdownHtml"
       ></div>
       <template v-else>{{ displayText }}</template>
+      <div v-if="transcript.visible" class="clowder-transcript">
+        <section v-if="transcript.thinking" class="clowder-transcript-section clowder-thought">
+          <div class="clowder-transcript-label">思考</div>
+          <div class="clowder-transcript-text">{{ transcript.thinking }}</div>
+        </section>
+        <section
+          v-for="(call, index) in transcript.toolCalls"
+          :key="`call-${index}`"
+          class="clowder-transcript-section clowder-tool-call"
+        >
+          <div class="clowder-transcript-label">工具调用</div>
+          <div class="clowder-transcript-title">{{ toolName(call) }}</div>
+          <pre v-if="toolInput(call)" class="clowder-transcript-pre">{{ toolInput(call) }}</pre>
+        </section>
+        <section
+          v-for="(result, index) in transcript.toolResults"
+          :key="`result-${index}`"
+          class="clowder-transcript-section clowder-tool-result"
+        >
+          <div class="clowder-transcript-label">工具结果</div>
+          <div class="clowder-transcript-title">{{ toolName(result) }}</div>
+          <pre v-if="toolOutput(result)" class="clowder-transcript-pre">{{ toolOutput(result) }}</pre>
+        </section>
+        <section
+          v-for="(block, index) in transcript.richBlocks"
+          :key="`rich-${block?.id || index}`"
+          class="clowder-transcript-section clowder-rich-block"
+        >
+          <div class="clowder-transcript-label">富内容</div>
+          <div class="clowder-transcript-title">{{ richBlockTitle(block) }}</div>
+          <div v-if="richBlockBody(block)" class="clowder-transcript-text">{{ richBlockBody(block) }}</div>
+        </section>
+      </div>
       <span v-if="mentionAll" class="mention-chip">@所有人</span>
       <span v-else-if="mentionUids.length > 0" class="mention-chip">@{{ mentionUids.length }}人</span>
     </div>
@@ -151,6 +333,108 @@ async function handleMarkdownClick(event: MouseEvent) {
   font-size: 11px;
   font-weight: 600;
   vertical-align: baseline;
+}
+
+.clowder-meta {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  max-width: 100%;
+  margin-bottom: 6px;
+  font-size: 11px;
+  line-height: 16px;
+  white-space: nowrap;
+}
+
+.clowder-badge {
+  flex: 0 0 auto;
+  padding: 0 5px;
+  border: var(--border-hairline);
+  border-radius: var(--radius-sm);
+  background: rgba(15, 118, 110, 0.08);
+  color: #0f766e;
+  font-weight: 600;
+}
+
+.clowder-cat {
+  min-width: 0;
+  overflow: hidden;
+  color: var(--text-secondary);
+  font-weight: 600;
+  text-overflow: ellipsis;
+}
+
+.unsupported-media {
+  margin-bottom: 6px;
+  padding: 4px 6px;
+  border: var(--border-hairline);
+  border-radius: var(--radius-sm);
+  background: #fff7ed;
+  color: #9a3412;
+  font-size: 12px;
+  line-height: 16px;
+}
+
+.clowder-transcript {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin-top: 8px;
+  padding-top: 8px;
+  border-top: var(--border-hairline);
+  white-space: normal;
+}
+
+.clowder-transcript-section {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  max-width: 100%;
+  padding: 6px 8px;
+  border: var(--border-hairline);
+  border-radius: var(--radius-sm);
+  background: rgba(15, 23, 42, 0.04);
+  color: var(--text-primary);
+}
+
+.text-cell.is-me .clowder-transcript-section {
+  background: rgba(255, 255, 255, 0.14);
+  color: #ffffff;
+}
+
+.clowder-transcript-label {
+  color: var(--text-secondary);
+  font-size: 11px;
+  font-weight: 700;
+  line-height: 16px;
+}
+
+.text-cell.is-me .clowder-transcript-label {
+  color: rgba(255, 255, 255, 0.72);
+}
+
+.clowder-transcript-title {
+  font-size: 12px;
+  font-weight: 700;
+  line-height: 18px;
+}
+
+.clowder-transcript-text,
+.clowder-transcript-pre {
+  max-width: 100%;
+  margin: 0;
+  overflow: auto;
+  color: inherit;
+  font-size: 12px;
+  line-height: 18px;
+  white-space: pre-wrap;
+}
+
+.clowder-transcript-pre {
+  padding: 6px;
+  border-radius: var(--radius-sm);
+  background: rgba(0, 0, 0, 0.06);
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
 }
 
 .markdown-body {

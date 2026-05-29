@@ -72,8 +72,7 @@ const visibleStart = computed(() => {
 });
 
 const visibleEnd = computed(() => {
-  // Always render to the end of the list to avoid bottomSpacer inaccuracy
-  return renderableMessages.value.length;
+  return Math.min(renderableMessages.value.length, visibleStart.value + historyWindowSize.value);
 });
 
 const visibleMessages = computed(() => {
@@ -84,8 +83,7 @@ const visibleMessages = computed(() => {
 });
 
 const topSpacerHeight = computed(() => visibleStart.value * estimatedRowHeight);
-// NOTE: No bottomSpacer — estimated heights are inaccurate for mixed-content messages
-// and cause large blank areas at the bottom. We always render to the end of the list.
+const bottomSpacerHeight = computed(() => Math.max(0, renderableMessages.value.length - visibleEnd.value) * estimatedRowHeight);
 
 function handleScroll() {
   scrollTop.value = scrollContainer.value?.scrollTop || 0;
@@ -126,6 +124,82 @@ function shouldShowTime(msg: any, index: number): boolean {
 
 function isMe(msg: any): boolean {
   return msg.fromUID === userStore.currentUser?.uid;
+}
+
+function textFromTranscriptItem(item: any): string {
+  if (item === undefined || item === null || item === '') return '';
+  if (typeof item === 'string') return item.trim();
+  if (typeof item === 'number' || typeof item === 'boolean') return String(item);
+  return String(
+    item.text ||
+    item.content ||
+    item.body ||
+    item.message ||
+    item.reasoning ||
+    item.thinking ||
+    item.summary ||
+    ''
+  ).trim();
+}
+
+function transcriptValues(value: unknown): string[] {
+  if (Array.isArray(value)) return value.map(textFromTranscriptItem).filter(Boolean);
+  const text = textFromTranscriptItem(value);
+  return text ? [text] : [];
+}
+
+function visibleTranscriptText(msg: any): string {
+  const content = msg?.content || msg?.payload || {};
+  const metadata = content.metadata || {};
+  return [
+    ...transcriptValues(content.thinking),
+    ...transcriptValues(content.thought),
+    ...transcriptValues(content.thoughts),
+    ...transcriptValues(content.reasoning),
+    ...transcriptValues(content.reasoning_content),
+    ...transcriptValues(content.transcript),
+    ...transcriptValues(content.transcriptBlocks || content.transcript_blocks),
+    ...transcriptValues(metadata.thinking),
+    ...transcriptValues(metadata.thought),
+    ...transcriptValues(metadata.thoughts),
+    ...transcriptValues(metadata.reasoning),
+    ...transcriptValues(metadata.reasoning_content),
+    ...transcriptValues(metadata.transcript),
+    ...transcriptValues(metadata.transcriptBlocks || metadata.transcript_blocks)
+  ].filter(Boolean).join('\n');
+}
+
+function buildMessageCopyText(msg: any): string {
+  const content = msg?.content || msg?.payload || {};
+  const body = String(content.text || content.content || '').trim();
+  const transcript = visibleTranscriptText(msg).trim();
+  return [body, transcript].filter(Boolean).join('\n\n');
+}
+
+function fallbackCopyText(text: string) {
+  const textarea = document.createElement('textarea');
+  textarea.value = text;
+  textarea.setAttribute('readonly', 'true');
+  textarea.style.position = 'fixed';
+  textarea.style.left = '-9999px';
+  textarea.style.top = '0';
+  document.body.appendChild(textarea);
+  textarea.focus();
+  textarea.select();
+  try {
+    const copied = document.execCommand('copy');
+    if (!copied) throw new Error('copy failed');
+  } finally {
+    document.body.removeChild(textarea);
+  }
+}
+
+async function copyTextToClipboard(text: string) {
+  if (navigator?.clipboard?.writeText && window.isSecureContext) {
+    await navigator.clipboard.writeText(text);
+    return;
+  }
+  fallbackCopyText(text);
 }
 
 function handleRightClick(e: MouseEvent, msg: any) {
@@ -177,9 +251,9 @@ const menuItems = computed(() => {
   if (isText) {
     items.push({
       label: '复制文本',
-      action: () => {
-        const text = selectedMsg.value.content?.text || '';
-        navigator.clipboard.writeText(text);
+      action: async () => {
+        const text = buildMessageCopyText(selectedMsg.value);
+        await copyTextToClipboard(text);
         Message.success('已复制到剪贴板');
       }
     });
@@ -317,6 +391,13 @@ function handleFilePreview(payload: any) {
   });
 }
 
+function handleImagePreview(payload: any) {
+  emit('open-preview', {
+    source: 'image',
+    ...payload
+  });
+}
+
 function handleCodePreview(payload: any) {
   emit('open-preview', {
     source: 'ai-code',
@@ -345,6 +426,7 @@ function handleCodePreview(payload: any) {
         class="msg-row"
         :class="{ 'is-me': isMe(item.msg) }"
         @contextmenu="handleRightClick($event, item.msg)"
+        @mousedown.right.prevent="handleRightClick($event, item.msg)"
       >
         <ChannelAvatar
           v-if="!isMe(item.msg)"
@@ -378,6 +460,7 @@ function handleCodePreview(payload: any) {
             v-else-if="item.msg.content?.type === 2"
             :message="item.msg"
             :is-me="isMe(item.msg)"
+            @preview="handleImagePreview"
           />
           <GifCell
             v-else-if="item.msg.content?.type === 3"
@@ -437,6 +520,7 @@ function handleCodePreview(payload: any) {
       </div>
     </div>
 
+    <div v-if="bottomSpacerHeight > 0" class="history-spacer" :style="{ height: `${bottomSpacerHeight}px` }"></div>
 
     <ContextMenu
       v-if="showMenu && menuItems.length > 0"
@@ -478,6 +562,7 @@ function handleCodePreview(payload: any) {
 .message-row-wrapper {
   display: flex;
   flex-direction: column;
+  min-height: 24px;
   overflow-anchor: none;
   flex-shrink: 0;
 }
