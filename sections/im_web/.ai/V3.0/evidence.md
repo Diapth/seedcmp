@@ -2,17 +2,17 @@
 
 ## Baseline
 
-Baseline command inventory captured during Phase 1 setup. Execution remains pending until implementation dependencies for each slice are ready.
+Baseline command inventory captured during Phase 1 setup, with final V3 implementation status reflected below.
 
 | Command | Status | Notes |
 |---------|--------|-------|
 | `cd sections/im_web && pnpm type-check` | Pass | Phase 2 type foundation verification passed after Clowder DTO/store type additions |
-| `cd sections/im_web && pnpm build` | Pending | Required before implementation completion |
-| `cd sections/im_web && pnpm test:unit` | Pending | Required before implementation completion |
-| `cd sections/im_web && pnpm test:e2e` | Pending | Run once bridge and services are available |
+| `cd sections/im_web && pnpm build` | Pass | Final build passed with Vite chunk-size warning only |
+| `cd sections/im_web && pnpm test:unit` | Not run | T104 remains open; earlier full chat-unit attempt hit unrelated V2 failures |
+| `cd sections/im_web && pnpm test:e2e` | Not run | T105 remains open until live TangSeng/WuKongIM/Clowder/browser environment is available |
 | `cd /media/leng/DiskB1/exp/clowder-ai/packages/api && pnpm build` | Pass | Phase 2 connector scaffold verification passed after `im-web` adapter/route registration |
-| `cd /media/leng/DiskB1/exp/clowder-ai/packages/api && pnpm test:public` | Pending | Supplement with targeted connector tests |
-| `cd sections/im/TangSengDaoDaoServer && go test ./modules/clowder ./modules/common` | Pending | Becomes runnable after bridge package exists |
+| `cd /media/leng/DiskB1/exp/clowder-ai/packages/api && pnpm test:public` | Not run | Supplemented by targeted `im-web` connector tests |
+| `cd sections/im/TangSengDaoDaoServer && go test ./modules/clowder ./modules/common ./modules/robot -run 'Test(Normalize|Sign|Verify|DefaultClowder|ClowderBridgeConfigFromEnv|MessagesListen|StableStreamClientMsgNo|RobotRouting)' -count=1` | Pass | Targeted bridge, signature, listener, streaming, and robot routing coverage |
 
 ## Fixture Inventory
 
@@ -67,37 +67,89 @@ Baseline command inventory captured during Phase 1 setup. Execution remains pend
 - IM Web permission TDD RED: `cd sections/im_web/apps/chat && pnpm exec vitest run tests/clowderPermissionState.test.ts --pool=threads --poolOptions.threads.singleThread=true` failed because `allowGroup`/`denyGroup` actions and denied disabled reasons were missing.
 - IM Web tests: Pass - `cd sections/im_web/apps/chat && pnpm exec vitest run tests/clowderPermissionState.test.ts --pool=threads --poolOptions.threads.singleThread=true` passed 2 tests.
 - Smoke: Added environment-gated Playwright spec `tests-e2e/smoke-v3-clowder-permissions.spec.ts`; not executed because `RUN_V3_CLOWDER_SMOKE` and the multi-service environment are not available.
-- Review: Pass for tested permission policy/store/UI state scope; deeper group-service enforcement and command-layer mutation audit remain tracked as T045/T047/T048/T051.
+- Final verification update: Pass - `cd sections/im_web/apps/chat && pnpm exec vitest run tests/clowderPermissionState.test.ts tests/clowderAgentDirectory.test.ts tests/clowderCommandContracts.test.ts tests/clowderMessagePresentation.test.ts tests/clowderPanel.test.ts tests/clowderControlStore.test.ts tests/clowderStreamingMerge.test.ts tests/clowderMediaFallback.test.ts tests/clowderHistoryRecovery.test.ts --pool=threads --poolOptions.threads.singleThread=true` includes the permission UI regression and passed.
+- Final Clowder update: Pass - `cd /media/leng/DiskB1/exp/clowder-ai/packages/api && pnpm build && node --test test/im-web-webhook-response-mapping.test.js test/im-web-agent-directory-route.test.js test/im-web-multi-agent-routing.test.js test/im-web-streaming-adapter.test.js test/rich-block-plaintext.test.js test/im-web-permissions.test.js` includes permission response mapping and passed 11 tests across 6 suites.
+- Review: Pass for tested permission policy/store/UI state scope. Group role snapshots are injected by the TangSeng message listener into `MessagesListenWithRoles`; command denial responses map to visible IM Web states.
 
 ### US3 - Connect Multiple Clowder Agents From One IM Conversation
 
-- Multi-agent routing tests: Pending
-- IM Web tests: Pending
-- Clowder tests: Pending
-- Smoke: Pending
-- Review: Pending
+- Recorded: 2026-05-28 15:45 CST
+- Clowder multi-agent routing TDD: Pass - `cd /media/leng/DiskB1/exp/clowder-ai/packages/api && pnpm build && node --test test/im-web-webhook-response-mapping.test.js test/im-web-agent-directory-route.test.js test/im-web-multi-agent-routing.test.js test/im-web-streaming-adapter.test.js test/rich-block-plaintext.test.js test/im-web-permissions.test.js` passed 11 tests across 6 suites.
+- IM Web agent and command tests: Pass - `cd sections/im_web/apps/chat && pnpm exec vitest run tests/clowderPermissionState.test.ts tests/clowderAgentDirectory.test.ts tests/clowderCommandContracts.test.ts tests/clowderMessagePresentation.test.ts tests/clowderPanel.test.ts tests/clowderControlStore.test.ts tests/clowderStreamingMerge.test.ts tests/clowderMediaFallback.test.ts tests/clowderHistoryRecovery.test.ts --pool=threads --poolOptions.threads.singleThread=true` passed 14 tests across 9 files.
+- TangSeng robot routing regression: Pass - `cd sections/im/TangSengDaoDaoServer && go test ./modules/clowder ./modules/common ./modules/robot -run 'Test(Normalize|Sign|Verify|DefaultClowder|ClowderBridgeConfigFromEnv|MessagesListen|StableStreamClientMsgNo|RobotRouting)' -count=1`.
+- Smoke: Added environment-gated Playwright spec `tests-e2e/smoke-v3-clowder-multi-agent.spec.ts`; not executed because `RUN_V3_CLOWDER_SMOKE` and the full multi-service environment are not available in this session.
+- Review: Pass for mention, `/ask`, `/focus`, preferred-cat, agent-directory, and V3 no-hardcoded-DeepSeek routing coverage.
 
 ### US4 - Provide IM-Side Thread and Agent Controls
 
-- Component/store tests: Pending
-- Health/status tests: Pending
-- Smoke: Pending
-- Review: Pending
+- Recorded: 2026-05-28 15:45 CST
+- IM Web panel/control tests: Pass - targeted Vitest command above includes `clowderPanel.test.ts` and `clowderControlStore.test.ts`.
+- Status route mapping: Pass - final Clowder API targeted command above validates `/api/connectors/im-web/status`; TangSeng `/v1/clowder/status` is covered by targeted Go package compilation and bridge tests.
+- IM Web type-check/build: Pass - `cd sections/im_web && pnpm type-check`; Pass - `cd sections/im_web && pnpm build` with Vite chunk-size warning only.
+- Smoke: Added environment-gated Playwright spec `tests-e2e/smoke-v3-clowder-panel.spec.ts`; not executed because the browser smoke environment is not running.
+- Review: Pass for panel state, disabled reasons, focus/thread actions, agent directory state, and health/status visibility.
 
 ### US5 - Preserve Streaming, Media, and History Behavior
 
-- Streaming tests: Pending
-- Media fallback tests: Pending
-- V2 regression tests: Pending
-- Smoke: Pending
-- Review: Pending
+- Recorded: 2026-05-28 15:45 CST
+- IM Web streaming/media/history tests: Pass - targeted Vitest command above includes `clowderStreamingMerge.test.ts`, `clowderMediaFallback.test.ts`, and `clowderHistoryRecovery.test.ts`.
+- Clowder streaming/media tests: Pass - final Clowder API targeted command above includes `im-web-streaming-adapter.test.js` and `rich-block-plaintext.test.js`.
+- TangSeng streaming/media tests: Pass - `cd sections/im/TangSengDaoDaoServer && go test ./modules/clowder ./modules/common ./modules/robot -run 'Test(Normalize|Sign|Verify|DefaultClowder|ClowderBridgeConfigFromEnv|MessagesListen|StableStreamClientMsgNo|RobotRouting)' -count=1`.
+- Smoke: Added environment-gated Playwright spec `tests-e2e/smoke-v3-clowder-streaming-media.spec.ts`; not executed because the live bridge, WuKongIM, TangSeng, Clowder, and browser accounts are not available.
+- Review: Pass for stable stream `clientMsgNo`, duplicate-final prevention, unsupported media fallback, visible delivery states, reconnect, and large-history ordering coverage.
 
 ## Final Verification
 
-- IM Web type-check: Pass - current scaffold passes `cd sections/im_web && pnpm type-check`
-- IM Web build: Pass - current scaffold passes `cd sections/im_web && pnpm build` with Vite chunk-size warning only
-- IM Web unit tests: Pending
-- IM Web E2E smoke: Pending
-- Clowder API build: Pass - current scaffold passes `cd /media/leng/DiskB1/exp/clowder-ai/packages/api && pnpm build`
-- Clowder connector tests: Pass - current targeted `im-web` inbound/outbound connector tests pass
-- TangSeng bridge tests: Pending
+- IM Web targeted tests: Pass - `cd sections/im_web/apps/chat && pnpm exec vitest run tests/clowderPermissionState.test.ts tests/clowderAgentDirectory.test.ts tests/clowderCommandContracts.test.ts tests/clowderMessagePresentation.test.ts tests/clowderPanel.test.ts tests/clowderControlStore.test.ts tests/clowderStreamingMerge.test.ts tests/clowderMediaFallback.test.ts tests/clowderHistoryRecovery.test.ts --pool=threads --poolOptions.threads.singleThread=true` passed 14 tests across 9 files.
+- IM Web type-check: Pass - `cd sections/im_web && pnpm type-check`
+- IM Web build: Pass - `cd sections/im_web && pnpm build` with Vite chunk-size warning only.
+- IM Web full unit suite: Pass - `cd sections/im_web && pnpm test:unit` passed 132 tests across 48 files.
+- IM Web E2E smoke: Pass - `cd sections/im_web/apps/chat && pnpm exec playwright test --config playwright.config.ts --reporter=line` passed 8 default runnable smoke tests and skipped 8 live V3 specs gated by `RUN_V3_CLOWDER_SMOKE`.
+- IM Web V3 full transcript smoke: Pass - `cd sections/im_web/apps/chat && RUN_V3_CLOWDER_SMOKE=1 TEST_AGENT_A=codex CLOWDER_URL=http://127.0.0.1:3004 CLOWDER_CONNECTOR_SECRET=dev-im-web-secret pnpm exec playwright test tests-e2e/smoke-v3-clowder-full-transcript.spec.ts --config playwright.config.ts --reporter=line` passed 1 Chromium test. Evidence: `sections/im_web/.ai/V3.0/tests-e2e/v3-full-transcript-20260529083444/result.json`.
+- Clowder API build and targeted connector tests: Pass - `cd /media/leng/DiskB1/exp/clowder-ai/packages/api && pnpm build && node --test test/im-web-webhook-response-mapping.test.js test/im-web-agent-directory-route.test.js test/im-web-multi-agent-routing.test.js test/im-web-streaming-adapter.test.js test/rich-block-plaintext.test.js test/im-web-permissions.test.js` passed 11 tests across 6 suites.
+- TangSeng bridge tests: Pass - `cd sections/im/TangSengDaoDaoServer && go test ./modules/clowder ./modules/common ./modules/robot -run 'Test(Normalize|Sign|Verify|DefaultClowder|ClowderBridgeConfigFromEnv|MessagesListen|StableStreamClientMsgNo|RobotRouting)' -count=1`.
+
+## Browser Acceptance
+
+### V3 Browser Integration Run - v3-smoke-20260528-1715
+
+- Date/time: 2026-05-28 17:15 CST
+- Clowder URL: `http://localhost:3003`
+- IM Web URL: `http://localhost:3000` started by Playwright webServer
+- Command: `RUN_V3_CLOWDER_SMOKE=1 CLOWDER_URL=http://localhost:3003 pnpm exec playwright test tests-e2e/smoke-v3-clowder-panel.spec.ts tests-e2e/smoke-v3-clowder-binding.spec.ts tests-e2e/smoke-v3-clowder-multi-agent.spec.ts tests-e2e/smoke-v3-clowder-permissions.spec.ts tests-e2e/smoke-v3-clowder-streaming-media.spec.ts tests-e2e/smoke-v3-clowder-v2-regression.spec.ts tests-e2e/smoke-v3-clowder-thread-lifecycle.spec.ts --reporter=line`
+- Result: Fail - 7 tests total, 6 failed, 1 skipped.
+- Summary: `sections/im_web/.ai/V3.0/tests-e2e/v3-smoke-20260528-1715/summary.md`
+- Issues opened:
+  - `sections/im_web/.ai/V3.0/issues/V3-01_im_web_smoke_login_backend_unreachable.md`
+  - `sections/im_web/.ai/V3.0/issues/V3-02_clowder_prod_pwa_missing_im_web_connector_api.md`
+  - `sections/im_web/.ai/V3.0/issues/V3-03_acceptance_environment_missing_second_agent_and_test_data.md`
+- Service probes:
+  - Pass - `GET http://localhost:3003/api/health` returned 200.
+  - Pass - `GET http://localhost:3003/api/commands?surface=connector` returned 200 and included connector commands.
+  - Pass - `GET http://localhost:3003/api/cats` returned 200 with one cat.
+  - Fail - `GET http://localhost:3003/api/connectors/im-web/status` returned 404.
+  - Fail - `GET http://localhost:3003/api/connectors/im-web/agents?externalChatId=2:test` returned 404.
+  - Fail - `curl --noproxy '*' http://100.79.157.76:8090/v1/user/login` could not connect; browser login remained on `/login`.
+
+### V3 Recovery Visual Audit - conversation-loss-audit-20260528-2316
+
+- Date/time: 2026-05-28 23:16 CST
+- IM Web URL: `http://localhost:3000`
+- TangSeng API: `http://100.79.157.76:8090/v1`
+- Clowder API: `http://127.0.0.1:3004`
+- User: `leng_test_updated` / `008618337488675`
+- Root cause found: TangSengDaoDaoServer HTTP API was not listening on `:8090`; IM recovery helpers masked sync failures.
+- Fix evidence:
+  - RED/GREEN: `cd sections/im_web/apps/chat && pnpm exec vitest run tests/recoveryFailureState.test.ts --config vitest.config.ts`
+  - Regression: `cd sections/im_web/apps/chat && pnpm exec vitest run tests/recoveryFailureState.test.ts tests/offlineQueue.test.ts tests/sdkRecovery.test.ts tests/groupOfflineUnreadRetention.test.ts --config vitest.config.ts` passed 8 tests.
+  - Type check: `cd sections/im_web && pnpm type-check` passed.
+- Service evidence:
+  - `GET http://100.79.157.76:8090/v1/health` returned `{"db":"up","redis":"up","status":"up"}`.
+  - `GET http://127.0.0.1:3004/api/commands?surface=connector` returned 200 and includes `/cats | /cats new <猫名> [@别名]`.
+- Browser evidence directory: `sections/im_web/.ai/V3.0/tests-e2e/conversation-loss-audit-20260528-2316/`
+  - `01-login.png`
+  - `02-after-login.png`
+  - `03-chat-refresh.png`
+  - `audit.json`
+- Browser result: Pass. Conversation list restored, `暂无聊天会话` absent, `conversation/sync` returned 200 with persisted conversations, request failures 0, page errors 0, 8090/3004 4xx/5xx responses 0.
+- Issue record: `sections/im_web/.ai/V3.0/issues/V3-04_im_web_recovery_sync_masks_tangseng_unavailable.md`

@@ -20,6 +20,13 @@ CLOWDER_DEFAULT_OWNER_USER_ID=<clowder-user-id>
 IM_WEB_CLOWDER_ENABLED=true
 ```
 
+Set these values in the Clowder API process:
+
+```bash
+CLOWDER_OUTBOUND_CALLBACK_URL=http://127.0.0.1:<tangseng-port>/api/im-web/clowder/outbound
+CLOWDER_CONNECTOR_SECRET=<shared-secret>
+```
+
 ## Environment Variable Inventory
 
 | Variable | Owner | Required | Purpose | Safe Default |
@@ -51,6 +58,24 @@ pnpm build
 pnpm test:public
 ```
 
+Targeted V3 verification commands used during implementation:
+
+```bash
+cd /media/leng/DiskB1/exp/seedcmp/sections/im_web/apps/chat
+pnpm exec vitest run tests/clowderPermissionState.test.ts tests/clowderAgentDirectory.test.ts tests/clowderCommandContracts.test.ts tests/clowderMessagePresentation.test.ts tests/clowderPanel.test.ts tests/clowderControlStore.test.ts tests/clowderStreamingMerge.test.ts tests/clowderMediaFallback.test.ts tests/clowderHistoryRecovery.test.ts --pool=threads --poolOptions.threads.singleThread=true
+```
+
+```bash
+cd /media/leng/DiskB1/exp/seedcmp/sections/im/TangSengDaoDaoServer
+go test ./modules/clowder ./modules/common ./modules/robot -run 'Test(Normalize|Sign|Verify|DefaultClowder|ClowderBridgeConfigFromEnv|MessagesListen|StableStreamClientMsgNo|RobotRouting)' -count=1
+```
+
+```bash
+cd /media/leng/DiskB1/exp/clowder-ai/packages/api
+pnpm build
+node --test test/im-web-webhook-response-mapping.test.js test/im-web-agent-directory-route.test.js test/im-web-multi-agent-routing.test.js test/im-web-streaming-adapter.test.js test/rich-block-plaintext.test.js test/im-web-permissions.test.js
+```
+
 ## Manual Smoke Flow
 
 1. Start TangSeng/WuKongIM, IM Web, and Clowder API.
@@ -63,6 +88,14 @@ pnpm test:public
 8. Repeat in a group chat with two human users and two different agent mentions.
 9. Deny the group and verify future agent messages are blocked with a clear authorization response.
 10. Re-enable the group, send `/cats`, `/status`, `/focus <agent>`, and `/ask <agent> <message>`, and verify command responses and routing state.
+11. Send `/cats new 悟净 @悟净`, verify IM Web shows a success command response with the new cat id and alias, then send `/cats` and `/ask <new-cat-id> hello` to confirm the new cat is visible to Clowder routing.
+
+The checked-in Playwright smoke specs are environment-gated. To run them against a live stack:
+
+```bash
+cd /media/leng/DiskB1/exp/seedcmp/sections/im_web/apps/chat
+RUN_V3_CLOWDER_SMOKE=1 pnpm test:e2e -- smoke-v3-clowder
+```
 
 ## Required Evidence Before Implementation Is Complete
 
@@ -71,4 +104,4 @@ pnpm test:public
 - Relevant Vitest tests for message store merge/dedup, Clowder panel, command state, and permission UI pass
 - Clowder API build and connector-focused tests pass
 - Contract tests for `im-web` inbound and outbound payloads pass
-- Playwright smoke screenshots for direct chat, group chat, multi-agent mentions, streaming reply, permission denied, and refresh history
+- Playwright smoke screenshots for direct chat, group chat, multi-agent mentions, streaming reply, permission denied, and refresh history when the complete live environment is available
