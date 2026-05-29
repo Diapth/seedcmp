@@ -46,6 +46,16 @@ sections/im_web/packages/**/*.js
 sections/im_web/**/*.vue.js
 sections/im_web/**/*.vue__VLS_*.vue.js
 
+# IM Web V3 evidence should keep text summaries in git; put binaries in artifacts/LFS.
+sections/im_web/.ai/V3.0/tests-e2e/**/*.png
+sections/im_web/.ai/V3.0/tests-e2e/**/*.jpg
+sections/im_web/.ai/V3.0/tests-e2e/**/*.jpeg
+sections/im_web/.ai/V3.0/tests-e2e/**/*.webm
+sections/im_web/.ai/V3.0/tests-e2e/**/*.zip
+sections/im_web/.ai/V3.0/issues/imgs/**/*.png
+sections/im_web/.ai/V3.0/issues/imgs/**/*.jpg
+sections/im_web/.ai/V3.0/issues/imgs/**/*.jpeg
+
 
 # C extensions
 *.so
