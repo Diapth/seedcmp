@@ -58,8 +58,12 @@ test.describe('V3 Clowder ragdoll matplotlib image smoke', () => {
     );
     const richImageEvidence = page.locator('.message-list').getByText(/富内容|rich content|y = sin\(x\) 函数图像/i);
     const evidenceCount = async () => (await nativeImageEvidence.count()) + (await richImageEvidence.count());
-    const beforeImageEvidenceCount = await evidenceCount();
     const beforeReplyCount = await clowderReplyCount(page);
+    const imageLoadPromise = page.waitForResponse(response => {
+      if (response.status() !== 200) return false;
+      const url = response.url();
+      return /\/uploads\/.*\.(png|jpe?g|gif|webp)(?:[?#].*)?$/i.test(url);
+    }, { timeout: 180000 }).catch(() => null);
     await sendChatMessage(page, prompt);
     await expect(page.locator('.message-list').getByText(prompt, { exact: true }).last()).toBeVisible({
       timeout: 10000,
@@ -67,16 +71,16 @@ test.describe('V3 Clowder ragdoll matplotlib image smoke', () => {
     await page.screenshot({ path: path.join(outputDir, '04-prompt-visible.png'), fullPage: true });
 
     await waitForNewClowderReply(page, beforeReplyCount, 180000);
+    const imageResponse = await imageLoadPromise;
+    expect(imageResponse, 'generated matplotlib PNG should load through /uploads in the remote browser').not.toBeNull();
     await expect(page.locator('.message-list')).toContainText(/sin|正弦|matplotlib|png|图片|图像/i, {
       timeout: 60000,
     });
 
-    await expect.poll(evidenceCount, { timeout: 90000 }).toBeGreaterThan(beforeImageEvidenceCount);
-
     const imageCell = page.locator('.message-list .image-cell button[title="预览图片"]').last();
     if (await imageCell.isVisible().catch(() => false)) {
       await imageCell.click();
-      await expect(page.locator('.chat-side-preview .preview-image').or(page.locator('.chat-side-preview')).first()).toBeVisible({
+      await expect(page.locator('.image-lightbox').first()).toBeVisible({
         timeout: 15000,
       });
     }
@@ -91,7 +95,7 @@ test.describe('V3 Clowder ragdoll matplotlib image smoke', () => {
       imageEvidenceCount: await evidenceCount(),
       nativeImageEvidenceCount: await nativeImageEvidence.count(),
       richImageEvidenceCount: await richImageEvidence.count(),
-      beforeImageEvidenceCount,
+      loadedImageUrl: imageResponse?.url() ?? null,
       failures,
       url: page.url(),
       recordedAt: new Date().toISOString(),

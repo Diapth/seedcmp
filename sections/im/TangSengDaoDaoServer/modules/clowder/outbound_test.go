@@ -43,6 +43,39 @@ func TestOutboundPayloadBuildsDirectMarkdownMessage(t *testing.T) {
 	assert.Equal(t, "invoke-1", body["invocation_id"])
 }
 
+func TestOutboundPayloadBuildsImageMessage(t *testing.T) {
+	payload := OutboundPayload{
+		ConnectorID:    ConnectorID,
+		ExternalChatID: "1:clowder_ai",
+		CatID:          "ragdoll-kn9a",
+		CatDisplayName: "布偶猫",
+		Content:        "y = sin(x) 函数图像",
+		Media: &OutboundMediaPayload{
+			Type:     "image",
+			URL:      "http://100.79.157.76:3003/api/connector-media/sinx.png",
+			FileName: "sinx.png",
+			Size:     4096,
+		},
+	}
+
+	req, err := BuildOutboundMessage(payload)
+
+	require.NoError(t, err)
+	assert.Equal(t, "clowder_ai", req.ChannelID)
+	assert.Equal(t, common.ChannelTypePerson.Uint8(), req.ChannelType)
+	assert.Equal(t, "clowder:ragdoll-kn9a", req.FromUID)
+
+	var body map[string]interface{}
+	require.NoError(t, json.Unmarshal(req.Payload, &body))
+	assert.Equal(t, float64(common.Image), body["type"])
+	assert.Equal(t, "http://100.79.157.76:3003/api/connector-media/sinx.png", body["url"])
+	assert.Equal(t, "sinx.png", body["name"])
+	assert.Equal(t, "y = sin(x) 函数图像", body["content"])
+	assert.Equal(t, "im-web", body["connector_id"])
+	assert.Equal(t, "ragdoll-kn9a", body["cat_id"])
+	assert.Equal(t, "布偶猫", body["cat_display_name"])
+}
+
 func TestOutboundPayloadBuildsVirtualClowderDirectMessageForUser(t *testing.T) {
 	userID := "u_1"
 	payload := OutboundPayload{

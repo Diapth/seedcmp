@@ -21,10 +21,19 @@ type OutboundPayload struct {
 	Content           string                   `json:"content"`
 	Format            string                   `json:"format"`
 	RichBlocks        []map[string]interface{} `json:"richBlocks,omitempty"`
+	Media             *OutboundMediaPayload    `json:"media,omitempty"`
 	Origin            map[string]interface{}   `json:"origin,omitempty"`
 	Stream            *OutboundStreamState     `json:"stream,omitempty"`
 	Metadata          map[string]interface{}   `json:"metadata,omitempty"`
 	PlatformMessageID string                   `json:"platformMessageId,omitempty"`
+}
+
+type OutboundMediaPayload struct {
+	Type     string `json:"type"`
+	URL      string `json:"url"`
+	FileName string `json:"fileName,omitempty"`
+	Size     int64  `json:"size,omitempty"`
+	Alt      string `json:"alt,omitempty"`
 }
 
 type OutboundStreamState struct {
@@ -41,7 +50,7 @@ func BuildOutboundMessage(payload OutboundPayload) (*config.MsgSendReq, error) {
 	if content == "" && payload.Stream != nil && payload.Stream.State == "cleanup" {
 		return nil, ErrOutboundNoop
 	}
-	if content == "" {
+	if content == "" && payload.Media == nil {
 		return nil, errors.New("empty clowder outbound content")
 	}
 
@@ -69,15 +78,7 @@ func BuildOutboundMessage(payload OutboundPayload) (*config.MsgSendReq, error) {
 	if payload.Stream != nil && payload.Stream.PlatformMessageID != "" {
 		platformMessageID = payload.Stream.PlatformMessageID
 	}
-	body := map[string]interface{}{
-		"type":         common.Text,
-		"content":      content,
-		"text":         content,
-		"format":       format,
-		"markdown":     format == "markdown",
-		"ai":           true,
-		"connector_id": ConnectorID,
-	}
+	body := buildOutboundMessageBody(payload, content, format)
 	if payload.ThreadID != "" {
 		body["thread_id"] = payload.ThreadID
 	}
@@ -121,6 +122,39 @@ func BuildOutboundMessage(payload OutboundPayload) (*config.MsgSendReq, error) {
 		FromUID:     fromUID,
 		Payload:     bodyBytes,
 	}, nil
+}
+
+func buildOutboundMessageBody(payload OutboundPayload, content string, format string) map[string]interface{} {
+	body := map[string]interface{}{
+		"type":         common.Text,
+		"content":      content,
+		"text":         content,
+		"format":       format,
+		"markdown":     format == "markdown",
+		"ai":           true,
+		"connector_id": ConnectorID,
+	}
+	if payload.Media == nil {
+		return body
+	}
+
+	mediaType := strings.ToLower(strings.TrimSpace(payload.Media.Type))
+	mediaURL := strings.TrimSpace(payload.Media.URL)
+	if mediaType == "image" && mediaURL != "" {
+		body["type"] = common.Image
+		body["url"] = mediaURL
+		if payload.Media.FileName != "" {
+			body["name"] = payload.Media.FileName
+		}
+		if payload.Media.Size > 0 {
+			body["size"] = payload.Media.Size
+		}
+		if content == "" && payload.Media.Alt != "" {
+			body["content"] = payload.Media.Alt
+			body["text"] = payload.Media.Alt
+		}
+	}
+	return body
 }
 
 var ErrOutboundNoop = errors.New("clowder outbound no-op")
