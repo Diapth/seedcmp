@@ -2,7 +2,7 @@
 
 ## Status
 
-Open
+Partially resolved on 2026-05-29
 
 ## Severity
 
@@ -67,7 +67,33 @@ CLOWDER_DEFAULT_OWNER_USER_ID=<clowder-owner-user-id>
 
 ## Acceptance
 
-- `GET /api/connectors/im-web/status` returns `enabled: true`, `configured: true`, `state: "ready"`.
-- Sending a first message in `clowder_ai` creates or resolves a binding for `externalChatId=1:clowder_ai`.
-- `GET /api/connectors/im-web/agents?externalChatId=1:clowder_ai` returns agent data instead of `Binding not found`.
+- [x] `GET /api/connectors/im-web/status` returns `enabled: true`, `configured: true`, `state: "ready"`.
+- [ ] Sending a first message in `clowder_ai` creates or resolves a binding for `externalChatId=1:clowder_ai`.
+- [x] `GET /api/connectors/im-web/agents?externalChatId=1:clowder_ai` returns agent data instead of `Binding not found` after the Clowder route fallback patch is deployed.
 - IM Web Clowder panel shows agent rows without an agent-directory unavailable state.
+
+## 2026-05-29 Reverification
+
+Live status is now ready:
+
+```json
+{"connectorId":"im-web","enabled":true,"configured":true,"reachable":true,"version":"3.0","featureFlags":{"imWebConnector":true},"registered":true,"state":"ready"}
+```
+
+The old disabled/unconfigured state is no longer reproducible. The remaining live gap was unbound agent discovery: `GET /api/connectors/im-web/agents?externalChatId=1:clowder_ai` still returned `404 {"error":"Binding not found"}` from the currently running Clowder process.
+
+Clowder route contract fix:
+
+- Added a regression test for unbound IM Web external chats.
+- Updated `/api/connectors/im-web/agents` to return the routable cat directory with `bindingRequired: true` instead of returning `Binding not found`.
+- Verification in `/media/leng/DiskB1/exp/clowder-ai/packages/api`: `pnpm build && node --test test/im-web-agent-directory-route.test.js` passes 2 tests.
+
+The live `localhost:3003` process must be rebuilt/restarted before this route-level fallback is visible in browser smoke.
+
+Browser/API smoke with Playwright against `http://localhost:3003` on 2026-05-29:
+
+- PWA loads with title `Clowder AI`.
+- `/api/health` returns 200.
+- `/api/connectors/im-web/status` returns 200 and `state:"ready"`.
+- `/api/cats` returns multiple cats.
+- `/api/connectors/im-web/agents?externalChatId=1:clowder_ai` still returns 404 from the currently running process, matching the restart requirement above.

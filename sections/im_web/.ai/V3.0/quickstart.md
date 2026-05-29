@@ -10,6 +10,15 @@
 
 ## Configuration Draft
 
+Set these values for the IM Web browser runtime. Vite reads `apps/chat/.env`; `scripts/dev-chat.sh` also accepts the same variables:
+
+```bash
+VITE_API_BASE_URL=http://127.0.0.1:8090/v1/
+VITE_MEDIA_BASE_URL=http://127.0.0.1:8090
+VITE_OBJECT_STORAGE_BASE_URL=http://127.0.0.1:9000
+VITE_TANGSENG_WS_HOST=127.0.0.1
+```
+
 Set these values in the backend environment that owns the bridge:
 
 ```bash
@@ -40,6 +49,10 @@ CLOWDER_CONNECTOR_SECRET=<shared-secret>
 | `CLOWDER_SIGNATURE_TOLERANCE_MS` | TangSeng bridge and Clowder | No | Accepted timestamp drift for signed callbacks | `300000` |
 | `CLOWDER_OUTBOUND_CALLBACK_URL` | Clowder API | Yes when enabled | TangSeng bridge callback URL for agent replies and stream events | empty |
 | `CLOWDER_IM_WEB_HEALTH_PATH` | TangSeng bridge | No | Health endpoint path used by IM Web status checks | `/api/clowder/status` |
+| `VITE_API_BASE_URL` | IM Web browser | Yes for non-proxy local runs | TangSeng HTTP API base used by axios | `/v1/` |
+| `VITE_MEDIA_BASE_URL` | IM Web browser | No | Browser-reachable media/file origin | derived from `VITE_API_BASE_URL` |
+| `VITE_OBJECT_STORAGE_BASE_URL` | IM Web browser | No | Browser-reachable object storage origin for preview links | derived from media host with port `9000` |
+| `VITE_TANGSENG_WS_HOST` | IM Web browser | No | Fallback host when WuKongIM returns `localhost`, `127.0.0.1`, or `0.0.0.0` websocket addresses | current browser host |
 
 Do not expose `CLOWDER_CONNECTOR_SECRET` or Clowder service credentials to browser code. Browser clients should call TangSeng-owned status/action APIs only.
 
@@ -50,6 +63,7 @@ cd /media/leng/DiskB1/exp/seedcmp/sections/im_web
 pnpm type-check
 pnpm build
 pnpm test:unit
+./scripts/dev-chat.sh
 ```
 
 ```bash

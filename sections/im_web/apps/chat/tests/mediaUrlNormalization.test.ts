@@ -8,7 +8,7 @@ vi.mock('@tsdaodao/base-vue', async () => {
     normalizeMediaUrl,
     apiClient: {
       defaults: {
-        baseURL: 'http://100.79.157.76:8090/v1/'
+        baseURL: 'http://im.example.com/v1/'
       },
       get: vi.fn(),
       post: vi.fn()
@@ -18,24 +18,31 @@ vi.mock('@tsdaodao/base-vue', async () => {
 })
 
 describe('media URL normalization', () => {
-  it('rewrites loopback file service URLs to the LAN-accessible media host', async () => {
-    const { resolveApiAssetUrl } = await import('../../../packages/datasource-vue/src/api/index.ts')
+  it('rewrites loopback file service URLs to the configured media host', async () => {
     const { normalizeMediaUrl } = await import('../../../packages/base-vue/src/service/mediaUrl.ts')
+    const mediaEnv = { VITE_API_BASE_URL: 'http://im.example.com/v1/' }
 
-    expect(resolveApiAssetUrl('http://127.0.0.1:8090/file/preview/chat/a.png')).toBe(
-      'http://100.79.157.76:9000/chat/a.png'
+    expect(normalizeMediaUrl('http://127.0.0.1:8090/file/preview/chat/a.png', { env: mediaEnv })).toBe(
+      'http://im.example.com:9000/chat/a.png'
     )
-    expect(resolveApiAssetUrl('http://localhost:8090/file/preview/chat/a.png')).toBe(
-      'http://100.79.157.76:9000/chat/a.png'
+    expect(normalizeMediaUrl('http://localhost:8090/file/preview/chat/a.png', { env: mediaEnv })).toBe(
+      'http://im.example.com:9000/chat/a.png'
     )
-    expect(normalizeMediaUrl('http://127.0.0.1:8090/file/preview/chat/report.pdf')).toBe(
-      'http://100.79.157.76:9000/chat/report.pdf'
+    expect(normalizeMediaUrl('http://127.0.0.1:8090/file/preview/chat/report.pdf', {
+      env: mediaEnv
+    })).toBe(
+      'http://im.example.com:9000/chat/report.pdf'
     )
-    expect(normalizeMediaUrl('http://127.0.0.1:9000/chat/report.pdf?download=1')).toBe(
-      'http://100.79.157.76:9000/chat/report.pdf?download=1'
+    expect(normalizeMediaUrl('http://127.0.0.1:9000/chat/report.pdf?download=1', {
+      env: mediaEnv
+    })).toBe(
+      'http://im.example.com:9000/chat/report.pdf?download=1'
     )
-    expect(resolveApiAssetUrl('file/preview/chat/1/target/report.pdf')).toBe(
-      'http://100.79.157.76:9000/chat/1/target/report.pdf'
+    expect(normalizeMediaUrl('file/preview/chat/1/target/report.pdf', {
+      baseUrl: 'http://im.example.com/v1/',
+      env: mediaEnv
+    })).toBe(
+      'http://im.example.com:9000/chat/1/target/report.pdf'
     )
   })
 

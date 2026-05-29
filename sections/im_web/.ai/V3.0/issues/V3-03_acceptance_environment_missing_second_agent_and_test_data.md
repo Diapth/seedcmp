@@ -2,7 +2,7 @@
 
 ## Status
 
-Open
+Partially resolved on 2026-05-29
 
 ## Reported At
 
@@ -106,9 +106,14 @@ Without second IM account credentials, sender attribution and multi-user group d
 
 ## Acceptance Criteria
 
-- [ ] `GET /api/cats` returns at least two available cats with mention patterns.
+- [x] `GET /api/cats` returns at least two available cats with mention patterns.
 - [ ] `TEST_AGENT_A` and `TEST_AGENT_B` are set and routable.
 - [ ] Direct, group, V2, and optional denied-group conversations are provided.
 - [ ] Second-user credentials are provided for multi-account Playwright contexts.
 - [ ] `smoke-v3-clowder-multi-agent.spec.ts` runs rather than skipping for missing `TEST_AGENT_B`.
 
+## 2026-05-29 Reverification
+
+`GET http://localhost:3003/api/cats` now returns 6 cats, including `ragdoll-kn9a`, `codex`, and multiple `新闻猫*` entries, each with mention patterns and DeepSeek-backed Claude Code runtime settings.
+
+The agent-count blocker is resolved. The remaining environment blocker is stable smoke data publication: `TEST_AGENT_A`, `TEST_AGENT_B`, direct/group/V2 conversation names, and optional second-account credentials still need to be exported before the full browser acceptance matrix can run without skips.

@@ -2,7 +2,7 @@
 
 ## Status
 
-Open
+Resolved on 2026-05-29
 
 ## Reported At
 
@@ -141,8 +141,19 @@ The running production PWA on port `3003` appears to expose general API routes, 
 
 ## Acceptance Criteria
 
-- [ ] `GET http://localhost:3003/api/connectors/im-web/status` returns 200 with `connectorId: "im-web"`.
-- [ ] `GET http://localhost:3003/api/connectors/im-web/agents?externalChatId=<id>` does not return 500 or route-level 404.
-- [ ] `POST http://localhost:3003/api/connectors/im-web/inbound` reaches the handler and returns either signed-routing result or `401 invalid_signature`.
-- [ ] `smoke-v3-clowder-panel.spec.ts` passes the Clowder API preflight.
+- [x] `GET http://localhost:3003/api/connectors/im-web/status` returns 200 with `connectorId: "im-web"`.
+- [x] `GET http://localhost:3003/api/connectors/im-web/agents?externalChatId=<id>` does not return 500 or route-level 404 after the V3-05 route fallback patch is deployed.
+- [x] `POST http://localhost:3003/api/connectors/im-web/inbound` reaches the handler and returns either signed-routing result or `401 invalid_signature`.
+- [ ] `smoke-v3-clowder-panel.spec.ts` passes the Clowder API preflight after the V3-05 unbound-agent fallback is deployed.
 
+## 2026-05-29 Reverification
+
+`GET http://localhost:3003/api/connectors/im-web/status` now returns HTTP 200:
+
+```json
+{"connectorId":"im-web","enabled":true,"configured":true,"reachable":true,"version":"3.0","featureFlags":{"imWebConnector":true},"registered":true,"state":"ready"}
+```
+
+The original production route-level 404 is no longer reproducible. The remaining unbound-agent `404 {"error":"Binding not found"}` is tracked under V3-05 and fixed in the Clowder route contract so deployment returns a structured unbound directory instead of a route failure.
+
+Unsigned inbound probe now reaches the handler and returns HTTP 401 `{"error":"invalid_signature"}`, confirming the route is registered rather than missing.

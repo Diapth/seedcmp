@@ -2,8 +2,25 @@ import axios, { AxiosRequestConfig } from 'axios';
 import { StorageService } from './StorageService';
 import { eventBus } from './EventBus';
 
+type RuntimeEnv = Record<string, unknown>;
+
+const DEFAULT_API_BASE_URL = '/v1/';
+
+function normalizeBaseUrl(value: unknown) {
+  const raw = typeof value === 'string' ? value.trim() : '';
+  if (!raw) return '';
+  return raw.endsWith('/') ? raw : `${raw}/`;
+}
+
+export function resolveApiBaseUrl(env: RuntimeEnv = ((import.meta as any).env || {})) {
+  return normalizeBaseUrl(env.VITE_API_BASE_URL) ||
+    normalizeBaseUrl(env.VITE_TANGSENG_API_BASE_URL) ||
+    normalizeBaseUrl(env.VITE_IM_WEB_API_BASE_URL) ||
+    DEFAULT_API_BASE_URL;
+}
+
 export const apiClient = axios.create({
-  baseURL: 'http://100.79.157.76:8090/v1/',
+  baseURL: resolveApiBaseUrl(),
   timeout: 10000,
 });
 

@@ -18,4 +18,21 @@ describe('source tree hygiene', () => {
 
     expect(trackedSidecars).toEqual([])
   })
+
+  it('does not track generated package JavaScript sidecars', () => {
+    const repoRoot = execSync('git rev-parse --show-toplevel', {
+      cwd: process.cwd(),
+      encoding: 'utf8'
+    }).trim()
+    const output = execSync("git ls-files 'sections/im_web/packages/**/*.js'", {
+      cwd: repoRoot,
+      encoding: 'utf8'
+    })
+    const trackedSidecars = output
+      .split('\n')
+      .map(line => line.trim())
+      .filter(Boolean)
+
+    expect(trackedSidecars).toEqual([])
+  })
 })
