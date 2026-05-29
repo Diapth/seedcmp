@@ -25,21 +25,43 @@ function stripApiPath(originOrBase: string) {
   }
 }
 
-export function resolveMediaOrigin(env: RuntimeEnv = runtimeEnv(), baseUrl?: string) {
+function isLocalBrowserOnlyHost(hostname: string) {
+  const host = hostname.trim().toLowerCase();
+  return host === '127.0.0.1' || host === 'localhost' || host === '0.0.0.0' || host === '::';
+}
+
+function rewriteLocalUrlForRemoteBrowser(value: string, browserHostname?: string) {
+  if (!value || !browserHostname || isLocalBrowserOnlyHost(browserHostname)) return value;
+  try {
+    const url = new URL(value);
+    if (isLocalBrowserOnlyHost(url.hostname)) {
+      url.hostname = browserHostname;
+    }
+    return url.toString();
+  } catch {
+    return value;
+  }
+}
+
+export function resolveMediaOrigin(
+  env: RuntimeEnv = runtimeEnv(),
+  baseUrl?: string,
+  browserHostname = globalThis.location?.hostname
+) {
   const origin = env.VITE_MEDIA_BASE_URL || env.VITE_FILE_BASE_URL;
-  if (origin) return String(origin).replace(/\/+$/, '');
+  if (origin) return rewriteLocalUrlForRemoteBrowser(String(origin).replace(/\/+$/, ''), browserHostname).replace(/\/+$/, '');
 
   const apiBase = getString(env, 'VITE_API_BASE_URL') ||
     getString(env, 'VITE_TANGSENG_API_BASE_URL') ||
     getString(env, 'VITE_IM_WEB_API_BASE_URL');
-  return stripApiPath(apiBase) ||
-    stripApiPath(baseUrl || '') ||
+  return rewriteLocalUrlForRemoteBrowser(stripApiPath(apiBase), browserHostname).replace(/\/+$/, '') ||
+    rewriteLocalUrlForRemoteBrowser(stripApiPath(baseUrl || ''), browserHostname).replace(/\/+$/, '') ||
     (globalThis.location?.origin || '');
 }
 
-function getObjectStorageOrigin(mediaOrigin: string, env: RuntimeEnv) {
+function getObjectStorageOrigin(mediaOrigin: string, env: RuntimeEnv, browserHostname?: string) {
   const origin = env.VITE_OBJECT_STORAGE_BASE_URL || env.VITE_MINIO_BASE_URL;
-  if (origin) return String(origin).replace(/\/+$/, '');
+  if (origin) return rewriteLocalUrlForRemoteBrowser(String(origin).replace(/\/+$/, ''), browserHostname).replace(/\/+$/, '');
   try {
     const url = new URL(mediaOrigin);
     url.port = DEFAULT_OBJECT_STORAGE_PORT;
@@ -49,12 +71,12 @@ function getObjectStorageOrigin(mediaOrigin: string, env: RuntimeEnv) {
   }
 }
 
-function normalizePreviewUrl(url: URL, mediaOrigin: string, env: RuntimeEnv) {
+function normalizePreviewUrl(url: URL, mediaOrigin: string, env: RuntimeEnv, browserHostname?: string) {
   const marker = '/file/preview/';
   const markerIndex = url.pathname.indexOf(marker);
   if (markerIndex < 0) return '';
   const objectPath = url.pathname.slice(markerIndex + marker.length);
-  const objectOrigin = getObjectStorageOrigin(mediaOrigin, env);
+  const objectOrigin = getObjectStorageOrigin(mediaOrigin, env, browserHostname);
   const objectUrl = new URL(objectPath.replace(/^\/+/, ''), `${objectOrigin}/`);
   objectUrl.search = url.search;
   objectUrl.hash = url.hash;
@@ -63,12 +85,13 @@ function normalizePreviewUrl(url: URL, mediaOrigin: string, env: RuntimeEnv) {
 
 export function normalizeMediaUrl(
   pathOrUrl: string,
-  options: { baseUrl?: string; referenceUrl?: string; env?: RuntimeEnv } = {}
+  options: { baseUrl?: string; referenceUrl?: string; env?: RuntimeEnv; browserHostname?: string } = {}
 ) {
   if (!pathOrUrl) return '';
 
   const env = options.env || runtimeEnv();
-  const mediaOrigin = resolveMediaOrigin(env, options.baseUrl);
+  const browserHostname = options.browserHostname || globalThis.location?.hostname;
+  const mediaOrigin = resolveMediaOrigin(env, options.baseUrl, browserHostname);
 
   if (/^https?:\/\//i.test(pathOrUrl)) {
     try {
@@ -81,7 +104,7 @@ export function normalizeMediaUrl(
           url.port = target.port;
         }
       }
-      return normalizePreviewUrl(url, mediaOrigin, env) || url.toString();
+      return normalizePreviewUrl(url, mediaOrigin, env, browserHostname) || url.toString();
     } catch {
       return pathOrUrl;
     }
@@ -104,7 +127,10 @@ export function normalizeMediaUrl(
   try {
     const normalizedBase = baseUrl.endsWith('/') ? baseUrl : `${baseUrl}/`;
     const url = new URL(pathOrUrl.replace(/^\/+/, ''), normalizedBase);
-    return normalizePreviewUrl(url, mediaOrigin, env) || url.toString();
+    if (isLocalBrowserOnlyHost(url.hostname) && browserHostname && !isLocalBrowserOnlyHost(browserHostname)) {
+      url.hostname = browserHostname;
+    }
+    return normalizePreviewUrl(url, mediaOrigin, env, browserHostname) || url.toString();
   } catch {
     return pathOrUrl;
   }

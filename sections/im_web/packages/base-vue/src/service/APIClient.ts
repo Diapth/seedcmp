@@ -12,11 +12,38 @@ function normalizeBaseUrl(value: unknown) {
   return raw.endsWith('/') ? raw : `${raw}/`;
 }
 
-export function resolveApiBaseUrl(env: RuntimeEnv = ((import.meta as any).env || {})) {
-  return normalizeBaseUrl(env.VITE_API_BASE_URL) ||
+function isLocalBrowserOnlyHost(hostname: string) {
+  const host = hostname.trim().toLowerCase();
+  return host === '127.0.0.1' || host === 'localhost' || host === '0.0.0.0' || host === '::';
+}
+
+function isRemoteBrowserHost(hostname?: string) {
+  return Boolean(hostname && !isLocalBrowserOnlyHost(hostname));
+}
+
+function rewriteLocalUrlForRemoteBrowser(value: string, browserHostname?: string) {
+  if (!value || !isRemoteBrowserHost(browserHostname)) return value;
+  try {
+    const url = new URL(value);
+    if (isLocalBrowserOnlyHost(url.hostname)) {
+      url.hostname = browserHostname!;
+    }
+    return url.toString();
+  } catch {
+    return value;
+  }
+}
+
+export function resolveApiBaseUrl(
+  env: RuntimeEnv = ((import.meta as any).env || {}),
+  browserHostname = globalThis.location?.hostname
+) {
+  const configuredBase = normalizeBaseUrl(env.VITE_API_BASE_URL) ||
     normalizeBaseUrl(env.VITE_TANGSENG_API_BASE_URL) ||
-    normalizeBaseUrl(env.VITE_IM_WEB_API_BASE_URL) ||
-    DEFAULT_API_BASE_URL;
+    normalizeBaseUrl(env.VITE_IM_WEB_API_BASE_URL);
+  return configuredBase
+    ? rewriteLocalUrlForRemoteBrowser(configuredBase, browserHostname)
+    : DEFAULT_API_BASE_URL;
 }
 
 export const apiClient = axios.create({

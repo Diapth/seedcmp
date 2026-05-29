@@ -21,19 +21,30 @@ function parseHost(value: string) {
   }
 }
 
-export function resolveWebsocketFallbackHost(env: RuntimeEnv = ((import.meta as any).env || {})) {
-  return getString(env, 'VITE_TANGSENG_WS_HOST') ||
-    getString(env, 'VITE_WS_HOST') ||
+function browserReachableHost(host: string, browserHostname?: string) {
+  if (!host) return '';
+  if (isUnreachableBrowserHost(host) && browserHostname && !isUnreachableBrowserHost(browserHostname)) {
+    return browserHostname;
+  }
+  return host;
+}
+
+export function resolveWebsocketFallbackHost(
+  env: RuntimeEnv = ((import.meta as any).env || {}),
+  browserHostname = globalThis.location?.hostname
+) {
+  return browserReachableHost(getString(env, 'VITE_TANGSENG_WS_HOST'), browserHostname) ||
+    browserReachableHost(getString(env, 'VITE_WS_HOST'), browserHostname) ||
     parseHost(getString(env, 'VITE_TANGSENG_WS_URL')) ||
     parseHost(getString(env, 'VITE_WS_URL')) ||
-    parseHost(getString(env, 'VITE_API_BASE_URL')) ||
-    parseHost(getString(env, 'VITE_TANGSENG_API_BASE_URL')) ||
-    globalThis.location?.hostname ||
+    browserReachableHost(parseHost(getString(env, 'VITE_API_BASE_URL')), browserHostname) ||
+    browserReachableHost(parseHost(getString(env, 'VITE_TANGSENG_API_BASE_URL')), browserHostname) ||
+    browserHostname ||
     'localhost';
 }
 
-export function resolveWebsocketConnectAddr(rawAddr: unknown, fallbackHost?: string, env?: RuntimeEnv) {
-  const host = fallbackHost || resolveWebsocketFallbackHost(env);
+export function resolveWebsocketConnectAddr(rawAddr: unknown, fallbackHost?: string, env?: RuntimeEnv, browserHostname = globalThis.location?.hostname) {
+  const host = fallbackHost || resolveWebsocketFallbackHost(env, browserHostname);
   const fallbackAddr = `ws://${host}:${DEFAULT_WS_PORT}`;
   if (typeof rawAddr !== 'string' || rawAddr.trim() === '') {
     return fallbackAddr;

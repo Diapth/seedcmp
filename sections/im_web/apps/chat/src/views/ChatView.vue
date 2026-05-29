@@ -22,6 +22,11 @@ const showUserProfile = ref(false);
 const showClowderPanel = ref(false);
 const activeRightDockTab = ref<'preview' | 'clowder'>('preview');
 const rightDockWidth = ref(Number(window.localStorage.getItem('im-web-right-dock-width') || 420));
+const imageLightbox = ref({
+  visible: false,
+  url: '',
+  title: ''
+});
 const sidePreviewRequestId = ref(0);
 const sidePreview = ref({
   visible: false,
@@ -86,6 +91,7 @@ onBeforeUnmount(() => {
 
 watch([channelId, channelType], () => {
   closeSidePreview();
+  closeImageLightbox();
   loadChannelDetails();
 });
 
@@ -158,12 +164,20 @@ function closeClowderPanel() {
   }
 }
 
+function closeImageLightbox() {
+  imageLightbox.value = {
+    visible: false,
+    url: '',
+    title: ''
+  };
+}
+
 async function handleOpenPreview(payload: any) {
   const requestId = sidePreviewRequestId.value + 1;
   sidePreviewRequestId.value = requestId;
-  activeRightDockTab.value = 'preview';
 
   if (payload?.source === 'ai-code') {
+    activeRightDockTab.value = 'preview';
     sidePreview.value = {
       visible: true,
       type: 'ai-html',
@@ -179,20 +193,16 @@ async function handleOpenPreview(payload: any) {
   }
 
   if (payload?.source === 'image') {
-    sidePreview.value = {
+    if (!payload?.url) return;
+    imageLightbox.value = {
       visible: true,
-      type: 'file-image',
-      title: '图片预览',
-      subtitle: payload?.name || '',
-      sourceUrl: payload?.url || '',
-      sourceText: '',
-      extension: payload?.extension || 'image',
-      loading: false,
-      error: payload?.url ? '' : '图片地址为空'
+      url: payload.url,
+      title: payload?.name || '图片预览'
     };
     return;
   }
 
+  activeRightDockTab.value = 'preview';
   const type = filePreviewType(payload?.kind || '');
   sidePreview.value = {
     visible: true,
@@ -340,6 +350,18 @@ function startRightDockResize(event: MouseEvent) {
       :visible="showUserProfile"
       @close="showUserProfile = false"
     />
+
+    <div
+      v-if="imageLightbox.visible"
+      class="image-lightbox"
+      role="dialog"
+      aria-modal="true"
+      aria-label="图片预览"
+      @click.self="closeImageLightbox"
+    >
+      <button class="image-lightbox-close" type="button" title="关闭预览" @click="closeImageLightbox">×</button>
+      <img class="image-lightbox-img" :src="imageLightbox.url" :alt="imageLightbox.title" />
+    </div>
   </div>
 </template>
 
@@ -482,6 +504,41 @@ function startRightDockResize(event: MouseEvent) {
 .right-dock-body {
   min-height: 0;
   overflow: hidden;
+}
+
+.image-lightbox {
+  position: fixed;
+  inset: 0;
+  z-index: 60;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 32px;
+  background: rgba(15, 23, 42, 0.72);
+}
+
+.image-lightbox-img {
+  max-width: min(92vw, 1280px);
+  max-height: 90vh;
+  object-fit: contain;
+  border-radius: var(--radius-sm);
+  background: #ffffff;
+  box-shadow: 0 20px 60px rgba(15, 23, 42, 0.32);
+}
+
+.image-lightbox-close {
+  position: fixed;
+  top: 18px;
+  right: 22px;
+  width: 36px;
+  height: 36px;
+  border: var(--border-hairline);
+  border-radius: var(--radius-sm);
+  background: rgba(255, 255, 255, 0.96);
+  color: var(--text-primary);
+  cursor: pointer;
+  font-size: 24px;
+  line-height: 1;
 }
 
 @media (max-width: 760px) {
