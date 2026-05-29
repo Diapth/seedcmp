@@ -1,0 +1,20 @@
+{
+  "runId": "v3-full-transcript-20260529083444",
+  "prompt": "@codex v3-full-transcript-20260529083444 整理一下今天的新闻",
+  "agent": "codex",
+  "optionalConfigCommand": "",
+  "focusCommand": "/focus codex",
+  "clowderReplies": 16,
+  "transcriptParts": 6,
+  "failures": [
+    "requestfailed: POST http://100.79.157.76:8090/v1/conversation/sync net::ERR_ABORTED",
+    "requestfailed: GET http://100.79.157.76:8090/v1/channels/clowder:bot/1 net::ERR_ABORTED",
+    "requestfailed: GET http://100.79.157.76:8090/v1/users/6db8b65b3ae94092badfeb82e47c06f7 net::ERR_ABORTED",
+    "requestfailed: POST http://100.79.157.76:8090/v1/conversation/extra/sync net::ERR_ABORTED",
+    "requestfailed: GET http://100.79.157.76:8090/v1/users/6db8b65b3ae94092badfeb82e47c06f7 net::ERR_ABORTED",
+    "requestfailed: GET http://100.79.157.76:8090/v1/users/6db8b65b3ae94092badfeb82e47c06f7 net::ERR_ABORTED",
+    "requestfailed: GET http://100.79.157.76:8090/v1/users/6db8b65b3ae94092badfeb82e47c06f7 net::ERR_ABORTED"
+  ],
+  "url": "http://localhost:3000/chat/conversation/clowder_ai/1",
+  "recordedAt": "2026-05-29T08:34:45.707Z"
+}

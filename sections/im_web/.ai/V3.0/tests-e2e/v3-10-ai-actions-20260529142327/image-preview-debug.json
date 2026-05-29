@@ -1,0 +1,53 @@
+{
+  "imageCells": [
+    {
+      "index": 0,
+      "text": "加载中...图片不可用",
+      "imgSrc": "",
+      "imgComplete": null,
+      "imgNaturalWidth": null,
+      "wrapperTag": "BUTTON",
+      "wrapperTitle": "预览图片"
+    },
+    {
+      "index": 1,
+      "text": "加载中...图片不可用",
+      "imgSrc": "",
+      "imgComplete": null,
+      "imgNaturalWidth": null,
+      "wrapperTag": "BUTTON",
+      "wrapperTitle": "预览图片"
+    },
+    {
+      "index": 2,
+      "text": "加载中...图片不可用",
+      "imgSrc": "",
+      "imgComplete": null,
+      "imgNaturalWidth": null,
+      "wrapperTag": "BUTTON",
+      "wrapperTitle": "预览图片"
+    },
+    {
+      "index": 3,
+      "text": "加载中...图片不可用",
+      "imgSrc": "",
+      "imgComplete": null,
+      "imgNaturalWidth": null,
+      "wrapperTag": "BUTTON",
+      "wrapperTitle": "预览图片"
+    },
+    {
+      "index": 4,
+      "text": "加载中...图片不可用",
+      "imgSrc": "",
+      "imgComplete": null,
+      "imgNaturalWidth": null,
+      "wrapperTag": "BUTTON",
+      "wrapperTitle": "预览图片"
+    }
+  ],
+  "rightDockVisible": false,
+  "sidePreviewText": "",
+  "previewImageCount": 0,
+  "previewImageSrc": ""
+}

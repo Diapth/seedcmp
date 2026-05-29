@@ -1,0 +1,48 @@
+{
+  "targetUrl": "http://100.79.157.76:3000",
+  "finalUrl": "http://100.79.157.76:3000/chat/conversation/clowder_ai/1",
+  "results": [
+    {
+      "name": "IM Web loads through external Tailscale URL",
+      "passed": true,
+      "details": "http://100.79.157.76:3000/chat"
+    },
+    {
+      "name": "Application is past blank screen",
+      "passed": true,
+      "details": "L leng_test_updated 在线 ◐ 会话 联系人 桌面通知已被浏览器拒绝 D DeepSeek AI 昨天 23:27 [草稿] 你这个猫咪图片的链接失效了，你再点其他的猫咪链接 1 你好 昨天 23:24 [草稿] /cat"
+    },
+    {
+      "name": "Clowder AI fixed contact is visible",
+      "passed": true,
+      "details": ""
+    },
+    {
+      "name": "Clicking Clowder AI opens the direct conversation",
+      "passed": true,
+      "details": "L leng_test_updated 在线 ◐ 会话 联系人 新的朋友 添加好友 发起群聊 群聊 9 新增机器人 系统机器人 u_10000 DeepSeek AI 机器人 Clowder AI Clowder 群聊 1231313131 TestGroup TestGroup1 你好 全面回归测试群 全面回归测试群"
+    },
+    {
+      "name": "Right dock opens for Clowder panel",
+      "passed": true,
+      "details": ""
+    },
+    {
+      "name": "Right dock can be resized horizontally",
+      "passed": true,
+      "details": "420 -> 502"
+    },
+    {
+      "name": "Textarea clipboard fallback executes in browser context",
+      "passed": true,
+      "details": "{\"ok\":true,\"copied\":true}"
+    }
+  ],
+  "consoleErrors": [
+    "Failed to load resource: the server responded with a status of 400 (Bad Request)",
+    "Failed to load resource: the server responded with a status of 400 (Bad Request)",
+    "Failed to load resource: the server responded with a status of 404 (Not Found)",
+    "Failed to load resource: the server responded with a status of 404 (Not Found)"
+  ],
+  "failedRequests": []
+}

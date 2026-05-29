@@ -1,0 +1,241 @@
+{
+  "state": {
+    "url": "http://localhost:3000/login",
+    "title": "唐僧叨叨 - 极简重构版",
+    "bodyText": "TangSengDaoDao\n\n极简主义双色即时通讯系统\n\n手机号/用户名\n密码\n安全登录\nQR\n扫码登录\n使用手机端扫码安全登录\n生成二维码\n检查状态\n刷新\n注册账号 · 测试验证码/密码统一为 123456",
+    "localStorage": {},
+    "emptyVisible": false,
+    "recoveryVisible": false,
+    "onlineVisible": false,
+    "conversationItems": []
+  },
+  "events": [
+    {
+      "type": "console",
+      "level": "debug",
+      "text": "[vite] connecting..."
+    },
+    {
+      "type": "console",
+      "level": "debug",
+      "text": "[vite] connected."
+    },
+    {
+      "type": "response",
+      "status": 200,
+      "method": "GET",
+      "url": "http://localhost:3000/@fs/media/leng/DiskB1/exp/seedcmp/sections/im_web/packages/base-vue/src/components/messages/TextCell.vue",
+      "body": "import { createHotContext as __vite__createHotContext } from \"/@vite/client\";import.meta.hot = __vite__createHotContext(\"/@fs/media/leng/DiskB1/exp/seedcmp/sections/im_web/packages/base-vue/src/components/messages/TextCell.vue\");import { defineComponent as _defineComponent } from \"/node_modules/.vite/deps/vue.js?v=824506a8\";\nimport { computed } from \"/node_modules/.vite/deps/vue.js?v=824506a8\";\nimport { renderMarkdown } from \"/@fs/media/leng/DiskB1/exp/seedcmp/sections/im_web/packages/base-vue/src/utils/markdown.ts\";\nconst _sfc_main = /* @__PURE__ */ _defineComponent({\n  __name: \"TextCell\",\n  props: {\n    message: { type: Object, required: true },\n    isMe: { type: Boolean, required: true }\n  },\n  emits: [\"preview-code\"],\n  setup(__props, { expose: __expose, emit: __emit }) {\n    __expose();\n    const props = __props;\n    const emit = __emit;\n    const displayText = computed(() => {\n      return props.message.content?.text || props.message.content?.content || props.message.payload?.tex"
+    },
+    {
+      "type": "response",
+      "status": 200,
+      "method": "GET",
+      "url": "http://localhost:3000/@fs/media/leng/DiskB1/exp/seedcmp/sections/im_web/packages/base-vue/src/components/messages/FileCell.vue",
+      "body": "import { createHotContext as __vite__createHotContext } from \"/@vite/client\";import.meta.hot = __vite__createHotContext(\"/@fs/media/leng/DiskB1/exp/seedcmp/sections/im_web/packages/base-vue/src/components/messages/FileCell.vue\");import { defineComponent as _defineComponent } from \"/node_modules/.vite/deps/vue.js?v=824506a8\";\nimport { computed } from \"/node_modules/.vite/deps/vue.js?v=824506a8\";\nimport { normalizeMediaUrl } from \"/@fs/media/leng/DiskB1/exp/seedcmp/sections/im_web/packages/base-vue/src/service/mediaUrl.ts\";\nconst _sfc_main = /* @__PURE__ */ _defineComponent({\n  __name: \"FileCell\",\n  props: {\n    message: { type: Object, required: true },\n    isMe: { type: Boolean, required: true }\n  },\n  emits: [\"preview\"],\n  setup(__props, { expose: __expose, emit: __emit }) {\n    __expose();\n    const props = __props;\n    const emit = __emit;\n    const url = computed(() => normalizeMediaUrl(props.message.content?.url || props.message.payload?.url || \"\"));\n    const name = computed(() ="
+    },
+    {
+      "type": "response",
+      "status": 200,
+      "method": "GET",
+      "url": "http://localhost:3000/@fs/media/leng/DiskB1/exp/seedcmp/sections/im_web/packages/base-vue/src/components/messages/SystemCell.vue",
+      "body": "import { createHotContext as __vite__createHotContext } from \"/@vite/client\";import.meta.hot = __vite__createHotContext(\"/@fs/media/leng/DiskB1/exp/seedcmp/sections/im_web/packages/base-vue/src/components/messages/SystemCell.vue\");import { defineComponent as _defineComponent } from \"/node_modules/.vite/deps/vue.js?v=824506a8\";\nimport { computed } from \"/node_modules/.vite/deps/vue.js?v=824506a8\";\nconst _sfc_main = /* @__PURE__ */ _defineComponent({\n  __name: \"SystemCell\",\n  props: {\n    message: { type: Object, required: true }\n  },\n  setup(__props, { expose: __expose }) {\n    __expose();\n    const props = __props;\n    const displayText = computed(() => {\n      const content = props.message.content || props.message.payload || {};\n      if (content.text)\n        return content.text;\n      const eventName = content.event || content.type_name || content.action || content.cmd;\n      const operator = content.operator_name || content.operatorName || content.inviter_name || content.from_name "
+    },
+    {
+      "type": "response",
+      "status": 200,
+      "method": "GET",
+      "url": "http://localhost:3000/@fs/media/leng/DiskB1/exp/seedcmp/sections/im_web/packages/base-vue/src/components/messages/ImageCell.vue",
+      "body": "import { createHotContext as __vite__createHotContext } from \"/@vite/client\";import.meta.hot = __vite__createHotContext(\"/@fs/media/leng/DiskB1/exp/seedcmp/sections/im_web/packages/base-vue/src/components/messages/ImageCell.vue\");import { defineComponent as _defineComponent } from \"/node_modules/.vite/deps/vue.js?v=824506a8\";\nimport { computed, ref, watch } from \"/node_modules/.vite/deps/vue.js?v=824506a8\";\nimport { normalizeMediaUrl } from \"/@fs/media/leng/DiskB1/exp/seedcmp/sections/im_web/packages/base-vue/src/service/mediaUrl.ts\";\nconst _sfc_main = /* @__PURE__ */ _defineComponent({\n  __name: \"ImageCell\",\n  props: {\n    message: { type: Object, required: true },\n    isMe: { type: Boolean, required: true }\n  },\n  setup(__props, { expose: __expose }) {\n    __expose();\n    const props = __props;\n    const imageUrl = computed(() => {\n      return normalizeMediaUrl(props.message.content?.url || props.message.payload?.url || \"\");\n    });\n    const imageLoadState = ref(\"idle\");\n    watch("
+    },
+    {
+      "type": "response",
+      "status": 200,
+      "method": "GET",
+      "url": "http://localhost:3000/@fs/media/leng/DiskB1/exp/seedcmp/sections/im_web/packages/base-vue/src/components/messages/TimeCell.vue",
+      "body": "import { createHotContext as __vite__createHotContext } from \"/@vite/client\";import.meta.hot = __vite__createHotContext(\"/@fs/media/leng/DiskB1/exp/seedcmp/sections/im_web/packages/base-vue/src/components/messages/TimeCell.vue\");import { defineComponent as _defineComponent } from \"/node_modules/.vite/deps/vue.js?v=824506a8\";\nimport { computed } from \"/node_modules/.vite/deps/vue.js?v=824506a8\";\nconst _sfc_main = /* @__PURE__ */ _defineComponent({\n  __name: \"TimeCell\",\n  props: {\n    timestamp: { type: Number, required: true }\n  },\n  setup(__props, { expose: __expose }) {\n    __expose();\n    const props = __props;\n    const displayTime = computed(() => {\n      if (!props.timestamp)\n        return \"\";\n      const date = new Date(props.timestamp * 1e3);\n      const now = /* @__PURE__ */ new Date();\n      if (date.toDateString() === now.toDateString()) {\n        return `\\u4ECA\\u5929 ${date.toLocaleTimeString([], { hour: \"2-digit\", minute: \"2-digit\" })}`;\n      }\n      const yesterday = new"
+    },
+    {
+      "type": "response",
+      "status": 200,
+      "method": "GET",
+      "url": "http://localhost:3000/@fs/media/leng/DiskB1/exp/seedcmp/sections/im_web/packages/base-vue/src/components/messages/VoiceCell.vue",
+      "body": "import { createHotContext as __vite__createHotContext } from \"/@vite/client\";import.meta.hot = __vite__createHotContext(\"/@fs/media/leng/DiskB1/exp/seedcmp/sections/im_web/packages/base-vue/src/components/messages/VoiceCell.vue\");import { defineComponent as _defineComponent } from \"/node_modules/.vite/deps/vue.js?v=824506a8\";\nimport { ref, computed, onBeforeUnmount } from \"/node_modules/.vite/deps/vue.js?v=824506a8\";\nimport { normalizeMediaUrl } from \"/@fs/media/leng/DiskB1/exp/seedcmp/sections/im_web/packages/base-vue/src/service/mediaUrl.ts\";\nconst _sfc_main = /* @__PURE__ */ _defineComponent({\n  __name: \"VoiceCell\",\n  props: {\n    message: { type: Object, required: true },\n    isMe: { type: Boolean, required: true }\n  },\n  setup(__props, { expose: __expose }) {\n    __expose();\n    const props = __props;\n    const url = computed(() => normalizeMediaUrl(props.message.content?.url || props.message.payload?.url || \"\"));\n    const duration = computed(() => props.message.content?.time || "
+    },
+    {
+      "type": "response",
+      "status": 200,
+      "method": "GET",
+      "url": "http://localhost:3000/@fs/media/leng/DiskB1/exp/seedcmp/sections/im_web/packages/base-vue/src/components/messages/VideoCell.vue",
+      "body": "import { createHotContext as __vite__createHotContext } from \"/@vite/client\";import.meta.hot = __vite__createHotContext(\"/@fs/media/leng/DiskB1/exp/seedcmp/sections/im_web/packages/base-vue/src/components/messages/VideoCell.vue\");import { defineComponent as _defineComponent } from \"/node_modules/.vite/deps/vue.js?v=824506a8\";\nimport { ref, computed } from \"/node_modules/.vite/deps/vue.js?v=824506a8\";\nimport { normalizeMediaUrl } from \"/@fs/media/leng/DiskB1/exp/seedcmp/sections/im_web/packages/base-vue/src/service/mediaUrl.ts\";\nconst _sfc_main = /* @__PURE__ */ _defineComponent({\n  __name: \"VideoCell\",\n  props: {\n    message: { type: Object, required: true },\n    isMe: { type: Boolean, required: true }\n  },\n  setup(__props, { expose: __expose }) {\n    __expose();\n    const props = __props;\n    const url = computed(() => normalizeMediaUrl(props.message.content?.url || props.message.payload?.url || \"\"));\n    const cover = computed(() => normalizeMediaUrl(props.message.content?.cover || p"
+    },
+    {
+      "type": "response",
+      "status": 200,
+      "method": "GET",
+      "url": "http://localhost:3000/@fs/media/leng/DiskB1/exp/seedcmp/sections/im_web/packages/base-vue/src/components/messages/GifCell.vue",
+      "body": "import { createHotContext as __vite__createHotContext } from \"/@vite/client\";import.meta.hot = __vite__createHotContext(\"/@fs/media/leng/DiskB1/exp/seedcmp/sections/im_web/packages/base-vue/src/components/messages/GifCell.vue\");import { defineComponent as _defineComponent } from \"/node_modules/.vite/deps/vue.js?v=824506a8\";\nimport { computed } from \"/node_modules/.vite/deps/vue.js?v=824506a8\";\nconst _sfc_main = /* @__PURE__ */ _defineComponent({\n  __name: \"GifCell\",\n  props: {\n    message: { type: Object, required: true },\n    isMe: { type: Boolean, required: true }\n  },\n  setup(__props, { expose: __expose }) {\n    __expose();\n    const props = __props;\n    const url = computed(() => props.message.content?.url || props.message.payload?.url || \"\");\n    const __returned__ = { props, url };\n    Object.defineProperty(__returned__, \"__isScriptSetup\", { enumerable: false, value: true });\n    return __returned__;\n  }\n});\nimport { openBlock as _openBlock, createElementBlock as _createElementBl"
+    },
+    {
+      "type": "response",
+      "status": 200,
+      "method": "GET",
+      "url": "http://localhost:3000/@fs/media/leng/DiskB1/exp/seedcmp/sections/im_web/packages/base-vue/src/components/messages/StickerCell.vue",
+      "body": "import { createHotContext as __vite__createHotContext } from \"/@vite/client\";import.meta.hot = __vite__createHotContext(\"/@fs/media/leng/DiskB1/exp/seedcmp/sections/im_web/packages/base-vue/src/components/messages/StickerCell.vue\");import { defineComponent as _defineComponent } from \"/node_modules/.vite/deps/vue.js?v=824506a8\";\nimport { computed } from \"/node_modules/.vite/deps/vue.js?v=824506a8\";\nconst _sfc_main = /* @__PURE__ */ _defineComponent({\n  __name: \"StickerCell\",\n  props: {\n    message: { type: Object, required: true },\n    isMe: { type: Boolean, required: true }\n  },\n  setup(__props, { expose: __expose }) {\n    __expose();\n    const props = __props;\n    const category = computed(() => props.message.content?.category || props.message.payload?.category || \"\");\n    const placeholder = computed(() => props.message.content?.placeholder || props.message.payload?.placeholder || \"\");\n    const stickerUrl = computed(() => {\n      if (placeholder.value.startsWith(\"http\") || placehold"
+    },
+    {
+      "type": "response",
+      "status": 200,
+      "method": "GET",
+      "url": "http://localhost:3000/@fs/media/leng/DiskB1/exp/seedcmp/sections/im_web/packages/base-vue/src/components/messages/LocationCell.vue",
+      "body": "import { createHotContext as __vite__createHotContext } from \"/@vite/client\";import.meta.hot = __vite__createHotContext(\"/@fs/media/leng/DiskB1/exp/seedcmp/sections/im_web/packages/base-vue/src/components/messages/LocationCell.vue\");import { defineComponent as _defineComponent } from \"/node_modules/.vite/deps/vue.js?v=824506a8\";\nimport { computed } from \"/node_modules/.vite/deps/vue.js?v=824506a8\";\nconst _sfc_main = /* @__PURE__ */ _defineComponent({\n  __name: \"LocationCell\",\n  props: {\n    message: { type: Object, required: true },\n    isMe: { type: Boolean, required: true }\n  },\n  setup(__props, { expose: __expose }) {\n    __expose();\n    const props = __props;\n    const title = computed(() => props.message.content?.title || props.message.payload?.title || \"\\u672A\\u77E5\\u4F4D\\u7F6E\");\n    const address = computed(() => props.message.content?.address || props.message.payload?.address || \"\\u672A\\u77E5\\u5730\\u5740\");\n    const __returned__ = { props, title, address };\n    Object.defineP"
+    },
+    {
+      "type": "response",
+      "status": 200,
+      "method": "GET",
+      "url": "http://localhost:3000/@fs/media/leng/DiskB1/exp/seedcmp/sections/im_web/packages/base-vue/src/components/messages/CardCell.vue",
+      "body": "import { createHotContext as __vite__createHotContext } from \"/@vite/client\";import.meta.hot = __vite__createHotContext(\"/@fs/media/leng/DiskB1/exp/seedcmp/sections/im_web/packages/base-vue/src/components/messages/CardCell.vue\");import { defineComponent as _defineComponent } from \"/node_modules/.vite/deps/vue.js?v=824506a8\";\nimport { computed } from \"/node_modules/.vite/deps/vue.js?v=824506a8\";\nimport ChannelAvatar from \"/@fs/media/leng/DiskB1/exp/seedcmp/sections/im_web/packages/base-vue/src/components/ChannelAvatar.vue\";\nconst _sfc_main = /* @__PURE__ */ _defineComponent({\n  __name: \"CardCell\",\n  props: {\n    message: { type: Object, required: true },\n    isMe: { type: Boolean, required: true }\n  },\n  setup(__props, { expose: __expose }) {\n    __expose();\n    const props = __props;\n    const name = computed(() => props.message.content?.name || props.message.payload?.name || \"\\u672A\\u77E5\\u7528\\u6237\");\n    const avatar = computed(() => props.message.content?.avatar || props.message.p"
+    },
+    {
+      "type": "response",
+      "status": 200,
+      "method": "GET",
+      "url": "http://localhost:3000/@fs/media/leng/DiskB1/exp/seedcmp/sections/im_web/packages/base-vue/src/components/messages/MergeCell.vue",
+      "body": "import { createHotContext as __vite__createHotContext } from \"/@vite/client\";import.meta.hot = __vite__createHotContext(\"/@fs/media/leng/DiskB1/exp/seedcmp/sections/im_web/packages/base-vue/src/components/messages/MergeCell.vue\");import { defineComponent as _defineComponent } from \"/node_modules/.vite/deps/vue.js?v=824506a8\";\nimport { computed } from \"/node_modules/.vite/deps/vue.js?v=824506a8\";\nconst _sfc_main = /* @__PURE__ */ _defineComponent({\n  __name: \"MergeCell\",\n  props: {\n    message: { type: Object, required: true },\n    isMe: { type: Boolean, required: true }\n  },\n  setup(__props, { expose: __expose }) {\n    __expose();\n    const props = __props;\n    const title = computed(() => props.message.content?.title || props.message.payload?.title || \"\\u804A\\u5929\\u8BB0\\u5F55\");\n    const previews = computed(() => {\n      const list = props.message.content?.messages || props.message.payload?.messages || [];\n      return list.slice(0, 3).map((m) => {\n        const text = m.content?.te"
+    },
+    {
+      "type": "response",
+      "status": 200,
+      "method": "GET",
+      "url": "http://localhost:3000/@fs/media/leng/DiskB1/exp/seedcmp/sections/im_web/packages/base-vue/src/components/messages/FileCell.vue?vue&type=style&index=0&scoped=94bf8c19&lang.css",
+      "body": "import { createHotContext as __vite__createHotContext } from \"/@vite/client\";import.meta.hot = __vite__createHotContext(\"/@fs/media/leng/DiskB1/exp/seedcmp/sections/im_web/packages/base-vue/src/components/messages/FileCell.vue?vue&type=style&index=0&scoped=94bf8c19&lang.css\");import { updateStyle as __vite__updateStyle, removeStyle as __vite__removeStyle } from \"/@vite/client\"\nconst __vite__id = \"/media/leng/DiskB1/exp/seedcmp/sections/im_web/packages/base-vue/src/components/messages/FileCell.vue?vue&type=style&index=0&scoped=94bf8c19&lang.css\"\nconst __vite__css = \"\\n.file-cell[data-v-94bf8c19] {\\n  display: flex;\\n  width: clamp(240px, 34vw, 320px);\\n  max-width: 100%;\\n  cursor: pointer;\\n}\\n.file-cell.unavailable[data-v-94bf8c19] {\\n  cursor: not-allowed;\\n}\\n.bubble[data-v-94bf8c19] {\\n  display: flex;\\n  align-items: center;\\n  gap: 12px;\\n  width: 100%;\\n  min-width: 0;\\n  padding: 12px 16px;\\n  border-radius: var(--radius-sm);\\n  border: var(--border-hairline);\\n  background-col"
+    },
+    {
+      "type": "response",
+      "status": 200,
+      "method": "GET",
+      "url": "http://localhost:3000/@fs/media/leng/DiskB1/exp/seedcmp/sections/im_web/packages/base-vue/src/components/messages/SystemCell.vue?vue&type=style&index=0&scoped=538333ce&lang.css",
+      "body": "import { createHotContext as __vite__createHotContext } from \"/@vite/client\";import.meta.hot = __vite__createHotContext(\"/@fs/media/leng/DiskB1/exp/seedcmp/sections/im_web/packages/base-vue/src/components/messages/SystemCell.vue?vue&type=style&index=0&scoped=538333ce&lang.css\");import { updateStyle as __vite__updateStyle, removeStyle as __vite__removeStyle } from \"/@vite/client\"\nconst __vite__id = \"/media/leng/DiskB1/exp/seedcmp/sections/im_web/packages/base-vue/src/components/messages/SystemCell.vue?vue&type=style&index=0&scoped=538333ce&lang.css\"\nconst __vite__css = \"\\n.system-cell[data-v-538333ce] {\\n  display: flex;\\n  justify-content: center;\\n  width: 100%;\\n  margin: 8px 0;\\n}\\n.system-bubble[data-v-538333ce] {\\n  background-color: var(--bg-secondary);\\n  color: var(--text-secondary);\\n  font-size: 11px;\\n  padding: 4px 10px;\\n  border-radius: var(--radius-sm);\\n  border: var(--border-hairline);\\n  max-width: 80%;\\n  text-align: center;\\n  word-break: break-all;\\n}\\n\"\n__vite__up"
+    },
+    {
+      "type": "response",
+      "status": 200,
+      "method": "GET",
+      "url": "http://localhost:3000/@fs/media/leng/DiskB1/exp/seedcmp/sections/im_web/packages/base-vue/src/components/messages/TextCell.vue?vue&type=style&index=0&scoped=c0035fb9&lang.css",
+      "body": "import { createHotContext as __vite__createHotContext } from \"/@vite/client\";import.meta.hot = __vite__createHotContext(\"/@fs/media/leng/DiskB1/exp/seedcmp/sections/im_web/packages/base-vue/src/components/messages/TextCell.vue?vue&type=style&index=0&scoped=c0035fb9&lang.css\");import { updateStyle as __vite__updateStyle, removeStyle as __vite__removeStyle } from \"/@vite/client\"\nconst __vite__id = \"/media/leng/DiskB1/exp/seedcmp/sections/im_web/packages/base-vue/src/components/messages/TextCell.vue?vue&type=style&index=0&scoped=c0035fb9&lang.css\"\nconst __vite__css = \"\\n.text-cell[data-v-c0035fb9] {\\n  display: flex;\\n  width: 100%;\\n}\\n.bubble[data-v-c0035fb9] {\\n  display: inline-block;\\n  width: fit-content;\\n  max-width: min(520px, 100%);\\n  padding: 10px 14px;\\n  border-radius: var(--radius-sm);\\n  font-size: 14px;\\n  line-height: 1.5;\\n  word-break: break-word;\\n  white-space: pre-wrap;\\n  border: var(--border-hairline);\\n  background-color: var(--bg-primary);\\n  color: var(--text-p"
+    },
+    {
+      "type": "response",
+      "status": 200,
+      "method": "GET",
+      "url": "http://localhost:3000/@fs/media/leng/DiskB1/exp/seedcmp/sections/im_web/packages/base-vue/src/components/messages/ImageCell.vue?vue&type=style&index=0&scoped=3915ada8&lang.css",
+      "body": "import { createHotContext as __vite__createHotContext } from \"/@vite/client\";import.meta.hot = __vite__createHotContext(\"/@fs/media/leng/DiskB1/exp/seedcmp/sections/im_web/packages/base-vue/src/components/messages/ImageCell.vue?vue&type=style&index=0&scoped=3915ada8&lang.css\");import { updateStyle as __vite__updateStyle, removeStyle as __vite__removeStyle } from \"/@vite/client\"\nconst __vite__id = \"/media/leng/DiskB1/exp/seedcmp/sections/im_web/packages/base-vue/src/components/messages/ImageCell.vue?vue&type=style&index=0&scoped=3915ada8&lang.css\"\nconst __vite__css = \"\\n.image-cell[data-v-3915ada8] {\\n  display: flex;\\n  width: 100%;\\n}\\n.image-wrapper[data-v-3915ada8] {\\n  width: min(240px, 56vw);\\n  aspect-ratio: 4 / 3;\\n  max-width: 240px;\\n  max-height: 320px;\\n  overflow: hidden;\\n  border-radius: var(--radius-sm);\\n  border: var(--border-hairline);\\n  background-color: var(--bg-secondary);\\n  display: flex;\\n  align-items: center;\\n  justify-content: center;\\n}\\n.bubble-image[data"
+    },
+    {
+      "type": "response",
+      "status": 200,
+      "method": "GET",
+      "url": "http://localhost:3000/@fs/media/leng/DiskB1/exp/seedcmp/sections/im_web/packages/base-vue/src/components/messages/TimeCell.vue?vue&type=style&index=0&scoped=e4ca3361&lang.css",
+      "body": "import { createHotContext as __vite__createHotContext } from \"/@vite/client\";import.meta.hot = __vite__createHotContext(\"/@fs/media/leng/DiskB1/exp/seedcmp/sections/im_web/packages/base-vue/src/components/messages/TimeCell.vue?vue&type=style&index=0&scoped=e4ca3361&lang.css\");import { updateStyle as __vite__updateStyle, removeStyle as __vite__removeStyle } from \"/@vite/client\"\nconst __vite__id = \"/media/leng/DiskB1/exp/seedcmp/sections/im_web/packages/base-vue/src/components/messages/TimeCell.vue?vue&type=style&index=0&scoped=e4ca3361&lang.css\"\nconst __vite__css = \"\\n.time-cell[data-v-e4ca3361] {\\n  display: flex;\\n  justify-content: center;\\n  width: 100%;\\n  margin: 16px 0 8px;\\n  user-select: none;\\n}\\n.time-label[data-v-e4ca3361] {\\n  font-size: 11px;\\n  color: var(--text-secondary);\\n  background-color: transparent;\\n  padding: 2px 8px;\\n}\\n\"\n__vite__updateStyle(__vite__id, __vite__css)\nimport.meta.hot.accept()\nimport.meta.hot.prune(() => __vite__removeStyle(__vite__id))"
+    },
+    {
+      "type": "response",
+      "status": 200,
+      "method": "GET",
+      "url": "http://localhost:3000/@fs/media/leng/DiskB1/exp/seedcmp/sections/im_web/packages/base-vue/src/components/messages/VoiceCell.vue?vue&type=style&index=0&scoped=1e2cce37&lang.css",
+      "body": "import { createHotContext as __vite__createHotContext } from \"/@vite/client\";import.meta.hot = __vite__createHotContext(\"/@fs/media/leng/DiskB1/exp/seedcmp/sections/im_web/packages/base-vue/src/components/messages/VoiceCell.vue?vue&type=style&index=0&scoped=1e2cce37&lang.css\");import { updateStyle as __vite__updateStyle, removeStyle as __vite__removeStyle } from \"/@vite/client\"\nconst __vite__id = \"/media/leng/DiskB1/exp/seedcmp/sections/im_web/packages/base-vue/src/components/messages/VoiceCell.vue?vue&type=style&index=0&scoped=1e2cce37&lang.css\"\nconst __vite__css = \"\\n.voice-cell[data-v-1e2cce37] {\\n  display: flex;\\n  width: 100%;\\n  cursor: pointer;\\n}\\n.voice-cell.unavailable[data-v-1e2cce37] {\\n  cursor: not-allowed;\\n  opacity: 0.72;\\n}\\n.bubble[data-v-1e2cce37] {\\n  display: flex;\\n  align-items: center;\\n  gap: 12px;\\n  min-width: 100px;\\n  max-width: 60%;\\n  padding: 10px 14px;\\n  border-radius: var(--radius-sm);\\n  border: var(--border-hairline);\\n  background-color: var(--bg"
+    },
+    {
+      "type": "response",
+      "status": 200,
+      "method": "GET",
+      "url": "http://localhost:3000/@fs/media/leng/DiskB1/exp/seedcmp/sections/im_web/packages/base-vue/src/components/messages/VideoCell.vue?vue&type=style&index=0&scoped=f1b4e35d&lang.css",
+      "body": "import { createHotContext as __vite__createHotContext } from \"/@vite/client\";import.meta.hot = __vite__createHotContext(\"/@fs/media/leng/DiskB1/exp/seedcmp/sections/im_web/packages/base-vue/src/components/messages/VideoCell.vue?vue&type=style&index=0&scoped=f1b4e35d&lang.css\");import { updateStyle as __vite__updateStyle, removeStyle as __vite__removeStyle } from \"/@vite/client\"\nconst __vite__id = \"/media/leng/DiskB1/exp/seedcmp/sections/im_web/packages/base-vue/src/components/messages/VideoCell.vue?vue&type=style&index=0&scoped=f1b4e35d&lang.css\"\nconst __vite__css = \"\\n.video-cell[data-v-f1b4e35d] {\\n  display: flex;\\n  width: 100%;\\n}\\n.bubble[data-v-f1b4e35d] {\\n  position: relative;\\n  max-width: 240px;\\n  border-radius: var(--radius-sm);\\n  overflow: hidden;\\n  border: var(--border-hairline);\\n  background-color: var(--bg-secondary);\\n  cursor: pointer;\\n  display: flex;\\n  align-items: center;\\n  justify-content: center;\\n  aspect-ratio: 16 / 10;\\n}\\n.bubble.unavailable[data-v-f1b"
+    },
+    {
+      "type": "response",
+      "status": 200,
+      "method": "GET",
+      "url": "http://localhost:3000/@fs/media/leng/DiskB1/exp/seedcmp/sections/im_web/packages/base-vue/src/components/messages/GifCell.vue?vue&type=style&index=0&scoped=f4914e1b&lang.css",
+      "body": "import { createHotContext as __vite__createHotContext } from \"/@vite/client\";import.meta.hot = __vite__createHotContext(\"/@fs/media/leng/DiskB1/exp/seedcmp/sections/im_web/packages/base-vue/src/components/messages/GifCell.vue?vue&type=style&index=0&scoped=f4914e1b&lang.css\");import { updateStyle as __vite__updateStyle, removeStyle as __vite__removeStyle } from \"/@vite/client\"\nconst __vite__id = \"/media/leng/DiskB1/exp/seedcmp/sections/im_web/packages/base-vue/src/components/messages/GifCell.vue?vue&type=style&index=0&scoped=f4914e1b&lang.css\"\nconst __vite__css = \"\\n.gif-cell[data-v-f4914e1b] {\\n  display: flex;\\n  width: 100%;\\n}\\n.bubble[data-v-f4914e1b] {\\n  max-width: 200px;\\n  max-height: 200px;\\n  border-radius: var(--radius-sm);\\n  overflow: hidden;\\n  border: var(--border-hairline);\\n  background-color: transparent;\\n  display: flex;\\n  align-items: center;\\n  justify-content: center;\\n}\\n.gif-image[data-v-f4914e1b] {\\n  max-width: 100%;\\n  max-height: 100%;\\n  object-fit: conta"
+    },
+    {
+      "type": "response",
+      "status": 200,
+      "method": "GET",
+      "url": "http://localhost:3000/@fs/media/leng/DiskB1/exp/seedcmp/sections/im_web/packages/base-vue/src/components/messages/StickerCell.vue?vue&type=style&index=0&scoped=c6467feb&lang.css",
+      "body": "import { createHotContext as __vite__createHotContext } from \"/@vite/client\";import.meta.hot = __vite__createHotContext(\"/@fs/media/leng/DiskB1/exp/seedcmp/sections/im_web/packages/base-vue/src/components/messages/StickerCell.vue?vue&type=style&index=0&scoped=c6467feb&lang.css\");import { updateStyle as __vite__updateStyle, removeStyle as __vite__removeStyle } from \"/@vite/client\"\nconst __vite__id = \"/media/leng/DiskB1/exp/seedcmp/sections/im_web/packages/base-vue/src/components/messages/StickerCell.vue?vue&type=style&index=0&scoped=c6467feb&lang.css\"\nconst __vite__css = \"\\n.sticker-cell[data-v-c6467feb] {\\n  display: flex;\\n  width: 100%;\\n}\\n.sticker-wrapper[data-v-c6467feb] {\\n  max-width: 120px;\\n  max-height: 120px;\\n  display: flex;\\n  align-items: center;\\n  justify-content: center;\\n}\\n.sticker-image[data-v-c6467feb] {\\n  max-width: 100%;\\n  max-height: 100%;\\n  object-fit: contain;\\n}\\n.sticker-cell.is-me[data-v-c6467feb] {\\n  justify-content: flex-end;\\n}\\n\"\n__vite__updateStyl"
+    },
+    {
+      "type": "response",
+      "status": 200,
+      "method": "GET",
+      "url": "http://localhost:3000/@fs/media/leng/DiskB1/exp/seedcmp/sections/im_web/packages/base-vue/src/components/messages/LocationCell.vue?vue&type=style&index=0&scoped=8c7ba2ba&lang.css",
+      "body": "import { createHotContext as __vite__createHotContext } from \"/@vite/client\";import.meta.hot = __vite__createHotContext(\"/@fs/media/leng/DiskB1/exp/seedcmp/sections/im_web/packages/base-vue/src/components/messages/LocationCell.vue?vue&type=style&index=0&scoped=8c7ba2ba&lang.css\");import { updateStyle as __vite__updateStyle, removeStyle as __vite__removeStyle } from \"/@vite/client\"\nconst __vite__id = \"/media/leng/DiskB1/exp/seedcmp/sections/im_web/packages/base-vue/src/components/messages/LocationCell.vue?vue&type=style&index=0&scoped=8c7ba2ba&lang.css\"\nconst __vite__css = \"\\n.location-cell[data-v-8c7ba2ba] {\\n  display: flex;\\n  width: 100%;\\n}\\n.bubble[data-v-8c7ba2ba] {\\n  max-width: 240px;\\n  border-radius: var(--radius-sm);\\n  overflow: hidden;\\n  border: var(--border-hairline);\\n  background-color: var(--bg-primary);\\n  color: var(--text-primary);\\n  display: flex;\\n  flex-direction: column;\\n}\\n.location-info[data-v-8c7ba2ba] {\\n  padding: 10px 12px;\\n  display: flex;\\n  flex-dir"
+    },
+    {
+      "type": "response",
+      "status": 200,
+      "method": "GET",
+      "url": "http://localhost:3000/@fs/media/leng/DiskB1/exp/seedcmp/sections/im_web/packages/base-vue/src/components/messages/CardCell.vue?vue&type=style&index=0&scoped=a69ad7c0&lang.css",
+      "body": "import { createHotContext as __vite__createHotContext } from \"/@vite/client\";import.meta.hot = __vite__createHotContext(\"/@fs/media/leng/DiskB1/exp/seedcmp/sections/im_web/packages/base-vue/src/components/messages/CardCell.vue?vue&type=style&index=0&scoped=a69ad7c0&lang.css\");import { updateStyle as __vite__updateStyle, removeStyle as __vite__removeStyle } from \"/@vite/client\"\nconst __vite__id = \"/media/leng/DiskB1/exp/seedcmp/sections/im_web/packages/base-vue/src/components/messages/CardCell.vue?vue&type=style&index=0&scoped=a69ad7c0&lang.css\"\nconst __vite__css = \"\\n.card-cell[data-v-a69ad7c0] {\\n  display: flex;\\n  width: 100%;\\n}\\n.bubble[data-v-a69ad7c0] {\\n  width: 220px;\\n  border-radius: var(--radius-sm);\\n  overflow: hidden;\\n  border: var(--border-hairline);\\n  background-color: var(--bg-primary);\\n  color: var(--text-primary);\\n  display: flex;\\n  flex-direction: column;\\n  cursor: pointer;\\n  transition: background-color 0.2s;\\n}\\n.bubble[data-v-a69ad7c0]:hover {\\n  backgrou"
+    },
+    {
+      "type": "response",
+      "status": 200,
+      "method": "GET",
+      "url": "http://localhost:3000/@fs/media/leng/DiskB1/exp/seedcmp/sections/im_web/packages/base-vue/src/components/messages/MergeCell.vue?vue&type=style&index=0&scoped=c504c6ba&lang.css",
+      "body": "import { createHotContext as __vite__createHotContext } from \"/@vite/client\";import.meta.hot = __vite__createHotContext(\"/@fs/media/leng/DiskB1/exp/seedcmp/sections/im_web/packages/base-vue/src/components/messages/MergeCell.vue?vue&type=style&index=0&scoped=c504c6ba&lang.css\");import { updateStyle as __vite__updateStyle, removeStyle as __vite__removeStyle } from \"/@vite/client\"\nconst __vite__id = \"/media/leng/DiskB1/exp/seedcmp/sections/im_web/packages/base-vue/src/components/messages/MergeCell.vue?vue&type=style&index=0&scoped=c504c6ba&lang.css\"\nconst __vite__css = \"\\n.merge-cell[data-v-c504c6ba] {\\n  display: flex;\\n  width: 100%;\\n}\\n.bubble[data-v-c504c6ba] {\\n  width: 240px;\\n  border-radius: var(--radius-sm);\\n  overflow: hidden;\\n  border: var(--border-hairline);\\n  background-color: var(--bg-primary);\\n  color: var(--text-primary);\\n  display: flex;\\n  flex-direction: column;\\n  cursor: pointer;\\n  transition: background-color 0.2s;\\n}\\n.bubble[data-v-c504c6ba]:hover {\\n  backg"
+    },
+    {
+      "type": "response",
+      "status": 200,
+      "method": "GET",
+      "url": "http://localhost:3000/@fs/media/leng/DiskB1/exp/seedcmp/sections/im_web/packages/datasource-vue/src/stores/clowderStore.ts",
+      "body": "import { computed, ref } from \"/node_modules/.vite/deps/vue.js?v=824506a8\";\nimport { defineStore } from \"/node_modules/.vite/deps/pinia.js?v=824506a8\";\nimport {\n  clowderApi\n} from \"/@fs/media/leng/DiskB1/exp/seedcmp/sections/im_web/packages/datasource-vue/src/api/clowder.ts\";\nfunction conversationKey(channelId, channelType) {\n  return `${String(channelId)}-${Number(channelType)}`;\n}\nfunction defaultStatus() {\n  return {\n    enabled: false,\n    configured: false,\n    reachable: false,\n    state: \"disabled\"\n  };\n}\nfunction disabledReasonFromPermission(permission) {\n  if (!permission)\n    return void 0;\n  if (permission.allowed === false)\n    return \"group_not_allowed\";\n  if (permission.adminOnlyCommands)\n    return \"admin_only_commands\";\n  return void 0;\n}\nfunction disabledReasonFromDelivery(state) {\n  if (state === \"media_download_failed\")\n    return \"media_download_failed\";\n  if (state === \"queue_full\" || state === \"full\")\n    return \"agent_queue_full\";\n  if (state === \"timeout\")\n    "
+    },
+    {
+      "type": "response",
+      "status": 200,
+      "method": "GET",
+      "url": "http://localhost:3000/@fs/media/leng/DiskB1/exp/seedcmp/sections/im_web/packages/datasource-vue/src/stores/conversationStore.ts",
+      "body": "import { defineStore } from \"/node_modules/.vite/deps/pinia.js?v=824506a8\";\nimport { ref, computed } from \"/node_modules/.vite/deps/vue.js?v=824506a8\";\nimport { groupApi, syncApi } from \"/@fs/media/leng/DiskB1/exp/seedcmp/sections/im_web/packages/datasource-vue/src/api/index.ts\";\nimport { useChannelStore } from \"/@fs/media/leng/DiskB1/exp/seedcmp/sections/im_web/packages/datasource-vue/src/stores/channelStore.ts\";\nimport { useGroupStore } from \"/@fs/media/leng/DiskB1/exp/seedcmp/sections/im_web/packages/datasource-vue/src/stores/groupStore.ts\";\nimport { useUserStore } from \"/@fs/media/leng/DiskB1/exp/seedcmp/sections/im_web/packages/datasource-vue/src/stores/userStore.ts\";\nimport { buildConversationFromGroup } from \"/@fs/media/leng/DiskB1/exp/seedcmp/sections/im_web/packages/datasource-vue/src/stores/groupChatUtils.ts\";\nimport { useMessageStore } from \"/@fs/media/leng/DiskB1/exp/seedcmp/sections/im_web/packages/datasource-vue/src/stores/messageStore.ts\";\nexport const useConversationSto"
+    },
+    {
+      "type": "response",
+      "status": 200,
+      "method": "GET",
+      "url": "http://localhost:3000/@fs/media/leng/DiskB1/exp/seedcmp/sections/im_web/packages/datasource-vue/src/stores/clowderTypes.ts",
+      "body": ""
+    },
+    {
+      "type": "response",
+      "status": 200,
+      "method": "GET",
+      "url": "http://localhost:3000/@fs/media/leng/DiskB1/exp/seedcmp/sections/im_web/packages/datasource-vue/src/stores/groupChatUtils.ts",
+      "body": "export const GROUP_ROLE_OWNER = 1;\nexport const GROUP_ROLE_ADMIN = 2;\nexport const GROUP_ROLE_MEMBER = 0;\nexport function normalizeGroup(input) {\n  const groupNo = String(input?.group_no || input?.groupNo || input?.channel_id || \"\");\n  if (!groupNo)\n    return null;\n  const owner = String(input.owner || input.creator || input.owner_uid || \"\");\n  return {\n    ...input,\n    group_no: groupNo,\n    name: input.remark || input.name || \"群聊\",\n    avatar: input.logo || input.avatar || \"\",\n    owner,\n    creator: input.creator || owner,\n    status: Number(input.status || 0),\n    role: Number(input.role ?? input.my_role ?? GROUP_ROLE_MEMBER),\n    mute: Number(input.mute || 0),\n    top: Number(input.top || input.stick || 0),\n    save: Number(input.save || input.saved || 0) || 1,\n    notice: input.notice || \"\"\n  };\n}\nexport function getGroupRoleLabel(value) {\n  const role = Number(value?.role ?? value ?? GROUP_ROLE_MEMBER);\n  if (role === GROUP_ROLE_OWNER)\n    return \"群主\";\n  if (role === GROUP_ROL"
+    },
+    {
+      "type": "response",
+      "status": 200,
+      "method": "GET",
+      "url": "http://localhost:3000/@fs/media/leng/DiskB1/exp/seedcmp/sections/im_web/packages/datasource-vue/src/stores/groupStore.ts",
+      "body": "import { defineStore } from \"/node_modules/.vite/deps/pinia.js?v=824506a8\";\nimport { ref, computed } from \"/node_modules/.vite/deps/vue.js?v=824506a8\";\nimport { groupApi } from \"/@fs/media/leng/DiskB1/exp/seedcmp/sections/im_web/packages/datasource-vue/src/api/index.ts\";\nimport { normalizeGroup as normalizeGroupInfo, normalizeGroupMember } from \"/@fs/media/leng/DiskB1/exp/seedcmp/sections/im_web/packages/datasource-vue/src/stores/groupChatUtils.ts\";\nexport const useGroupStore = defineStore(\"group\", () => {\n  const groups = ref({});\n  const groupMembers = ref({});\n  const resetVersion = ref(0);\n  function normalizeGroup(input) {\n    return normalizeGroupInfo(input);\n  }\n  function upsertGroup(input) {\n    const group = normalizeGroup(input);\n    if (!group)\n      return null;\n    groups.value[group.group_no] = {\n      ...groups.value[group.group_no] || {},\n      ...group\n    };\n    return groups.value[group.group_no];\n  }\n  async function fetchMyGroups() {\n    const version = resetVersi"
+    },
+    {
+      "type": "response",
+      "status": 200,
+      "method": "GET",
+      "url": "http://localhost:3000/@fs/media/leng/DiskB1/exp/seedcmp/sections/im_web/packages/datasource-vue/src/stores/messageStore.ts",
+      "body": "import { defineStore } from \"/node_modules/.vite/deps/pinia.js?v=824506a8\";\nimport { ref } from \"/node_modules/.vite/deps/vue.js?v=824506a8\";\nimport WKSDK, { MessageContent, MessageImage } from \"/node_modules/.vite/deps/wukongimjssdk.js?v=824506a8\";\nimport { commonApi, resolveApiAssetUrl, syncApi } from \"/@fs/media/leng/DiskB1/exp/seedcmp/sections/im_web/packages/datasource-vue/src/api/index.ts\";\nimport { MessageFile, MessageVoice } from \"/@fs/media/leng/DiskB1/exp/seedcmp/sections/im_web/packages/datasource-vue/src/contentTypes/index.ts\";\nimport { useConversationStore } from \"/@fs/media/leng/DiskB1/exp/seedcmp/sections/im_web/packages/datasource-vue/src/stores/conversationStore.ts\";\nimport { useUserStore } from \"/@fs/media/leng/DiskB1/exp/seedcmp/sections/im_web/packages/datasource-vue/src/stores/userStore.ts\";\nconst MEDIA_UPLOAD_TYPE = \"chat\";\nconst DEEPSEEK_AI_ROBOT_ID = \"deepseek_ai_robot\";\nconst CLOWDER_CONNECTOR_ID = \"im-web\";\nexport class RobotCommandContent extends MessageConte"
+    },
+    {
+      "type": "response",
+      "status": 200,
+      "method": "GET",
+      "url": "http://localhost:3000/@fs/media/leng/DiskB1/exp/seedcmp/sections/im_web/packages/datasource-vue/src/api/clowder.ts",
+      "body": "import { apiClient } from \"/@fs/media/leng/DiskB1/exp/seedcmp/sections/im_web/packages/base-vue/src/index.ts\";\nexport const clowderApi = {\n  getStatus() {\n    return apiClient.get(\"clowder/status\");\n  },\n  getConversationState(params) {\n    return apiClient.get(\"clowder/conversation\", { params });\n  },\n  getAgentDirectory(params) {\n    return apiClient.get(\"clowder/conversation/agents\", { params });\n  },\n  bindConversation(data) {\n    return apiClient.post(\"clowder/conversation/bind\", data);\n  },\n  setFocus(data) {\n    return apiClient.post(\"clowder/conversation/focus\", data);\n  },\n  clearFocus(params) {\n    return apiClient.post(\"clowder/conversation/focus/clear\", params);\n  },\n  allowGroup(params) {\n    return apiClient.post(\"clowder/group/allow\", params);\n  },\n  denyGroup(params) {\n    return apiClient.post(\"clowder/group/deny\", params);\n  }\n};\n\n//# sourceMappingURL=data:application/json;base64,eyJ2ZXJzaW9uIjozLCJzb3VyY2VzIjpbImNsb3dkZXIudHMiXSwic291cmNlc0NvbnRlbnQiOlsiaW1wb3J0IHsgY"
+    }
+  ]
+}

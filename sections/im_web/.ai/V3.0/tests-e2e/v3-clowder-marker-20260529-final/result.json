@@ -1,0 +1,660 @@
+{
+  "targetUrl": "http://100.79.157.76:3000/",
+  "clowderUrl": "http://100.79.157.76:3000/chat/conversation/clowder_ai/1",
+  "marker": "Clowder UI marker 1779988384984",
+  "markerVisible": false,
+  "catsCommandVisible": true,
+  "extra400Count": 0,
+  "extra400": [],
+  "relevantNetwork": [
+    {
+      "status": 200,
+      "url": "http://100.79.157.76:3000/@fs/media/leng/DiskB1/exp/seedcmp/sections/im_web/packages/base-vue/src/components/messages/CardCell.vue"
+    },
+    {
+      "status": 200,
+      "url": "http://100.79.157.76:3000/@fs/media/leng/DiskB1/exp/seedcmp/sections/im_web/packages/base-vue/src/components/messages/MergeCell.vue"
+    },
+    {
+      "status": 200,
+      "url": "http://100.79.157.76:3000/@fs/media/leng/DiskB1/exp/seedcmp/sections/im_web/packages/datasource-vue/src/stores/clowderTypes.ts"
+    },
+    {
+      "status": 200,
+      "url": "http://100.79.157.76:3000/@fs/media/leng/DiskB1/exp/seedcmp/sections/im_web/packages/datasource-vue/src/stores/clowderStore.ts?t=1779986788954"
+    },
+    {
+      "status": 200,
+      "url": "http://100.79.157.76:3000/@fs/media/leng/DiskB1/exp/seedcmp/sections/im_web/packages/datasource-vue/src/stores/messageStore.ts?t=1779986788954"
+    },
+    {
+      "status": 200,
+      "url": "http://100.79.157.76:3000/@fs/media/leng/DiskB1/exp/seedcmp/sections/im_web/packages/base-vue/src/components/messages/TextCell.vue?vue&type=style&index=0&scoped=c0035fb9&lang.css"
+    },
+    {
+      "status": 200,
+      "url": "http://100.79.157.76:3000/@fs/media/leng/DiskB1/exp/seedcmp/sections/im_web/packages/base-vue/src/components/messages/ImageCell.vue?vue&type=style&index=0&scoped=3915ada8&lang.css"
+    },
+    {
+      "status": 200,
+      "url": "http://100.79.157.76:3000/@fs/media/leng/DiskB1/exp/seedcmp/sections/im_web/packages/base-vue/src/components/messages/SystemCell.vue?vue&type=style&index=0&scoped=538333ce&lang.css"
+    },
+    {
+      "status": 200,
+      "url": "http://100.79.157.76:3000/@fs/media/leng/DiskB1/exp/seedcmp/sections/im_web/packages/base-vue/src/components/messages/VoiceCell.vue?vue&type=style&index=0&scoped=1e2cce37&lang.css"
+    },
+    {
+      "status": 200,
+      "url": "http://100.79.157.76:3000/@fs/media/leng/DiskB1/exp/seedcmp/sections/im_web/packages/base-vue/src/components/messages/TimeCell.vue?vue&type=style&index=0&scoped=e4ca3361&lang.css"
+    },
+    {
+      "status": 200,
+      "url": "http://100.79.157.76:3000/@fs/media/leng/DiskB1/exp/seedcmp/sections/im_web/packages/base-vue/src/components/messages/VideoCell.vue?vue&type=style&index=0&scoped=f1b4e35d&lang.css"
+    },
+    {
+      "status": 200,
+      "url": "http://100.79.157.76:3000/@fs/media/leng/DiskB1/exp/seedcmp/sections/im_web/packages/base-vue/src/components/messages/FileCell.vue?vue&type=style&index=0&scoped=94bf8c19&lang.css"
+    },
+    {
+      "status": 200,
+      "url": "http://100.79.157.76:3000/@fs/media/leng/DiskB1/exp/seedcmp/sections/im_web/packages/base-vue/src/components/messages/GifCell.vue?vue&type=style&index=0&scoped=f4914e1b&lang.css"
+    },
+    {
+      "status": 200,
+      "url": "http://100.79.157.76:3000/@fs/media/leng/DiskB1/exp/seedcmp/sections/im_web/packages/base-vue/src/components/messages/StickerCell.vue?vue&type=style&index=0&scoped=c6467feb&lang.css"
+    },
+    {
+      "status": 200,
+      "url": "http://100.79.157.76:3000/@fs/media/leng/DiskB1/exp/seedcmp/sections/im_web/packages/base-vue/src/components/messages/LocationCell.vue?vue&type=style&index=0&scoped=8c7ba2ba&lang.css"
+    },
+    {
+      "status": 200,
+      "url": "http://100.79.157.76:3000/@fs/media/leng/DiskB1/exp/seedcmp/sections/im_web/packages/base-vue/src/components/messages/CardCell.vue?vue&type=style&index=0&scoped=a69ad7c0&lang.css"
+    },
+    {
+      "status": 200,
+      "url": "http://100.79.157.76:3000/@fs/media/leng/DiskB1/exp/seedcmp/sections/im_web/packages/base-vue/src/components/messages/MergeCell.vue?vue&type=style&index=0&scoped=c504c6ba&lang.css"
+    },
+    {
+      "status": 200,
+      "url": "http://100.79.157.76:3000/@fs/media/leng/DiskB1/exp/seedcmp/sections/im_web/packages/datasource-vue/src/api/clowder.ts?t=1779986788954"
+    },
+    {
+      "status": 200,
+      "url": "http://100.79.157.76:8090/v1/conversation/sync"
+    },
+    {
+      "status": 200,
+      "url": "http://100.79.157.76:8090/v1/conversation/extra/sync"
+    },
+    {
+      "status": 200,
+      "url": "http://100.79.157.76:8090/v1/message/channel/sync"
+    },
+    {
+      "status": 200,
+      "url": "http://100.79.157.76:8090/v1/message/channel/sync"
+    },
+    {
+      "status": 200,
+      "url": "http://100.79.157.76:8090/v1/message/channel/sync"
+    },
+    {
+      "status": 200,
+      "url": "http://100.79.157.76:8090/v1/message/channel/sync"
+    },
+    {
+      "status": 200,
+      "url": "http://100.79.157.76:8090/v1/message/channel/sync"
+    },
+    {
+      "status": 200,
+      "url": "http://100.79.157.76:8090/v1/message/channel/sync"
+    },
+    {
+      "status": 200,
+      "url": "http://100.79.157.76:8090/v1/message/channel/sync"
+    },
+    {
+      "status": 200,
+      "url": "http://100.79.157.76:8090/v1/message/channel/sync"
+    },
+    {
+      "status": 200,
+      "url": "http://100.79.157.76:8090/v1/message/channel/sync"
+    },
+    {
+      "status": 200,
+      "url": "http://100.79.157.76:8090/v1/conversation/sync"
+    },
+    {
+      "status": 200,
+      "url": "http://100.79.157.76:8090/v1/conversation/sync"
+    },
+    {
+      "status": 200,
+      "url": "http://100.79.157.76:8090/v1/message/channel/sync"
+    },
+    {
+      "status": 200,
+      "url": "http://100.79.157.76:8090/v1/message/channel/sync"
+    },
+    {
+      "status": 200,
+      "url": "http://100.79.157.76:8090/v1/message/channel/sync"
+    },
+    {
+      "status": 200,
+      "url": "http://100.79.157.76:8090/v1/message/channel/sync"
+    },
+    {
+      "status": 200,
+      "url": "http://100.79.157.76:8090/v1/message/channel/sync"
+    },
+    {
+      "status": 200,
+      "url": "http://100.79.157.76:8090/v1/conversation/extra/sync"
+    },
+    {
+      "status": 200,
+      "url": "http://100.79.157.76:8090/v1/conversation/extra/sync"
+    },
+    {
+      "status": 200,
+      "url": "http://100.79.157.76:8090/v1/message/channel/sync"
+    },
+    {
+      "status": 200,
+      "url": "http://100.79.157.76:8090/v1/message/channel/sync"
+    },
+    {
+      "status": 200,
+      "url": "http://100.79.157.76:8090/v1/message/channel/sync"
+    },
+    {
+      "status": 200,
+      "url": "http://100.79.157.76:8090/v1/message/channel/sync"
+    },
+    {
+      "status": 200,
+      "url": "http://100.79.157.76:8090/v1/message/channel/sync"
+    },
+    {
+      "status": 200,
+      "url": "http://100.79.157.76:8090/v1/message/channel/sync"
+    },
+    {
+      "status": 200,
+      "url": "http://100.79.157.76:8090/v1/message/channel/sync"
+    },
+    {
+      "status": 200,
+      "url": "http://100.79.157.76:8090/v1/message/channel/sync"
+    },
+    {
+      "status": 200,
+      "url": "http://100.79.157.76:8090/v1/message/channel/sync"
+    },
+    {
+      "status": 200,
+      "url": "http://100.79.157.76:8090/v1/message/channel/sync"
+    },
+    {
+      "status": 200,
+      "url": "http://100.79.157.76:8090/v1/message/channel/sync"
+    },
+    {
+      "status": 200,
+      "url": "http://100.79.157.76:8090/v1/message/channel/sync"
+    },
+    {
+      "status": 200,
+      "url": "http://100.79.157.76:8090/v1/message/channel/sync"
+    },
+    {
+      "status": 200,
+      "url": "http://100.79.157.76:8090/v1/message/channel/sync"
+    },
+    {
+      "status": 200,
+      "url": "http://100.79.157.76:8090/v1/message/channel/sync"
+    },
+    {
+      "status": 200,
+      "url": "http://100.79.157.76:8090/v1/message/channel/sync"
+    },
+    {
+      "status": 200,
+      "url": "http://100.79.157.76:8090/v1/message/channel/sync"
+    },
+    {
+      "status": 200,
+      "url": "http://100.79.157.76:8090/v1/message/pinned/sync"
+    },
+    {
+      "status": 200,
+      "url": "http://100.79.157.76:8090/v1/message/pinned/sync"
+    },
+    {
+      "status": 200,
+      "url": "http://100.79.157.76:8090/v1/message/pinned/sync"
+    },
+    {
+      "status": 200,
+      "url": "http://100.79.157.76:8090/v1/message/pinned/sync"
+    },
+    {
+      "status": 200,
+      "url": "http://100.79.157.76:8090/v1/message/pinned/sync"
+    },
+    {
+      "status": 200,
+      "url": "http://100.79.157.76:8090/v1/message/pinned/sync"
+    },
+    {
+      "status": 200,
+      "url": "http://100.79.157.76:8090/v1/message/pinned/sync"
+    },
+    {
+      "status": 200,
+      "url": "http://100.79.157.76:8090/v1/message/pinned/sync"
+    },
+    {
+      "status": 200,
+      "url": "http://100.79.157.76:8090/v1/message/pinned/sync"
+    },
+    {
+      "status": 200,
+      "url": "http://100.79.157.76:8090/v1/message/pinned/sync"
+    },
+    {
+      "status": 200,
+      "url": "http://100.79.157.76:8090/v1/message/pinned/sync"
+    },
+    {
+      "status": 200,
+      "url": "http://100.79.157.76:8090/v1/message/pinned/sync"
+    },
+    {
+      "status": 200,
+      "url": "http://100.79.157.76:8090/v1/message/pinned/sync"
+    },
+    {
+      "status": 200,
+      "url": "http://100.79.157.76:8090/v1/message/pinned/sync"
+    },
+    {
+      "status": 200,
+      "url": "http://100.79.157.76:8090/v1/message/pinned/sync"
+    },
+    {
+      "status": 200,
+      "url": "http://100.79.157.76:8090/v1/message/pinned/sync"
+    },
+    {
+      "status": 200,
+      "url": "http://100.79.157.76:8090/v1/message/pinned/sync"
+    },
+    {
+      "status": 200,
+      "url": "http://100.79.157.76:8090/v1/message/reminder/sync"
+    },
+    {
+      "status": 200,
+      "url": "http://100.79.157.76:3000/chat/conversation/clowder_ai/1"
+    },
+    {
+      "status": 200,
+      "url": "http://100.79.157.76:3000/@fs/media/leng/DiskB1/exp/seedcmp/sections/im_web/packages/base-vue/src/components/messages/TextCell.vue?t=1779984078374"
+    },
+    {
+      "status": 200,
+      "url": "http://100.79.157.76:3000/@fs/media/leng/DiskB1/exp/seedcmp/sections/im_web/packages/base-vue/src/components/messages/ImageCell.vue"
+    },
+    {
+      "status": 200,
+      "url": "http://100.79.157.76:3000/@fs/media/leng/DiskB1/exp/seedcmp/sections/im_web/packages/base-vue/src/components/messages/SystemCell.vue"
+    },
+    {
+      "status": 200,
+      "url": "http://100.79.157.76:3000/@fs/media/leng/DiskB1/exp/seedcmp/sections/im_web/packages/base-vue/src/components/messages/TimeCell.vue"
+    },
+    {
+      "status": 200,
+      "url": "http://100.79.157.76:3000/@fs/media/leng/DiskB1/exp/seedcmp/sections/im_web/packages/base-vue/src/components/messages/VoiceCell.vue"
+    },
+    {
+      "status": 200,
+      "url": "http://100.79.157.76:3000/@fs/media/leng/DiskB1/exp/seedcmp/sections/im_web/packages/base-vue/src/components/messages/FileCell.vue"
+    },
+    {
+      "status": 200,
+      "url": "http://100.79.157.76:3000/@fs/media/leng/DiskB1/exp/seedcmp/sections/im_web/packages/base-vue/src/components/messages/VideoCell.vue"
+    },
+    {
+      "status": 200,
+      "url": "http://100.79.157.76:3000/@fs/media/leng/DiskB1/exp/seedcmp/sections/im_web/packages/base-vue/src/components/messages/GifCell.vue"
+    },
+    {
+      "status": 200,
+      "url": "http://100.79.157.76:3000/@fs/media/leng/DiskB1/exp/seedcmp/sections/im_web/packages/base-vue/src/components/messages/StickerCell.vue"
+    },
+    {
+      "status": 200,
+      "url": "http://100.79.157.76:3000/@fs/media/leng/DiskB1/exp/seedcmp/sections/im_web/packages/base-vue/src/components/messages/LocationCell.vue"
+    },
+    {
+      "status": 200,
+      "url": "http://100.79.157.76:3000/@fs/media/leng/DiskB1/exp/seedcmp/sections/im_web/packages/base-vue/src/components/messages/CardCell.vue"
+    },
+    {
+      "status": 200,
+      "url": "http://100.79.157.76:3000/@fs/media/leng/DiskB1/exp/seedcmp/sections/im_web/packages/base-vue/src/components/messages/MergeCell.vue"
+    },
+    {
+      "status": 200,
+      "url": "http://100.79.157.76:3000/@fs/media/leng/DiskB1/exp/seedcmp/sections/im_web/packages/base-vue/src/components/messages/TextCell.vue?vue&type=style&index=0&scoped=c0035fb9&lang.css"
+    },
+    {
+      "status": 200,
+      "url": "http://100.79.157.76:3000/@fs/media/leng/DiskB1/exp/seedcmp/sections/im_web/packages/base-vue/src/components/messages/ImageCell.vue?vue&type=style&index=0&scoped=3915ada8&lang.css"
+    },
+    {
+      "status": 200,
+      "url": "http://100.79.157.76:3000/@fs/media/leng/DiskB1/exp/seedcmp/sections/im_web/packages/base-vue/src/components/messages/SystemCell.vue?vue&type=style&index=0&scoped=538333ce&lang.css"
+    },
+    {
+      "status": 200,
+      "url": "http://100.79.157.76:3000/@fs/media/leng/DiskB1/exp/seedcmp/sections/im_web/packages/base-vue/src/components/messages/TimeCell.vue?vue&type=style&index=0&scoped=e4ca3361&lang.css"
+    },
+    {
+      "status": 200,
+      "url": "http://100.79.157.76:3000/@fs/media/leng/DiskB1/exp/seedcmp/sections/im_web/packages/base-vue/src/components/messages/VoiceCell.vue?vue&type=style&index=0&scoped=1e2cce37&lang.css"
+    },
+    {
+      "status": 200,
+      "url": "http://100.79.157.76:3000/@fs/media/leng/DiskB1/exp/seedcmp/sections/im_web/packages/base-vue/src/components/messages/FileCell.vue?vue&type=style&index=0&scoped=94bf8c19&lang.css"
+    },
+    {
+      "status": 200,
+      "url": "http://100.79.157.76:3000/@fs/media/leng/DiskB1/exp/seedcmp/sections/im_web/packages/base-vue/src/components/messages/VideoCell.vue?vue&type=style&index=0&scoped=f1b4e35d&lang.css"
+    },
+    {
+      "status": 200,
+      "url": "http://100.79.157.76:3000/@fs/media/leng/DiskB1/exp/seedcmp/sections/im_web/packages/base-vue/src/components/messages/GifCell.vue?vue&type=style&index=0&scoped=f4914e1b&lang.css"
+    },
+    {
+      "status": 200,
+      "url": "http://100.79.157.76:3000/@fs/media/leng/DiskB1/exp/seedcmp/sections/im_web/packages/base-vue/src/components/messages/StickerCell.vue?vue&type=style&index=0&scoped=c6467feb&lang.css"
+    },
+    {
+      "status": 200,
+      "url": "http://100.79.157.76:3000/@fs/media/leng/DiskB1/exp/seedcmp/sections/im_web/packages/base-vue/src/components/messages/LocationCell.vue?vue&type=style&index=0&scoped=8c7ba2ba&lang.css"
+    },
+    {
+      "status": 200,
+      "url": "http://100.79.157.76:3000/@fs/media/leng/DiskB1/exp/seedcmp/sections/im_web/packages/base-vue/src/components/messages/CardCell.vue?vue&type=style&index=0&scoped=a69ad7c0&lang.css"
+    },
+    {
+      "status": 200,
+      "url": "http://100.79.157.76:3000/@fs/media/leng/DiskB1/exp/seedcmp/sections/im_web/packages/base-vue/src/components/messages/MergeCell.vue?vue&type=style&index=0&scoped=c504c6ba&lang.css"
+    },
+    {
+      "status": 200,
+      "url": "http://100.79.157.76:3000/@fs/media/leng/DiskB1/exp/seedcmp/sections/im_web/packages/datasource-vue/src/stores/clowderTypes.ts"
+    },
+    {
+      "status": 200,
+      "url": "http://100.79.157.76:3000/@fs/media/leng/DiskB1/exp/seedcmp/sections/im_web/packages/datasource-vue/src/stores/clowderStore.ts?t=1779986788954"
+    },
+    {
+      "status": 200,
+      "url": "http://100.79.157.76:3000/@fs/media/leng/DiskB1/exp/seedcmp/sections/im_web/packages/datasource-vue/src/stores/messageStore.ts?t=1779986788954"
+    },
+    {
+      "status": 200,
+      "url": "http://100.79.157.76:3000/@fs/media/leng/DiskB1/exp/seedcmp/sections/im_web/packages/datasource-vue/src/api/clowder.ts?t=1779986788954"
+    },
+    {
+      "status": 200,
+      "url": "http://100.79.157.76:3000/src/components/ClowderConversationPanel.vue?t=1779986788954"
+    },
+    {
+      "status": 200,
+      "url": "http://100.79.157.76:3000/src/components/ClowderConversationPanel.vue?t=1779984275286&vue&type=style&index=0&scoped=371fd023&lang.css"
+    },
+    {
+      "status": 200,
+      "url": "http://100.79.157.76:8090/v1/message/channel/sync"
+    },
+    {
+      "status": 200,
+      "url": "http://100.79.157.76:8090/v1/message/channel/sync"
+    },
+    {
+      "status": 200,
+      "url": "http://100.79.157.76:8090/v1/message/channel/sync"
+    },
+    {
+      "status": 200,
+      "url": "http://100.79.157.76:8090/v1/message/channel/sync"
+    },
+    {
+      "status": 200,
+      "url": "http://100.79.157.76:8090/v1/message/channel/sync"
+    },
+    {
+      "status": 200,
+      "url": "http://100.79.157.76:8090/v1/message/channel/sync"
+    },
+    {
+      "status": 200,
+      "url": "http://100.79.157.76:8090/v1/message/channel/sync"
+    },
+    {
+      "status": 200,
+      "url": "http://100.79.157.76:8090/v1/message/channel/sync"
+    },
+    {
+      "status": 200,
+      "url": "http://100.79.157.76:8090/v1/message/channel/sync"
+    },
+    {
+      "status": 200,
+      "url": "http://100.79.157.76:8090/v1/message/channel/sync"
+    },
+    {
+      "status": 200,
+      "url": "http://100.79.157.76:8090/v1/conversation/sync"
+    },
+    {
+      "status": 200,
+      "url": "http://100.79.157.76:8090/v1/conversation/sync"
+    },
+    {
+      "status": 200,
+      "url": "http://100.79.157.76:8090/v1/conversation/sync"
+    },
+    {
+      "status": 200,
+      "url": "http://100.79.157.76:8090/v1/conversation/extra/sync"
+    },
+    {
+      "status": 200,
+      "url": "http://100.79.157.76:8090/v1/conversation/extra/sync"
+    },
+    {
+      "status": 200,
+      "url": "http://100.79.157.76:8090/v1/conversation/extra/sync"
+    },
+    {
+      "status": 200,
+      "url": "http://100.79.157.76:8090/v1/message/channel/sync"
+    },
+    {
+      "status": 200,
+      "url": "http://100.79.157.76:8090/v1/message/channel/sync"
+    },
+    {
+      "status": 200,
+      "url": "http://100.79.157.76:8090/v1/message/channel/sync"
+    },
+    {
+      "status": 200,
+      "url": "http://100.79.157.76:8090/v1/message/channel/sync"
+    },
+    {
+      "status": 200,
+      "url": "http://100.79.157.76:8090/v1/message/channel/sync"
+    },
+    {
+      "status": 200,
+      "url": "http://100.79.157.76:8090/v1/message/channel/sync"
+    },
+    {
+      "status": 200,
+      "url": "http://100.79.157.76:8090/v1/message/channel/sync"
+    },
+    {
+      "status": 200,
+      "url": "http://100.79.157.76:8090/v1/message/channel/sync"
+    },
+    {
+      "status": 200,
+      "url": "http://100.79.157.76:8090/v1/message/channel/sync"
+    },
+    {
+      "status": 200,
+      "url": "http://100.79.157.76:8090/v1/message/channel/sync"
+    },
+    {
+      "status": 200,
+      "url": "http://100.79.157.76:8090/v1/message/channel/sync"
+    },
+    {
+      "status": 200,
+      "url": "http://100.79.157.76:8090/v1/message/channel/sync"
+    },
+    {
+      "status": 200,
+      "url": "http://100.79.157.76:8090/v1/message/channel/sync"
+    },
+    {
+      "status": 200,
+      "url": "http://100.79.157.76:8090/v1/message/channel/sync"
+    },
+    {
+      "status": 200,
+      "url": "http://100.79.157.76:8090/v1/message/channel/sync"
+    },
+    {
+      "status": 200,
+      "url": "http://100.79.157.76:8090/v1/message/channel/sync"
+    },
+    {
+      "status": 200,
+      "url": "http://100.79.157.76:8090/v1/message/channel/sync"
+    },
+    {
+      "status": 200,
+      "url": "http://100.79.157.76:8090/v1/message/channel/sync"
+    },
+    {
+      "status": 200,
+      "url": "http://100.79.157.76:8090/v1/message/channel/sync"
+    },
+    {
+      "status": 200,
+      "url": "http://100.79.157.76:8090/v1/message/channel/sync"
+    },
+    {
+      "status": 200,
+      "url": "http://100.79.157.76:8090/v1/message/pinned/sync"
+    },
+    {
+      "status": 200,
+      "url": "http://100.79.157.76:8090/v1/message/pinned/sync"
+    },
+    {
+      "status": 200,
+      "url": "http://100.79.157.76:8090/v1/message/pinned/sync"
+    },
+    {
+      "status": 200,
+      "url": "http://100.79.157.76:8090/v1/message/channel/sync"
+    },
+    {
+      "status": 200,
+      "url": "http://100.79.157.76:8090/v1/message/channel/sync"
+    },
+    {
+      "status": 200,
+      "url": "http://100.79.157.76:8090/v1/message/pinned/sync"
+    },
+    {
+      "status": 200,
+      "url": "http://100.79.157.76:8090/v1/message/pinned/sync"
+    },
+    {
+      "status": 200,
+      "url": "http://100.79.157.76:8090/v1/message/pinned/sync"
+    },
+    {
+      "status": 200,
+      "url": "http://100.79.157.76:8090/v1/message/pinned/sync"
+    },
+    {
+      "status": 200,
+      "url": "http://100.79.157.76:8090/v1/message/pinned/sync"
+    },
+    {
+      "status": 200,
+      "url": "http://100.79.157.76:8090/v1/message/pinned/sync"
+    },
+    {
+      "status": 200,
+      "url": "http://100.79.157.76:8090/v1/message/pinned/sync"
+    },
+    {
+      "status": 200,
+      "url": "http://100.79.157.76:8090/v1/message/pinned/sync"
+    },
+    {
+      "status": 200,
+      "url": "http://100.79.157.76:8090/v1/message/pinned/sync"
+    },
+    {
+      "status": 200,
+      "url": "http://100.79.157.76:8090/v1/message/pinned/sync"
+    },
+    {
+      "status": 200,
+      "url": "http://100.79.157.76:8090/v1/message/pinned/sync"
+    },
+    {
+      "status": 200,
+      "url": "http://100.79.157.76:8090/v1/message/pinned/sync"
+    },
+    {
+      "status": 200,
+      "url": "http://100.79.157.76:8090/v1/message/pinned/sync"
+    },
+    {
+      "status": 200,
+      "url": "http://100.79.157.76:8090/v1/message/pinned/sync"
+    },
+    {
+      "status": 200,
+      "url": "http://100.79.157.76:8090/v1/message/reminder/sync"
+    }
+  ],
+  "consoleMessages": [],
+  "screenshots": [
+    "/media/leng/DiskB1/exp/seedcmp/sections/im_web/.ai/V3.0/tests-e2e/v3-clowder-marker-20260529-final/01-after-login.png",
+    "/media/leng/DiskB1/exp/seedcmp/sections/im_web/.ai/V3.0/tests-e2e/v3-clowder-marker-20260529-final/02-clowder-conversation-open.png",
+    "/media/leng/DiskB1/exp/seedcmp/sections/im_web/.ai/V3.0/tests-e2e/v3-clowder-marker-20260529-final/03-marker-visible-check.png",
+    "/media/leng/DiskB1/exp/seedcmp/sections/im_web/.ai/V3.0/tests-e2e/v3-clowder-marker-20260529-final/04-before-cats-send.png",
+    "/media/leng/DiskB1/exp/seedcmp/sections/im_web/.ai/V3.0/tests-e2e/v3-clowder-marker-20260529-final/05-after-cats-send.png"
+  ],
+  "finalTextTail": "L\nleng_test_updated\n在线\n◐\n会话\n联系人\n桌面通知已被浏览器拒绝\nC\nClowder AI\n09:29\n/cats\nD\nDeepSeek AI\n昨天 23:27\n[草稿] 你这个猫咪图片的链接失效了，你再点其他的猫咪链接\n1\n你好\n昨天 23:24\n[草稿] /cats\n系\n系统账号\n星期二 09:00\n给我写一个mnist手写数据集的cnn分类代码\n1\n123\n星期一 20:55\n[图片]\nTestGroup1\n星期一 20:44\nleng_test_updated： 32\nTestGroup\n星期一 14:08\nleng_test_updated： 22222222\n逐\n逐味魔\n星期一 14:07\n3333333333333333\nY\nyunyi\n星期日 21:07\n[文件] manual-audit-file-1779628029439.txt\n文\n文件传输助手\n星期六 11:34\n回归测试：后端与IM联动已成功解决！系统功能稳定。\nT\nTestFriend2\n星期六 11:34\nThis is a draft message\n1231313131\n05/22\nleng_test_updated： shiashia\n全面回归测试群\n你已加入群聊 全面回归测试群\n全面回归测试群\n你已加入群聊 全面回归测试群\n全面回归测试群\n你已加入群聊 全面回归测试群\n全面回归测试群\n你已加入群聊 全面回归测试群\n全面回归测试群\n你已加入群聊 全面回归测试群\nClowder AI\n在线\nC\n今天 12:40 AM\n/cats\n/cats\n今天 12:56 AM\n/cats\n今天 09:29 AM\n/cats\nBot\nAI\nClowder AI\n消息会进入 Clowder 多智能体连接器\nClowder 联系人已启用\n普通消息、/cats、/focus、/ask 等命令会由 TangSeng 桥接到 Clowder。\n输入自动同步草稿，Enter 发送，Ctrl+Enter 换行\n发送\nEnter"
+}

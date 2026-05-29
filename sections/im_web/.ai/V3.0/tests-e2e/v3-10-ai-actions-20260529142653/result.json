@@ -1,0 +1,23 @@
+{
+  "runId": "v3-10-ai-actions-20260529142653",
+  "targetUrl": "http://localhost:3000",
+  "outputDir": "/media/leng/DiskB1/exp/seedcmp/sections/im_web/.ai/V3.0/tests-e2e/v3-10-ai-actions-20260529142653",
+  "checks": {
+    "draftClearedAcrossContexts": true,
+    "copiedTextPreview": "好的，我来整理一下今天（2026年5月29日）的新闻摘要。\n\n---\n\n## 📰 2026年5月29日 新闻摘要\n\n---\n\n### 🇨🇳 一、国内新闻\n\n**🔴 突发 / 社会**  \n- **新疆吐鲁番市托克逊县发生5.0级地震**，震源深度20公里。中国地震局启动四级应急响应，暂未收到人员伤亡报告。  \n- **河南安阳客车追尾事故**：5月28日凌晨客车追尾半挂货车，**13人死亡、3人受伤**，车主已被警方控制。  \n- **中组部划拨7200万元** 支援安徽、广西等6省区防汛抗灾。\n\n**🏗 政策**  \n- **国务院印发《城市更新\"十五五\"规划》**，到2030年城市更新取得重要进展，预计带动**十万亿元级投资**。  \n- **中美关税谈判**：双方原则同意在贸易理事会项下讨论同等规模产品对等降税，各约 **300亿美元或更多**。  \n- **两部门**联合印发《人工智能计量体系和能力建设指引（2026版）》。\n\n**🚀 航天**  \n- **神舟二十一号与神舟二十三号乘组完成在轨交接**，神舟二十一号乘组将于近日乘神舟二十二号返回东风着陆场。\n\n**",
+    "imagePreviewVisible": false,
+    "filePreviewVisible": true,
+    "failures": []
+  },
+  "screenshots": [
+    "/media/leng/DiskB1/exp/seedcmp/sections/im_web/.ai/V3.0/tests-e2e/v3-10-ai-actions-20260529142653/01-a-after-login.png",
+    "/media/leng/DiskB1/exp/seedcmp/sections/im_web/.ai/V3.0/tests-e2e/v3-10-ai-actions-20260529142653/01-b-after-login.png",
+    "/media/leng/DiskB1/exp/seedcmp/sections/im_web/.ai/V3.0/tests-e2e/v3-10-ai-actions-20260529142653/02-b-draft-before-send.png",
+    "/media/leng/DiskB1/exp/seedcmp/sections/im_web/.ai/V3.0/tests-e2e/v3-10-ai-actions-20260529142653/03-a-sent-draft.png",
+    "/media/leng/DiskB1/exp/seedcmp/sections/im_web/.ai/V3.0/tests-e2e/v3-10-ai-actions-20260529142653/04-b-draft-cleared-after-reload.png",
+    "/media/leng/DiskB1/exp/seedcmp/sections/im_web/.ai/V3.0/tests-e2e/v3-10-ai-actions-20260529142653/05-clowder-copy-menu-open.png",
+    "/media/leng/DiskB1/exp/seedcmp/sections/im_web/.ai/V3.0/tests-e2e/v3-10-ai-actions-20260529142653/06-clowder-copy-after-click.png",
+    "/media/leng/DiskB1/exp/seedcmp/sections/im_web/.ai/V3.0/tests-e2e/v3-10-ai-actions-20260529142653/07-clowder-image-preview.png",
+    "/media/leng/DiskB1/exp/seedcmp/sections/im_web/.ai/V3.0/tests-e2e/v3-10-ai-actions-20260529142653/08-clowder-file-preview.png"
+  ]
+}
