@@ -22,6 +22,14 @@ export interface Conversation {
 }
 
 const LOCAL_ONLY_DIRECT_CONVERSATION_IDS = new Set(['deepseek_ai_robot', 'clowder_ai']);
+const LOCAL_ONLY_DRAFTS_STORAGE_PREFIX = 'im-web:local-only-drafts';
+const CLEARED_UNREAD_STORAGE_PREFIX = 'im-web:cleared-unread';
+
+interface ClearedUnreadRecord {
+  seq: number;
+  lastMsgTime: number;
+  clearedAt: number;
+}
 
 export const useConversationStore = defineStore('conversation', () => {
   const conversations = ref<Conversation[]>([]);
@@ -42,6 +50,110 @@ export const useConversationStore = defineStore('conversation', () => {
 
   function getConversationKey(channelId: string, channelType: number) {
     return `${String(channelId)}-${Number(channelType)}`;
+  }
+
+  function getStorageScope() {
+    if (userStore.currentUser?.uid) {
+      return String(userStore.currentUser.uid);
+    }
+    if (typeof window !== 'undefined') {
+      return window.localStorage.getItem('uid') || 'anonymous';
+    }
+    return 'anonymous';
+  }
+
+  function getScopedStorageKey(prefix: string) {
+    return `${prefix}:${getStorageScope()}`;
+  }
+
+  function readScopedRecord<T>(prefix: string): Record<string, T> {
+    if (typeof window === 'undefined') return {};
+    try {
+      const raw = window.localStorage.getItem(getScopedStorageKey(prefix));
+      if (!raw) return {};
+      const parsed = JSON.parse(raw);
+      return parsed && typeof parsed === 'object' ? parsed : {};
+    } catch {
+      return {};
+    }
+  }
+
+  function writeScopedRecord<T>(prefix: string, record: Record<string, T>) {
+    if (typeof window === 'undefined') return;
+    const storageKey = getScopedStorageKey(prefix);
+    const hasValues = Object.keys(record).length > 0;
+    try {
+      if (hasValues) {
+        window.localStorage.setItem(storageKey, JSON.stringify(record));
+      } else {
+        window.localStorage.removeItem(storageKey);
+      }
+    } catch {
+      // Storage can be unavailable in private contexts; in-memory state still works.
+    }
+  }
+
+  function getStoredLocalOnlyDraft(key: string) {
+    const record = readScopedRecord<string>(LOCAL_ONLY_DRAFTS_STORAGE_PREFIX);
+    if (!Object.prototype.hasOwnProperty.call(record, key)) {
+      return undefined;
+    }
+    return String(record[key] || '');
+  }
+
+  function setStoredLocalOnlyDraft(key: string, draft: string) {
+    const record = readScopedRecord<string>(LOCAL_ONLY_DRAFTS_STORAGE_PREFIX);
+    if (draft) {
+      record[key] = draft;
+    } else {
+      delete record[key];
+    }
+    writeScopedRecord(LOCAL_ONLY_DRAFTS_STORAGE_PREFIX, record);
+  }
+
+  function getStoredClearedUnread(key: string): ClearedUnreadRecord | undefined {
+    const record = readScopedRecord<ClearedUnreadRecord>(CLEARED_UNREAD_STORAGE_PREFIX);
+    const stored = record[key];
+    if (!stored || typeof stored !== 'object') return undefined;
+    return {
+      seq: Number(stored.seq || 0),
+      lastMsgTime: Number(stored.lastMsgTime || 0),
+      clearedAt: Number(stored.clearedAt || 0)
+    };
+  }
+
+  function setStoredClearedUnread(key: string, seq: number, lastMsgTime: number) {
+    const record = readScopedRecord<ClearedUnreadRecord>(CLEARED_UNREAD_STORAGE_PREFIX);
+    const current = getStoredClearedUnread(key);
+    record[key] = {
+      seq: Math.max(Number(current?.seq || 0), Number(seq || 0)),
+      lastMsgTime: Math.max(Number(current?.lastMsgTime || 0), Number(lastMsgTime || 0)),
+      clearedAt: Date.now()
+    };
+    writeScopedRecord(CLEARED_UNREAD_STORAGE_PREFIX, record);
+  }
+
+  function removeStoredClearedUnread(key: string) {
+    const record = readScopedRecord<ClearedUnreadRecord>(CLEARED_UNREAD_STORAGE_PREFIX);
+    delete record[key];
+    writeScopedRecord(CLEARED_UNREAD_STORAGE_PREFIX, record);
+  }
+
+  function hasDraftInMemory(key: string) {
+    return Object.prototype.hasOwnProperty.call(drafts.value, key);
+  }
+
+  function resolveDraft(channelId: string, channelType: number, key: string, remoteDraft = '') {
+    if (isLocalOnlyDirectConversation(channelId, channelType)) {
+      if (hasDraftInMemory(key)) {
+        return drafts.value[key] || '';
+      }
+      return getStoredLocalOnlyDraft(key) ?? '';
+    }
+    if (hasDraftInMemory(key)) {
+      return drafts.value[key] || '';
+    }
+    return remoteDraft || '';
   }
 
   function findConversation(channelId: string, channelType: number) {
@@ -156,6 +268,7 @@ export const useConversationStore = defineStore('conversation', () => {
     const channelType = Number(item.channel_type);
     const key = getConversationKey(channelId, channelType);
     const rawLastMessage = getLastMessageSource(item);
+    const remoteDraft = item.extra?.draft ?? item.draft ?? '';
 
     return {
       channel_id: channelId,
@@ -166,7 +279,7 @@ export const useConversationStore = defineStore('conversation', () => {
       last_message: normalizeLastMessage(item),
       top: info.top || item.top || item.stick || item.extra?.top || item.extra?.stick || 0,
       mute: info.mute || item.mute || item.extra?.mute || 0,
-      draft: drafts.value[key] || item.extra?.draft || item.draft || '',
+      draft: resolveDraft(channelId, channelType, key, remoteDraft),
       name: info.name || item.name || item.remark || '',
       avatar: info.avatar || item.logo || item.avatar || ''
     };
@@ -193,7 +306,7 @@ export const useConversationStore = defineStore('conversation', () => {
         last_msg_seq: Math.max(Number(existing.last_msg_seq || 0), Number(normalized.last_msg_seq || 0)),
         last_msg_time: Math.max(Number(existing.last_msg_time || 0), Number(normalized.last_msg_time || 0)),
         last_message: normalized.last_message || existing.last_message,
-        draft: drafts.value[key] || normalized.draft || existing.draft || ''
+        draft: resolveDraft(normalized.channel_id, normalized.channel_type, key, normalized.draft || existing.draft || '')
       });
     }
     conversations.value = Array.from(merged.values());
@@ -249,10 +362,21 @@ export const useConversationStore = defineStore('conversation', () => {
 
   function getEffectiveUnread(item: any, key: string) {
     const unread = Number(item.unread || 0);
-    const clearedSeq = Number(clearedUnreadSeqs.value[key] || 0);
+    const storedCleared = getStoredClearedUnread(key);
+    const clearedSeq = Math.max(Number(clearedUnreadSeqs.value[key] || 0), Number(storedCleared?.seq || 0));
     const itemSeq = Number(item.last_msg_seq || item.message_seq || item.last_message?.message_seq || item.last_message?.messageSeq || 0);
+    const itemTime = Number(item.last_msg_time || item.timestamp || item.last_message?.timestamp || 0);
 
     if (clearedSeq > 0 && itemSeq > 0 && itemSeq <= clearedSeq) {
+      return 0;
+    }
+    if (
+      storedCleared &&
+      isLocalOnlyDirectConversation(String(item.channel_id), Number(item.channel_type)) &&
+      itemSeq === 0 &&
+      itemTime > 0 &&
+      itemTime <= Number(storedCleared.lastMsgTime || 0)
+    ) {
       return 0;
     }
     return unread;
@@ -271,7 +395,7 @@ export const useConversationStore = defineStore('conversation', () => {
     if (conv) {
       Object.assign(conv, {
         ...next,
-        draft: drafts.value[key] || next.draft || conv.draft || ''
+        draft: resolveDraft(next.channel_id, next.channel_type, key, next.draft || conv.draft || '')
       });
     } else {
       conversations.value.push(next);
@@ -395,14 +519,19 @@ export const useConversationStore = defineStore('conversation', () => {
           const key = getConversationKey(channelId, channelType);
           const hasDraft = Object.prototype.hasOwnProperty.call(item, 'draft');
           const nextDraft = hasDraft ? String(item.draft || '') : undefined;
-          if (hasDraft) {
+          const isLocalOnly = isLocalOnlyDirectConversation(channelId, channelType);
+          if (hasDraft && !isLocalOnly) {
             drafts.value[key] = nextDraft || '';
             syncedDrafts.value[key] = nextDraft || '';
+          } else if (hasDraft && isLocalOnly) {
+            const localDraft = resolveDraft(channelId, channelType, key, '');
+            drafts.value[key] = localDraft;
+            syncedDrafts.value[key] = localDraft;
           }
           const conv = findConversation(channelId, channelType);
           if (conv) {
             if (hasDraft) {
-              conv.draft = nextDraft || '';
+              conv.draft = isLocalOnly ? resolveDraft(channelId, channelType, key, '') : nextDraft || '';
             }
             conv.top = item.top || 0;
             conv.mute = item.mute || 0;
@@ -420,8 +549,12 @@ export const useConversationStore = defineStore('conversation', () => {
   async function updateDraft(channelId: string, channelType: number, draftText: string) {
     channelId = String(channelId);
     channelType = Number(channelType);
+    draftText = String(draftText || '');
     const key = getConversationKey(channelId, channelType);
     if (drafts.value[key] === draftText) {
+      if (isLocalOnlyDirectConversation(channelId, channelType)) {
+        setStoredLocalOnlyDraft(key, draftText);
+      }
       return;
     }
 
@@ -432,6 +565,8 @@ export const useConversationStore = defineStore('conversation', () => {
     }
 
     if (isLocalOnlyDirectConversation(channelId, channelType)) {
+      setStoredLocalOnlyDraft(key, draftText);
+      syncedDrafts.value[key] = draftText;
       return;
     }
 
@@ -497,6 +632,7 @@ export const useConversationStore = defineStore('conversation', () => {
     const key = getConversationKey(channelId, channelType);
     unreadMap.value[key] = 0;
     const conv = findConversation(channelId, channelType);
+    setStoredClearedUnread(key, Number(conv?.last_msg_seq || 0), Number(conv?.last_msg_time || 0));
     if (isBrandNewEmptyConversation(channelId, channelType, conv)) {
       return;
     }
@@ -528,6 +664,9 @@ export const useConversationStore = defineStore('conversation', () => {
 
     if (message.isUnreadCleared && isDigest) {
       clearedUnreadSeqs.value[key] = Math.max(Number(clearedUnreadSeqs.value[key] || 0), messageSeq);
+      setStoredClearedUnread(key, messageSeq, Number(message.timestamp || 0));
+    } else if (!isOwnMessage && isDigest) {
+      removeStoredClearedUnread(key);
     }
 
     if (conv) {
@@ -553,7 +692,7 @@ export const useConversationStore = defineStore('conversation', () => {
         last_message: isDigest ? normalizedMsg : undefined,
         top: info.top || 0,
         mute: info.mute || 0,
-        draft: drafts.value[key] || '',
+        draft: resolveDraft(channelId, channelType, key),
         name: info.name,
         avatar: info.avatar
       });
@@ -584,7 +723,9 @@ export const useConversationStore = defineStore('conversation', () => {
         if (message.isUnreadCleared && isDigest) {
           conv.unread = 0;
           unreadMap.value[key] = 0;
+          setStoredClearedUnread(key, Number(message.messageSeq || 0), Number(message.timestamp || 0));
         } else if (!isOwnMessage && isDigest) {
+          removeStoredClearedUnread(key);
           conv.unread = Number(conv.unread || 0) + 1;
           unreadMap.value[key] = conv.unread;
         }
@@ -601,7 +742,7 @@ export const useConversationStore = defineStore('conversation', () => {
       last_message: isDigest ? normalizedMsg : undefined,
       top: 0,
       mute: 0,
-      draft: drafts.value[key] || '',
+      draft: resolveDraft(channelId, channelType, key),
       name: '',
       avatar: ''
     };

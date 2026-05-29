@@ -42,6 +42,7 @@ describe('clowder virtual conversation drafts', () => {
   beforeEach(() => {
     setActivePinia(createPinia())
     vi.clearAllMocks()
+    window.localStorage.clear()
     syncConversationExtra.mockResolvedValue([])
     updateConversationExtra.mockResolvedValue({})
   })
@@ -90,6 +91,30 @@ describe('clowder virtual conversation drafts', () => {
     await store.syncExtra()
 
     expect(store.drafts['friend-a-1']).toBe('')
+    expect(store.conversations[0].draft).toBe('')
+  })
+
+  it('does not let stale remote drafts revive local-only AI conversation input after it was cleared', async () => {
+    const { useConversationStore } = await import('../../../packages/datasource-vue/src/stores/conversationStore.ts')
+    const store = useConversationStore()
+    store.conversations.push({
+      channel_id: 'clowder_ai',
+      channel_type: 1,
+      unread: 0,
+      last_msg_seq: 0,
+      last_msg_time: 0,
+      draft: ''
+    } as any)
+
+    await store.updateDraft('clowder_ai', 1, '/cats')
+    await store.updateDraft('clowder_ai', 1, '')
+    syncConversationExtra.mockResolvedValueOnce([
+      { channel_id: 'clowder_ai', channel_type: 1, draft: '/cats', version: 10 }
+    ])
+
+    await store.syncExtra()
+
+    expect(store.drafts['clowder_ai-1']).toBe('')
     expect(store.conversations[0].draft).toBe('')
   })
 

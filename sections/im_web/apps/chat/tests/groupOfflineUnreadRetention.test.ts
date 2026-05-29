@@ -45,6 +45,7 @@ describe('group offline unread retention', () => {
   beforeEach(() => {
     setActivePinia(createPinia())
     vi.clearAllMocks()
+    window.localStorage.clear()
     syncConversationExtra.mockResolvedValue([])
     syncMessages.mockResolvedValue({ messages: [] })
     clearUnread.mockResolvedValue(undefined)
@@ -85,6 +86,52 @@ describe('group offline unread retention', () => {
 
     expect(store.conversations.find(item => item.channel_id === 'group-a')?.unread).toBe(0)
     expect(store.unreadMap['group-a-2']).toBe(0)
+  })
+
+  it('keeps a local-only AI conversation read after refresh when remote sync returns stale unread', async () => {
+    let apiCalls = 0
+    syncConversations.mockImplementation(async () => {
+      apiCalls++
+      return {
+        conversations: [{
+          channel_id: 'clowder_ai',
+          channel_type: 1,
+          unread: 1,
+          last_msg_seq: 0,
+          last_msg_time: 1700000010,
+          last_message: {
+            message_seq: 0,
+            timestamp: 1700000010,
+            payload: { type: 1, text: 'stale unread' }
+          }
+        }],
+        users: [{ uid: 'clowder_ai', name: 'Clowder AI' }]
+      }
+    })
+
+    const { useConversationStore } = await import('../../../packages/datasource-vue/src/stores/conversationStore.ts')
+    const { useUserStore } = await import('../../../packages/datasource-vue/src/stores/userStore.ts')
+    const firstStore = useConversationStore()
+    const firstUserStore = useUserStore()
+    firstUserStore.currentUser = { uid: 'reader-a', name: 'Reader' }
+
+    await firstStore.syncConversations()
+    expect(firstStore.conversations.find(item => item.channel_id === 'clowder_ai')?.unread).toBe(1)
+
+    await firstStore.clearUnread('clowder_ai', 1)
+    expect(firstStore.conversations.find(item => item.channel_id === 'clowder_ai')?.unread).toBe(0)
+    expect(window.localStorage.getItem('im-web:cleared-unread:reader-a')).toContain('clowder_ai-1')
+
+    setActivePinia(createPinia())
+    const secondStore = useConversationStore()
+    const secondUserStore = useUserStore()
+    secondUserStore.currentUser = { uid: 'reader-a', name: 'Reader' }
+
+    await secondStore.syncConversations()
+
+    expect(apiCalls).toBe(2)
+    expect(secondStore.conversations.find(item => item.channel_id === 'clowder_ai')?.unread).toBe(0)
+    expect(secondStore.unreadMap['clowder_ai-1']).toBe(0)
   })
 
   it('does not sync an empty draft when no remote draft has ever been saved', async () => {
