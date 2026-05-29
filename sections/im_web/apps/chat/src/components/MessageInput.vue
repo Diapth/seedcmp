@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { ref, computed, watch, onBeforeUnmount, nextTick } from 'vue';
 import { Message as ArcoMessage } from '@arco-design/web-vue';
-import { commonApi, useMessageStore, useConversationStore, useGroupStore, useUserStore } from '@tsdaodao/datasource-vue';
+import { commonApi, useMessageStore, useConversationStore, useGroupStore, useUserStore, useClowderStore } from '@tsdaodao/datasource-vue';
 import { useRobotConfigStore } from '@tsdaodao/contacts-vue';
 import WKSDK, { CMDContent } from 'wukongimjssdk';
 
@@ -14,9 +14,11 @@ const messageStore = useMessageStore();
 const conversationStore = useConversationStore();
 const groupStore = useGroupStore();
 const userStore = useUserStore();
+const clowderStore = useClowderStore();
 const robotConfigStore = useRobotConfigStore();
 
 const inputText = ref('');
+const lastAppliedDraft = ref('');
 const textareaRef = ref<HTMLTextAreaElement | null>(null);
 const imageInputRef = ref<HTMLInputElement | null>(null);
 const fileInputRef = ref<HTMLInputElement | null>(null);
@@ -33,8 +35,10 @@ let voiceStream: MediaStream | null = null;
 let voiceChunks: Blob[] = [];
 let voiceTimer: number | undefined;
 let aiAbortController: AbortController | null = null;
+let clowderSyncTimers: number[] = [];
 const SYSTEM_ROBOT_ID = 'u_10000';
 const DEEPSEEK_AI_ROBOT_ID = 'deepseek_ai_robot';
+const CLOWDER_AI_ROBOT_ID = 'clowder_ai';
 
 // Mention state
 const showMentionPopup = ref(false);
@@ -60,6 +64,18 @@ const isAiRobotConversation = computed(() => {
     props.channelId === DEEPSEEK_AI_ROBOT_ID;
 });
 
+const isClowderAiConversation = computed(() => {
+  return props.channelType === 1 &&
+    props.channelId === CLOWDER_AI_ROBOT_ID;
+});
+
+const activeConversationDraft = computed(() => {
+  const conv = conversationStore.conversations.find(
+    c => c.channel_id === props.channelId && c.channel_type === props.channelType
+  );
+  return conv?.draft || '';
+});
+
 // Group members list
 const currentGroupMembers = computed(() => {
   return groupStore.groupMembers[props.channelId] || [];
@@ -83,16 +99,21 @@ const filteredGroupMembers = computed(() => {
 });
 
 watch(() => props.channelId, (newId) => {
-  const conv = conversationStore.conversations.find(
-    c => c.channel_id === newId && c.channel_type === props.channelType
-  );
-  inputText.value = conv?.draft || '';
+  lastAppliedDraft.value = activeConversationDraft.value;
+  inputText.value = lastAppliedDraft.value;
   messageStore.setReplyTarget(null);
   showMentionPopup.value = false;
   if (props.channelType === 2 && newId && currentGroupMembers.value.length === 0) {
     void groupStore.fetchGroupMembers(newId);
   }
 }, { immediate: true });
+
+watch(activeConversationDraft, (draft) => {
+  if (inputText.value === '' || inputText.value === lastAppliedDraft.value) {
+    inputText.value = draft;
+    lastAppliedDraft.value = draft;
+  }
+});
 
 watch(inputText, (newVal) => {
   conversationStore.updateDraft(props.channelId, props.channelType, newVal);
@@ -172,6 +193,21 @@ function cleanupVoiceRecording() {
   voiceStream = null;
   voiceRecorder = null;
   voiceChunks = [];
+}
+
+function clearClowderConversationSyncTimers() {
+  for (const timer of clowderSyncTimers) window.clearTimeout(timer);
+  clowderSyncTimers = [];
+}
+
+function scheduleClowderConversationSync(channelId: string, channelType: number) {
+  clearClowderConversationSyncTimers();
+  const delays = [750, 2500, 10000, 30000, 90000, 180000, 300000];
+  clowderSyncTimers = delays.map((delay) =>
+    window.setTimeout(() => {
+      void messageStore.syncMessages(channelId, channelType);
+    }, delay),
+  );
 }
 
 async function startVoiceRecording() {
@@ -292,6 +328,7 @@ async function sendAiAssistant(promptText?: string) {
 
   aiState.value = 'loading';
   inputText.value = '';
+  lastAppliedDraft.value = '';
   conversationStore.updateDraft(props.channelId, props.channelType, '');
   let aiMessageClientMsgNo = '';
   try {
@@ -541,6 +578,11 @@ async function handleSend() {
 
   try {
     await messageStore.sendMessage(props.channelId, props.channelType, text, options);
+    if (isClowderAiConversation.value) {
+      await clowderStore.sendConversationMessage({ channelId: props.channelId, channelType: props.channelType as 1 | 2 }, text);
+      await messageStore.syncMessages(props.channelId, props.channelType);
+      scheduleClowderConversationSync(props.channelId, props.channelType);
+    }
     messageStore.setReplyTarget(null);
     mentionedUids.value = [];
   } catch (err) {
@@ -560,6 +602,7 @@ function handleKeyDown(e: KeyboardEvent) {
 
 onBeforeUnmount(() => {
   if (typingTimeout) clearTimeout(typingTimeout);
+  clearClowderConversationSyncTimers();
   aiAbortController?.abort();
   cleanupVoiceRecording();
 });
@@ -675,6 +718,17 @@ onBeforeUnmount(() => {
       <div class="robot-state">
         <span class="robot-state-title">AI 联系人已启用</span>
         <span>使用系统环境变量中的 DeepSeek Key，回复会按 Markdown 显示。</span>
+      </div>
+    </div>
+
+    <div v-if="isClowderAiConversation" class="robot-panel clowder-contact-panel">
+      <div class="robot-panel-header">
+        <span class="robot-panel-title">Clowder AI</span>
+        <span class="robot-panel-hint">消息会进入 Clowder 多智能体连接器</span>
+      </div>
+      <div class="robot-state">
+        <span class="robot-state-title">Clowder 联系人已启用</span>
+        <span>普通消息、/cats、/focus、/ask 等命令会由 TangSeng 桥接到 Clowder。</span>
       </div>
     </div>
 
