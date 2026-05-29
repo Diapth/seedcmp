@@ -10,6 +10,20 @@ describe('message media cells', () => {
     expect(source.default).toContain('aspect-ratio')
   })
 
+  it('image cells emit preview payloads that the chat side preview can render', async () => {
+    const image = await import('../../../packages/base-vue/src/components/messages/ImageCell.vue?raw')
+    const list = await import('../src/components/MessageList.vue?raw')
+    const view = await import('../src/views/ChatView.vue?raw')
+    const preview = await import('../src/components/ChatSidePreview.vue?raw')
+
+    expect(image.default).toContain("event: 'preview'")
+    expect(image.default).toContain("kind: 'image'")
+    expect(list.default).toContain('@preview="handleImagePreview"')
+    expect(view.default).toContain("payload?.source === 'image'")
+    expect(preview.default).toContain("'file-image'")
+    expect(preview.default).toContain('preview-image')
+  })
+
   it('file, voice, and video cells expose unavailable states instead of dead controls', async () => {
     const file = await import('../../../packages/base-vue/src/components/messages/FileCell.vue?raw')
     const voice = await import('../../../packages/base-vue/src/components/messages/VoiceCell.vue?raw')

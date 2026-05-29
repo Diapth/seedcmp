@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, onMounted, watch, computed } from 'vue';
+import { ref, onMounted, onBeforeUnmount, watch, computed } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
 import { useChannelStore } from '@tsdaodao/datasource-vue';
 import { useMessageStore } from '@tsdaodao/datasource-vue';
@@ -8,6 +8,7 @@ import { GroupSettingsDrawer } from '@tsdaodao/base-vue';
 import MessageList from '../components/MessageList.vue';
 import MessageInput from '../components/MessageInput.vue';
 import ChatSidePreview, { type ChatSidePreviewKind } from '../components/ChatSidePreview.vue';
+import ClowderConversationPanel from '../components/ClowderConversationPanel.vue';
 import UserProfileDrawer from './UserProfileDrawer.vue';
 
 const route = useRoute();
@@ -18,6 +19,9 @@ const conversationStore = useConversationStore();
 
 const showGroupSettings = ref(false);
 const showUserProfile = ref(false);
+const showClowderPanel = ref(false);
+const activeRightDockTab = ref<'preview' | 'clowder'>('preview');
+const rightDockWidth = ref(Number(window.localStorage.getItem('im-web-right-dock-width') || 420));
 const sidePreviewRequestId = ref(0);
 const sidePreview = ref({
   visible: false,
@@ -45,6 +49,12 @@ const isTyping = computed(() => {
   return messageStore.typingState[key]?.isTyping === true;
 });
 
+const rightDockVisible = computed(() => sidePreview.value.visible || showClowderPanel.value);
+const rightDockTabs = computed(() => [
+  { key: 'preview', label: '预览', visible: sidePreview.value.visible },
+  { key: 'clowder', label: 'Clowder', visible: showClowderPanel.value }
+].filter(tab => tab.visible));
+
 function isChatViewActive(cid: string, ctype: number) {
   return route.name === 'Conversation' &&
     String(route.params.channelId || '') === String(cid) &&
@@ -70,6 +80,10 @@ onMounted(() => {
   loadChannelDetails();
 });
 
+onBeforeUnmount(() => {
+  stopRightDockResize();
+});
+
 watch([channelId, channelType], () => {
   closeSidePreview();
   loadChannelDetails();
@@ -91,9 +105,18 @@ function handleGroupSettingsClick() {
   showGroupSettings.value = true;
 }
 
+function handleClowderClick() {
+  showClowderPanel.value = true;
+  activeRightDockTab.value = 'clowder';
+}
+
 function handleMembersClick() {
   showGroupSettings.value = false;
   router.push(`/chat/group-members/${channelId.value}`);
+}
+
+function selectRightDockTab(tab: 'preview' | 'clowder') {
+  activeRightDockTab.value = tab;
 }
 
 function filePreviewType(kind: string): ChatSidePreviewKind {
@@ -123,11 +146,22 @@ function closeSidePreview() {
   sidePreview.value.visible = false;
   sidePreview.value.loading = false;
   sidePreview.value.error = '';
+  if (activeRightDockTab.value === 'preview') {
+    activeRightDockTab.value = showClowderPanel.value ? 'clowder' : 'preview';
+  }
+}
+
+function closeClowderPanel() {
+  showClowderPanel.value = false;
+  if (activeRightDockTab.value === 'clowder') {
+    activeRightDockTab.value = sidePreview.value.visible ? 'preview' : 'clowder';
+  }
 }
 
 async function handleOpenPreview(payload: any) {
   const requestId = sidePreviewRequestId.value + 1;
   sidePreviewRequestId.value = requestId;
+  activeRightDockTab.value = 'preview';
 
   if (payload?.source === 'ai-code') {
     sidePreview.value = {
@@ -140,6 +174,21 @@ async function handleOpenPreview(payload: any) {
       extension: 'html',
       loading: false,
       error: payload.code ? '' : '代码块内容为空'
+    };
+    return;
+  }
+
+  if (payload?.source === 'image') {
+    sidePreview.value = {
+      visible: true,
+      type: 'file-image',
+      title: '图片预览',
+      subtitle: payload?.name || '',
+      sourceUrl: payload?.url || '',
+      sourceText: '',
+      extension: payload?.extension || 'image',
+      loading: false,
+      error: payload?.url ? '' : '图片地址为空'
     };
     return;
   }
@@ -172,6 +221,30 @@ async function handleOpenPreview(payload: any) {
     sidePreview.value.loading = false;
   }
 }
+
+function setRightDockWidth(width: number) {
+  const maxWidth = Math.max(420, Math.floor(window.innerWidth * 0.75));
+  const next = Math.min(maxWidth, Math.max(360, Math.floor(width)));
+  rightDockWidth.value = next;
+  window.localStorage.setItem('im-web-right-dock-width', String(next));
+}
+
+function handleRightDockResize(event: MouseEvent) {
+  setRightDockWidth(window.innerWidth - event.clientX);
+}
+
+function stopRightDockResize() {
+  window.removeEventListener('mousemove', handleRightDockResize);
+  window.removeEventListener('mouseup', stopRightDockResize);
+  document.body.classList.remove('is-resizing-right-dock');
+}
+
+function startRightDockResize(event: MouseEvent) {
+  event.preventDefault();
+  document.body.classList.add('is-resizing-right-dock');
+  window.addEventListener('mousemove', handleRightDockResize);
+  window.addEventListener('mouseup', stopRightDockResize);
+}
 </script>
 
 <template>
@@ -185,6 +258,9 @@ async function handleOpenPreview(payload: any) {
         </div>
 
         <div class="header-right">
+          <button class="settings-btn" @click="handleClowderClick" title="Clowder">
+            C
+          </button>
           <button v-if="channelType === 2" class="settings-btn" @click="handleGroupSettingsClick" title="群聊设置">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" class="settings-icon">
               <circle cx="12" cy="12" r="3" />
@@ -206,18 +282,49 @@ async function handleOpenPreview(payload: any) {
       />
     </div>
 
-    <ChatSidePreview
-      :visible="sidePreview.visible"
-      :type="sidePreview.type"
-      :title="sidePreview.title"
-      :subtitle="sidePreview.subtitle"
-      :source-url="sidePreview.sourceUrl"
-      :source-text="sidePreview.sourceText"
-      :extension="sidePreview.extension"
-      :loading="sidePreview.loading"
-      :error="sidePreview.error"
-      @close="closeSidePreview"
-    />
+    <aside
+      v-if="rightDockVisible"
+      class="right-dock"
+      :style="{ width: `${rightDockWidth}px` }"
+      aria-label="右侧工作区"
+    >
+      <div class="right-dock-resizer" title="拖动调整宽度" @mousedown="startRightDockResize"></div>
+      <header v-if="rightDockTabs.length > 1" class="right-dock-tabs">
+        <button
+          v-for="tab in rightDockTabs"
+          :key="tab.key"
+          type="button"
+          class="dock-tab"
+          :class="{ active: activeRightDockTab === tab.key }"
+          @click="selectRightDockTab(tab.key as 'preview' | 'clowder')"
+        >
+          {{ tab.label }}
+        </button>
+      </header>
+      <div class="right-dock-body">
+        <ChatSidePreview
+          v-show="sidePreview.visible && activeRightDockTab === 'preview'"
+          :visible="sidePreview.visible"
+          :type="sidePreview.type"
+          :title="sidePreview.title"
+          :subtitle="sidePreview.subtitle"
+          :source-url="sidePreview.sourceUrl"
+          :source-text="sidePreview.sourceText"
+          :extension="sidePreview.extension"
+          :loading="sidePreview.loading"
+          :error="sidePreview.error"
+          @close="closeSidePreview"
+        />
+
+        <ClowderConversationPanel
+          v-show="showClowderPanel && activeRightDockTab === 'clowder'"
+          :visible="showClowderPanel"
+          :channel-id="channelId"
+          :channel-type="channelType"
+          @close="closeClowderPanel"
+        />
+      </div>
+    </aside>
 
     <GroupSettingsDrawer
       v-if="channelType === 2"
@@ -319,9 +426,81 @@ async function handleOpenPreview(payload: any) {
   height: 20px;
 }
 
+.right-dock {
+  position: relative;
+  display: grid;
+  grid-template-rows: auto minmax(0, 1fr);
+  min-width: 360px;
+  max-width: 75vw;
+  height: 100%;
+  border-left: var(--border-hairline);
+  background: var(--bg-primary);
+  overflow: hidden;
+}
+
+.right-dock-resizer {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: -3px;
+  z-index: 3;
+  width: 7px;
+  cursor: col-resize;
+}
+
+.right-dock-resizer:hover {
+  background: rgba(22, 93, 255, 0.16);
+}
+
+.right-dock-tabs {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  height: 40px;
+  padding: 0 10px;
+  border-bottom: var(--border-hairline);
+  background: var(--bg-primary);
+}
+
+.dock-tab {
+  height: 28px;
+  padding: 0 10px;
+  border: var(--border-hairline);
+  border-radius: var(--radius-sm);
+  background: var(--bg-secondary);
+  color: var(--text-secondary);
+  cursor: pointer;
+  font-size: 12px;
+}
+
+.dock-tab.active {
+  background: var(--primary-color, #165dff);
+  color: #ffffff;
+  border-color: var(--primary-color, #165dff);
+}
+
+.right-dock-body {
+  min-height: 0;
+  overflow: hidden;
+}
+
 @media (max-width: 760px) {
   .chat-view-container {
     grid-template-columns: minmax(0, 1fr);
+  }
+
+  .right-dock {
+    position: absolute;
+    inset: 0;
+    z-index: 20;
+    width: 100% !important;
+    min-width: 0;
+    max-width: none;
+    border-left: 0;
+  }
+
+  .right-dock-resizer {
+    display: none;
   }
 }
 </style>

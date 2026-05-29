@@ -7,14 +7,33 @@ const props = defineProps<{
     fromUID: string;
     content?: {
       url?: string;
+      name?: string;
+      size?: number;
     };
     [key: string]: any;
   };
   isMe: boolean;
 }>();
 
+const emit = defineEmits<{
+  (event: 'preview', payload: {
+    kind: 'image';
+    url: string;
+    name: string;
+    size: number;
+    extension: string;
+  }): void;
+}>();
+
 const imageUrl = computed(() => {
   return normalizeMediaUrl(props.message.content?.url || props.message.payload?.url || '');
+});
+const imageName = computed(() => props.message.content?.name || props.message.payload?.name || '图片');
+const imageSize = computed(() => props.message.content?.size || props.message.payload?.size || 0);
+const imageExtension = computed(() => {
+  const name = imageName.value.split('?')[0].toLowerCase();
+  const dot = name.lastIndexOf('.');
+  return dot >= 0 ? name.slice(dot + 1) : 'image';
 });
 
 const imageLoadState = ref<'idle' | 'loading' | 'loaded' | 'error'>('idle');
@@ -26,11 +45,22 @@ watch(
   },
   { immediate: true }
 );
+
+function openPreview() {
+  if (!imageUrl.value || imageLoadState.value === 'error') return;
+  emit('preview', {
+    kind: 'image',
+    url: imageUrl.value,
+    name: imageName.value,
+    size: imageSize.value,
+    extension: imageExtension.value
+  });
+}
 </script>
 
 <template>
   <div class="image-cell" :class="{ 'is-me': isMe }">
-    <div class="image-wrapper">
+    <button class="image-wrapper" type="button" title="预览图片" @click="openPreview">
       <img
         v-if="imageUrl && imageLoadState !== 'error'"
         :src="imageUrl"
@@ -41,7 +71,7 @@ watch(
       />
       <div v-else class="image-placeholder">加载中...</div>
       <div v-if="imageLoadState === 'error'" class="image-placeholder">图片不可用</div>
-    </div>
+    </button>
   </div>
 </template>
 
@@ -63,6 +93,8 @@ watch(
   display: flex;
   align-items: center;
   justify-content: center;
+  padding: 0;
+  cursor: zoom-in;
 }
 
 .bubble-image {

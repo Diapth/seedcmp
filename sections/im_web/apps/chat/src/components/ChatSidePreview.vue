@@ -2,7 +2,7 @@
 import { computed } from 'vue';
 import { renderMarkdown } from '@tsdaodao/base-vue';
 
-export type ChatSidePreviewKind = 'file-markdown' | 'file-text' | 'file-html' | 'file-pdf' | 'file-office' | 'ai-html';
+export type ChatSidePreviewKind = 'file-markdown' | 'file-text' | 'file-html' | 'file-pdf' | 'file-office' | 'file-image' | 'ai-html';
 
 const props = defineProps<{
   visible: boolean;
@@ -32,7 +32,7 @@ function openExternal() {
 </script>
 
 <template>
-  <aside v-if="visible" class="chat-side-preview" aria-label="右侧预览">
+  <section v-if="visible" class="chat-side-preview" aria-label="右侧预览">
     <div class="preview-panel">
       <header class="preview-header">
         <div class="preview-title">
@@ -56,7 +56,8 @@ function openExternal() {
           v-else-if="type === 'file-html' || type === 'ai-html'"
           class="html-preview"
           :srcdoc="htmlSrcDoc"
-          :sandbox="htmlPreviewSandbox"
+          sandbox="allow-scripts"
+          :data-sandbox-policy="htmlPreviewSandbox"
           title="HTML 预览"
         ></iframe>
         <iframe
@@ -65,6 +66,12 @@ function openExternal() {
           :src="sourceUrl"
           title="PDF 文件预览"
         ></iframe>
+        <img
+          v-else-if="type === 'file-image'"
+          class="preview-image"
+          :src="sourceUrl"
+          :alt="subtitle || title"
+        />
         <div v-else-if="type === 'file-office'" class="office-preview">
           <div class="office-preview-icon">{{ (extension || 'DOC').slice(0, 3).toUpperCase() }}</div>
           <div class="office-preview-copy">
@@ -79,15 +86,13 @@ function openExternal() {
         <button class="preview-secondary" @click="openExternal">打开/下载</button>
       </footer>
     </div>
-  </aside>
+  </section>
 </template>
 
 <style scoped>
 .chat-side-preview {
-  min-width: clamp(360px, 36vw, 560px);
-  max-width: 560px;
+  width: 100%;
   height: 100%;
-  border-left: var(--border-hairline);
   background: var(--bg-primary);
   overflow: hidden;
 }
@@ -243,6 +248,14 @@ function openExternal() {
   background: #ffffff;
 }
 
+.preview-image {
+  display: block;
+  max-width: 100%;
+  max-height: 100%;
+  margin: 0 auto;
+  object-fit: contain;
+}
+
 .office-preview {
   display: flex;
   align-items: center;
@@ -298,13 +311,9 @@ function openExternal() {
 
 @media (max-width: 760px) {
   .chat-side-preview {
-    position: absolute;
-    inset: 0;
-    z-index: 20;
     min-width: 0;
     max-width: none;
     width: 100%;
-    border-left: 0;
   }
 
   .preview-body {
