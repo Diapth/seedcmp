@@ -19,6 +19,12 @@ export default defineConfig({
   },
   server: {
     port: 3000,
-    host: true
+    host: true,
+    proxy: {
+      '/v1': {
+        target: process.env.VITE_TANGSENG_PROXY_TARGET || 'http://127.0.0.1:8090',
+        changeOrigin: true
+      }
+    }
   }
 })
