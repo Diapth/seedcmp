@@ -1,0 +1,10 @@
+{
+  "runId": "remote-history-sync-20260529161555",
+  "status": 200,
+  "contentType": "application/json; charset=utf-8",
+  "conversationCount": 10,
+  "visibleConversationCount": 19,
+  "failures": [],
+  "url": "http://100.79.157.76:3000/chat",
+  "recordedAt": "2026-05-29T16:15:55.428Z"
+}

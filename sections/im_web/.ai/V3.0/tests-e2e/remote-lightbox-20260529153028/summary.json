@@ -1,0 +1,11 @@
+{
+  "target": "http://100.79.157.76:3011",
+  "remoteApiSeen": true,
+  "localApiSeen": false,
+  "failed": [],
+  "screenshots": [
+    "01-remote-chat-loaded.png",
+    "02-image-message-sent.png",
+    "03-image-lightbox.png"
+  ]
+}

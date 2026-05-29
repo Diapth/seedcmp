@@ -1,0 +1,26 @@
+{
+  "runId": "local-ai-draft-unread-refresh-20260529163502",
+  "failures": [
+    "requestfailed: POST http://100.79.157.76:3000/v1/message/channel/sync net::ERR_ABORTED",
+    "requestfailed: POST http://100.79.157.76:3000/v1/message/channel/sync net::ERR_ABORTED",
+    "requestfailed: POST http://100.79.157.76:3000/v1/message/channel/sync net::ERR_ABORTED",
+    "requestfailed: POST http://100.79.157.76:3000/v1/message/channel/sync net::ERR_ABORTED",
+    "requestfailed: POST http://100.79.157.76:3000/v1/message/channel/sync net::ERR_ABORTED",
+    "requestfailed: POST http://100.79.157.76:3000/v1/message/channel/sync net::ERR_ABORTED",
+    "requestfailed: POST http://100.79.157.76:3000/v1/message/channel/sync net::ERR_ABORTED",
+    "requestfailed: POST http://100.79.157.76:3000/v1/message/channel/sync net::ERR_ABORTED",
+    "requestfailed: POST http://100.79.157.76:3000/v1/message/channel/sync net::ERR_ABORTED",
+    "requestfailed: POST http://100.79.157.76:3000/v1/message/channel/sync net::ERR_ABORTED",
+    "requestfailed: GET http://100.79.157.76:3000/src/utils/conversationPresentation.ts net::ERR_ABORTED",
+    "requestfailed: GET http://100.79.157.76:3000/src/views/ConversationList.vue?vue&type=style&index=0&scoped=54bbe06e&lang.css net::ERR_ABORTED",
+    "requestfailed: GET http://100.79.157.76:3000/src/views/MyProfileDrawer.vue?vue&type=style&index=0&scoped=0df12f95&lang.css net::ERR_ABORTED",
+    "requestfailed: GET http://100.79.157.76:3000/src/components/SearchResultList.vue?vue&type=style&index=0&scoped=660785c8&lang.css net::ERR_ABORTED"
+  ],
+  "screenshots": [
+    "/media/leng/DiskB1/exp/seedcmp/sections/im_web/.ai/V3.0/tests-e2e/local-ai-draft-unread-refresh-20260529163502/01-stale-unread-before-open.png",
+    "/media/leng/DiskB1/exp/seedcmp/sections/im_web/.ai/V3.0/tests-e2e/local-ai-draft-unread-refresh-20260529163502/02-cleared-draft-after-reload.png",
+    "/media/leng/DiskB1/exp/seedcmp/sections/im_web/.ai/V3.0/tests-e2e/local-ai-draft-unread-refresh-20260529163502/03-no-stale-unread-after-refresh.png"
+  ],
+  "url": "http://100.79.157.76:3000/chat",
+  "recordedAt": "2026-05-29T16:35:03.997Z"
+}
