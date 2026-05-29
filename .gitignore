@@ -41,6 +41,10 @@ sections/im/**/*.pem
 sections/im/**/*.key
 sections/im/**/*.crt
 
+# IM Web local Vue language-service/build sidecars
+sections/im_web/**/*.vue.js
+sections/im_web/**/*.vue__VLS_*.vue.js
+
 
 # C extensions
 *.so
