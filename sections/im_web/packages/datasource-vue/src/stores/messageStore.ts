@@ -191,6 +191,40 @@ export const useMessageStore = defineStore('message', () => {
     if (typeof normalized.url === 'string') {
       normalized.url = normalizeMediaUrl(normalized.url);
     }
+    if (normalized.connectorId === undefined && normalized.connector_id !== undefined) {
+      normalized.connectorId = normalized.connector_id;
+    }
+    if (normalized.catId === undefined && normalized.cat_id !== undefined) {
+      normalized.catId = normalized.cat_id;
+    }
+    if (normalized.catDisplayName === undefined && normalized.cat_display_name !== undefined) {
+      normalized.catDisplayName = normalized.cat_display_name;
+    }
+    if (normalized.threadId === undefined && normalized.thread_id !== undefined) {
+      normalized.threadId = normalized.thread_id;
+    }
+    if (normalized.invocationId === undefined && normalized.invocation_id !== undefined) {
+      normalized.invocationId = normalized.invocation_id;
+    }
+    if (normalized.platformMessageId === undefined && normalized.platform_message_id !== undefined) {
+      normalized.platformMessageId = normalized.platform_message_id;
+    }
+    if (normalized.richBlocks === undefined) {
+      normalized.richBlocks = normalized.rich_blocks || normalized.rich?.blocks || normalized.metadata?.richBlocks || normalized.metadata?.rich_blocks;
+    }
+    if (normalized.metadata && typeof normalized.metadata === 'object') {
+      const metadata = { ...normalized.metadata };
+      if (metadata.thinking === undefined) {
+        metadata.thinking = metadata.thought || metadata.reasoning || metadata.reasoning_content;
+      }
+      if (metadata.toolCalls === undefined) {
+        metadata.toolCalls = metadata.tool_calls || metadata.toolEvents || metadata.tool_events;
+      }
+      if (metadata.toolResults === undefined) {
+        metadata.toolResults = metadata.tool_results;
+      }
+      normalized.metadata = metadata;
+    }
 
     return normalized;
   }
@@ -205,7 +239,7 @@ export const useMessageStore = defineStore('message', () => {
       format: normalized.format || 'markdown',
       markdown: normalized.markdown ?? true,
       ai: normalized.ai ?? true,
-      streaming
+      streaming: streaming || normalized.streaming === true || normalized.stream?.state === 'placeholder'
     });
   }
 
@@ -674,6 +708,32 @@ export const useMessageStore = defineStore('message', () => {
       return true;
     }
     return false;
+  }
+
+  function addClowderCommandResponse(channelId: string, channelType: number, response: {
+    text: string;
+    command?: string;
+    clientMsgNo?: string;
+    timestamp?: number;
+  }) {
+    const clientMsgNo = response.clientMsgNo || `clowder-command-${Date.now()}-${Math.random().toString(16).slice(2)}`;
+    const msg: Message = {
+      messageID: '',
+      messageSeq: 0,
+      clientMsgNo,
+      fromUID: 'clowder:command',
+      timestamp: response.timestamp || Math.floor(Date.now() / 1000),
+      content: {
+        type: 1000,
+        text: response.text,
+        connectorId: CLOWDER_CONNECTOR_ID,
+        connectorCommand: response.command || true
+      },
+      isRevoked: false,
+      status: 'success'
+    };
+    addMessage(channelId, channelType, msg);
+    return msg;
   }
 
   async function revokeMessage(channelId: string, channelType: number, clientMsgNo: string, messageId: string) {
@@ -1318,6 +1378,7 @@ export const useMessageStore = defineStore('message', () => {
     addRealtimeMessage,
     updateMessageStatus,
     removeMessageByClientMsgNo,
+    addClowderCommandResponse,
     setReplyTarget,
     isFromThisTabSend,
     reset

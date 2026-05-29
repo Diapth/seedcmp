@@ -10,6 +10,9 @@ const props = defineProps<{
 
 const label = computed(() => {
   if (props.loading) return 'Clowder connecting';
+  if (props.reason === 'group_not_allowed') return 'Clowder group not allowed';
+  if (props.reason === 'command_admin_only' || props.reason === 'admin_only_commands') return 'Clowder admin only';
+  if (props.reason === 'permission_denied') return 'Clowder denied';
   if (props.reason) return props.reason;
   switch (props.state) {
     case 'ready':

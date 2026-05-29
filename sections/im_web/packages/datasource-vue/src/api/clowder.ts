@@ -81,6 +81,12 @@ export interface ClowderConversationStateResponse {
   disabledReason?: string;
 }
 
+export interface ClowderAgentDirectoryResponse {
+  agents: ClowderAgent[];
+  preferredCatIds?: string[];
+  lastActiveCatId?: string;
+}
+
 export interface ClowderBindRequest extends ClowderConversationRef {
   threadId?: string;
   title?: string;
@@ -90,12 +96,19 @@ export interface ClowderFocusRequest extends ClowderConversationRef {
   catId?: string;
 }
 
+export interface ClowderMessageRequest extends ClowderConversationRef {
+  text: string;
+}
+
 export const clowderApi = {
   getStatus() {
     return apiClient.get<ClowderConnectionStatus>('clowder/status');
   },
   getConversationState(params: ClowderConversationRef) {
     return apiClient.get<ClowderConversationStateResponse>('clowder/conversation', { params });
+  },
+  getAgentDirectory(params: ClowderConversationRef) {
+    return apiClient.get<ClowderAgentDirectoryResponse>('clowder/conversation/agents', { params });
   },
   bindConversation(data: ClowderBindRequest) {
     return apiClient.post<IMConnectorBinding>('clowder/conversation/bind', data);
@@ -105,6 +118,9 @@ export const clowderApi = {
   },
   clearFocus(params: ClowderConversationRef) {
     return apiClient.post<ClowderConversationStateResponse>('clowder/conversation/focus/clear', params);
+  },
+  sendConversationMessage(data: ClowderMessageRequest) {
+    return apiClient.post<Record<string, unknown>>('clowder/conversation/message', data);
   },
   allowGroup(params: ClowderConversationRef) {
     return apiClient.post<IMConnectorPermission>('clowder/group/allow', params);

@@ -36,7 +36,7 @@ export const useGroupStore = defineStore('group', () => {
     return groups.value[group.group_no];
   }
 
-  async function fetchMyGroups() {
+  async function fetchMyGroups(options: { throwOnError?: boolean } = {}) {
     const version = resetVersion.value;
     try {
       const res: any = await groupApi.getMyGroups();
@@ -47,6 +47,9 @@ export const useGroupStore = defineStore('group', () => {
       });
     } catch (e) {
       console.error(e);
+      if (options.throwOnError) {
+        throw e;
+      }
     }
   }
 

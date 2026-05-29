@@ -10,6 +10,7 @@ const contactStore = useContactStore();
 const groupStore = useGroupStore();
 const SYSTEM_ROBOT_ID = 'u_10000';
 const DEEPSEEK_AI_ROBOT_ID = 'deepseek_ai_robot';
+const CLOWDER_AI_ROBOT_ID = 'clowder_ai';
 
 onMounted(() => {
   contactStore.syncContacts();
@@ -47,6 +48,10 @@ function handleSystemRobot() {
 
 function handleDeepSeekRobot() {
   router.push(`/chat/conversation/${DEEPSEEK_AI_ROBOT_ID}/1`);
+}
+
+function handleClowderRobot() {
+  router.push(`/chat/conversation/${CLOWDER_AI_ROBOT_ID}/1`);
 }
 
 function scrollToGroupList() {
@@ -165,6 +170,22 @@ function scrollToLetter(letter: string) {
         </div>
         <div class="action-label">DeepSeek AI</div>
         <span class="action-count robot-tag">机器人</span>
+      </div>
+
+      <div class="action-item clowder-robot-action" @click="handleClowderRobot">
+        <div class="action-icon clowder-icon">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" class="svg-icon">
+            <path d="M12 3v3" />
+            <rect x="4" y="6" width="16" height="14" rx="3" />
+            <path d="M8 13h.01" />
+            <path d="M16 13h.01" />
+            <path d="M9 17h6" />
+            <path d="M3 11h2" />
+            <path d="M19 11h2" />
+          </svg>
+        </div>
+        <div class="action-label">Clowder AI</div>
+        <span class="action-count robot-tag">Clowder</span>
       </div>
     </div>
 
@@ -309,11 +330,19 @@ function scrollToLetter(letter: string) {
   background-color: #7c3aed;
 }
 
+.clowder-icon {
+  background-color: #0f766e;
+}
+
 .robot-config-action {
   border-top: var(--border-hairline);
 }
 
 .ai-robot-action {
+  border-top: var(--border-hairline);
+}
+
+.clowder-robot-action {
   border-top: var(--border-hairline);
 }
 

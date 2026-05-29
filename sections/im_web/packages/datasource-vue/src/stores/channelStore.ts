@@ -23,6 +23,20 @@ export const useChannelStore = defineStore('channel', () => {
   async function getChannelInfo(channelId: string, channelType: number): Promise<ChannelInfo> {
     const key = `${channelId}-${channelType}`;
     if (channels.value[key]) return channels.value[key];
+    if (String(channelId) === 'clowder_ai' && Number(channelType) === 1) {
+      channels.value[key] = {
+        channel_id: 'clowder_ai',
+        channel_type: 1,
+        name: 'Clowder AI',
+        avatar: '',
+        mute: 0,
+        top: 0,
+        save: 0,
+        robot: 1,
+        category: 'clowder'
+      };
+      return channels.value[key];
+    }
     const version = resetVersion.value;
 
     try {

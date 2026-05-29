@@ -61,6 +61,7 @@ describe('message listener own echo handling', () => {
   beforeEach(() => {
     setActivePinia(createPinia())
     vi.clearAllMocks()
+    vi.resetModules()
     Object.defineProperty(window, 'location', {
       configurable: true,
       value: { pathname: '/chat/conversation/friend-a/1' }
@@ -91,5 +92,37 @@ describe('message listener own echo handling', () => {
     })
 
     expect(useMessageStore().getChannelMessages('friend-a', 1)).toHaveLength(0)
+  })
+
+  it('keys incoming direct messages by sender when SDK channel is the current user', async () => {
+    Object.defineProperty(window, 'location', {
+      configurable: true,
+      value: { pathname: '/chat/conversation/clowder_ai/1' }
+    })
+
+    const { registerMessageListeners } = await import('../../../packages/datasource-vue/src/cmd/index.ts')
+    const { useMessageStore } = await import('../../../packages/datasource-vue/src/stores/messageStore.ts')
+    const { useUserStore } = await import('../../../packages/datasource-vue/src/stores/userStore.ts')
+
+    const userStore = useUserStore()
+    userStore.currentUser = { uid: 'me', name: 'Me' }
+
+    registerMessageListeners()
+    const listener = addMessageListener.mock.calls[0][0]
+    listener({
+      channel: { channelID: 'me', channelType: 1 },
+      fromUID: 'clowder_ai',
+      clientMsgNo: 'sdk-client-2',
+      messageID: 'm2',
+      messageSeq: 2,
+      timestamp: 101,
+      status: 1,
+      reactions: [],
+      remoteExtra: undefined,
+      content: { contentType: 1, contentObj: { text: 'Clowder reply' } }
+    })
+
+    expect(useMessageStore().getChannelMessages('clowder_ai', 1)).toHaveLength(1)
+    expect(useMessageStore().getChannelMessages('me', 1)).toHaveLength(0)
   })
 })

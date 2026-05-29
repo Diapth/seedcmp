@@ -8,6 +8,35 @@ import { userApi } from '../api';
 
 const pendingClientMsgNoBySeq = new Map<number, string>();
 
+export function resolveVisibleMessageChannel(
+  channelId: string,
+  channelType: number,
+  fromUID: string,
+  currentUid: string
+) {
+  const normalizedChannelType = Number(channelType);
+  const normalizedChannelId = String(channelId || '');
+  const normalizedFromUID = String(fromUID || '');
+  const normalizedCurrentUid = String(currentUid || '');
+
+  if (
+    normalizedChannelType === 1 &&
+    normalizedChannelId === normalizedCurrentUid &&
+    normalizedFromUID !== '' &&
+    normalizedFromUID !== normalizedCurrentUid
+  ) {
+    return {
+      channelId: normalizedFromUID,
+      channelType: normalizedChannelType
+    };
+  }
+
+  return {
+    channelId: normalizedChannelId,
+    channelType: normalizedChannelType
+  };
+}
+
 export function registerCMDListeners() {
   WKSDK.shared().chatManager.addCMDListener((msg: Message) => {
     const content = msg.content;
@@ -150,10 +179,16 @@ export function registerMessageListeners() {
     const conversationStore = useConversationStore();
     const userStore = useUserStore();
 
-    const channelId = message.channel.channelID;
-    const channelType = message.channel.channelType;
+    const rawChannelId = message.channel.channelID;
+    const rawChannelType = message.channel.channelType;
     const currentUid = String(userStore.currentUser?.uid || '');
     const isOwnMessage = String(message.fromUID || '') === currentUid;
+    const { channelId, channelType } = resolveVisibleMessageChannel(
+      rawChannelId,
+      rawChannelType,
+      String(message.fromUID || ''),
+      currentUid
+    );
     const currentPath = typeof window !== 'undefined' ? window.location.pathname : '';
     const isViewingChannel = currentPath.includes(`/chat/conversation/${channelId}/${channelType}`);
 
