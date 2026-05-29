@@ -82,6 +82,16 @@ export async function openV2Conversation(page: Page) {
   });
 }
 
+export async function openClowderAiConversation(page: Page) {
+  await page.goto('/chat/conversation/clowder_ai/1');
+  await expect(page.locator('.message-input-container')).toBeVisible({ timeout: 15000 });
+  await expect(page.locator('.message-list')).toBeVisible({ timeout: 15000 });
+  const panel = page.locator('.clowder-contact-panel').first();
+  if (await panel.isVisible().catch(() => false)) {
+    await expect(panel).toContainText(/Clowder AI|Clowder 联系人/i, { timeout: 15000 });
+  }
+}
+
 export async function sendChatMessage(page: Page, message: string) {
   const input = page.locator('.input-textarea');
   await expect(input).toBeVisible({ timeout: 10000 });
