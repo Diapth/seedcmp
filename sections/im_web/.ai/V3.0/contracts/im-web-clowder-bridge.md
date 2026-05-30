@@ -89,6 +89,59 @@ Permission response:
 }
 ```
 
+Permission-denied HTTP responses use status `403` with the same skipped envelope. Recognized reasons are `group_not_allowed`, `command_admin_only`, and `permission_denied`; IM Web maps each reason to a visible disabled or authorization state.
+
+## Status Response
+
+`GET /api/connectors/im-web/status`
+
+Response:
+
+```json
+{
+  "connectorId": "im-web",
+  "enabled": true,
+  "configured": true,
+  "reachable": true,
+  "version": "3.0",
+  "featureFlags": {
+    "multiAgent": true,
+    "streaming": true,
+    "mediaFallback": true,
+    "groupPermissions": true
+  }
+}
+```
+
+TangSeng exposes the browser-facing equivalent through its Clowder status endpoint. Browser code should use the TangSeng endpoint rather than calling Clowder directly.
+
+## Agent Directory
+
+`GET /api/connectors/im-web/agents?externalChatId=2:group_123`
+
+Response:
+
+```json
+{
+  "externalChatId": "2:group_123",
+  "agents": [
+    {
+      "id": "codex",
+      "displayName": "Codex",
+      "aliases": ["@codex", "codex"],
+      "available": true,
+      "preferred": true,
+      "lastActiveAt": "2026-05-28T07:45:00.000Z",
+      "messageCount": 12
+    }
+  ],
+  "preferredCatIds": ["codex"],
+  "lastActiveCatId": "codex"
+}
+```
+
+The Clowder route resolves the requester from the `x-cat-cafe-user` identity header and derives directory entries from thread cats, participants, preferred cats, and last-active metadata.
+
 ## Outbound Delivery Callback
 
 `POST /api/im-web/clowder/outbound`
@@ -152,12 +205,15 @@ Supported connector commands:
 - `/thread <thread-id> <message>`
 - `/where`
 - `/cats`
+- `/cats new <cat-name> [@alias]`
 - `/status`
 - `/history [1-5]`
 - `/focus [cat|clear]`
 - `/ask <cat> <message>`
 - `/allow-group [externalChatId]`
 - `/deny-group [externalChatId]`
+
+`/cats new` creates a Clowder runtime cat through the Clowder API process, returns a visible command response with the new cat id and alias, and relies on Clowder's catalog reconciliation so the new cat appears in later `/cats`, `/ask`, mention routing, and agent directory responses.
 
 Commands must use the same permission rules as normal message routing.
 
@@ -166,6 +222,7 @@ Commands must use the same permission rules as normal message routing.
 - `401 invalid_signature`
 - `403 group_not_allowed`
 - `403 command_admin_only`
+- `403 permission_denied`
 - `404 binding_not_found`
 - `409 duplicate`
 - `429 agent_queue_full`

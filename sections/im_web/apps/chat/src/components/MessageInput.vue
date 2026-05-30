@@ -35,6 +35,7 @@ let voiceTimer: number | undefined;
 let aiAbortController: AbortController | null = null;
 const SYSTEM_ROBOT_ID = 'u_10000';
 const DEEPSEEK_AI_ROBOT_ID = 'deepseek_ai_robot';
+const CLOWDER_AI_ROBOT_ID = 'clowder_ai';
 
 // Mention state
 const showMentionPopup = ref(false);
@@ -58,6 +59,11 @@ const activeRobotConfig = computed(() => robotConfigStore.enabledConfigs[0]);
 const isAiRobotConversation = computed(() => {
   return props.channelType === 1 &&
     props.channelId === DEEPSEEK_AI_ROBOT_ID;
+});
+
+const isClowderAiConversation = computed(() => {
+  return props.channelType === 1 &&
+    props.channelId === CLOWDER_AI_ROBOT_ID;
 });
 
 // Group members list
@@ -675,6 +681,17 @@ onBeforeUnmount(() => {
       <div class="robot-state">
         <span class="robot-state-title">AI 联系人已启用</span>
         <span>使用系统环境变量中的 DeepSeek Key，回复会按 Markdown 显示。</span>
+      </div>
+    </div>
+
+    <div v-if="isClowderAiConversation" class="robot-panel clowder-contact-panel">
+      <div class="robot-panel-header">
+        <span class="robot-panel-title">Clowder AI</span>
+        <span class="robot-panel-hint">消息会进入 Clowder 多智能体连接器</span>
+      </div>
+      <div class="robot-state">
+        <span class="robot-state-title">Clowder 联系人已启用</span>
+        <span>普通消息、/cats、/focus、/ask 等命令会由 TangSeng 桥接到 Clowder。</span>
       </div>
     </div>
 

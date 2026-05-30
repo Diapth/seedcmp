@@ -123,17 +123,12 @@ func extractAttachments(content map[string]interface{}) []Attachment {
 	if contentType == 0 || contentType == 1 {
 		return nil
 	}
-	attachmentType := "file"
-	if contentType == 2 {
-		attachmentType = "image"
-	} else if contentType == 4 {
-		attachmentType = "audio"
-	}
 	size, _ := content["size"].(float64)
-	return []Attachment{{
-		Type:     attachmentType,
-		URL:      firstString(content, "url", "remote_url"),
-		FileName: firstString(content, "name", "fileName", "file_name"),
-		Size:     int64(size),
-	}}
+	attachment := NormalizeMediaAttachment(
+		int(contentType),
+		firstString(content, "url", "remote_url"),
+		firstString(content, "name", "fileName", "file_name"),
+		int64(size),
+	)
+	return []Attachment{attachment}
 }

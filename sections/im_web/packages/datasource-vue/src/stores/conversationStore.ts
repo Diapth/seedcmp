@@ -21,6 +21,8 @@ export interface Conversation {
   avatar?: string;
 }
 
+const LOCAL_ONLY_DIRECT_CONVERSATION_IDS = new Set(['deepseek_ai_robot', 'clowder_ai']);
+
 export const useConversationStore = defineStore('conversation', () => {
   const conversations = ref<Conversation[]>([]);
   const drafts = ref<Record<string, string>>({});
@@ -232,9 +234,12 @@ export const useConversationStore = defineStore('conversation', () => {
     console.warn(`[ConversationStore] Remote ${action} command failed; local state was kept`, e);
   }
 
+  function isLocalOnlyDirectConversation(channelId: string, channelType: number) {
+    return Number(channelType) === 1 && LOCAL_ONLY_DIRECT_CONVERSATION_IDS.has(String(channelId));
+  }
+
   function isBrandNewEmptyConversation(channelId: string, channelType: number, conv?: Conversation) {
-    return channelId === 'deepseek_ai_robot' &&
-      channelType === 1 &&
+    return isLocalOnlyDirectConversation(channelId, channelType) &&
       !conv &&
       Number(unreadMap.value[getConversationKey(channelId, channelType)] || 0) === 0;
   }
@@ -271,7 +276,7 @@ export const useConversationStore = defineStore('conversation', () => {
     compactConversations();
   }
 
-  async function syncConversations() {
+  async function syncConversations(options: { throwOnError?: boolean } = {}) {
     const version = resetVersion.value;
     try {
       const res: any = await syncApi.syncConversations({ msg_count: 1 });
@@ -319,6 +324,9 @@ export const useConversationStore = defineStore('conversation', () => {
       ensureGroupConversations();
     } catch (e) {
       console.error('[ConversationStore] Failed to sync conversations', e);
+      if (options.throwOnError) {
+        throw e;
+      }
     }
   }
 
@@ -364,9 +372,9 @@ export const useConversationStore = defineStore('conversation', () => {
     }));
   }
 
-  async function syncGroupConversations() {
+  async function syncGroupConversations(options: { throwOnError?: boolean } = {}) {
     const version = resetVersion.value;
-    await groupStore.fetchMyGroups();
+    await groupStore.fetchMyGroups({ throwOnError: options.throwOnError });
     if (version !== resetVersion.value) return;
     ensureGroupConversations();
     await prefetchMissingGroupConversationSummaries();
@@ -414,6 +422,10 @@ export const useConversationStore = defineStore('conversation', () => {
     const conv = findConversation(channelId, channelType);
     if (conv) {
       conv.draft = draftText;
+    }
+
+    if (isLocalOnlyDirectConversation(channelId, channelType)) {
+      return;
     }
 
     if (draftSyncTimers.value[key]) {
@@ -618,8 +630,8 @@ export const useConversationStore = defineStore('conversation', () => {
   async function recoverAfterReconnect() {
     recoveryState.value = 'syncing';
     try {
-      await syncConversations();
-      await syncGroupConversations();
+      await syncConversations({ throwOnError: true });
+      await syncGroupConversations({ throwOnError: true });
       const messageStore = useMessageStore();
       const activeConversations = [...uniqueConversations.value];
       await Promise.all(activeConversations.map(async conv => {
@@ -627,7 +639,7 @@ export const useConversationStore = defineStore('conversation', () => {
         await messageStore.syncPinnedMessages(conv.channel_id, conv.channel_type);
       }));
       await messageStore.syncReminders(activeConversations.map(conv => conv.channel_id));
-      await groupStore.fetchMyGroups();
+      await groupStore.fetchMyGroups({ throwOnError: true });
       ensureGroupConversations();
       recoveryState.value = 'recovered';
       lastRecoveryAt.value = Date.now();

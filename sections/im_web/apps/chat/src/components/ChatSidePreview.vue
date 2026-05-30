@@ -32,7 +32,7 @@ function openExternal() {
 </script>
 
 <template>
-  <aside v-if="visible" class="chat-side-preview" aria-label="右侧预览">
+  <section v-if="visible" class="chat-side-preview" aria-label="右侧预览">
     <div class="preview-panel">
       <header class="preview-header">
         <div class="preview-title">
@@ -79,15 +79,13 @@ function openExternal() {
         <button class="preview-secondary" @click="openExternal">打开/下载</button>
       </footer>
     </div>
-  </aside>
+  </section>
 </template>
 
 <style scoped>
 .chat-side-preview {
-  min-width: clamp(360px, 36vw, 560px);
-  max-width: 560px;
+  width: 100%;
   height: 100%;
-  border-left: var(--border-hairline);
   background: var(--bg-primary);
   overflow: hidden;
 }
@@ -298,13 +296,9 @@ function openExternal() {
 
 @media (max-width: 760px) {
   .chat-side-preview {
-    position: absolute;
-    inset: 0;
-    z-index: 20;
     min-width: 0;
     max-width: none;
     width: 100%;
-    border-left: 0;
   }
 
   .preview-body {

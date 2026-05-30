@@ -69,4 +69,14 @@ describe('clowder permission state', () => {
     expect(store.getConversation('group-a', 2)?.permission?.allowed).toBe(false)
     expect(store.getConversation('group-a', 2)?.disabledReason).toBe('group_not_allowed')
   })
+
+  it('renders permission denied and admin-only badge labels from stable reason codes', async () => {
+    const fs = await import('node:fs/promises')
+    const path = await import('node:path')
+    const source = await fs.readFile(path.resolve(process.cwd(), 'src/components/ClowderStatusBadge.vue'), 'utf8')
+
+    expect(source).toContain('Clowder denied')
+    expect(source).toContain('Clowder admin only')
+    expect(source).toContain('Clowder group not allowed')
+  })
 })

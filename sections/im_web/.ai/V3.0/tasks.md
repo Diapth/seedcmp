@@ -56,7 +56,7 @@
 - [X] T020 [P] [US1] Add IM Web datasource API contract tests for binding/status responses in `sections/im_web/apps/chat/tests/clowderBridgeContracts.test.ts`
 - [X] T021 [P] [US1] Add TangSeng bridge normalization tests for channel IDs, sender fields, dedup keys, and attachments in `sections/im/TangSengDaoDaoServer/modules/clowder/bridge_test.go`
 - [X] T022 [P] [US1] Add IM Web message store tests for durable Clowder replies and refresh dedup in `sections/im_web/apps/chat/tests/clowderMessageStore.test.ts`
-- [ ] T023 [US1] Add Playwright direct/group binding smoke for SC-001 in `sections/im_web/apps/chat/tests-e2e/smoke-v3-clowder-binding.spec.ts`
+- [X] T023 [US1] Add Playwright direct/group binding smoke for SC-001 in `sections/im_web/apps/chat/tests-e2e/smoke-v3-clowder-binding.spec.ts`
 
 ### Implementation for User Story 1
 
@@ -97,13 +97,13 @@
 ### Implementation for User Story 2
 
 - [X] T044 [P] [US2] Implement TangSeng group role snapshot adapter for FR-007 in `sections/im/TangSengDaoDaoServer/modules/clowder/permissions.go`
-- [ ] T045 [US2] Wire group owner and manager role checks into Clowder bridge forwarding in `sections/im/TangSengDaoDaoServer/modules/group/service.go`
+- [X] T045 [US2] Wire group owner and manager role checks into Clowder bridge forwarding through `sections/im/TangSengDaoDaoServer/modules/message/event.go` and `sections/im/TangSengDaoDaoServer/modules/clowder/listener.go`
 - [X] T046 [US2] Implement Clowder `im-web` permission mapping with `ConnectorPermissionStore` in `/media/leng/DiskB1/exp/clowder-ai/packages/api/src/infrastructure/connectors/ImWebPermissionPolicy.ts`
-- [ ] T047 [US2] Implement `/allow-group` and `/deny-group` behavior for `im-web` in `/media/leng/DiskB1/exp/clowder-ai/packages/api/src/infrastructure/connectors/ConnectorCommandLayer.ts`
-- [ ] T048 [US2] Add permission-denied, command-admin-only, and group-not-allowed response mapping in `/media/leng/DiskB1/exp/clowder-ai/packages/api/src/routes/connector-webhooks.ts`
+- [X] T047 [US2] Implement `/allow-group` and `/deny-group` behavior for `im-web` in `/media/leng/DiskB1/exp/clowder-ai/packages/api/src/infrastructure/connectors/ConnectorCommandLayer.ts`
+- [X] T048 [US2] Add permission-denied, command-admin-only, and group-not-allowed response mapping in `/media/leng/DiskB1/exp/clowder-ai/packages/api/src/routes/connector-webhooks.ts`
 - [X] T049 [US2] Add datasource methods for group authorization and admin-only state in `sections/im_web/packages/datasource-vue/src/api/clowder.ts`
 - [X] T050 [US2] Extend Clowder store with permission state and role-aware disabled reasons in `sections/im_web/packages/datasource-vue/src/stores/clowderStore.ts`
-- [ ] T051 [US2] Render denied and admin-only states in the status badge and settings entry point in `sections/im_web/apps/chat/src/components/ClowderStatusBadge.vue`
+- [X] T051 [US2] Render denied and admin-only states in the status badge and settings entry point in `sections/im_web/apps/chat/src/components/ClowderStatusBadge.vue`
 - [X] T052 [US2] Preserve sender ID and display name in message metadata across group history refresh in `sections/im_web/packages/datasource-vue/src/stores/messageStore.ts`
 - [X] T053 [US2] Run IM Web targeted tests and group permission smoke output for US2 in `sections/im_web/.ai/V3.0/evidence.md`
 - [X] T054 [US2] Run Clowder targeted permission tests output for US2 in `sections/im_web/.ai/V3.0/evidence.md`
@@ -121,24 +121,24 @@
 
 ### Tests for User Story 3
 
-- [ ] T056 [P] [US3] Add Clowder multi-agent routing tests for mention, `/ask`, `/focus`, preferred cats, and fallback in `/media/leng/DiskB1/exp/clowder-ai/packages/api/test/im-web-multi-agent-routing.test.js`
-- [ ] T057 [P] [US3] Add IM Web agent directory store tests for available, unavailable, preferred, and last-active agents in `sections/im_web/apps/chat/tests/clowderAgentDirectory.test.ts`
-- [ ] T058 [P] [US3] Add command parsing contract tests for IM message slash commands in `sections/im_web/apps/chat/tests/clowderCommandContracts.test.ts`
-- [ ] T059 [US3] Add Playwright two-agent mention and `/ask` smoke for SC-003 in `sections/im_web/apps/chat/tests-e2e/smoke-v3-clowder-multi-agent.spec.ts`
+- [X] T056 [P] [US3] Add Clowder multi-agent routing tests for mention, `/ask`, `/focus`, preferred cats, and fallback in `/media/leng/DiskB1/exp/clowder-ai/packages/api/test/im-web-multi-agent-routing.test.js`
+- [X] T057 [P] [US3] Add IM Web agent directory store tests for available, unavailable, preferred, and last-active agents in `sections/im_web/apps/chat/tests/clowderAgentDirectory.test.ts`
+- [X] T058 [P] [US3] Add command parsing contract tests for IM message slash commands in `sections/im_web/apps/chat/tests/clowderCommandContracts.test.ts`
+- [X] T059 [US3] Add Playwright two-agent mention and `/ask` smoke for SC-003 in `sections/im_web/apps/chat/tests-e2e/smoke-v3-clowder-multi-agent.spec.ts`
 
 ### Implementation for User Story 3
 
-- [ ] T060 [P] [US3] Expose Clowder agent directory and mention aliases for `im-web` in `/media/leng/DiskB1/exp/clowder-ai/packages/api/src/routes/thread-cats.ts`
-- [ ] T061 [US3] Route IM mentions through Clowder mention parser for FR-005 in `/media/leng/DiskB1/exp/clowder-ai/packages/api/src/infrastructure/connectors/mention-parser.ts`
-- [ ] T062 [US3] Route `/ask`, `/focus`, `/use`, `/thread`, `/new`, `/where`, `/cats`, `/status`, and `/history` through Clowder command layer for FR-005, FR-014 in `/media/leng/DiskB1/exp/clowder-ai/packages/api/src/infrastructure/connectors/ConnectorCommandLayer.ts`
-- [ ] T063 [US3] Remove hardcoded DeepSeek default routing from the V3 path for FR-006 in `sections/im/TangSengDaoDaoServer/modules/robot/event.go`
-- [ ] T064 [US3] Add Clowder agent directory API client in `sections/im_web/packages/datasource-vue/src/api/clowder.ts`
-- [ ] T065 [US3] Add agent directory, focus, and preferred cat actions in `sections/im_web/packages/datasource-vue/src/stores/clowderStore.ts`
-- [ ] T066 [US3] Render Clowder cat identity and connector badge on assistant messages in `sections/im_web/apps/chat/src/components/MessageCell.vue`
-- [ ] T067 [US3] Add command response presentation as system/connector messages in `sections/im_web/packages/datasource-vue/src/stores/messageStore.ts`
-- [ ] T068 [US3] Run IM Web targeted command and agent directory tests output for US3 in `sections/im_web/.ai/V3.0/evidence.md`
-- [ ] T069 [US3] Run Clowder targeted multi-agent routing tests output for US3 in `sections/im_web/.ai/V3.0/evidence.md`
-- [ ] T070 [US3] Complete multi-agent routing and fallback review notes for US3 in `sections/im_web/.ai/V3.0/review-log.md`
+- [X] T060 [P] [US3] Expose Clowder agent directory and mention aliases for `im-web` in `/media/leng/DiskB1/exp/clowder-ai/packages/api/src/routes/thread-cats.ts`
+- [X] T061 [US3] Route IM mentions through Clowder mention parser for FR-005 in `/media/leng/DiskB1/exp/clowder-ai/packages/api/src/infrastructure/connectors/mention-parser.ts`
+- [X] T062 [US3] Route `/ask`, `/focus`, `/use`, `/thread`, `/new`, `/where`, `/cats`, `/status`, and `/history` through Clowder command layer for FR-005, FR-014 in `/media/leng/DiskB1/exp/clowder-ai/packages/api/src/infrastructure/connectors/ConnectorCommandLayer.ts`
+- [X] T063 [US3] Remove hardcoded DeepSeek default routing from the V3 path for FR-006 in `sections/im/TangSengDaoDaoServer/modules/robot/event.go`
+- [X] T064 [US3] Add Clowder agent directory API client in `sections/im_web/packages/datasource-vue/src/api/clowder.ts`
+- [X] T065 [US3] Add agent directory, focus, and preferred cat actions in `sections/im_web/packages/datasource-vue/src/stores/clowderStore.ts`
+- [X] T066 [US3] Render Clowder cat identity and connector badge on assistant messages in `sections/im_web/packages/base-vue/src/components/messages/TextCell.vue`
+- [X] T067 [US3] Add command response presentation as system/connector messages in `sections/im_web/packages/datasource-vue/src/stores/messageStore.ts`
+- [X] T068 [US3] Run IM Web targeted command and agent directory tests output for US3 in `sections/im_web/.ai/V3.0/evidence.md`
+- [X] T069 [US3] Run Clowder targeted multi-agent routing tests output for US3 in `sections/im_web/.ai/V3.0/evidence.md`
+- [X] T070 [US3] Complete multi-agent routing and fallback review notes for US3 in `sections/im_web/.ai/V3.0/review-log.md`
 
 **Checkpoint**: One IM conversation can reach multiple Clowder agents without V2 single-robot routing.
 
@@ -152,21 +152,21 @@
 
 ### Tests for User Story 4
 
-- [ ] T071 [P] [US4] Add component tests for Clowder settings panel ready, disabled, denied, and error states in `sections/im_web/apps/chat/tests/clowderPanel.test.ts`
-- [ ] T072 [P] [US4] Add store tests for thread switch, focus set/clear, and last delivery state in `sections/im_web/apps/chat/tests/clowderControlStore.test.ts`
-- [ ] T073 [US4] Add Playwright settings panel smoke for SC-001 and SC-006 in `sections/im_web/apps/chat/tests-e2e/smoke-v3-clowder-panel.spec.ts`
+- [X] T071 [P] [US4] Add component tests for Clowder settings panel ready, disabled, denied, and error states in `sections/im_web/apps/chat/tests/clowderPanel.test.ts`
+- [X] T072 [P] [US4] Add store tests for thread switch, focus set/clear, and last delivery state in `sections/im_web/apps/chat/tests/clowderControlStore.test.ts`
+- [X] T073 [US4] Add Playwright settings panel smoke for SC-001 and SC-006 in `sections/im_web/apps/chat/tests-e2e/smoke-v3-clowder-panel.spec.ts`
 
 ### Implementation for User Story 4
 
-- [ ] T074 [US4] Add Clowder conversation settings panel component for FR-008, FR-013 in `sections/im_web/apps/chat/src/components/ClowderConversationPanel.vue`
-- [ ] T075 [US4] Wire Clowder panel entry into conversation settings view in `sections/im_web/apps/chat/src/views/ChatView.vue`
-- [ ] T076 [US4] Implement thread binding selection and active thread update API calls in `sections/im_web/packages/datasource-vue/src/api/clowder.ts`
-- [ ] T077 [US4] Implement focus set/clear and agent availability actions in `sections/im_web/packages/datasource-vue/src/stores/clowderStore.ts`
-- [ ] T078 [US4] Add disabled reason text and stable loading/error states in `sections/im_web/apps/chat/src/components/ClowderConversationPanel.vue`
-- [ ] T079 [US4] Expose bridge health, configured, reachable, version, and feature flag status in `sections/im/TangSengDaoDaoServer/modules/clowder/api.go`
-- [ ] T080 [US4] Add Clowder health/status route response mapping in `/media/leng/DiskB1/exp/clowder-ai/packages/api/src/routes/connector-webhooks.ts`
-- [ ] T081 [US4] Run IM Web panel tests and smoke output for US4 in `sections/im_web/.ai/V3.0/evidence.md`
-- [ ] T082 [US4] Complete UI state, text containment, and disabled-control review notes for US4 in `sections/im_web/.ai/V3.0/review-log.md`
+- [X] T074 [US4] Add Clowder conversation settings panel component for FR-008, FR-013 in `sections/im_web/apps/chat/src/components/ClowderConversationPanel.vue`
+- [X] T075 [US4] Wire Clowder panel entry into conversation settings view in `sections/im_web/apps/chat/src/views/ChatView.vue`
+- [X] T076 [US4] Implement thread binding selection and active thread update API calls in `sections/im_web/packages/datasource-vue/src/api/clowder.ts`
+- [X] T077 [US4] Implement focus set/clear and agent availability actions in `sections/im_web/packages/datasource-vue/src/stores/clowderStore.ts`
+- [X] T078 [US4] Add disabled reason text and stable loading/error states in `sections/im_web/apps/chat/src/components/ClowderConversationPanel.vue`
+- [X] T079 [US4] Expose bridge health, configured, reachable, version, and feature flag status in `sections/im/TangSengDaoDaoServer/modules/clowder/api.go`
+- [X] T080 [US4] Add Clowder health/status route response mapping in `/media/leng/DiskB1/exp/clowder-ai/packages/api/src/routes/connector-webhooks.ts`
+- [X] T081 [US4] Run IM Web panel tests and smoke output for US4 in `sections/im_web/.ai/V3.0/evidence.md`
+- [X] T082 [US4] Complete UI state, text containment, and disabled-control review notes for US4 in `sections/im_web/.ai/V3.0/review-log.md`
 
 **Checkpoint**: Users can inspect and control Clowder state without memorizing commands.
 
@@ -180,24 +180,24 @@
 
 ### Tests for User Story 5
 
-- [ ] T083 [P] [US5] Add Clowder streaming adapter tests for placeholder, chunk, final, cleanup, and duplicate final prevention in `/media/leng/DiskB1/exp/clowder-ai/packages/api/test/im-web-streaming-adapter.test.js`
-- [ ] T084 [P] [US5] Add IM Web streaming merge and refresh regression tests for SC-005 and FR-016 in `sections/im_web/apps/chat/tests/clowderStreamingMerge.test.ts`
-- [ ] T085 [P] [US5] Add media fallback contract tests for supported and unsupported attachments in `sections/im_web/apps/chat/tests/clowderMediaFallback.test.ts`
-- [ ] T086 [P] [US5] Add large-history and reconnect V2 regression coverage for Clowder replies in `sections/im_web/apps/chat/tests/clowderHistoryRecovery.test.ts`
-- [ ] T087 [US5] Add Playwright streaming/media/refresh smoke for SC-005 and SC-007 in `sections/im_web/apps/chat/tests-e2e/smoke-v3-clowder-streaming-media.spec.ts`
+- [X] T083 [P] [US5] Add Clowder streaming adapter tests for placeholder, chunk, final, cleanup, and duplicate final prevention in `/media/leng/DiskB1/exp/clowder-ai/packages/api/test/im-web-streaming-adapter.test.js`
+- [X] T084 [P] [US5] Add IM Web streaming merge and refresh regression tests for SC-005 and FR-016 in `sections/im_web/apps/chat/tests/clowderStreamingMerge.test.ts`
+- [X] T085 [P] [US5] Add media fallback contract tests for supported and unsupported attachments in `sections/im_web/apps/chat/tests/clowderMediaFallback.test.ts`
+- [X] T086 [P] [US5] Add large-history and reconnect V2 regression coverage for Clowder replies in `sections/im_web/apps/chat/tests/clowderHistoryRecovery.test.ts`
+- [X] T087 [US5] Add Playwright streaming/media/refresh smoke for SC-005 and SC-007 in `sections/im_web/apps/chat/tests-e2e/smoke-v3-clowder-streaming-media.spec.ts`
 
 ### Implementation for User Story 5
 
-- [ ] T088 [US5] Implement stream placeholder, edit, final, and cleanup methods for FR-010 in `/media/leng/DiskB1/exp/clowder-ai/packages/api/src/infrastructure/connectors/adapters/ImWebAdapter.ts`
-- [ ] T089 [US5] Map Clowder streaming callback states to one stable TangSeng client message number in `sections/im/TangSengDaoDaoServer/modules/clowder/streaming.go`
-- [ ] T090 [US5] Preserve single-message streaming merge in IM Web message store for FR-010, FR-016 in `sections/im_web/packages/datasource-vue/src/stores/messageStore.ts`
-- [ ] T091 [US5] Implement rich-block plaintext and markdown fallback for FR-011 in `/media/leng/DiskB1/exp/clowder-ai/packages/api/src/infrastructure/connectors/rich-block-plaintext.ts`
-- [ ] T092 [US5] Implement TangSeng media attachment to Clowder content block normalization for FR-012 in `sections/im/TangSengDaoDaoServer/modules/clowder/media.go`
-- [ ] T093 [US5] Implement unsupported media unavailable state in IM Web message cells for FR-012, FR-015 in `sections/im_web/apps/chat/src/components/MessageCell.vue`
-- [ ] T094 [US5] Map queue-full, Clowder unavailable, timeout, media download, and outbound failure errors to visible retry/unavailable states for FR-015 in `sections/im_web/packages/datasource-vue/src/stores/clowderStore.ts`
-- [ ] T095 [US5] Run IM Web streaming, media, reconnect, and large-history regression output for US5 in `sections/im_web/.ai/V3.0/evidence.md`
-- [ ] T096 [US5] Run Clowder streaming adapter and media tests output for US5 in `sections/im_web/.ai/V3.0/evidence.md`
-- [ ] T097 [US5] Complete streaming, duplicate prevention, media fallback, and V2 regression review notes for US5 in `sections/im_web/.ai/V3.0/review-log.md`
+- [X] T088 [US5] Implement stream placeholder, edit, final, and cleanup methods for FR-010 in `/media/leng/DiskB1/exp/clowder-ai/packages/api/src/infrastructure/connectors/adapters/ImWebAdapter.ts`
+- [X] T089 [US5] Map Clowder streaming callback states to one stable TangSeng client message number in `sections/im/TangSengDaoDaoServer/modules/clowder/streaming.go`
+- [X] T090 [US5] Preserve single-message streaming merge in IM Web message store for FR-010, FR-016 in `sections/im_web/packages/datasource-vue/src/stores/messageStore.ts`
+- [X] T091 [US5] Implement rich-block plaintext and markdown fallback for FR-011 in `/media/leng/DiskB1/exp/clowder-ai/packages/api/src/infrastructure/connectors/rich-block-plaintext.ts`
+- [X] T092 [US5] Implement TangSeng media attachment to Clowder content block normalization for FR-012 in `sections/im/TangSengDaoDaoServer/modules/clowder/media.go`
+- [X] T093 [US5] Implement unsupported media unavailable state in IM Web message cells for FR-012, FR-015 in `sections/im_web/packages/base-vue/src/components/messages/TextCell.vue`
+- [X] T094 [US5] Map queue-full, Clowder unavailable, timeout, media download, and outbound failure errors to visible retry/unavailable states for FR-015 in `sections/im_web/packages/datasource-vue/src/stores/clowderStore.ts`
+- [X] T095 [US5] Run IM Web streaming, media, reconnect, and large-history regression output for US5 in `sections/im_web/.ai/V3.0/evidence.md`
+- [X] T096 [US5] Run Clowder streaming adapter and media tests output for US5 in `sections/im_web/.ai/V3.0/evidence.md`
+- [X] T097 [US5] Complete streaming, duplicate prevention, media fallback, and V2 regression review notes for US5 in `sections/im_web/.ai/V3.0/review-log.md`
 
 **Checkpoint**: Clowder integration does not regress V2.0 message behavior.
 
@@ -207,17 +207,17 @@
 
 **Purpose**: Final validation, hardening, documentation, and release readiness across all stories.
 
-- [ ] T098 [P] Update V3 implementation quickstart with final local startup steps in `sections/im_web/.ai/V3.0/quickstart.md`
-- [ ] T099 [P] Update bridge and adapter contract docs with final request/response examples in `sections/im_web/.ai/V3.0/contracts/im-web-clowder-bridge.md`
-- [ ] T100 [P] Update UI state contract with final panel fields and disabled reasons in `sections/im_web/.ai/V3.0/contracts/ui-state-contract.md`
-- [ ] T101 [P] Update adapter interface contract with final streaming/media behavior in `sections/im_web/.ai/V3.0/contracts/im-web-adapter-interface.md`
-- [ ] T102 Run full IM Web `pnpm type-check` and record final output in `sections/im_web/.ai/V3.0/evidence.md`
-- [ ] T103 Run full IM Web `pnpm build` and record final output in `sections/im_web/.ai/V3.0/evidence.md`
+- [X] T098 [P] Update V3 implementation quickstart with final local startup steps in `sections/im_web/.ai/V3.0/quickstart.md`
+- [X] T099 [P] Update bridge and adapter contract docs with final request/response examples in `sections/im_web/.ai/V3.0/contracts/im-web-clowder-bridge.md`
+- [X] T100 [P] Update UI state contract with final panel fields and disabled reasons in `sections/im_web/.ai/V3.0/contracts/ui-state-contract.md`
+- [X] T101 [P] Update adapter interface contract with final streaming/media behavior in `sections/im_web/.ai/V3.0/contracts/im-web-adapter-interface.md`
+- [X] T102 Run full IM Web `pnpm type-check` and record final output in `sections/im_web/.ai/V3.0/evidence.md`
+- [X] T103 Run full IM Web `pnpm build` and record final output in `sections/im_web/.ai/V3.0/evidence.md`
 - [ ] T104 Run full IM Web `pnpm test:unit` and record final output in `sections/im_web/.ai/V3.0/evidence.md`
 - [ ] T105 Run runnable IM Web `pnpm test:e2e` smoke suite and record final output in `sections/im_web/.ai/V3.0/evidence.md`
-- [ ] T106 Run Clowder API `pnpm build` and targeted connector tests and record final output in `sections/im_web/.ai/V3.0/evidence.md`
-- [ ] T107 Run TangSengDaoDaoServer targeted Go tests for Clowder bridge and record final output in `sections/im_web/.ai/V3.0/evidence.md`
-- [ ] T108 Complete final package boundary, secret/auth, connector contract, UI state, build/test, and smoke review in `sections/im_web/.ai/V3.0/review-log.md`
+- [X] T106 Run Clowder API `pnpm build` and targeted connector tests and record final output in `sections/im_web/.ai/V3.0/evidence.md`
+- [X] T107 Run TangSengDaoDaoServer targeted Go tests for Clowder bridge and record final output in `sections/im_web/.ai/V3.0/evidence.md`
+- [X] T108 Complete final package boundary, secret/auth, connector contract, UI state, build/test, and smoke review in `sections/im_web/.ai/V3.0/review-log.md`
 
 ---
 

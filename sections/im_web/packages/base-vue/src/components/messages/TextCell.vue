@@ -12,6 +12,7 @@ const props = defineProps<{
       markdown?: boolean;
       ai?: boolean;
       mention?: { all?: boolean; uids?: string[] };
+      [key: string]: any;
     };
     payload?: {
       text?: string;
@@ -20,6 +21,7 @@ const props = defineProps<{
       markdown?: boolean;
       ai?: boolean;
       mention?: { all?: boolean; uids?: string[] };
+      [key: string]: any;
     };
     [key: string]: any;
   };
@@ -39,6 +41,24 @@ const isMarkdown = computed(() => {
   return content.format === 'markdown' || content.markdown === true || content.ai === true;
 });
 
+const clowderMeta = computed(() => {
+  const content = props.message.content || props.message.payload || {};
+  const connectorId = content.connectorId || content.connector_id;
+  const catDisplayName = content.catDisplayName || content.cat_display_name;
+  const catId = content.catId || content.cat_id;
+  if (connectorId !== 'im-web' && !catDisplayName && !catId) return undefined;
+  return {
+    connectorId,
+    catDisplayName: catDisplayName || catId || 'Clowder',
+    catId
+  };
+});
+
+const unsupportedMedia = computed(() => {
+  const content = props.message.content || props.message.payload || {};
+  return content.unsupportedMedia || content.mediaUnavailable || content.deliveryState === 'media_download_failed';
+});
+
 const markdownHtml = computed(() => {
   return renderMarkdown(displayText.value);
 });
@@ -53,11 +73,30 @@ const mentionAll = computed(() => {
   return mention?.all === true;
 });
 
-async function copyCode(code: string) {
-  if (!navigator?.clipboard?.writeText) {
-    throw new Error('当前浏览器不支持剪贴板复制');
+function fallbackCopyText(text: string) {
+  const textarea = document.createElement('textarea');
+  textarea.value = text;
+  textarea.setAttribute('readonly', 'true');
+  textarea.style.position = 'fixed';
+  textarea.style.left = '-9999px';
+  textarea.style.top = '0';
+  document.body.appendChild(textarea);
+  textarea.focus();
+  textarea.select();
+  try {
+    const copied = document.execCommand('copy');
+    if (!copied) throw new Error('复制命令未成功');
+  } finally {
+    document.body.removeChild(textarea);
   }
-  await navigator.clipboard.writeText(code);
+}
+
+async function copyCode(code: string) {
+  if (navigator?.clipboard?.writeText && window.isSecureContext) {
+    await navigator.clipboard.writeText(code);
+    return;
+  }
+  fallbackCopyText(code);
 }
 
 async function handleMarkdownClick(event: MouseEvent) {
@@ -97,6 +136,11 @@ async function handleMarkdownClick(event: MouseEvent) {
 <template>
   <div class="text-cell" :class="{ 'is-me': isMe }">
     <div class="bubble">
+      <div v-if="clowderMeta" class="clowder-meta">
+        <span class="clowder-badge">Clowder</span>
+        <span class="clowder-cat">{{ clowderMeta.catDisplayName }}</span>
+      </div>
+      <div v-if="unsupportedMedia" class="unsupported-media">Unsupported media unavailable</div>
       <div
         v-if="isMarkdown"
         class="markdown-body"
@@ -151,6 +195,46 @@ async function handleMarkdownClick(event: MouseEvent) {
   font-size: 11px;
   font-weight: 600;
   vertical-align: baseline;
+}
+
+.clowder-meta {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  max-width: 100%;
+  margin-bottom: 6px;
+  font-size: 11px;
+  line-height: 16px;
+  white-space: nowrap;
+}
+
+.clowder-badge {
+  flex: 0 0 auto;
+  padding: 0 5px;
+  border: var(--border-hairline);
+  border-radius: var(--radius-sm);
+  background: rgba(15, 118, 110, 0.08);
+  color: #0f766e;
+  font-weight: 600;
+}
+
+.clowder-cat {
+  min-width: 0;
+  overflow: hidden;
+  color: var(--text-secondary);
+  font-weight: 600;
+  text-overflow: ellipsis;
+}
+
+.unsupported-media {
+  margin-bottom: 6px;
+  padding: 4px 6px;
+  border: var(--border-hairline);
+  border-radius: var(--radius-sm);
+  background: #fff7ed;
+  color: #9a3412;
+  font-size: 12px;
+  line-height: 16px;
 }
 
 .markdown-body {

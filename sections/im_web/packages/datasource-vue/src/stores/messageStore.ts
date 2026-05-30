@@ -676,6 +676,32 @@ export const useMessageStore = defineStore('message', () => {
     return false;
   }
 
+  function addClowderCommandResponse(channelId: string, channelType: number, response: {
+    text: string;
+    command?: string;
+    clientMsgNo?: string;
+    timestamp?: number;
+  }) {
+    const clientMsgNo = response.clientMsgNo || `clowder-command-${Date.now()}-${Math.random().toString(16).slice(2)}`;
+    const msg: Message = {
+      messageID: '',
+      messageSeq: 0,
+      clientMsgNo,
+      fromUID: 'clowder:command',
+      timestamp: response.timestamp || Math.floor(Date.now() / 1000),
+      content: {
+        type: 1000,
+        text: response.text,
+        connectorId: CLOWDER_CONNECTOR_ID,
+        connectorCommand: response.command || true
+      },
+      isRevoked: false,
+      status: 'success'
+    };
+    addMessage(channelId, channelType, msg);
+    return msg;
+  }
+
   async function revokeMessage(channelId: string, channelType: number, clientMsgNo: string, messageId: string) {
     const version = resetVersion.value;
     try {
@@ -1318,6 +1344,7 @@ export const useMessageStore = defineStore('message', () => {
     addRealtimeMessage,
     updateMessageStatus,
     removeMessageByClientMsgNo,
+    addClowderCommandResponse,
     setReplyTarget,
     isFromThisTabSend,
     reset

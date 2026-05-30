@@ -81,6 +81,12 @@ export interface ClowderConversationStateResponse {
   disabledReason?: string;
 }
 
+export interface ClowderAgentDirectoryResponse {
+  agents: ClowderAgent[];
+  preferredCatIds?: string[];
+  lastActiveCatId?: string;
+}
+
 export interface ClowderBindRequest extends ClowderConversationRef {
   threadId?: string;
   title?: string;
@@ -96,6 +102,9 @@ export const clowderApi = {
   },
   getConversationState(params: ClowderConversationRef) {
     return apiClient.get<ClowderConversationStateResponse>('clowder/conversation', { params });
+  },
+  getAgentDirectory(params: ClowderConversationRef) {
+    return apiClient.get<ClowderAgentDirectoryResponse>('clowder/conversation/agents', { params });
   },
   bindConversation(data: ClowderBindRequest) {
     return apiClient.post<IMConnectorBinding>('clowder/conversation/bind', data);
