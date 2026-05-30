@@ -1,0 +1,56 @@
+{
+  "runId": "v3-18-cat-group-regression-20260530124633",
+  "target": "http://100.79.157.76:3000",
+  "username": "18337488675",
+  "groupName": "V3-18猫群回归-1780145193850",
+  "catName": "布偶猫",
+  "message": "@ragdoll-kn9a V3-18回归：请一句话确认你收到了这个群聊消息。",
+  "timestamp": "2026-05-30T12:46:33.850Z",
+  "failedRequests": [
+    "POST http://100.79.157.76:3000/v1/conversation/extra/sync net::ERR_ABORTED",
+    "GET http://100.79.157.76:3000/v1/group/my net::ERR_ABORTED"
+  ],
+  "consoleErrors": [
+    "Failed to load resource: the server responded with a status of 400 (Bad Request)",
+    "Failed to load resource: the server responded with a status of 400 (Bad Request)",
+    "Failed to load resource: the server responded with a status of 400 (Bad Request)"
+  ],
+  "screenshots": {
+    "mention": "/media/leng/DiskB1/exp/seedcmp/assets/screenshots/v3-18-cat-group-regression-20260530124633-01-mention.png",
+    "afterSend": "/media/leng/DiskB1/exp/seedcmp/assets/screenshots/v3-18-cat-group-regression-20260530124633-02-after-send.png",
+    "afterWait": "/media/leng/DiskB1/exp/seedcmp/assets/screenshots/v3-18-cat-group-regression-20260530124633-03-after-wait.png"
+  },
+  "observations": {
+    "groupUrl": "http://100.79.157.76:3000/chat/conversation/88399bbd0d0342c9b41c97cb6385a032/2",
+    "groupId": "88399bbd0d0342c9b41c97cb6385a032",
+    "mentionCatVisibleBeforeOpeningDetails": true,
+    "rowsAfterWait": [
+      {
+        "index": 0,
+        "className": "msg-row is-me",
+        "text": "@ragdoll-kn9a V3-18回归：请一句话确认你收到了这个群聊消息。"
+      },
+      {
+        "index": 1,
+        "className": "msg-row",
+        "text": "Lleng_test_updatedClowderClowder布偶猫/宪宪已收到群聊消息 ✅ [宪宪/deepseek-v4-flash🐾] — 球权还在发送方，等待下一步指示。"
+      }
+    ],
+    "clowderRows": [
+      {
+        "index": 0,
+        "className": "msg-row is-me",
+        "text": "@ragdoll-kn9a V3-18回归：请一句话确认你收到了这个群聊消息。"
+      },
+      {
+        "index": 1,
+        "className": "msg-row",
+        "text": "Lleng_test_updatedClowderClowder布偶猫/宪宪已收到群聊消息 ✅ [宪宪/deepseek-v4-flash🐾] — 球权还在发送方，等待下一步指示。"
+      }
+    ],
+    "questionIndex": 0,
+    "firstThinkingIndex": -1,
+    "placeholderAfterQuestion": true
+  },
+  "error": "locator.waitFor: Timeout 10000ms exceeded.\nCall log:\n\u001b[2m  - waiting for locator('.cat-add-select') to be visible\u001b[22m\n\n    at main (/home/leng/.codex/skills/playwright-skill/.temp-execution-1780145193717.js:116:43)"
+}

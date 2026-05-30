@@ -1,0 +1,32 @@
+{
+  "createdCat": {
+    "name": "测试猫",
+    "alias": "@测试猫",
+    "personality": "用于 V3-15 自动化验证的猫猫角色",
+    "capabilities": [
+      "浏览器测试",
+      "群聊协作"
+    ]
+  },
+  "directMessage": {
+    "channelId": "clowder_cat:opus",
+    "channelType": 1,
+    "directCatId": "opus",
+    "text": "Playwright 直聊路由验证"
+  },
+  "groupCreate": {
+    "name": "V3-15 猫猫群",
+    "members": [
+      "alice"
+    ]
+  },
+  "groupSync": {
+    "groupId": "group-v3-15-cat-lifecycle",
+    "groupName": "V3-15 猫猫群",
+    "catIds": [
+      "test-cat"
+    ],
+    "proactiveReplies": false,
+    "prompt": "Group: V3-15 猫猫群 (id: group-v3-15-cat-lifecycle)\nHumans:\n- Alice (id: alice, role: member, mention: @Alice)\nCats:\n- 测试猫 (catId: test-cat, aliases: @测试猫, mention: @测试猫)\nAllowed @ targets: @Alice, @测试猫\nRules: Cats may answer only when mentioned or focused.\nPrivacy: Cats can see display names, roles, and mention handles only."
+  }
+}

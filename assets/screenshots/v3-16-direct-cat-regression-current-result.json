@@ -1,0 +1,162 @@
+{
+  "targetUrl": "http://localhost:3000",
+  "accounts": [
+    "acct_a",
+    "acct_b"
+  ],
+  "checks": [
+    {
+      "name": "Account A direct cat send renders one outgoing bubble",
+      "status": "passed"
+    },
+    {
+      "name": "Account A direct cat persisted history keeps one outgoing bubble",
+      "status": "passed"
+    },
+    {
+      "name": "Account A cat reply is visible in direct cat conversation",
+      "status": "passed"
+    },
+    {
+      "name": "Clowder AI conversation does not receive direct-cat error/reply",
+      "status": "passed"
+    },
+    {
+      "name": "Account B direct cat history is isolated from Account A",
+      "status": "passed"
+    }
+  ],
+  "requests": {
+    "A": {
+      "syncRequests": [
+        {
+          "channel_id": "clowder_cat:opus",
+          "channel_type": 1,
+          "limit": 30,
+          "start_message_seq": 0,
+          "end_message_seq": 0,
+          "pull_mode": 1
+        },
+        {
+          "channel_id": "clowder_cat:opus",
+          "channel_type": 1,
+          "limit": 30,
+          "start_message_seq": 0,
+          "end_message_seq": 0,
+          "pull_mode": 1
+        },
+        {
+          "channel_id": "clowder_ai",
+          "channel_type": 1,
+          "limit": 30,
+          "start_message_seq": 0,
+          "end_message_seq": 0,
+          "pull_mode": 1
+        },
+        {
+          "channel_id": "clowder_cat:opus",
+          "channel_type": 1,
+          "limit": 30,
+          "start_message_seq": 0,
+          "end_message_seq": 0,
+          "pull_mode": 1
+        },
+        {
+          "channel_id": "clowder_cat:opus",
+          "channel_type": 1,
+          "limit": 30,
+          "start_message_seq": 0,
+          "end_message_seq": 0,
+          "pull_mode": 1
+        },
+        {
+          "channel_id": "clowder_cat:opus",
+          "channel_type": 1,
+          "limit": 30,
+          "start_message_seq": 2,
+          "end_message_seq": 0,
+          "pull_mode": 1
+        },
+        {
+          "channel_id": "clowder_ai",
+          "channel_type": 1,
+          "limit": 30,
+          "start_message_seq": 0,
+          "end_message_seq": 0,
+          "pull_mode": 1
+        },
+        {
+          "channel_id": "clowder_ai",
+          "channel_type": 1,
+          "limit": 30,
+          "start_message_seq": 0,
+          "end_message_seq": 0,
+          "pull_mode": 1
+        },
+        {
+          "channel_id": "clowder_cat:opus",
+          "channel_type": 1,
+          "limit": 30,
+          "start_message_seq": 0,
+          "end_message_seq": 0,
+          "pull_mode": 1
+        },
+        {
+          "channel_id": "clowder_ai",
+          "channel_type": 1,
+          "limit": 30,
+          "start_message_seq": 0,
+          "end_message_seq": 0,
+          "pull_mode": 1
+        }
+      ],
+      "clowderMessages": [
+        {
+          "channelId": "clowder_cat:opus",
+          "channelType": 1,
+          "directCatId": "opus",
+          "targetCatIds": [],
+          "text": "你好 V3-16 A"
+        }
+      ]
+    },
+    "B": {
+      "syncRequests": [
+        {
+          "channel_id": "clowder_cat:opus",
+          "channel_type": 1,
+          "limit": 30,
+          "start_message_seq": 0,
+          "end_message_seq": 0,
+          "pull_mode": 1
+        },
+        {
+          "channel_id": "clowder_cat:opus",
+          "channel_type": 1,
+          "limit": 30,
+          "start_message_seq": 2,
+          "end_message_seq": 0,
+          "pull_mode": 1
+        },
+        {
+          "channel_id": "clowder_ai",
+          "channel_type": 1,
+          "limit": 30,
+          "start_message_seq": 0,
+          "end_message_seq": 0,
+          "pull_mode": 1
+        }
+      ],
+      "clowderMessages": []
+    },
+    "consoleErrors": [],
+    "failedRequests": []
+  },
+  "screenshots": [
+    "/media/leng/DiskB1/exp/seedcmp/assets/screenshots/v3-16-direct-cat-regression-current-a-one-send.png",
+    "/media/leng/DiskB1/exp/seedcmp/assets/screenshots/v3-16-direct-cat-regression-current-a-direct-reply.png",
+    "/media/leng/DiskB1/exp/seedcmp/assets/screenshots/v3-16-direct-cat-regression-current-clowder-ai-clean.png",
+    "/media/leng/DiskB1/exp/seedcmp/assets/screenshots/v3-16-direct-cat-regression-current-b-direct-reply.png"
+  ],
+  "timestamp": "2026-05-30T08:04:55.680Z"
+}

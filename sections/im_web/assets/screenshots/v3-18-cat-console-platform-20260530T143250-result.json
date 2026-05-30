@@ -1,0 +1,94 @@
+{
+  "url": "http://100.79.157.76:3000/chat/clowder-cats",
+  "options": [
+    {
+      "value": "",
+      "text": "请选择 Codex 或 Claude Code"
+    },
+    {
+      "value": "openai",
+      "text": "Codex"
+    },
+    {
+      "value": "anthropic",
+      "text": "Claude Code"
+    }
+  ],
+  "initialButtonDisabled": true,
+  "afterCodexButtonDisabled": false,
+  "screenshotPath": "assets/screenshots/v3-18-cat-console-platform-20260530T143250.png",
+  "consoleMessages": [
+    {
+      "type": "debug",
+      "text": "[vite] connecting..."
+    },
+    {
+      "type": "debug",
+      "text": "[vite] connected."
+    },
+    {
+      "type": "log",
+      "text": "web运行环境"
+    },
+    {
+      "type": "log",
+      "text": "使用原生websocket"
+    },
+    {
+      "type": "log",
+      "text": "websocket WebSocket"
+    },
+    {
+      "type": "log",
+      "text": "onopen..."
+    },
+    {
+      "type": "log",
+      "text": "服务器协议版本: 5"
+    },
+    {
+      "type": "log",
+      "text": "成功连接到节点[1]"
+    },
+    {
+      "type": "log",
+      "text": "[SDK] Connected successfully."
+    },
+    {
+      "type": "debug",
+      "text": "[vite] connecting..."
+    },
+    {
+      "type": "debug",
+      "text": "[vite] connected."
+    },
+    {
+      "type": "log",
+      "text": "web运行环境"
+    },
+    {
+      "type": "log",
+      "text": "使用原生websocket"
+    },
+    {
+      "type": "log",
+      "text": "websocket WebSocket"
+    },
+    {
+      "type": "log",
+      "text": "onopen..."
+    },
+    {
+      "type": "log",
+      "text": "服务器协议版本: 5"
+    },
+    {
+      "type": "log",
+      "text": "成功连接到节点[1]"
+    },
+    {
+      "type": "log",
+      "text": "[SDK] Connected successfully."
+    }
+  ]
+}
