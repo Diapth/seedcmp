@@ -4,11 +4,21 @@ import {
   clowderApi,
   type ClowderAgent,
   type ClowderAgentDirectoryResponse,
+  type ClowderCatContactResponse,
+  type ClowderCatDirectoryResponse,
+  type ClowderCreateCatRequest,
   type ClowderConversationRef,
   type ClowderConversationStateResponse,
   type ClowderConnectionStatus,
   type IMConnectorPermission
 } from '../api/clowder';
+import {
+  buildClowderGroupPrompt,
+  isClowderCatContactId,
+  toClowderCatContact,
+  type ClowderCatContact,
+  type ClowderGroupPromptInput
+} from './clowderCatContacts';
 
 function conversationKey(channelId: string, channelType: number) {
   return `${String(channelId)}-${Number(channelType)}`;
@@ -73,6 +83,10 @@ export const useClowderStore = defineStore('clowder', () => {
   const status = ref<ClowderConnectionStatus>(defaultStatus());
   const conversations = ref<Record<string, ClowderConversationStateResponse>>({});
   const agentDirectories = ref<Record<string, ClowderAgentDirectoryRuntimeState>>({});
+  const catContactDirectory = ref<ClowderCatContact[]>([]);
+  const connectedCatContacts = ref<ClowderCatContact[]>([]);
+  const groupCatMemberships = ref<Record<string, ClowderCatContact[]>>({});
+  const groupPrompts = ref<Record<string, string>>({});
   const loading = ref(false);
   const error = ref<string | undefined>();
 
@@ -169,6 +183,119 @@ export const useClowderStore = defineStore('clowder', () => {
     }
   }
 
+  function normalizeCatDirectory(response: ClowderCatDirectoryResponse) {
+    return (response.agents || []).map(agent => toClowderCatContact(agent, {
+      connected: agent.connected === true
+    }));
+  }
+
+  function upsertConnectedCatContact(contact: ClowderCatContact) {
+    const idx = connectedCatContacts.value.findIndex(item => item.catId === contact.catId);
+    const next = {
+      ...contact,
+      connected: true
+    };
+    if (idx >= 0) {
+      connectedCatContacts.value[idx] = next;
+    } else {
+      connectedCatContacts.value.push(next);
+    }
+    const directoryIdx = catContactDirectory.value.findIndex(item => item.catId === contact.catId);
+    if (directoryIdx >= 0) {
+      catContactDirectory.value[directoryIdx] = next;
+    }
+    return next;
+  }
+
+  function getCatContactById(contactIdOrCatId: string) {
+    const catId = isClowderCatContactId(contactIdOrCatId)
+      ? String(contactIdOrCatId).slice('clowder_cat:'.length)
+      : String(contactIdOrCatId || '');
+    return connectedCatContacts.value.find(item => item.catId === catId) ||
+      catContactDirectory.value.find(item => item.catId === catId);
+  }
+
+  async function loadCatContactDirectory(params?: { query?: string; includeUnavailable?: boolean }) {
+    loading.value = true;
+    error.value = undefined;
+    try {
+      const directory = normalizeCatDirectory(await clowderApi.getCatDirectory(params) as unknown as ClowderCatDirectoryResponse);
+      catContactDirectory.value = directory;
+      connectedCatContacts.value = directory.filter(cat => cat.connected);
+      return directory;
+    } catch (err) {
+      error.value = err instanceof Error ? err.message : 'Clowder cat directory unavailable';
+      throw err;
+    } finally {
+      loading.value = false;
+    }
+  }
+
+  function contactFromCatResponse(response: ClowderCatContactResponse) {
+    return toClowderCatContact(response.agent, {
+      connected: response.contact?.connected !== false,
+      source: response.contact?.source || response.agent.source || 'existing'
+    });
+  }
+
+  async function connectExistingCat(catId: string) {
+    loading.value = true;
+    error.value = undefined;
+    try {
+      const contact = contactFromCatResponse(await clowderApi.connectCatContact({ catId }) as unknown as ClowderCatContactResponse);
+      return upsertConnectedCatContact(contact);
+    } catch (err) {
+      error.value = err instanceof Error ? err.message : 'Clowder cat connect failed';
+      throw err;
+    } finally {
+      loading.value = false;
+    }
+  }
+
+  async function createCatAndConnect(input: ClowderCreateCatRequest) {
+    loading.value = true;
+    error.value = undefined;
+    try {
+      const contact = contactFromCatResponse(await clowderApi.createCatAndConnect(input) as unknown as ClowderCatContactResponse);
+      return upsertConnectedCatContact(contact);
+    } catch (err) {
+      error.value = err instanceof Error ? err.message : 'Clowder cat creation failed';
+      throw err;
+    } finally {
+      loading.value = false;
+    }
+  }
+
+  async function syncMixedGroupCats(input: ClowderGroupPromptInput) {
+    const prompt = buildClowderGroupPrompt(input);
+    const catMembers = input.catMembers.map(cat => 'id' in cat
+      ? cat as ClowderCatContact
+      : toClowderCatContact(cat));
+    groupCatMemberships.value[input.groupId] = catMembers;
+    groupPrompts.value[input.groupId] = prompt;
+    await clowderApi.syncGroupCats({
+      groupId: input.groupId,
+      groupName: input.groupName,
+      catIds: catMembers.map(cat => cat.catId),
+      proactiveReplies: input.rules?.proactiveReplies === true,
+      prompt
+    });
+    return prompt;
+  }
+
+  async function removeGroupCat(groupId: string, catId: string, groupName?: string) {
+    const nextCats = (groupCatMemberships.value[groupId] || []).filter(cat => cat.catId !== catId);
+    groupCatMemberships.value[groupId] = nextCats;
+    await clowderApi.syncGroupCats({
+      groupId,
+      groupName: groupName || groupId,
+      catIds: nextCats.map(cat => cat.catId),
+      proactiveReplies: false,
+      prompt: groupPrompts.value[groupId] || ''
+    });
+    return nextCats;
+  }
+
   function applyConversationState(refInput: ClowderConversationRef, state: ClowderConversationStateResponse) {
     const key = conversationKey(refInput.channelId, refInput.channelType);
     const next = normalizeConversationState(state);
@@ -256,7 +383,11 @@ export const useClowderStore = defineStore('clowder', () => {
     }
   }
 
-  async function sendConversationMessage(refInput: ClowderConversationRef, text: string) {
+  async function sendConversationMessage(refInput: ClowderConversationRef & {
+    directCatId?: string;
+    targetCatIds?: string[];
+    promptContext?: string;
+  }, text: string) {
     return clowderApi.sendConversationMessage({ ...refInput, text });
   }
 
@@ -264,6 +395,10 @@ export const useClowderStore = defineStore('clowder', () => {
     status.value = defaultStatus();
     conversations.value = {};
     agentDirectories.value = {};
+    catContactDirectory.value = [];
+    connectedCatContacts.value = [];
+    groupCatMemberships.value = {};
+    groupPrompts.value = {};
     loading.value = false;
     error.value = undefined;
   }
@@ -279,7 +414,17 @@ export const useClowderStore = defineStore('clowder', () => {
     loadConversation,
     bindConversation,
     loadAgentDirectory,
+    loadCatContactDirectory,
     getConversation,
+    catContactDirectory,
+    connectedCatContacts,
+    groupCatMemberships,
+    groupPrompts,
+    getCatContactById,
+    connectExistingCat,
+    createCatAndConnect,
+    syncMixedGroupCats,
+    removeGroupCat,
     allowGroup,
     denyGroup,
     setFocus,

@@ -30,4 +30,17 @@ describe('contact group creation and friend search state', () => {
     expect(source.default).toContain('groupStore.upsertGroup')
     expect(source.default).toContain('router.push(`/chat/conversation/${groupNo}/2`)')
   })
+
+  it('allows mixed human and connected Clowder cat contacts when creating a group', async () => {
+    const source = await import('../src/views/CreateGroupPage.vue?raw')
+
+    expect(source.default).toContain('useClowderStore')
+    expect(source.default).toContain('loadCatContactDirectory')
+    expect(source.default).toContain('mixedSelectableContacts')
+    expect(source.default).toContain('selectedCatContactIds')
+    expect(source.default).toContain('syncMixedGroupCats')
+    expect(source.default).toContain('clowder-cat-badge')
+    expect(source.default).toContain('猫猫')
+    expect(source.default).toContain('member.catContact?.id')
+  })
 })

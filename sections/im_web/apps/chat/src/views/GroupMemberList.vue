@@ -6,6 +6,7 @@ import {
   canManageGroupMember,
   canRemoveGroupAdmin,
   getMyGroupRole,
+  useClowderStore,
   useGroupStore
 } from '@tsdaodao/datasource-vue';
 import { useUserStore } from '@tsdaodao/datasource-vue';
@@ -16,11 +17,13 @@ const route = useRoute();
 const router = useRouter();
 const groupStore = useGroupStore();
 const userStore = useUserStore();
+const clowderStore = useClowderStore();
 
 const groupNo = computed(() => route.params.groupNo as string);
 
 const groupInfo = computed(() => groupStore.groups[groupNo.value]);
 const members = computed(() => groupStore.groupMembers[groupNo.value] || []);
+const catMembers = computed(() => clowderStore.groupCatMemberships[groupNo.value] || []);
 const memberKeyword = ref('');
 const pendingAction = ref<null | { title: string; message: string; danger?: boolean; run: () => Promise<void> }>(null);
 const pendingActionLoading = ref(false);
@@ -35,6 +38,18 @@ const filteredMembers = computed(() => {
       member.member_name,
       member.uid,
       member.member_uid
+    ].some(value => String(value || '').toLowerCase().includes(keyword));
+  });
+});
+
+const filteredCatMembers = computed(() => {
+  const keyword = memberKeyword.value.trim().toLowerCase();
+  if (!keyword) return catMembers.value;
+  return catMembers.value.filter(cat => {
+    return [
+      cat.displayName,
+      cat.catId,
+      ...cat.aliases
     ].some(value => String(value || '').toLowerCase().includes(keyword));
   });
 });
@@ -62,6 +77,18 @@ async function handleRemoveMember(uid: string) {
     run: async () => {
       await groupStore.removeMembers(groupNo.value, [uid]);
       Message.success('已移出该成员');
+    }
+  };
+}
+
+async function handleRemoveCatMember(catId: string) {
+  pendingAction.value = {
+    title: '移出猫猫成员',
+    message: '确认从群里移出该猫猫？',
+    danger: true,
+    run: async () => {
+      await clowderStore.removeGroupCat(groupNo.value, catId, groupInfo.value?.name || groupNo.value);
+      Message.success('已移出猫猫成员');
     }
   };
 }
@@ -145,7 +172,7 @@ function handleGoBack() {
           <polyline points="12 19 5 12 12 5" />
         </svg>
       </button>
-      <h3 class="page-title">群成员列表 ({{ members.length }}人)</h3>
+      <h3 class="page-title">群成员列表 ({{ members.length + catMembers.length }}人)</h3>
     </div>
 
     <div class="page-content">
@@ -218,6 +245,30 @@ function handleGoBack() {
               @click="handleBlacklistMember(m.uid)"
             >
               黑名单
+            </button>
+          </div>
+        </div>
+
+        <div v-if="filteredCatMembers.length > 0" class="cat-section-title">猫猫成员</div>
+        <div
+          v-for="cat in filteredCatMembers"
+          :key="cat.id"
+          class="member-row clowder-cat-member"
+        >
+          <ChannelAvatar :avatar="cat.avatar" :name="cat.displayName" :size="36" />
+          <div class="member-body">
+            <span class="member-name">{{ cat.displayName }}</span>
+            <span class="role-badge cat">猫猫</span>
+            <span class="cat-alias">{{ cat.aliases.join(', ') }}</span>
+          </div>
+
+          <div class="member-actions">
+            <button
+              v-if="canManage"
+              class="action-btn kick-btn"
+              @click="handleRemoveCatMember(cat.catId)"
+            >
+              移出
             </button>
           </div>
         </div>
@@ -354,6 +405,29 @@ function handleGoBack() {
 .role-badge.muted {
   background-color: #ff4d4f15;
   color: #ff4d4f;
+}
+
+.role-badge.cat {
+  color: #0f766e;
+  background: rgba(15, 118, 110, 0.1);
+}
+
+.cat-section-title {
+  padding: 8px 16px;
+  background: var(--bg-secondary);
+  border-bottom: var(--border-hairline);
+  color: var(--text-secondary);
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.clowder-cat-member {
+  background: rgba(15, 118, 110, 0.04);
+}
+
+.cat-alias {
+  color: var(--text-secondary);
+  font-size: 12px;
 }
 
 .member-actions {

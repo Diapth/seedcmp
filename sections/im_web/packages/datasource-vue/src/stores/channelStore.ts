@@ -1,6 +1,8 @@
 import { defineStore } from 'pinia';
 import { ref } from 'vue';
 import { commonApi, groupApi } from '../api';
+import { getClowderCatIdFromContactId, isClowderCatContactId } from './clowderCatContacts';
+import { useClowderStore } from './clowderStore';
 
 export interface ChannelInfo {
   channel_id: string;
@@ -34,6 +36,27 @@ export const useChannelStore = defineStore('channel', () => {
         save: 0,
         robot: 1,
         category: 'clowder'
+      };
+      return channels.value[key];
+    }
+    if (Number(channelType) === 1 && isClowderCatContactId(String(channelId))) {
+      const catId = getClowderCatIdFromContactId(String(channelId)) || String(channelId);
+      const clowderStore = useClowderStore();
+      const catContact = clowderStore.getCatContactById(String(channelId));
+      channels.value[key] = {
+        channel_id: String(channelId),
+        channel_type: 1,
+        name: catContact?.displayName || catId,
+        avatar: catContact?.avatar || '',
+        mute: 0,
+        top: 0,
+        save: 0,
+        robot: 1,
+        category: 'clowder-cat',
+        catId,
+        aliases: catContact?.aliases || [],
+        personalitySummary: catContact?.personalitySummary || '',
+        capabilitySummary: catContact?.capabilitySummary || ''
       };
       return channels.value[key];
     }

@@ -1,7 +1,16 @@
 <script setup lang="ts">
 import { ref, computed, watch, onBeforeUnmount, nextTick } from 'vue';
 import { Message as ArcoMessage } from '@arco-design/web-vue';
-import { commonApi, useMessageStore, useConversationStore, useGroupStore, useUserStore, useClowderStore } from '@tsdaodao/datasource-vue';
+import {
+  commonApi,
+  getClowderCatIdFromContactId,
+  isClowderCatContactId,
+  useMessageStore,
+  useConversationStore,
+  useGroupStore,
+  useUserStore,
+  useClowderStore
+} from '@tsdaodao/datasource-vue';
 import { useRobotConfigStore } from '@tsdaodao/contacts-vue';
 import WKSDK, { CMDContent } from 'wukongimjssdk';
 
@@ -69,6 +78,10 @@ const isClowderAiConversation = computed(() => {
     props.channelId === CLOWDER_AI_ROBOT_ID;
 });
 
+const isClowderCatConversation = computed(() => {
+  return props.channelType === 1 && isClowderCatContactId(props.channelId);
+});
+
 const activeConversationDraft = computed(() => {
   const conv = conversationStore.conversations.find(
     c => c.channel_id === props.channelId && c.channel_type === props.channelType
@@ -81,18 +94,37 @@ const currentGroupMembers = computed(() => {
   return groupStore.groupMembers[props.channelId] || [];
 });
 
+const catMentionMembers = computed(() => {
+  return (clowderStore.groupCatMemberships[props.channelId] || []).map(cat => ({
+    uid: cat.id,
+    member_uid: cat.id,
+    name: cat.displayName,
+    display_name: cat.displayName,
+    role_label: '猫猫',
+    catContact: cat
+  }));
+});
+
+const clowderPromptContext = computed(() => {
+  return props.channelType === 2 ? clowderStore.groupPrompts[props.channelId] : undefined;
+});
+
 function getMemberUid(member: any): string {
-  return String(member?.member_uid || member?.uid || '');
+  return String(member?.catContact?.id || member?.member_uid || member?.uid || '');
 }
 
 function getMemberDisplayName(member: any): string {
-  return String(member?.display_name || member?.member_name || member?.name || getMemberUid(member));
+  return String(member?.catContact?.displayName || member?.display_name || member?.member_name || member?.name || getMemberUid(member));
 }
 
-const filteredGroupMembers = computed(() => {
+const filteredMentionTargets = computed(() => {
   const query = mentionQuery.value.toLowerCase();
-  if (!query) return currentGroupMembers.value;
-  return currentGroupMembers.value.filter(m => 
+  const targets = [
+    ...currentGroupMembers.value,
+    ...catMentionMembers.value
+  ];
+  if (!query) return targets;
+  return targets.filter(m => 
     getMemberDisplayName(m).toLowerCase().includes(query) ||
     getMemberUid(m).toLowerCase().includes(query)
   );
@@ -167,6 +199,19 @@ function selectMember(member: any) {
   }
   showMentionPopup.value = false;
   textareaRef.value?.focus();
+}
+
+function getMentionedTargetCatIds(text: string) {
+  return catMentionMembers.value
+    .filter(member => {
+      const cat = member.catContact;
+      if (!cat) return false;
+      const names = [cat.displayName, ...cat.aliases, ...cat.mentionNames]
+        .filter(Boolean)
+        .map(name => String(name).startsWith('@') ? String(name) : `@${name}`);
+      return names.some(name => text.includes(name));
+    })
+    .map(member => member.catContact.catId);
 }
 
 function openImagePicker() {
@@ -549,11 +594,13 @@ async function handleSend() {
   const options: any = {};
   
   // Build Mention
+  const targetCatIds = props.channelType === 2 ? getMentionedTargetCatIds(text) : [];
+
   if (props.channelType === 2) {
     if (text.includes('@所有人') || text.includes('@all')) {
       options.mention = { all: true, uids: [] };
     } else if (mentionedUids.value.length > 0) {
-      const activeMentions = mentionedUids.value.filter(uid => {
+      const activeMentions = mentionedUids.value.filter(uid => !isClowderCatContactId(uid)).filter(uid => {
         const member = currentGroupMembers.value.find(m => getMemberUid(m) === uid);
         const name = member ? getMemberDisplayName(member) : uid;
         return text.includes(`@${name}`) || text.includes(`@${uid}`);
@@ -578,8 +625,14 @@ async function handleSend() {
 
   try {
     await messageStore.sendMessage(props.channelId, props.channelType, text, options);
-    if (isClowderAiConversation.value) {
-      await clowderStore.sendConversationMessage({ channelId: props.channelId, channelType: props.channelType as 1 | 2 }, text);
+    if (isClowderAiConversation.value || isClowderCatConversation.value || targetCatIds.length > 0) {
+      await clowderStore.sendConversationMessage({
+        channelId: props.channelId,
+        channelType: props.channelType as 1 | 2,
+        directCatId: getClowderCatIdFromContactId(props.channelId),
+        targetCatIds,
+        promptContext: clowderPromptContext.value
+      }, text);
       await messageStore.syncMessages(props.channelId, props.channelType);
       scheduleClowderConversationSync(props.channelId, props.channelType);
     }
@@ -611,11 +664,12 @@ onBeforeUnmount(() => {
 <template>
   <div class="message-input-container">
     <!-- Mention Selector popup -->
-    <div v-if="showMentionPopup && filteredGroupMembers.length > 0" class="mention-popup">
+    <div v-if="showMentionPopup && filteredMentionTargets.length > 0" class="mention-popup">
       <div 
-        v-for="member in filteredGroupMembers" 
+        v-for="member in filteredMentionTargets" 
         :key="getMemberUid(member)" 
         class="mention-item"
+        :class="{ 'is-clowder-cat': !!member.catContact }"
         @click="selectMember(member)"
       >
         <span class="mention-name">{{ getMemberDisplayName(member) }}</span>
@@ -728,7 +782,18 @@ onBeforeUnmount(() => {
       </div>
       <div class="robot-state">
         <span class="robot-state-title">Clowder 联系人已启用</span>
-        <span>普通消息、/cats、/focus、/ask 等命令会由 TangSeng 桥接到 Clowder。</span>
+        <span>普通消息、@猫猫、/cats、/focus、/ask 等会由 TangSeng 桥接到 Clowder。</span>
+      </div>
+    </div>
+
+    <div v-if="isClowderCatConversation" class="robot-panel clowder-contact-panel">
+      <div class="robot-panel-header">
+        <span class="robot-panel-title">Clowder 猫猫</span>
+        <span class="robot-panel-hint">消息会发送给这个猫猫联系人</span>
+      </div>
+      <div class="robot-state">
+        <span class="robot-state-title">猫猫直聊已启用</span>
+        <span>回复会使用稳定猫猫身份，刷新历史后仍保留该联系人。</span>
       </div>
     </div>
 
@@ -827,6 +892,11 @@ onBeforeUnmount(() => {
 
 .mention-item:hover {
   background-color: var(--bg-hover);
+}
+
+.mention-item.is-clowder-cat .mention-role {
+  color: #0f766e;
+  background: rgba(15, 118, 110, 0.1);
 }
 
 .mention-name {

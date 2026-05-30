@@ -63,6 +63,19 @@ Agent replies should use one of these identities:
 
 The chosen identity must be durable so history sync and message grouping remain stable.
 
+IM Web maps each cat to a browser contact and direct conversation:
+
+- contact id: `clowder_cat:<catId>`
+- direct conversation id: `clowder_cat:<catId>`
+- outbound sender id: `clowder_cat_<catId>`
+- history group key: `clowder-cat:<catId>`
+
+If the adapter cannot send as a per-cat robot account, it must include `catId`, `catDisplayName`, and the contact id metadata in the delivered message so browser history and presentation do not collapse replies into generic `Clowder AI`.
+
+## Mixed Group Prompt Context
+
+For group messages that include connected cats, TangSeng sends the generated prompt context with the inbound message. The prompt lists human members, cat members, allowed mention targets, proactive reply rules, and the privacy boundary. Clowder uses this as connector context; the browser keeps only the latest prompt preview and group-to-cat membership metadata.
+
 ## Delivery Completion
 
 `onDeliveryBatchDone(externalChatId, true)` indicates no more output is expected for the current invocation and should clear IM typing/streaming indicators.

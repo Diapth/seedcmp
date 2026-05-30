@@ -6,6 +6,7 @@ export * from './stores/conversationStore';
 export * from './stores/messageStore';
 export * from './stores/clowderTypes';
 export * from './stores/clowderStore';
+export * from './stores/clowderCatContacts';
 export * from './stores/groupStore';
 export * from './stores/groupChatUtils';
 export * from './cmd';

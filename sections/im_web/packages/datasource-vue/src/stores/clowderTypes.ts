@@ -1,5 +1,6 @@
 import type {
   ClowderAgent,
+  ClowderCatSource,
   ClowderConnectionState,
   ClowderConnectionStatus,
   ClowderDeliveryState,
@@ -9,9 +10,11 @@ import type {
   IMConnectorBinding,
   IMConnectorPermission
 } from '../api/clowder';
+import type { ClowderCatContact } from './clowderCatContacts';
 
 export type {
   ClowderAgent,
+  ClowderCatSource,
   ClowderConnectionState,
   ClowderConnectionStatus,
   ClowderDeliveryState,
@@ -21,6 +24,8 @@ export type {
   IMConnectorBinding,
   IMConnectorPermission
 };
+
+export type { ClowderCatContact };
 
 export interface ClowderAgentDirectoryState {
   agents: ClowderAgent[];

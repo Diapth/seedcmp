@@ -19,7 +19,18 @@ im-web
 Examples:
 
 - Direct chat: `1:deepseek_ai_robot`
+- Direct cat chat: `1:clowder_cat:<catId>`
 - Group chat: `2:group_123`
+
+## Cat Contact Identity
+
+Browser-visible Clowder cats use durable IM-side contact IDs without making the browser the source of truth for the Clowder registry:
+
+- contact id / direct conversation id: `clowder_cat:<catId>`
+- outbound sender id: `clowder_cat_<catId>` after replacing non identifier characters with `_`
+- history grouping key: `clowder-cat:<catId>`
+- binding owner: TangSeng bridge stores IM contact/group bindings; Clowder remains authoritative for cat registry, routing, permissions, and availability
+- preferred sender model: one robot account per cat; MVP fallback may still carry cat metadata on a shared `clowder_agent`, but IM Web must preserve the per-cat contact id in content metadata and history merge keys
 
 ## Inbound Message Request
 
@@ -56,7 +67,9 @@ Body:
       "fileName": "image.png",
       "size": 12345
     }
-  ]
+  ],
+  "targetCatIds": ["codex"],
+  "promptContext": "Group: Product Group..."
 }
 ```
 
@@ -139,6 +152,24 @@ Response:
   "lastActiveCatId": "codex"
 }
 ```
+
+## Cat Contact Directory
+
+`GET /api/tangseng/clowder/cats`
+
+Returns routable Clowder cats as contact-like records through TangSeng. The browser does not own the registry; it maps each returned `catId` to `clowder_cat:<catId>` locally.
+
+`POST /api/tangseng/clowder/cats/connect`
+
+Connects an existing routable cat as an IM-side contact after the bridge confirms the Clowder `catId`.
+
+`POST /api/tangseng/clowder/cats`
+
+Creates a cat in Clowder and connects it only after Clowder returns a stable routable `catId`.
+
+`POST /api/tangseng/clowder/group/cats/sync`
+
+Stores durable group-to-cat membership metadata and the current generated group prompt for a mixed human/cat group.
 
 The Clowder route resolves the requester from the `x-cat-cafe-user` identity header and derives directory entries from thread cats, participants, preferred cats, and last-active metadata.
 
