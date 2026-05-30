@@ -4,6 +4,7 @@ import { Message as ArcoMessage } from '@arco-design/web-vue';
 import {
   commonApi,
   getClowderCatIdFromContactId,
+  isClowderAiContactId,
   isClowderCatContactId,
   useMessageStore,
   useConversationStore,
@@ -36,6 +37,7 @@ const robotMenuState = ref<'idle' | 'loading' | 'ready' | 'unavailable' | 'faile
 const robotMenus = ref<Array<{ id: string; title: string; command: string; robotId: string }>>([]);
 const robotAck = ref('');
 const aiState = ref<'idle' | 'loading' | 'failed'>('idle');
+const sendingState = ref<'idle' | 'sending'>('idle');
 const voiceState = ref<'idle' | 'recording' | 'sending' | 'unsupported'>('idle');
 const voiceDuration = ref(0);
 let typingTimeout: any = null;
@@ -75,7 +77,7 @@ const isAiRobotConversation = computed(() => {
 
 const isClowderAiConversation = computed(() => {
   return props.channelType === 1 &&
-    props.channelId === CLOWDER_AI_ROBOT_ID;
+    isClowderAiContactId(props.channelId);
 });
 
 const isClowderCatConversation = computed(() => {
@@ -130,13 +132,27 @@ const filteredMentionTargets = computed(() => {
   );
 });
 
+async function ensureGroupMentionMembersLoaded() {
+  if (props.channelType !== 2 || !props.channelId) return;
+  const tasks: Promise<unknown>[] = [];
+  if (currentGroupMembers.value.length === 0) {
+    tasks.push(groupStore.fetchGroupMembers(props.channelId));
+  }
+  if (clowderStore.groupCatMemberships[props.channelId] === undefined) {
+    tasks.push(clowderStore.loadGroupCats(props.channelId).catch(() => undefined));
+  }
+  if (tasks.length > 0) {
+    await Promise.allSettled(tasks);
+  }
+}
+
 watch(() => props.channelId, (newId) => {
   lastAppliedDraft.value = activeConversationDraft.value;
   inputText.value = lastAppliedDraft.value;
   messageStore.setReplyTarget(null);
   showMentionPopup.value = false;
-  if (props.channelType === 2 && newId && currentGroupMembers.value.length === 0) {
-    void groupStore.fetchGroupMembers(newId);
+  if (props.channelType === 2 && newId) {
+    void ensureGroupMentionMembersLoaded();
   }
 }, { immediate: true });
 
@@ -162,6 +178,7 @@ watch(inputText, (newVal) => {
     if (!query.includes(' ')) {
       showMentionPopup.value = true;
       mentionQuery.value = query;
+      void ensureGroupMentionMembersLoaded();
       return;
     }
   }
@@ -214,6 +231,40 @@ function getMentionedTargetCatIds(text: string) {
     .map(member => member.catContact.catId);
 }
 
+function getMessageVisibleText(message: any) {
+  const content = message?.content || message?.payload || {};
+  const text = content.text || content.content || content.name || content.fileName || content.url || '';
+  return String(text || '').replace(/\s+/g, ' ').trim();
+}
+
+function getMessageSenderName(message: any) {
+  const content = message?.content || message?.payload || {};
+  if (content.catDisplayName || content.cat_display_name) {
+    return String(content.catDisplayName || content.cat_display_name);
+  }
+  const fromUID = String(message?.fromUID || '');
+  if (fromUID === userStore.currentUser?.uid) {
+    return userStore.currentUser?.name || fromUID;
+  }
+  return userStore.userCache[fromUID]?.name || fromUID || 'unknown';
+}
+
+function buildClowderPromptContext(text: string, targetCatIds: string[]) {
+  if (props.channelType !== 2) return clowderPromptContext.value;
+  const recentMessages = messageStore.getChannelMessages(props.channelId, props.channelType)
+    .filter(message => getMessageVisibleText(message))
+    .slice(-12)
+    .map(message => `- ${getMessageSenderName(message)}: ${getMessageVisibleText(message)}`);
+  const base = clowderPromptContext.value || `Group: ${props.channelId} (id: ${props.channelId})`;
+  return [
+    base,
+    `Mention target cat ids: ${targetCatIds.length ? targetCatIds.join(', ') : 'none'}`,
+    `Current message: ${text}`,
+    'Recent messages:',
+    ...(recentMessages.length ? recentMessages : ['- No recent messages available.'])
+  ].join('\n');
+}
+
 function openImagePicker() {
   imageInputRef.value?.click();
 }
@@ -253,6 +304,17 @@ function scheduleClowderConversationSync(channelId: string, channelType: number)
       void messageStore.syncMessages(channelId, channelType);
     }, delay),
   );
+}
+
+async function sendClowderRouteMessage(text: string, targetCatIds: string[]) {
+  await clowderStore.sendConversationMessage({
+    channelId: props.channelId,
+    channelType: props.channelType as 1 | 2,
+    directCatId: getClowderCatIdFromContactId(props.channelId),
+    targetCatIds,
+    promptContext: buildClowderPromptContext(text, targetCatIds)
+  }, text);
+  scheduleClowderConversationSync(props.channelId, props.channelType);
 }
 
 async function startVoiceRecording() {
@@ -477,9 +539,7 @@ async function insertMentionTrigger() {
   if (props.channelType === 2) {
     mentionQuery.value = '';
     showMentionPopup.value = true;
-    if (currentGroupMembers.value.length === 0) {
-      void groupStore.fetchGroupMembers(props.channelId);
-    }
+    void ensureGroupMentionMembersLoaded();
   }
   textareaRef.value?.focus();
 }
@@ -582,12 +642,14 @@ async function handleDrop(event: DragEvent) {
 async function handleSend() {
   const text = inputText.value.trim();
   if (!text) return;
+  if (sendingState.value === 'sending') return;
 
   if (isAiRobotConversation.value) {
     await sendAiAssistant(text);
     return;
   }
 
+  sendingState.value = 'sending';
   inputText.value = '';
   conversationStore.updateDraft(props.channelId, props.channelType, '');
 
@@ -626,20 +688,14 @@ async function handleSend() {
   try {
     await messageStore.sendMessage(props.channelId, props.channelType, text, options);
     if (isClowderAiConversation.value || isClowderCatConversation.value || targetCatIds.length > 0) {
-      await clowderStore.sendConversationMessage({
-        channelId: props.channelId,
-        channelType: props.channelType as 1 | 2,
-        directCatId: getClowderCatIdFromContactId(props.channelId),
-        targetCatIds,
-        promptContext: clowderPromptContext.value
-      }, text);
-      await messageStore.syncMessages(props.channelId, props.channelType);
-      scheduleClowderConversationSync(props.channelId, props.channelType);
+      await sendClowderRouteMessage(text, targetCatIds);
     }
     messageStore.setReplyTarget(null);
     mentionedUids.value = [];
   } catch (err) {
     console.error('Failed to send message', err);
+  } finally {
+    sendingState.value = 'idle';
   }
 }
 

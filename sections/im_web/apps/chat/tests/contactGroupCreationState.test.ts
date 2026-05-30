@@ -43,4 +43,13 @@ describe('contact group creation and friend search state', () => {
     expect(source.default).toContain('猫猫')
     expect(source.default).toContain('member.catContact?.id')
   })
+
+  it('allows cat-only group creation without requiring an invited human contact', async () => {
+    const source = await import('../src/views/CreateGroupPage.vue?raw')
+
+    expect(source.default).not.toContain("Message.warning('请选择至少一个真人联系人作为群成员')")
+    expect(source.default).not.toContain('selectedHumanUids.value.length === 0')
+    expect(source.default).toContain('members: selectedHumanUids.value')
+    expect(source.default).toContain('selectedCats.length > 0')
+  })
 })

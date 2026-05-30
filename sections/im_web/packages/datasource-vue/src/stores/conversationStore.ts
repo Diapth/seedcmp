@@ -4,9 +4,10 @@ import { groupApi, syncApi } from '../api';
 import { useChannelStore } from './channelStore';
 import { useGroupStore } from './groupStore';
 import { useUserStore } from './userStore';
+import { useClowderStore } from './clowderStore';
 import { buildConversationFromGroup } from './groupChatUtils';
 import { useMessageStore } from './messageStore';
-import { isClowderCatContactId } from './clowderCatContacts';
+import { getClowderCatIdFromContactId, isClowderAiContactId, isClowderCatContactId } from './clowderCatContacts';
 
 export interface Conversation {
   channel_id: string;
@@ -48,6 +49,7 @@ export const useConversationStore = defineStore('conversation', () => {
   const channelStore = useChannelStore();
   const groupStore = useGroupStore();
   const userStore = useUserStore();
+  const clowderStore = useClowderStore();
 
   function getConversationKey(channelId: string, channelType: number) {
     return `${String(channelId)}-${Number(channelType)}`;
@@ -233,6 +235,42 @@ export const useConversationStore = defineStore('conversation', () => {
     };
   }
 
+  function extractClowderCatDisplayNameFromText(text: string) {
+    const value = String(text || '').trim();
+    const prefixMatch = value.match(/^【([^】]{1,40}?)】/);
+    if (prefixMatch) return prefixMatch[1].replace(/[🐱🐈🐾\s]+$/g, '').trim();
+
+    const inlineSlashMatch = value.match(/(?:^|[\s，。:：])([^\s/［\[\]］，。:：]{1,40})\/[^\s/［\[\]］，。:：]{1,40}(?=[\s，。:：]|已|收|回|确|$)/u);
+    if (inlineSlashMatch) return inlineSlashMatch[1].replace(/[🐱🐈🐾\s]+$/g, '').trim();
+
+    const suffixMatch = value.match(/[［\[]([^\]/\]］\n]{1,40})\/[^\]］\n]{1,120}[］\]]\s*$/);
+    if (suffixMatch) return suffixMatch[1].replace(/[🐱🐈🐾\s]+$/g, '').trim();
+
+    return '';
+  }
+
+  function resolveClowderConversationName(channelId: string, currentName: string, lastMessage?: any) {
+    const catId = getClowderCatIdFromContactId(channelId);
+    if (!catId) return currentName;
+    const payload = lastMessage?.content || lastMessage?.payload || {};
+    const catName = String(payload.catDisplayName || payload.cat_display_name || '').trim() ||
+      extractClowderCatDisplayNameFromText(String(payload.text || payload.content || ''));
+    if (catName) return catName;
+    const catContactName = String(clowderStore.getCatContactById(channelId)?.displayName || '').trim();
+    if (catContactName) return catContactName;
+    if (currentName && currentName !== catId) return currentName;
+    return catId;
+  }
+
+  function applyClowderConversationName(channelId: string, channelType: number, conv: Conversation, lastMessage?: any) {
+    const nextName = resolveClowderConversationName(channelId, conv.name || '', lastMessage);
+    if (!nextName || nextName === conv.name) return;
+    conv.name = nextName;
+    if (Number(channelType) === 1 && isClowderCatContactId(channelId)) {
+      channelStore.updateChannelInfo(channelId, channelType, { name: nextName });
+    }
+  }
+
   function normalizeSyncedMessage(item: any) {
     return {
       ...item,
@@ -270,6 +308,8 @@ export const useConversationStore = defineStore('conversation', () => {
     const key = getConversationKey(channelId, channelType);
     const rawLastMessage = getLastMessageSource(item);
     const remoteDraft = item.extra?.draft ?? item.draft ?? '';
+    const lastMessage = normalizeLastMessage(item);
+    const name = resolveClowderConversationName(channelId, info.name || item.name || item.remark || '', lastMessage);
 
     return {
       channel_id: channelId,
@@ -277,11 +317,11 @@ export const useConversationStore = defineStore('conversation', () => {
       unread: Number(item.unread || 0),
       last_msg_seq: Number(item.last_msg_seq || rawLastMessage?.message_seq || rawLastMessage?.messageSeq || 0),
       last_msg_time: Number(item.last_msg_time || item.timestamp || rawLastMessage?.timestamp || 0),
-      last_message: normalizeLastMessage(item),
+      last_message: lastMessage,
       top: info.top || item.top || item.stick || item.extra?.top || item.extra?.stick || 0,
       mute: info.mute || item.mute || item.extra?.mute || 0,
       draft: resolveDraft(channelId, channelType, key, remoteDraft),
-      name: info.name || item.name || item.remark || '',
+      name,
       avatar: info.avatar || item.logo || item.avatar || ''
     };
   }
@@ -351,7 +391,7 @@ export const useConversationStore = defineStore('conversation', () => {
   function isLocalOnlyDirectConversation(channelId: string, channelType: number) {
     return Number(channelType) === 1 &&
       (channelId === 'deepseek_ai_robot' ||
-        channelId === 'clowder_ai' ||
+        isClowderAiContactId(String(channelId)) ||
         isClowderCatContactId(String(channelId)) ||
         LOCAL_ONLY_DIRECT_CONVERSATION_IDS.has(String(channelId)));
   }
@@ -683,6 +723,7 @@ export const useConversationStore = defineStore('conversation', () => {
       if (isDigest) {
         conv.last_message = normalizedMsg;
       }
+      applyClowderConversationName(channelId, channelType, conv, normalizedMsg);
       if (message.isUnreadCleared && isDigest) {
         conv.unread = 0;
         unreadMap.value[key] = 0;
@@ -728,6 +769,7 @@ export const useConversationStore = defineStore('conversation', () => {
         if (isDigest || !conv.last_message) {
           conv.last_message = normalizedMsg;
         }
+        applyClowderConversationName(channelId, channelType, conv, normalizedMsg);
         if (message.isUnreadCleared && isDigest) {
           conv.unread = 0;
           unreadMap.value[key] = 0;
@@ -751,7 +793,7 @@ export const useConversationStore = defineStore('conversation', () => {
       top: 0,
       mute: 0,
       draft: resolveDraft(channelId, channelType, key),
-      name: '',
+      name: normalizedMsg ? resolveClowderConversationName(channelId, '', normalizedMsg) : '',
       avatar: ''
     };
     conversations.value.push(next);
@@ -763,7 +805,10 @@ export const useConversationStore = defineStore('conversation', () => {
     if (current) {
       current.top = current.top || info.top || 0;
       current.mute = current.mute || info.mute || 0;
-      current.name = current.name || info.name || '';
+      current.name = resolveClowderConversationName(channelId, current.name || info.name || '', normalizedMsg);
+      if (Number(channelType) === 1 && isClowderCatContactId(channelId) && current.name) {
+        channelStore.updateChannelInfo(channelId, channelType, { name: current.name });
+      }
       current.avatar = current.avatar || info.avatar || '';
     }
     return next;

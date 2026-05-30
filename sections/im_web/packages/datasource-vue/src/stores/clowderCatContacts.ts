@@ -1,6 +1,8 @@
 import type { ClowderAgent, ClowderCatSource } from '../api/clowder';
 
 export const CLOWDER_CAT_CONTACT_PREFIX = 'clowder_cat:';
+export const CLOWDER_AI_CONTACT_ID = 'clowder_ai';
+export const LEGACY_CLOWDER_CONTACT_PREFIX = 'clowder:';
 
 export interface ClowderCatContact {
   id: string;
@@ -88,6 +90,11 @@ export function getClowderCatIdFromContactId(contactId: string) {
 
 export function isClowderCatContactId(contactId: string) {
   return !!getClowderCatIdFromContactId(contactId);
+}
+
+export function isClowderAiContactId(contactId: string) {
+  const id = String(contactId || '').trim();
+  return id === CLOWDER_AI_CONTACT_ID || id.startsWith(LEGACY_CLOWDER_CONTACT_PREFIX);
 }
 
 export function toClowderCatContact(agent: ClowderAgent, overrides: Partial<ClowderCatContact> = {}): ClowderCatContact {

@@ -42,6 +42,24 @@ describe('file preview, voice sending, and AI markdown contracts', () => {
     expect(html).not.toContain('<script>alert(1)</script>')
   })
 
+  it('renders markdown pipe tables as real table elements', async () => {
+    const markdown = await import('../../../packages/base-vue/src/utils/markdown.ts')
+
+    const html = markdown.renderMarkdown([
+      '| 猫猫 | 模型 | 擅长 |',
+      '|---|---|---|',
+      '| Codex @codex | DeepSeek V4 Flash | 架构设计、写代码一把好手 |',
+      '| 新闻猫 @news | DeepSeek V4 Flash | 架构设计、写代码一把好手 |'
+    ].join('\n'))
+
+    expect(html).toContain('<table>')
+    expect(html).toContain('<thead>')
+    expect(html).toContain('<tbody>')
+    expect(html).toContain('<th>猫猫</th>')
+    expect(html).toContain('<td>Codex @codex</td>')
+    expect(html).not.toContain('<p>| 猫猫 | 模型 | 擅长 |</p>')
+  })
+
   it('chat side preview renders files and AI HTML in the right-side workspace', async () => {
     const source = await import('../src/components/ChatSidePreview.vue?raw')
 

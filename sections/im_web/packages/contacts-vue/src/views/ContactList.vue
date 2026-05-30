@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, onMounted, ref } from 'vue';
+import { computed, onMounted } from 'vue';
 import { useRouter } from 'vue-router';
 import { useContactStore } from '../stores/contactStore';
 import { useClowderStore, useGroupStore } from '@tsdaodao/datasource-vue';
@@ -15,8 +15,6 @@ const CLOWDER_AI_ROBOT_ID = 'clowder_ai';
 
 const clowderCatContacts = computed(() => clowderStore.catContactDirectory);
 const connectedCatContacts = computed(() => clowderStore.connectedCatContacts);
-const showCreateCatForm = ref(false);
-const newCatName = ref('');
 
 onMounted(() => {
   contactStore.syncContacts();
@@ -49,6 +47,10 @@ function handleConfigureRobot() {
   router.push('/chat/robots');
 }
 
+function handleConfigureClowderCats() {
+  router.push('/chat/clowder-cats');
+}
+
 function handleSystemRobot() {
   router.push(`/chat/conversation/${SYSTEM_ROBOT_ID}/1`);
 }
@@ -64,19 +66,6 @@ function handleClowderRobot() {
 async function handleConnectCat(catId: string) {
   const cat = await clowderStore.connectExistingCat(catId).catch(() => undefined);
   if (cat) {
-    router.push(`/chat/conversation/${cat.directConversationId}/1`);
-  }
-}
-
-async function handleCreateCatAndConnect() {
-  const name = newCatName.value.trim();
-  if (!name) return;
-  const cat = await clowderStore.createCatAndConnect({
-    name
-  }).catch(() => undefined);
-  if (cat) {
-    newCatName.value = '';
-    showCreateCatForm.value = false;
     router.push(`/chat/conversation/${cat.directConversationId}/1`);
   }
 }
@@ -219,7 +208,7 @@ function scrollToLetter(letter: string) {
         <span class="action-count robot-tag">Clowder</span>
       </div>
 
-      <div class="action-item clowder-cat-action">
+      <div class="action-item clowder-cat-action" @click="handleConfigureClowderCats">
         <div class="action-icon clowder-cat-icon">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" class="svg-icon">
             <circle cx="8" cy="9" r="4" />
@@ -229,21 +218,6 @@ function scrollToLetter(letter: string) {
         </div>
         <div class="action-label">Clowder 猫猫</div>
         <span class="action-count">{{ connectedCatContacts.length }}</span>
-        <div class="cat-action-buttons">
-          <button type="button" class="cat-action-btn" @click.stop="clowderStore.loadCatContactDirectory({ includeUnavailable: true })">添加已有猫猫</button>
-          <button type="button" class="cat-action-btn" @click.stop="showCreateCatForm = !showCreateCatForm">创建猫猫并连接</button>
-        </div>
-      </div>
-
-      <div v-if="showCreateCatForm" class="create-cat-row">
-        <input
-          v-model="newCatName"
-          class="create-cat-input"
-          type="text"
-          placeholder="猫猫名称"
-          @keydown.enter="handleCreateCatAndConnect"
-        />
-        <button type="button" class="cat-action-btn primary" @click="handleCreateCatAndConnect">连接</button>
       </div>
     </div>
 
@@ -448,15 +422,6 @@ function scrollToLetter(letter: string) {
   border-top: var(--border-hairline);
 }
 
-.cat-action-buttons {
-  margin-left: auto;
-  display: flex;
-  gap: 6px;
-  flex-wrap: wrap;
-  justify-content: flex-end;
-}
-
-.cat-action-btn,
 .cat-connect-btn {
   height: 26px;
   padding: 0 8px;
@@ -468,37 +433,9 @@ function scrollToLetter(letter: string) {
   cursor: pointer;
 }
 
-.cat-action-btn:hover,
 .cat-connect-btn:hover {
   color: var(--primary-color, #165dff);
   border-color: var(--primary-color, #165dff);
-}
-
-.cat-action-btn.primary {
-  color: #ffffff;
-  border-color: var(--primary-color, #165dff);
-  background: var(--primary-color, #165dff);
-}
-
-.create-cat-row {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  padding: 8px 16px 12px 60px;
-  border-top: var(--border-hairline);
-}
-
-.create-cat-input {
-  flex: 1;
-  min-width: 0;
-  height: 28px;
-  padding: 0 8px;
-  border: var(--border-hairline);
-  border-radius: var(--radius-sm);
-  background: var(--bg-secondary);
-  color: var(--text-primary);
-  font-size: 12px;
-  outline: none;
 }
 
 .svg-icon {

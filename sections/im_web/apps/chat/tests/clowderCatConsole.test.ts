@@ -1,0 +1,39 @@
+import { describe, expect, it } from 'vitest'
+
+describe('Clowder cat console', () => {
+  it('routes the contact entry to a full cat management console', async () => {
+    const router = await import('../src/router/index.ts?raw')
+    const contactList = await import('../../../packages/contacts-vue/src/views/ContactList.vue?raw')
+    const index = await import('../../../packages/contacts-vue/src/index.ts?raw')
+
+    expect(index.default).toContain('ClowderCatConsolePage')
+    expect(router.default).toContain('ClowderCatConsolePage')
+    expect(router.default).toContain("path: 'clowder-cats'")
+    expect(contactList.default).toContain('handleConfigureClowderCats')
+    expect(contactList.default).toContain("router.push('/chat/clowder-cats')")
+    expect(contactList.default).not.toContain('cat-action-buttons')
+    expect(contactList.default).not.toContain('showCreateCatForm')
+  })
+
+  it('provides a robot-console style create/connect surface for cat contacts', async () => {
+    const page = await import('../../../packages/contacts-vue/src/views/ClowderCatConsolePage.vue?raw')
+
+    expect(page.default).toContain('猫猫设置')
+    expect(page.default).toContain('Clowder 猫猫联系人')
+    expect(page.default).toContain('createCatAndConnect')
+    expect(page.default).toContain('connectExistingCat')
+    expect(page.default).toContain('loadCatContactDirectory')
+    expect(page.default).toContain('router.push(`/chat/conversation/${cat.directConversationId}/1`)')
+    expect(page.default).toContain('form.alias')
+    expect(page.default).toContain('form.clientId')
+    expect(page.default).toContain('运行平台')
+    expect(page.default).toContain('Codex')
+    expect(page.default).toContain('Claude Code')
+    expect(page.default).toContain('form.personality')
+    expect(page.default).toContain('form.capabilitiesText')
+    expect(page.default).toContain('const clientId = form.clientId')
+    expect(page.default).toContain('clientId,')
+    expect(page.default).toContain('console-layout')
+    expect(page.default).toContain('cat-row')
+  })
+})

@@ -1,7 +1,7 @@
 import { createRouter, createWebHistory } from 'vue-router';
 import { StorageService } from '@tsdaodao/base-vue';
 import { LoginPage } from '@tsdaodao/login-vue';
-import { FriendRequestsPage, AddFriendPage, BlacklistPage, RobotConfigPage } from '@tsdaodao/contacts-vue';
+import { FriendRequestsPage, AddFriendPage, BlacklistPage, RobotConfigPage, ClowderCatConsolePage } from '@tsdaodao/contacts-vue';
 const routes = [
     {
         path: '/',
@@ -53,6 +53,11 @@ const routes = [
                 path: 'robots',
                 name: 'RobotConfig',
                 component: RobotConfigPage
+            },
+            {
+                path: 'clowder-cats',
+                name: 'ClowderCatConsole',
+                component: ClowderCatConsolePage
             },
             {
                 path: 'create-group',

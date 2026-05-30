@@ -3,6 +3,7 @@ import { ref, onMounted, computed, watch } from 'vue';
 import { useGroupStore } from '@tsdaodao/datasource-vue';
 import { useUserStore } from '@tsdaodao/datasource-vue';
 import { useConversationStore } from '@tsdaodao/datasource-vue';
+import { useClowderStore } from '@tsdaodao/datasource-vue';
 import { getMyGroupRole } from '@tsdaodao/datasource-vue';
 import { friendApi, groupApi } from '@tsdaodao/datasource-vue';
 import ChannelAvatar from './ChannelAvatar.vue';
@@ -20,9 +21,11 @@ const emit = defineEmits(['close', 'members-click']);
 const groupStore = useGroupStore();
 const userStore = useUserStore();
 const conversationStore = useConversationStore();
+const clowderStore = useClowderStore();
 
 const groupInfo = computed(() => groupStore.groups[props.groupNo]);
 const members = computed(() => groupStore.groupMembers[props.groupNo] || []);
+const catMembers = computed(() => clowderStore.groupCatMemberships[props.groupNo] || []);
 const avatarInputRef = ref<HTMLInputElement | null>(null);
 
 const editingName = ref(false);
@@ -99,6 +102,7 @@ watch(
 async function loadGroupDetails() {
   await groupStore.getGroupInfo(props.groupNo);
   await groupStore.fetchGroupMembers(props.groupNo);
+  await clowderStore.loadGroupCats(props.groupNo).catch(() => undefined);
 }
 
 async function refreshGroupDetails() {
@@ -391,19 +395,25 @@ async function confirmDestructiveAction() {
         <!-- Members Summary -->
         <div class="members-summary-section">
           <div class="section-title-row" @click="emit('members-click')">
-            <span>群成员 ({{ members.length }}人)</span>
+            <span>群成员 ({{ members.length + catMembers.length }}人)</span>
             <button class="view-all-btn">查看全部</button>
           </div>
           <div class="role-summary">
             <span>群主 {{ roleSummary.owner }}</span>
             <span>管理员 {{ roleSummary.admin }}</span>
             <span>成员 {{ roleSummary.member }}</span>
+            <span>猫猫 {{ catMembers.length }}</span>
           </div>
           <div class="members-grid">
             <div v-for="m in members.slice(0, 8)" :key="m.uid" class="member-item">
               <ChannelAvatar :avatar="m.avatar" :name="m.name" :size="32" />
               <span class="member-name">{{ m.display_name || m.name }}</span>
               <span v-if="m.role_label !== '成员'" class="member-role">{{ m.role_label }}</span>
+            </div>
+            <div v-for="cat in catMembers.slice(0, Math.max(0, 8 - members.length))" :key="cat.id" class="member-item clowder-cat-member">
+              <ChannelAvatar :avatar="cat.avatar" :name="cat.displayName" :size="32" />
+              <span class="member-name">{{ cat.displayName }}</span>
+              <span class="member-role">猫猫</span>
             </div>
           </div>
         </div>
@@ -423,6 +433,9 @@ async function confirmDestructiveAction() {
           </button>
           <button class="secondary-action-btn" @click="openInviteModal">
             邀请成员
+          </button>
+          <button v-if="canManageGroup" class="secondary-action-btn" @click="emit('members-click')">
+            添加猫猫
           </button>
           <button class="secondary-action-btn" @click="loadQRCode">
             群二维码

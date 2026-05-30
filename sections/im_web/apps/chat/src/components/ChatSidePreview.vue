@@ -238,6 +238,30 @@ function openExternal() {
   font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
 }
 
+.markdown-preview :deep(table) {
+  display: block;
+  max-width: 100%;
+  margin: 0 0 10px;
+  border-collapse: collapse;
+  overflow-x: auto;
+}
+
+.markdown-preview :deep(th),
+.markdown-preview :deep(td) {
+  min-width: 80px;
+  padding: 6px 8px;
+  border: var(--border-hairline);
+  text-align: left;
+  vertical-align: top;
+  white-space: normal;
+  word-break: break-word;
+}
+
+.markdown-preview :deep(th) {
+  background: rgba(0, 0, 0, 0.04);
+  font-weight: 600;
+}
+
 .html-preview,
 .pdf-preview {
   width: 100%;

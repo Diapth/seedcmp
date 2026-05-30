@@ -69,10 +69,6 @@ async function handleCreate() {
     Message.warning('请选择至少一个群成员');
     return;
   }
-  if (selectedHumanUids.value.length === 0) {
-    Message.warning('请选择至少一个真人联系人作为群成员');
-    return;
-  }
 
   creating.value = true;
   try {

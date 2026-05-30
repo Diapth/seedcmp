@@ -49,12 +49,27 @@ const clowderMeta = computed(() => {
   const catDisplayName = content.catDisplayName || content.cat_display_name;
   const catId = content.catId || content.cat_id;
   if (connectorId !== 'im-web' && !catDisplayName && !catId) return undefined;
+  const inferredDisplayName = inferClowderCatDisplayName(displayText.value);
   return {
     connectorId,
-    catDisplayName: catDisplayName || catId || 'Clowder',
+    catDisplayName: catDisplayName || inferredDisplayName || catId || 'Clowder',
     catId
   };
 });
+
+function inferClowderCatDisplayName(text: string) {
+  const value = String(text || '').trim();
+  const prefixMatch = value.match(/^【([^】]{1,40}?)】/);
+  if (prefixMatch) return prefixMatch[1].replace(/[🐱🐈🐾\s]+$/g, '').trim();
+
+  const inlineSlashMatch = value.match(/(?:^|[\s，。:：])([^\s/［\[\]］，。:：]{1,40})\/[^\s/［\[\]］，。:：]{1,40}(?=[\s，。:：]|已|收|回|确|$)/u);
+  if (inlineSlashMatch) return inlineSlashMatch[1].replace(/[🐱🐈🐾\s]+$/g, '').trim();
+
+  const suffixMatch = value.match(/[［\[]([^\]/\]］\n]{1,40})\/[^\]］\n]{1,120}[］\]]\s*$/);
+  if (suffixMatch) return suffixMatch[1].replace(/[🐱🐈🐾\s]+$/g, '').trim();
+
+  return '';
+}
 
 const unsupportedMedia = computed(() => {
   const content = messageContent.value;
@@ -491,6 +506,36 @@ async function handleMarkdownClick(event: MouseEvent) {
 .markdown-body :deep(pre code) {
   padding: 0;
   background: transparent;
+}
+
+.markdown-body :deep(table) {
+  display: block;
+  max-width: 100%;
+  margin: 0 0 8px;
+  border-collapse: collapse;
+  overflow-x: auto;
+  font-size: 13px;
+  line-height: 1.45;
+}
+
+.markdown-body :deep(th),
+.markdown-body :deep(td) {
+  min-width: 72px;
+  padding: 6px 8px;
+  border: var(--border-hairline);
+  text-align: left;
+  vertical-align: top;
+  white-space: normal;
+  word-break: break-word;
+}
+
+.markdown-body :deep(th) {
+  background: rgba(0, 0, 0, 0.04);
+  font-weight: 600;
+}
+
+.text-cell.is-me .markdown-body :deep(th) {
+  background: rgba(255, 255, 255, 0.16);
 }
 
 .markdown-body :deep(.markdown-code-block) {

@@ -17,6 +17,7 @@ export default defineConfig({
     setupFiles: ['./tests/setup.ts']
   },
   resolve: {
+    extensions: ['.ts', '.tsx', '.mts', '.mjs', '.js', '.jsx', '.json'],
     alias: [
       { find: /^@tsdaodao\/base-vue$/, replacement: path.resolve(__dirname, '../../packages/base-vue/src/index.ts') },
       { find: /^@tsdaodao\/base-vue\/(.*)$/, replacement: path.resolve(__dirname, '../../packages/base-vue/src/$1') },

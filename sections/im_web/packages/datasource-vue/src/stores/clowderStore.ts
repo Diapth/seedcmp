@@ -10,6 +10,7 @@ import {
   type ClowderConversationRef,
   type ClowderConversationStateResponse,
   type ClowderConnectionStatus,
+  type ClowderGroupCatStateResponse,
   type IMConnectorPermission
 } from '../api/clowder';
 import {
@@ -183,8 +184,8 @@ export const useClowderStore = defineStore('clowder', () => {
     }
   }
 
-  function normalizeCatDirectory(response: ClowderCatDirectoryResponse) {
-    return (response.agents || []).map(agent => toClowderCatContact(agent, {
+  function normalizeCatDirectory(response?: ClowderCatDirectoryResponse) {
+    return (response?.agents || []).map(agent => toClowderCatContact(agent, {
       connected: agent.connected === true
     }));
   }
@@ -277,21 +278,112 @@ export const useClowderStore = defineStore('clowder', () => {
       groupId: input.groupId,
       groupName: input.groupName,
       catIds: catMembers.map(cat => cat.catId),
+      cats: catMembers.map(cat => ({
+        catId: cat.catId,
+        displayName: cat.displayName,
+        aliases: cat.aliases,
+        mentionPatterns: cat.mentionNames,
+        avatar: cat.avatar,
+        personalitySummary: cat.personalitySummary,
+        capabilitySummary: cat.capabilitySummary,
+        available: cat.available,
+        availabilityState: cat.availabilityState,
+        source: cat.source,
+        connected: true
+      })),
       proactiveReplies: input.rules?.proactiveReplies === true,
       prompt
     });
     return prompt;
   }
 
-  async function removeGroupCat(groupId: string, catId: string, groupName?: string) {
-    const nextCats = (groupCatMemberships.value[groupId] || []).filter(cat => cat.catId !== catId);
+  function serializeGroupCatsForSync(cats: ClowderCatContact[]) {
+    return cats.map(cat => ({
+      catId: cat.catId,
+      displayName: cat.displayName,
+      aliases: cat.aliases,
+      mentionPatterns: cat.mentionNames,
+      avatar: cat.avatar,
+      personalitySummary: cat.personalitySummary,
+      capabilitySummary: cat.capabilitySummary,
+      available: cat.available,
+      availabilityState: cat.availabilityState,
+      source: cat.source,
+      connected: true
+    }));
+  }
+
+  function buildCurrentGroupPrompt(groupId: string, groupName: string, cats: ClowderCatContact[]) {
+    const prompt = buildClowderGroupPrompt({
+      groupId,
+      groupName,
+      humanMembers: [],
+      catMembers: cats,
+      rules: {
+        proactiveReplies: false,
+        privacy: 'Cats can see display names, roles, and mention handles only.'
+      }
+    });
+    groupPrompts.value[groupId] = prompt;
+    return prompt;
+  }
+
+  async function loadGroupCats(groupId: string) {
+    const response = await clowderApi.getGroupCats({ groupId }) as unknown as ClowderGroupCatStateResponse;
+    let cats = (response.cats || []).map(agent => toClowderCatContact(agent, {
+      connected: true
+    }));
+    if (cats.length === 0) {
+      try {
+        const directory = await clowderApi.getAgentDirectory({
+          channelId: groupId,
+          channelType: 2
+        }) as unknown as ClowderAgentDirectoryResponse;
+        cats = (directory.agents || []).map(agent => toClowderCatContact(agent, {
+          connected: true
+        }));
+      } catch (_err) {
+        cats = [];
+      }
+    }
+    groupCatMemberships.value[groupId] = cats;
+    groupPrompts.value[groupId] = response.prompt || '';
+    return cats;
+  }
+
+  async function addGroupCat(groupId: string, catId: string, groupName?: string) {
+    const contact = getCatContactById(catId);
+    if (!contact) {
+      throw new Error('Clowder cat contact is not connected');
+    }
+    const current = groupCatMemberships.value[groupId] || [];
+    const nextCats = current.some(cat => cat.catId === contact.catId)
+      ? current
+      : [...current, contact];
     groupCatMemberships.value[groupId] = nextCats;
+    const nextPrompt = buildCurrentGroupPrompt(groupId, groupName || groupId, nextCats);
     await clowderApi.syncGroupCats({
       groupId,
       groupName: groupName || groupId,
       catIds: nextCats.map(cat => cat.catId),
+      cats: serializeGroupCatsForSync(nextCats),
       proactiveReplies: false,
-      prompt: groupPrompts.value[groupId] || ''
+      prompt: nextPrompt
+    });
+    return nextCats;
+  }
+
+  async function removeGroupCat(groupId: string, catId: string, groupName?: string) {
+    const nextCats = (groupCatMemberships.value[groupId] || []).filter(cat => cat.catId !== catId);
+    groupCatMemberships.value[groupId] = nextCats;
+    const nextPrompt = buildCurrentGroupPrompt(groupId, groupName || groupId, nextCats);
+    await clowderApi.syncGroupCats({
+      groupId,
+      groupName: groupName || groupId,
+      catIds: nextCats.map(cat => cat.catId),
+      cats: serializeGroupCatsForSync(nextCats),
+      proactiveReplies: false,
+      prompt: nextPrompt
     });
     return nextCats;
   }
@@ -424,6 +516,8 @@ export const useClowderStore = defineStore('clowder', () => {
     connectExistingCat,
     createCatAndConnect,
     syncMixedGroupCats,
+    loadGroupCats,
+    addGroupCat,
     removeGroupCat,
     allowGroup,
     denyGroup,

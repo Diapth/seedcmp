@@ -1,7 +1,6 @@
 <script setup lang="ts">
 import { ref, onMounted, watch, nextTick, computed } from 'vue';
-import { useMessageStore } from '@tsdaodao/datasource-vue';
-import { useUserStore } from '@tsdaodao/datasource-vue';
+import { useChannelStore, useMessageStore, useUserStore } from '@tsdaodao/datasource-vue';
 import { useRemoteConfig } from '@tsdaodao/base-vue';
 import {
   TextCell,
@@ -33,6 +32,7 @@ const emit = defineEmits<{
 
 const messageStore = useMessageStore();
 const userStore = useUserStore();
+const channelStore = useChannelStore();
 const { remoteConfig } = useRemoteConfig();
 
 const scrollContainer = ref<HTMLDivElement | null>(null);
@@ -122,8 +122,82 @@ function shouldShowTime(msg: any, index: number): boolean {
   return (msg.timestamp - prevMsg.timestamp) > 300;
 }
 
+function isClowderConnectorMessage(msg: any): boolean {
+  const content = msg?.content || msg?.payload || {};
+  return content.connectorId === 'im-web' ||
+    content.connector_id === 'im-web' ||
+    Boolean(content.catDisplayName || content.cat_display_name || content.catId || content.cat_id);
+}
+
 function isMe(msg: any): boolean {
+  if (isClowderConnectorMessage(msg)) return false;
   return msg.fromUID === userStore.currentUser?.uid;
+}
+
+function getClowderSenderName(msg: any): string {
+  const content = msg?.content || msg?.payload || {};
+  const connectorId = content.connectorId || content.connector_id;
+  const isDirectCatChannel = props.channelType === 1 && String(props.channelId || '').startsWith('clowder_cat:');
+  if (connectorId !== 'im-web' && !content.catDisplayName && !content.cat_display_name && !content.catId && !content.cat_id && !isDirectCatChannel) {
+    return '';
+  }
+  const explicitName = String(content.catDisplayName || content.cat_display_name || '').trim();
+  if (explicitName) return explicitName;
+
+  const prefixName = extractClowderCatDisplayNameFromText(String(content.text || content.content || ''));
+  if (prefixName) return prefixName;
+
+  if (isDirectCatChannel) {
+    const catId = String(props.channelId || '').slice('clowder_cat:'.length);
+    const cachedName = String(channelStore.channels[channelKey.value]?.name || '').trim();
+    if (cachedName && cachedName !== props.channelId && cachedName !== catId) return cachedName;
+  }
+
+  return String(content.catId || content.cat_id || '');
+}
+
+function extractClowderCatDisplayNameFromText(text: string) {
+  const value = String(text || '').trim();
+  const prefixMatch = value.match(/^【([^】]{1,40}?)】/);
+  if (prefixMatch) return prefixMatch[1].replace(/[🐱🐈🐾\s]+$/g, '').trim();
+
+  const inlineSlashMatch = value.match(/(?:^|[\s，。:：])([^\s/［\[\]］，。:：]{1,40})\/[^\s/［\[\]］，。:：]{1,40}(?=[\s，。:：]|已|收|回|确|$)/u);
+  if (inlineSlashMatch) return inlineSlashMatch[1].replace(/[🐱🐈🐾\s]+$/g, '').trim();
+
+  const suffixMatch = value.match(/[［\[]([^\]/\]］\n]{1,40})\/[^\]］\n]{1,120}[］\]]\s*$/);
+  if (suffixMatch) return suffixMatch[1].replace(/[🐱🐈🐾\s]+$/g, '').trim();
+
+  return '';
+}
+
+function getClowderSenderAvatar(msg: any): string {
+  const content = msg?.content || msg?.payload || {};
+  const metadata = content.metadata || {};
+  const avatar = content.avatar ||
+    content.catAvatar ||
+    content.cat_avatar ||
+    metadata.avatar ||
+    metadata.catAvatar ||
+    metadata.cat_avatar ||
+    '';
+  if (avatar) return String(avatar);
+
+  if (props.channelType === 1 && String(props.channelId || '').startsWith('clowder_cat:')) {
+    return String(channelStore.channels[channelKey.value]?.avatar || '');
+  }
+  return '';
+}
+
+function getMessageSenderName(msg: any): string {
+  const clowderName = getClowderSenderName(msg);
+  if (clowderName) return clowderName;
+  return userStore.userCache[msg.fromUID]?.name || msg.fromUID || '加载中';
+}
+
+function getMessageSenderAvatar(msg: any): string {
+  const clowderAvatar = getClowderSenderAvatar(msg);
+  if (clowderAvatar) return clowderAvatar;
+  return userStore.userCache[msg.fromUID]?.avatar || '';
 }
 
 function textFromTranscriptItem(item: any): string {
@@ -430,8 +504,8 @@ function handleCodePreview(payload: any) {
       >
         <ChannelAvatar
           v-if="!isMe(item.msg)"
-          :name="userStore.userCache[item.msg.fromUID]?.name || '加载中'"
-          :avatar="userStore.userCache[item.msg.fromUID]?.avatar"
+          :name="getMessageSenderName(item.msg)"
+          :avatar="getMessageSenderAvatar(item.msg)"
           :size="36"
           class="msg-avatar"
         />
@@ -441,7 +515,7 @@ function handleCodePreview(payload: any) {
             v-if="channelType === 2 && !isMe(item.msg)"
             class="user-name-label"
           >
-            {{ userStore.userCache[item.msg.fromUID]?.name || item.msg.fromUID }}
+            {{ getMessageSenderName(item.msg) }}
           </div>
 
           <!-- Quote / Reply Reference Box -->

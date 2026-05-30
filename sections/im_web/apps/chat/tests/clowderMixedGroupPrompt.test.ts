@@ -1,11 +1,12 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { createPinia, setActivePinia } from 'pinia'
 
+const get = vi.fn()
 const post = vi.fn()
 
 vi.mock('@tsdaodao/base-vue', () => ({
   apiClient: {
-    get: vi.fn(),
+    get,
     post
   }
 }))
@@ -64,5 +65,130 @@ describe('Clowder mixed human and cat group prompt', () => {
     expect(prompt).toContain('Allowed @ targets: @Alice, @Bob, @codex, @news')
     expect(prompt).toContain('Cats may answer only when mentioned or focused.')
     expect(prompt).toContain('Cats can see display names, roles, and mention handles only.')
+  })
+
+  it('forwards group cat mention targets and recent context to Clowder conversation routing', async () => {
+    const { useClowderStore } = await import('../../../packages/datasource-vue/src/stores/clowderStore.ts')
+    const clowderStore = useClowderStore()
+
+    await clowderStore.sendConversationMessage({
+      channelId: 'group-1',
+      channelType: 2,
+      targetCatIds: ['codex'],
+      promptContext: [
+        'Group: Launch Room (id: group-1)',
+        'Recent messages:',
+        '- Alice: @Codex 帮我整理一下',
+        '- News Cat: 上一轮摘要'
+      ].join('\n')
+    }, '@Codex 帮我整理一下')
+
+    expect(post).toHaveBeenCalledWith('clowder/conversation/message', {
+      channelId: 'group-1',
+      channelType: 2,
+      targetCatIds: ['codex'],
+      promptContext: expect.stringContaining('Recent messages:'),
+      text: '@Codex 帮我整理一下'
+    })
+  })
+
+  it('message input builds Clowder group context from prompt metadata and recent messages', async () => {
+    const source = await import('../src/components/MessageInput.vue?raw')
+
+    expect(source.default).toContain('buildClowderPromptContext')
+    expect(source.default).toContain('Recent messages:')
+    expect(source.default).toContain('messageStore.getChannelMessages(props.channelId, props.channelType)')
+    expect(source.default).toContain('targetCatIds')
+    expect(source.default).toContain('promptContext: buildClowderPromptContext(text, targetCatIds)')
+  })
+
+  it('loads durable group cat membership back from the bridge', async () => {
+    get.mockResolvedValueOnce({
+      groupId: 'group-1',
+      groupName: 'Launch Room',
+      catIds: ['codex'],
+      prompt: 'Group: Launch Room\nCats:\n- Codex',
+      cats: [
+        {
+          catId: 'codex',
+          displayName: 'Codex',
+          aliases: ['@codex'],
+          mentionPatterns: ['@codex'],
+          available: true,
+          connected: true
+        }
+      ]
+    })
+    const { useClowderStore } = await import('../../../packages/datasource-vue/src/stores/clowderStore.ts')
+    const clowderStore = useClowderStore()
+
+    const cats = await clowderStore.loadGroupCats('group-1')
+
+    expect(get).toHaveBeenCalledWith('clowder/group/cats', { params: { groupId: 'group-1' } })
+    expect(cats.map(cat => cat.catId)).toEqual(['codex'])
+    expect(clowderStore.groupCatMemberships['group-1'].map(cat => cat.displayName)).toEqual(['Codex'])
+    expect(clowderStore.groupPrompts['group-1']).toContain('Launch Room')
+  })
+
+  it('adds a connected cat to an existing group and syncs the durable membership', async () => {
+    const { useClowderStore } = await import('../../../packages/datasource-vue/src/stores/clowderStore.ts')
+    const clowderStore = useClowderStore()
+    clowderStore.connectedCatContacts = [
+      {
+        id: 'clowder_cat:codex',
+        catId: 'codex',
+        displayName: 'Codex',
+        aliases: ['@codex'],
+        mentionNames: ['@codex'],
+        avatar: '',
+        personalitySummary: 'Careful coding partner',
+        capabilitySummary: 'code, tests',
+        available: true,
+        availabilityState: 'available',
+        source: 'existing',
+        connected: true
+      }
+    ]
+
+    const cats = await clowderStore.addGroupCat('group-1', 'codex', 'Launch Room')
+
+    expect(cats.map(cat => cat.catId)).toEqual(['codex'])
+    expect(post).toHaveBeenCalledWith('clowder/group/cats/sync', expect.objectContaining({
+      groupId: 'group-1',
+      groupName: 'Launch Room',
+      catIds: ['codex'],
+      cats: [expect.objectContaining({ catId: 'codex', displayName: 'Codex' })],
+      prompt: expect.stringContaining('Codex')
+    }))
+  })
+
+  it('falls back to the group agent directory when no durable cat membership exists yet', async () => {
+    get
+      .mockResolvedValueOnce({
+        groupId: 'group-legacy',
+        catIds: [],
+        cats: [],
+        prompt: ''
+      })
+      .mockResolvedValueOnce({
+        agents: [
+          {
+            catId: 'opus',
+            displayName: '布偶猫',
+            aliases: ['@布偶猫'],
+            mentionPatterns: ['@布偶猫'],
+            available: true
+          }
+        ]
+      })
+    const { useClowderStore } = await import('../../../packages/datasource-vue/src/stores/clowderStore.ts')
+    const clowderStore = useClowderStore()
+
+    const cats = await clowderStore.loadGroupCats('group-legacy')
+
+    expect(get).toHaveBeenNthCalledWith(1, 'clowder/group/cats', { params: { groupId: 'group-legacy' } })
+    expect(get).toHaveBeenNthCalledWith(2, 'clowder/conversation/agents', { params: { channelId: 'group-legacy', channelType: 2 } })
+    expect(cats.map(cat => cat.displayName)).toEqual(['布偶猫'])
+    expect(clowderStore.groupCatMemberships['group-legacy'].map(cat => cat.catId)).toEqual(['opus'])
   })
 })

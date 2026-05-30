@@ -1,7 +1,7 @@
 import { defineStore } from 'pinia';
 import { ref } from 'vue';
 import { commonApi, groupApi } from '../api';
-import { getClowderCatIdFromContactId, isClowderCatContactId } from './clowderCatContacts';
+import { getClowderCatIdFromContactId, isClowderAiContactId, isClowderCatContactId } from './clowderCatContacts';
 import { useClowderStore } from './clowderStore';
 
 export interface ChannelInfo {
@@ -24,10 +24,10 @@ export const useChannelStore = defineStore('channel', () => {
   // Get channel detail, with caching
   async function getChannelInfo(channelId: string, channelType: number): Promise<ChannelInfo> {
     const key = `${channelId}-${channelType}`;
-    if (channels.value[key]) return channels.value[key];
-    if (String(channelId) === 'clowder_ai' && Number(channelType) === 1) {
+    if (isClowderAiContactId(String(channelId)) && Number(channelType) === 1) {
       channels.value[key] = {
-        channel_id: 'clowder_ai',
+        ...channels.value[key],
+        channel_id: String(channelId),
         channel_type: 1,
         name: 'Clowder AI',
         avatar: '',
@@ -42,12 +42,24 @@ export const useChannelStore = defineStore('channel', () => {
     if (Number(channelType) === 1 && isClowderCatContactId(String(channelId))) {
       const catId = getClowderCatIdFromContactId(String(channelId)) || String(channelId);
       const clowderStore = useClowderStore();
-      const catContact = clowderStore.getCatContactById(String(channelId));
+      let catContact = clowderStore.getCatContactById(String(channelId));
+      const cached = channels.value[key];
+      const cachedName = String(cached?.name || '').trim();
+      const hasOnlyRawName = !cachedName || cachedName === String(channelId) || cachedName === catId;
+      if (!catContact && hasOnlyRawName) {
+        try {
+          await clowderStore.loadCatContactDirectory({ includeUnavailable: true });
+          catContact = clowderStore.getCatContactById(String(channelId));
+        } catch (e) {
+          console.warn(`Failed to load Clowder cat directory for ${channelId}`, e);
+        }
+      }
       channels.value[key] = {
+        ...cached,
         channel_id: String(channelId),
         channel_type: 1,
-        name: catContact?.displayName || catId,
-        avatar: catContact?.avatar || '',
+        name: catContact?.displayName || (hasOnlyRawName ? catId : cachedName),
+        avatar: catContact?.avatar || cached?.avatar || '',
         mute: 0,
         top: 0,
         save: 0,
@@ -60,6 +72,7 @@ export const useChannelStore = defineStore('channel', () => {
       };
       return channels.value[key];
     }
+    if (channels.value[key]) return channels.value[key];
     const version = resetVersion.value;
 
     try {

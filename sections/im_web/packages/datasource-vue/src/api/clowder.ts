@@ -118,6 +118,7 @@ export interface ClowderMessageRequest extends ClowderConversationRef {
 export interface ClowderCreateCatRequest {
   name: string;
   alias?: string;
+  clientId: 'openai' | 'anthropic';
   personality?: string;
   capabilities?: string[];
 }
@@ -134,7 +135,17 @@ export interface ClowderGroupCatSyncRequest {
   groupId: string;
   groupName: string;
   catIds: string[];
+  cats?: ClowderAgent[];
   prompt: string;
+  proactiveReplies?: boolean;
+}
+
+export interface ClowderGroupCatStateResponse {
+  groupId: string;
+  groupName?: string;
+  catIds: string[];
+  cats?: ClowderAgent[];
+  prompt?: string;
   proactiveReplies?: boolean;
 }
 
@@ -171,6 +182,9 @@ export const clowderApi = {
   },
   syncGroupCats(data: ClowderGroupCatSyncRequest) {
     return apiClient.post<Record<string, unknown>>('clowder/group/cats/sync', data);
+  },
+  getGroupCats(params: { groupId: string }) {
+    return apiClient.get<ClowderGroupCatStateResponse>('clowder/group/cats', { params });
   },
   allowGroup(params: ClowderConversationRef) {
     return apiClient.post<IMConnectorPermission>('clowder/group/allow', params);

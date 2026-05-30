@@ -25,6 +25,7 @@ const groupInfo = computed(() => groupStore.groups[groupNo.value]);
 const members = computed(() => groupStore.groupMembers[groupNo.value] || []);
 const catMembers = computed(() => clowderStore.groupCatMemberships[groupNo.value] || []);
 const memberKeyword = ref('');
+const selectedCatId = ref('');
 const pendingAction = ref<null | { title: string; message: string; danger?: boolean; run: () => Promise<void> }>(null);
 const pendingActionLoading = ref(false);
 
@@ -54,18 +55,39 @@ const filteredCatMembers = computed(() => {
   });
 });
 
+const availableCatsForGroup = computed(() => {
+  const currentCatIds = new Set(catMembers.value.map(cat => cat.catId));
+  return clowderStore.connectedCatContacts.filter(cat => !currentCatIds.has(cat.catId));
+});
+
+const currentMember = computed(() => {
+  const uid = String(userStore.currentUser?.uid || '');
+  if (!uid) return null;
+  return members.value.find((member: any) => String(member.uid || member.member_uid || '') === uid) || null;
+});
+
+const currentMemberRole = computed(() => Number(currentMember.value?.role || 0));
+
+const isCurrentUserOwner = computed(() => {
+  const uid = String(userStore.currentUser?.uid || '');
+  const owner = String(groupInfo.value?.owner || groupInfo.value?.creator || '');
+  return (!!uid && !!owner && uid === owner) || currentMemberRole.value === 1;
+});
+
 const isOwner = computed(() => {
-  return getMyGroupRole(groupInfo.value, userStore.currentUser?.uid) === 1;
+  return isCurrentUserOwner.value || getMyGroupRole(groupInfo.value, userStore.currentUser?.uid) === 1;
 });
 
 const canManage = computed(() => {
-  return getMyGroupRole(groupInfo.value, userStore.currentUser?.uid) >= 1;
+  return isOwner.value || currentMemberRole.value === 2 || getMyGroupRole(groupInfo.value, userStore.currentUser?.uid) >= 1;
 });
 
 onMounted(async () => {
   if (groupNo.value) {
     await groupStore.getGroupInfo(groupNo.value);
     await groupStore.fetchGroupMembers(groupNo.value);
+    await clowderStore.loadCatContactDirectory({ includeUnavailable: true }).catch(() => undefined);
+    await clowderStore.loadGroupCats(groupNo.value).catch(() => undefined);
   }
 });
 
@@ -91,6 +113,18 @@ async function handleRemoveCatMember(catId: string) {
       Message.success('已移出猫猫成员');
     }
   };
+}
+
+async function handleAddCatMember() {
+  const catId = selectedCatId.value;
+  if (!catId) return;
+  try {
+    await clowderStore.addGroupCat(groupNo.value, catId, groupInfo.value?.name || groupNo.value);
+    selectedCatId.value = '';
+    Message.success('已添加猫猫成员');
+  } catch (err: any) {
+    Message.error(err.message || err.msg || '添加猫猫失败');
+  }
 }
 
 async function handleAppointManager(uid: string) {
@@ -186,6 +220,26 @@ function handleGoBack() {
       </div>
 
       <div class="members-list">
+        <div v-if="canManage" class="cat-add-row">
+          <select v-model="selectedCatId" class="cat-add-select">
+            <option value="">添加猫猫</option>
+            <option
+              v-for="cat in availableCatsForGroup"
+              :key="cat.id"
+              :value="cat.catId"
+            >
+              {{ cat.displayName }}
+            </option>
+          </select>
+          <button
+            class="action-btn"
+            :disabled="!selectedCatId"
+            @click="handleAddCatMember"
+          >
+            添加
+          </button>
+        </div>
+
         <div v-for="m in filteredMembers" :key="m.uid" class="member-row">
           <ChannelAvatar :avatar="m.avatar" :name="m.name" :size="36" />
           <div class="member-body">
@@ -361,6 +415,27 @@ function handleGoBack() {
 .members-list {
   display: flex;
   flex-direction: column;
+}
+
+.cat-add-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 16px 12px;
+  border-bottom: var(--border-hairline);
+  background-color: var(--bg-primary);
+}
+
+.cat-add-select {
+  flex: 1;
+  height: 34px;
+  padding: 0 10px;
+  background-color: var(--bg-primary);
+  border: var(--border-hairline);
+  border-radius: var(--radius-sm);
+  color: var(--text-primary);
+  font-size: 13px;
+  outline: none;
 }
 
 .member-row {

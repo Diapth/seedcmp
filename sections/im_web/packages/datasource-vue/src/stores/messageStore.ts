@@ -3,6 +3,9 @@ import { ref } from 'vue';
 import WKSDK, { Message as WKMessage, MessageContent, MessageImage } from 'wukongimjssdk';
 import { commonApi, resolveApiAssetUrl, syncApi } from '../api';
 import { MessageFile, MessageVoice } from '../contentTypes/index';
+import { getClowderCatIdFromContactId, isClowderAiContactId, isClowderCatContactId } from './clowderCatContacts';
+import { useChannelStore } from './channelStore';
+import { useClowderStore } from './clowderStore';
 import { useConversationStore } from './conversationStore';
 import { useUserStore } from './userStore';
 
@@ -145,6 +148,8 @@ export const useMessageStore = defineStore('message', () => {
   const sendingFromThisTab = new Set<string>();
 
   const conversationStore = useConversationStore();
+  const channelStore = useChannelStore();
+  const clowderStore = useClowderStore();
   const userStore = useUserStore();
 
   function getChannelMessages(channelId: string, channelType: number): Message[] {
@@ -254,6 +259,17 @@ export const useMessageStore = defineStore('message', () => {
       String(content?.connectorId || content?.connector_id || '') === CLOWDER_CONNECTOR_ID;
   }
 
+  function clowderStreamState(content?: any) {
+    return String(content?.stream?.state || content?.stream_state || '').trim();
+  }
+
+  function isClowderStreamingPlaceholder(msg: Message) {
+    if (!isAiAssistantSource(msg.fromUID, msg.content)) return false;
+    if (String(msg.content?.connectorId || msg.content?.connector_id || '') !== CLOWDER_CONNECTOR_ID) return false;
+    const state = clowderStreamState(msg.content);
+    return msg.content?.streaming === true && (state === 'placeholder' || state === 'chunk');
+  }
+
   function isLocalStreamingAiMessage(msg: Message) {
     const clientMsgNo = String(msg.clientMsgNo || '');
     const messageID = String(msg.messageID || '');
@@ -261,7 +277,7 @@ export const useMessageStore = defineStore('message', () => {
       clientMsgNo.startsWith('clowder-stream-') ||
       messageID.startsWith('ai-stream-') ||
       messageID.startsWith('clowder-stream-');
-    return isLocalStreamKey &&
+    return (isLocalStreamKey || isClowderStreamingPlaceholder(msg)) &&
       isAiAssistantSource(msg.fromUID, msg.content) &&
       (
         msg.content?.streaming === true ||
@@ -299,6 +315,46 @@ export const useMessageStore = defineStore('message', () => {
       clientMsgNo: local.clientMsgNo,
       content: normalizeAiRobotMessageContent(incoming.fromUID, incoming.content, false),
       status: 'success'
+    };
+  }
+
+  function isLocalPendingMessageFromSender(msg: Message, fromUID: string) {
+    if (!fromUID || String(msg.fromUID || '') !== fromUID) return false;
+    if (Number(msg.messageSeq || 0) > 0) return false;
+    if (String(msg.messageID || '')) return false;
+    return !!String(msg.clientMsgNo || '') && !!getMessageText(msg);
+  }
+
+  function findMergeableLocalOwnMessage(list: Message[], incoming: Message) {
+    const incomingFromUID = String(incoming.fromUID || '');
+    if (!incomingFromUID) return undefined;
+    if (Number(incoming.messageSeq || 0) <= 0 && !String(incoming.messageID || '')) return undefined;
+    const incomingText = getMessageText(incoming);
+    if (!incomingText) return undefined;
+
+    const incomingTs = Number(incoming.timestamp || 0);
+    const candidates = list.filter(item =>
+      isLocalPendingMessageFromSender(item, incomingFromUID) &&
+      getMessageText(item) === incomingText &&
+      Math.abs(Number(item.timestamp || 0) - incomingTs) <= 600
+    );
+    if (!candidates.length) return undefined;
+
+    return candidates.sort((a, b) => {
+      const aDiff = Math.abs(Number(a.timestamp || 0) - incomingTs);
+      const bDiff = Math.abs(Number(b.timestamp || 0) - incomingTs);
+      if (aDiff !== bDiff) return aDiff - bDiff;
+      return Number(b.timestamp || 0) - Number(a.timestamp || 0);
+    })[0];
+  }
+
+  function mergePersistedOwnMessageIntoLocal(local: Message, incoming: Message): Message {
+    return {
+      ...local,
+      ...incoming,
+      clientMsgNo: local.clientMsgNo,
+      status: 'success',
+      retryable: false
     };
   }
 
@@ -344,18 +400,33 @@ export const useMessageStore = defineStore('message', () => {
     }
   }
 
-  function isDeepSeekAiChannel(channelId: string, channelType: number) {
-    return Number(channelType) === 1 && String(channelId || '') === DEEPSEEK_AI_ROBOT_ID;
+  function isAiDirectChannel(channelId: string, channelType: number) {
+    if (Number(channelType) !== 1) return false;
+    const id = String(channelId || '');
+    return id === DEEPSEEK_AI_ROBOT_ID || isClowderAiContactId(id) || isClowderCatContactId(id);
   }
 
   function sortMessagesForChannel(list: Message[], channelId: string, channelType: number) {
     list.sort((a, b) => {
-      if (isDeepSeekAiChannel(channelId, channelType)) {
+      if (Number(channelType) === 2) {
+        const aPlaceholder = isClowderStreamingPlaceholder(a);
+        const bPlaceholder = isClowderStreamingPlaceholder(b);
+        if (aPlaceholder !== bPlaceholder) {
+          const aAssistant = isAiAssistantSource(a.fromUID, a.content);
+          const bAssistant = isAiAssistantSource(b.fromUID, b.content);
+          const nearSameTurn = Math.abs(Number(a.timestamp || 0) - Number(b.timestamp || 0)) <= 120;
+          if (nearSameTurn && aAssistant !== bAssistant) {
+            return aPlaceholder ? 1 : -1;
+          }
+        }
+      }
+
+      if (isAiDirectChannel(channelId, channelType)) {
         const timeDiff = Number(a.timestamp || 0) - Number(b.timestamp || 0);
         if (timeDiff !== 0) return timeDiff;
 
-        const aIsAi = String(a.fromUID || '') === DEEPSEEK_AI_ROBOT_ID;
-        const bIsAi = String(b.fromUID || '') === DEEPSEEK_AI_ROBOT_ID;
+        const aIsAi = isAiAssistantSource(a.fromUID, a.content);
+        const bIsAi = isAiAssistantSource(b.fromUID, b.content);
         if (aIsAi !== bIsAi) return aIsAi ? 1 : -1;
       }
 
@@ -429,8 +500,50 @@ export const useMessageStore = defineStore('message', () => {
     return getLatestConversationDigestMessage(list) || [...list].reverse().find(msg => msg && !msg.isRevoked);
   }
 
+  function extractClowderCatDisplayNameFromText(text: string) {
+    const value = String(text || '').trim();
+    const prefixMatch = value.match(/^【([^】]{1,40}?)】/);
+    if (prefixMatch) return prefixMatch[1].replace(/[🐱🐈🐾\s]+$/g, '').trim();
+
+    const inlineSlashMatch = value.match(/(?:^|[\s，。:：])([^\s/［\[\]］，。:：]{1,40})\/[^\s/［\[\]］，。:：]{1,40}(?=[\s，。:：]|已|收|回|确|$)/u);
+    if (inlineSlashMatch) return inlineSlashMatch[1].replace(/[🐱🐈🐾\s]+$/g, '').trim();
+
+    const suffixMatch = value.match(/[［\[]([^\]/\]］\n]{1,40})\/[^\]］\n]{1,120}[］\]]\s*$/);
+    if (suffixMatch) return suffixMatch[1].replace(/[🐱🐈🐾\s]+$/g, '').trim();
+
+    return '';
+  }
+
+  function getClowderDisplayNameFromMessage(message?: Message) {
+    const content = message?.content || {};
+    const metadataName = String(content.catDisplayName || content.cat_display_name || '').trim();
+    if (metadataName) return metadataName;
+    return extractClowderCatDisplayNameFromText(String(content.text || content.content || ''));
+  }
+
+  function getClowderDisplayNameFromMessageList(channelId: string, list: Message[]) {
+    if (!getClowderCatIdFromContactId(channelId)) return '';
+    for (const message of [...list].reverse()) {
+      const name = getClowderDisplayNameFromMessage(message);
+      if (name) return name;
+    }
+    return '';
+  }
+
+  function resolveClowderConversationName(channelId: string, currentName: string, lastMessage: Message, fallbackName = '') {
+    const catId = getClowderCatIdFromContactId(channelId);
+    if (!catId) return currentName;
+    const catName = getClowderDisplayNameFromMessage(lastMessage) || fallbackName;
+    if (catName) return catName;
+    const catContactName = String(clowderStore.getCatContactById(channelId)?.displayName || '').trim();
+    if (catContactName) return catContactName;
+    if (currentName && currentName !== catId) return currentName;
+    return catId;
+  }
+
   function updateExistingConversationSummary(channelId: string, channelType: number, lastMessage: Message, options: ConversationSummaryOptions = {}) {
     const key = getChannelKey(channelId, channelType);
+    const historyName = getClowderDisplayNameFromMessageList(channelId, messages.value[key] || []);
     const matching = conversationStore.conversations.filter(item =>
       String(item.channel_id) === String(channelId) &&
       Number(item.channel_type) === Number(channelType)
@@ -447,6 +560,10 @@ export const useMessageStore = defineStore('message', () => {
       fromUID: lastMessage.fromUID
     };
     for (const item of matching) {
+      item.name = resolveClowderConversationName(channelId, item.name || '', lastMessage, historyName);
+      if (Number(channelType) === 1 && isClowderCatContactId(channelId) && item.name) {
+        channelStore.updateChannelInfo(channelId, channelType, { name: item.name });
+      }
       item.last_msg_seq = lastMessage.messageSeq || item.last_msg_seq;
       item.last_msg_time = lastMessage.timestamp || item.last_msg_time;
       item.last_message = summary;
@@ -551,6 +668,13 @@ export const useMessageStore = defineStore('message', () => {
               mergedMap.set(localKey, { ...existing, ...m, clientMsgNo: existing.clientMsgNo || m.clientMsgNo });
               return;
             }
+          }
+          const localOwn = findMergeableLocalOwnMessage(Array.from(mergedMap.values()), m);
+          if (localOwn) {
+            const localKey = getMessageMergeKey(localOwn);
+            mergedMap.set(localKey, mergePersistedOwnMessageIntoLocal(localOwn, m));
+            removePendingMessage(localOwn.clientMsgNo);
+            return;
           }
           const localStreamingAi = findMergeableLocalAiStream(Array.from(mergedMap.values()), m, { protectHistory: true });
           if (localStreamingAi) {
