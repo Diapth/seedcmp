@@ -94,6 +94,42 @@ func TestOutboundPayloadBuildsVirtualClowderDirectMessageForUser(t *testing.T) {
 	assert.Equal(t, "clowder_ai", req.FromUID)
 }
 
+func TestOutboundPayloadUsesReplySenderForDirectMessage(t *testing.T) {
+	payload := OutboundPayload{
+		ConnectorID:    ConnectorID,
+		ExternalChatID: "1:clowder_ai",
+		CatID:          "codex",
+		Content:        "hello from clowder",
+		Format:         "markdown",
+		Metadata: map[string]interface{}{
+			"replyToSender": map[string]interface{}{
+				"id": "u_10001",
+			},
+		},
+	}
+
+	req, err := BuildOutboundMessage(payload)
+
+	require.NoError(t, err)
+	assert.Equal(t, "u_10001", req.ChannelID)
+	assert.Equal(t, common.ChannelTypePerson.Uint8(), req.ChannelType)
+	assert.Equal(t, "clowder_ai", req.FromUID)
+}
+
+func TestOutboundPayloadUsesDefaultRecipientForDirectMessageWithoutSenderMetadata(t *testing.T) {
+	req, err := BuildOutboundMessageWithDefaultRecipient(OutboundPayload{
+		ConnectorID:    ConnectorID,
+		ExternalChatID: "1:clowder_ai",
+		Content:        "hello from clowder",
+		Format:         "markdown",
+	}, "18337488675")
+
+	require.NoError(t, err)
+	assert.Equal(t, "18337488675", req.ChannelID)
+	assert.Equal(t, common.ChannelTypePerson.Uint8(), req.ChannelType)
+	assert.Equal(t, "clowder_ai", req.FromUID)
+}
+
 func TestVirtualClowderExternalChatIDIncludesUserFakeChannel(t *testing.T) {
 	userID := "u_1"
 

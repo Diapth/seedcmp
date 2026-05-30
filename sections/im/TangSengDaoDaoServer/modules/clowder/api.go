@@ -239,7 +239,7 @@ func (c *Clowder) outbound(ctx *wkhttp.Context) {
 		ctx.JSON(http.StatusBadRequest, map[string]string{"error": "invalid_connector"})
 		return
 	}
-	msgReq, err := BuildOutboundMessage(payload)
+	msgReq, err := BuildOutboundMessageWithDefaultRecipient(payload, c.config.DefaultOwnerUserID)
 	if err != nil {
 		if errors.Is(err, ErrOutboundNoop) {
 			ctx.JSON(http.StatusOK, map[string]interface{}{"ok": true, "skipped": "noop"})

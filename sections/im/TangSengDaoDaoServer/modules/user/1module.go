@@ -46,6 +46,7 @@ func init() {
 							uids = append(uids, user.UID)
 						}
 					}
+					uids = append(uids, ClowderAIUID)
 					return uids, nil
 				},
 			},

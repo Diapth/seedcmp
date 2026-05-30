@@ -42,9 +42,20 @@ type OutboundStreamState struct {
 }
 
 func BuildOutboundMessage(payload OutboundPayload) (*config.MsgSendReq, error) {
+	return BuildOutboundMessageWithDefaultRecipient(payload, "")
+}
+
+func BuildOutboundMessageWithDefaultRecipient(payload OutboundPayload, defaultRecipientUID string) (*config.MsgSendReq, error) {
 	channelType, channelID, err := parseExternalChatID(payload.ExternalChatID)
 	if err != nil {
 		return nil, err
+	}
+	directRecipientUID := ""
+	if channelType == common.ChannelTypePerson.Uint8() {
+		directRecipientUID = outboundDirectRecipientUID(payload, defaultRecipientUID)
+		if directRecipientUID != "" {
+			channelID = directRecipientUID
+		}
 	}
 	content := strings.TrimSpace(payload.Content)
 	if content == "" && payload.Stream != nil && payload.Stream.State == "cleanup" {
@@ -61,6 +72,9 @@ func BuildOutboundMessage(payload OutboundPayload) (*config.MsgSendReq, error) {
 	fromUID := clowderAIDirectChannelID
 	if catID := strings.TrimSpace(payload.CatID); catID != "" {
 		fromUID = "clowder:" + catID
+	}
+	if directRecipientUID != "" {
+		fromUID = clowderAIDirectChannelID
 	}
 	if channelType == common.ChannelTypePerson.Uint8() && common.IsFakeChannel(channelID) {
 		uids := strings.Split(channelID, "@")
@@ -122,6 +136,37 @@ func BuildOutboundMessage(payload OutboundPayload) (*config.MsgSendReq, error) {
 		FromUID:     fromUID,
 		Payload:     bodyBytes,
 	}, nil
+}
+
+func outboundDirectRecipientUID(payload OutboundPayload, defaultRecipientUID string) string {
+	for _, key := range []string{"replyToSender", "reply_to_sender"} {
+		if value, ok := payload.Metadata[key]; ok {
+			if uid := nestedString(value, "id", "uid", "userId", "user_id"); uid != "" {
+				return uid
+			}
+		}
+	}
+	return strings.TrimSpace(defaultRecipientUID)
+}
+
+func nestedString(value interface{}, keys ...string) string {
+	switch typed := value.(type) {
+	case map[string]interface{}:
+		for _, key := range keys {
+			if raw, ok := typed[key]; ok {
+				if text := strings.TrimSpace(fmt.Sprint(raw)); text != "" {
+					return text
+				}
+			}
+		}
+	case map[string]string:
+		for _, key := range keys {
+			if text := strings.TrimSpace(typed[key]); text != "" {
+				return text
+			}
+		}
+	}
+	return ""
 }
 
 func buildOutboundMessageBody(payload OutboundPayload, content string, format string) map[string]interface{} {
