@@ -1,21 +1,28 @@
 <script setup lang="ts">
-import { onMounted } from 'vue';
+import { computed, onMounted, ref } from 'vue';
 import { useRouter } from 'vue-router';
 import { useContactStore } from '../stores/contactStore';
-import { useGroupStore } from '@tsdaodao/datasource-vue';
+import { useClowderStore, useGroupStore } from '@tsdaodao/datasource-vue';
 import { ChannelAvatar } from '@tsdaodao/base-vue';
 
 const router = useRouter();
 const contactStore = useContactStore();
 const groupStore = useGroupStore();
+const clowderStore = useClowderStore();
 const SYSTEM_ROBOT_ID = 'u_10000';
 const DEEPSEEK_AI_ROBOT_ID = 'deepseek_ai_robot';
 const CLOWDER_AI_ROBOT_ID = 'clowder_ai';
+
+const clowderCatContacts = computed(() => clowderStore.catContactDirectory);
+const connectedCatContacts = computed(() => clowderStore.connectedCatContacts);
+const showCreateCatForm = ref(false);
+const newCatName = ref('');
 
 onMounted(() => {
   contactStore.syncContacts();
   contactStore.refreshFriendRequestUnreadCount();
   groupStore.fetchMyGroups();
+  clowderStore.loadCatContactDirectory({ includeUnavailable: true }).catch(() => undefined);
 });
 
 function handleContactClick(uid: string) {
@@ -52,6 +59,30 @@ function handleDeepSeekRobot() {
 
 function handleClowderRobot() {
   router.push(`/chat/conversation/${CLOWDER_AI_ROBOT_ID}/1`);
+}
+
+async function handleConnectCat(catId: string) {
+  const cat = await clowderStore.connectExistingCat(catId).catch(() => undefined);
+  if (cat) {
+    router.push(`/chat/conversation/${cat.directConversationId}/1`);
+  }
+}
+
+async function handleCreateCatAndConnect() {
+  const name = newCatName.value.trim();
+  if (!name) return;
+  const cat = await clowderStore.createCatAndConnect({
+    name
+  }).catch(() => undefined);
+  if (cat) {
+    newCatName.value = '';
+    showCreateCatForm.value = false;
+    router.push(`/chat/conversation/${cat.directConversationId}/1`);
+  }
+}
+
+function handleCatContactClick(cat: { directConversationId: string }) {
+  router.push(`/chat/conversation/${cat.directConversationId}/1`);
 }
 
 function scrollToGroupList() {
@@ -187,6 +218,33 @@ function scrollToLetter(letter: string) {
         <div class="action-label">Clowder AI</div>
         <span class="action-count robot-tag">Clowder</span>
       </div>
+
+      <div class="action-item clowder-cat-action">
+        <div class="action-icon clowder-cat-icon">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" class="svg-icon">
+            <circle cx="8" cy="9" r="4" />
+            <circle cx="16" cy="9" r="4" />
+            <path d="M4 20c.8-3 3.1-5 6-5h4c2.9 0 5.2 2 6 5" />
+          </svg>
+        </div>
+        <div class="action-label">Clowder 猫猫</div>
+        <span class="action-count">{{ connectedCatContacts.length }}</span>
+        <div class="cat-action-buttons">
+          <button type="button" class="cat-action-btn" @click.stop="clowderStore.loadCatContactDirectory({ includeUnavailable: true })">添加已有猫猫</button>
+          <button type="button" class="cat-action-btn" @click.stop="showCreateCatForm = !showCreateCatForm">创建猫猫并连接</button>
+        </div>
+      </div>
+
+      <div v-if="showCreateCatForm" class="create-cat-row">
+        <input
+          v-model="newCatName"
+          class="create-cat-input"
+          type="text"
+          placeholder="猫猫名称"
+          @keydown.enter="handleCreateCatAndConnect"
+        />
+        <button type="button" class="cat-action-btn primary" @click="handleCreateCatAndConnect">连接</button>
+      </div>
     </div>
 
     <div class="grouped-list-wrapper">
@@ -218,6 +276,42 @@ function scrollToLetter(letter: string) {
 
       <div v-if="contactStore.groupedContacts.length === 0 && groupStore.savedGroups.length === 0" class="empty-contacts">
         <p>通讯录暂无好友</p>
+      </div>
+
+      <div v-if="clowderCatContacts.length > 0" class="clowder-cats-section">
+        <div class="group-title">Clowder 猫猫</div>
+        <div class="group-items">
+          <div
+            v-for="cat in clowderCatContacts"
+            :key="cat.id"
+            class="friend-item clowder-cat-contact"
+            :class="{ unavailable: !cat.available }"
+            @click="cat.connected ? handleCatContactClick(cat) : handleConnectCat(cat.catId)"
+          >
+            <ChannelAvatar
+              :avatar="cat.avatar"
+              :name="cat.displayName"
+              :size="36"
+            />
+            <div class="friend-info cat-info">
+              <div class="cat-title-row">
+                <span class="friend-name">{{ cat.displayName }}</span>
+                <span class="clowder-cat-badge">猫猫</span>
+                <span v-if="cat.connected" class="cat-connected">已连接</span>
+              </div>
+              <span class="cat-summary">{{ cat.personalitySummary || 'Clowder 联系人' }}</span>
+              <span class="cat-summary muted">{{ cat.capabilitySummary || cat.aliases.join(', ') }}</span>
+            </div>
+            <button
+              v-if="!cat.connected"
+              type="button"
+              class="cat-connect-btn"
+              @click.stop="handleConnectCat(cat.catId)"
+            >
+              添加
+            </button>
+          </div>
+        </div>
       </div>
 
       <div v-else class="groups-scroller">
@@ -334,6 +428,10 @@ function scrollToLetter(letter: string) {
   background-color: #0f766e;
 }
 
+.clowder-cat-icon {
+  background-color: #0f766e;
+}
+
 .robot-config-action {
   border-top: var(--border-hairline);
 }
@@ -344,6 +442,63 @@ function scrollToLetter(letter: string) {
 
 .clowder-robot-action {
   border-top: var(--border-hairline);
+}
+
+.clowder-cat-action {
+  border-top: var(--border-hairline);
+}
+
+.cat-action-buttons {
+  margin-left: auto;
+  display: flex;
+  gap: 6px;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+}
+
+.cat-action-btn,
+.cat-connect-btn {
+  height: 26px;
+  padding: 0 8px;
+  border: var(--border-hairline);
+  border-radius: var(--radius-sm);
+  background: var(--bg-secondary);
+  color: var(--text-secondary);
+  font-size: 11px;
+  cursor: pointer;
+}
+
+.cat-action-btn:hover,
+.cat-connect-btn:hover {
+  color: var(--primary-color, #165dff);
+  border-color: var(--primary-color, #165dff);
+}
+
+.cat-action-btn.primary {
+  color: #ffffff;
+  border-color: var(--primary-color, #165dff);
+  background: var(--primary-color, #165dff);
+}
+
+.create-cat-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 16px 12px 60px;
+  border-top: var(--border-hairline);
+}
+
+.create-cat-input {
+  flex: 1;
+  min-width: 0;
+  height: 28px;
+  padding: 0 8px;
+  border: var(--border-hairline);
+  border-radius: var(--radius-sm);
+  background: var(--bg-secondary);
+  color: var(--text-primary);
+  font-size: 12px;
+  outline: none;
 }
 
 .svg-icon {
@@ -443,6 +598,57 @@ function scrollToLetter(letter: string) {
   align-items: center;
   gap: 6px;
   overflow: hidden;
+}
+
+.cat-info {
+  flex: 1;
+  min-width: 0;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 2px;
+}
+
+.cat-title-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+}
+
+.clowder-cat-contact.unavailable {
+  opacity: 0.72;
+}
+
+.clowder-cat-badge,
+.cat-connected {
+  flex-shrink: 0;
+  border-radius: var(--radius-sm);
+  padding: 1px 5px;
+  font-size: 10px;
+  font-weight: 600;
+}
+
+.clowder-cat-badge {
+  color: #0f766e;
+  background: rgba(15, 118, 110, 0.1);
+}
+
+.cat-connected {
+  color: var(--primary-color, #165dff);
+  background: rgba(22, 93, 255, 0.08);
+}
+
+.cat-summary {
+  max-width: 100%;
+  color: var(--text-secondary);
+  font-size: 11.5px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.cat-summary.muted {
+  color: var(--text-disabled, #9ca3af);
 }
 
 .friend-name {

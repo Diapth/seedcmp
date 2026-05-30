@@ -1,14 +1,21 @@
 <script setup lang="ts">
-import { ref, onMounted } from 'vue';
+import { computed, ref, onMounted } from 'vue';
 import { useRouter } from 'vue-router';
 import { useContactStore } from '@tsdaodao/contacts-vue';
-import { groupApi, useGroupStore } from '@tsdaodao/datasource-vue';
+import {
+  groupApi,
+  isClowderCatContactId,
+  useClowderStore,
+  useGroupStore,
+  type ClowderCatContact
+} from '@tsdaodao/datasource-vue';
 import { ChannelAvatar } from '@tsdaodao/base-vue';
 import { Message } from '@arco-design/web-vue';
 
 const router = useRouter();
 const contactStore = useContactStore();
 const groupStore = useGroupStore();
+const clowderStore = useClowderStore();
 
 const groupName = ref('');
 const selectedUids = ref<string[]>([]);
@@ -17,7 +24,31 @@ const inviteMode = ref<'direct' | 'approval'>('direct');
 
 onMounted(() => {
   contactStore.syncContacts();
+  clowderStore.loadCatContactDirectory({ includeUnavailable: true }).catch(() => undefined);
 });
+
+const mixedSelectableContacts = computed(() => {
+  const humans = contactStore.contacts.map(contact => ({
+    id: String(contact.uid),
+    uid: String(contact.uid),
+    name: contact.remark || contact.name,
+    avatar: contact.avatar,
+    type: 'human' as const,
+    catContact: undefined as ClowderCatContact | undefined
+  }));
+  const cats = clowderStore.connectedCatContacts.map(cat => ({
+    id: cat.id,
+    uid: cat.id,
+    name: cat.displayName,
+    avatar: cat.avatar,
+    type: 'cat' as const,
+    catContact: cat
+  }));
+  return [...humans, ...cats];
+});
+
+const selectedCatContactIds = computed(() => selectedUids.value.filter(isClowderCatContactId));
+const selectedHumanUids = computed(() => selectedUids.value.filter(uid => !isClowderCatContactId(uid)));
 
 function toggleSelect(uid: string) {
   const idx = selectedUids.value.indexOf(uid);
@@ -38,17 +69,41 @@ async function handleCreate() {
     Message.warning('请选择至少一个群成员');
     return;
   }
+  if (selectedHumanUids.value.length === 0) {
+    Message.warning('请选择至少一个真人联系人作为群成员');
+    return;
+  }
 
   creating.value = true;
   try {
     const res: any = await groupApi.createGroup({
       name,
-      members: selectedUids.value
+      members: selectedHumanUids.value
     });
     
     const groupNo = res.data?.group_no || res.group_no;
     if (groupNo) {
       groupStore.upsertGroup(res.data || res);
+      const selectedCats = clowderStore.connectedCatContacts.filter(cat => selectedCatContactIds.value.includes(cat.id));
+      if (selectedCats.length > 0) {
+        await clowderStore.syncMixedGroupCats({
+          groupId: groupNo,
+          groupName: name,
+          humanMembers: contactStore.contacts
+            .filter(contact => selectedHumanUids.value.includes(String(contact.uid)))
+            .map(contact => ({
+              id: String(contact.uid),
+              displayName: contact.remark || contact.name || String(contact.uid),
+              role: 'member',
+              mentionHandle: `@${contact.remark || contact.name || contact.uid}`
+            })),
+          catMembers: selectedCats,
+          rules: {
+            proactiveReplies: false,
+            privacy: 'Cats can see display names, roles, and mention handles only.'
+          }
+        });
+      }
       if (inviteMode.value === 'approval') {
         await groupStore.updateGroupSetting(groupNo, { invite: 1 });
       }
@@ -96,7 +151,7 @@ function handleGoBack() {
 
       <!-- Friend Selector -->
       <div class="selector-section">
-        <label class="section-label">选择联系人 (已选 {{ selectedUids.length }}人)</label>
+        <label class="section-label">选择联系人 (已选 {{ selectedUids.length }}人，猫猫 {{ selectedCatContactIds.length }})</label>
         <div class="invite-mode-row">
           <button
             class="mode-btn"
@@ -122,29 +177,33 @@ function handleGoBack() {
         </div>
         
         <div class="friends-list-wrapper">
-          <div v-if="contactStore.contacts.length === 0" class="empty-state">
+          <div v-if="mixedSelectableContacts.length === 0" class="empty-state">
             <p>暂无联系人可选择</p>
           </div>
           
           <div v-else class="friends-list">
             <div 
-              v-for="friend in contactStore.contacts" 
-              :key="friend.uid" 
+              v-for="member in mixedSelectableContacts" 
+              :key="member.uid" 
               class="selector-item"
-              :class="{ selected: selectedUids.includes(friend.uid) }"
-              @click="toggleSelect(friend.uid)"
+              :class="{ selected: selectedUids.includes(member.uid), 'is-clowder-cat': member.type === 'cat' }"
+              @click="toggleSelect(member.uid)"
             >
               <div class="checkbox-wrapper">
                 <div class="custom-checkbox"></div>
               </div>
               
               <ChannelAvatar 
-                :avatar="friend.avatar" 
-                :name="friend.remark || friend.name" 
+                :avatar="member.avatar" 
+                :name="member.name" 
                 :size="36" 
               />
               
-              <span class="friend-name">{{ friend.remark || friend.name }}</span>
+              <div class="selector-label">
+                <span class="friend-name">{{ member.name }}</span>
+                <span v-if="member.catContact?.id" class="clowder-cat-badge">猫猫</span>
+                <span v-if="member.catContact?.capabilitySummary" class="cat-capability">{{ member.catContact.capabilitySummary }}</span>
+              </div>
             </div>
           </div>
         </div>
@@ -353,6 +412,35 @@ function handleGoBack() {
   border: solid #ffffff;
   border-width: 0 2px 2px 0;
   transform: rotate(45deg);
+}
+
+.selector-item.is-clowder-cat {
+  background: rgba(15, 118, 110, 0.04);
+}
+
+.selector-label {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+}
+
+.clowder-cat-badge {
+  flex-shrink: 0;
+  border-radius: var(--radius-sm);
+  padding: 1px 5px;
+  color: #0f766e;
+  background: rgba(15, 118, 110, 0.1);
+  font-size: 10px;
+  font-weight: 600;
+}
+
+.cat-capability {
+  color: var(--text-secondary);
+  font-size: 11px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 .friend-name {

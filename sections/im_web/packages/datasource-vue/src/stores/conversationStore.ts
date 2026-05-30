@@ -6,6 +6,7 @@ import { useGroupStore } from './groupStore';
 import { useUserStore } from './userStore';
 import { buildConversationFromGroup } from './groupChatUtils';
 import { useMessageStore } from './messageStore';
+import { isClowderCatContactId } from './clowderCatContacts';
 
 export interface Conversation {
   channel_id: string;
@@ -351,6 +352,7 @@ export const useConversationStore = defineStore('conversation', () => {
     return Number(channelType) === 1 &&
       (channelId === 'deepseek_ai_robot' ||
         channelId === 'clowder_ai' ||
+        isClowderCatContactId(String(channelId)) ||
         LOCAL_ONLY_DIRECT_CONVERSATION_IDS.has(String(channelId)));
   }
 

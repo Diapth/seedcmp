@@ -14,4 +14,16 @@ describe('Clowder AI contact routing', () => {
     expect(source.default).toContain('300000')
     expect(source.default).not.toContain("props.channelId === DEEPSEEK_AI_ROBOT_ID || props.channelId === CLOWDER_AI_ROBOT_ID")
   })
+
+  it('routes direct Clowder cat contacts and includes mixed group prompt context for cat mentions', async () => {
+    const source = await import('../src/components/MessageInput.vue?raw')
+
+    expect(source.default).toContain('isClowderCatConversation')
+    expect(source.default).toContain('getClowderCatIdFromContactId')
+    expect(source.default).toContain('catMentionMembers')
+    expect(source.default).toContain('filteredMentionTargets')
+    expect(source.default).toContain('clowderPromptContext')
+    expect(source.default).toContain('targetCatIds')
+    expect(source.default).toContain('clowderStore.sendConversationMessage')
+  })
 })

@@ -43,6 +43,22 @@ describe('Clowder AI fixed contact entry', () => {
     expect(contactList.default).toContain('clowder-icon')
   })
 
+  it('shows a Clowder cat management entry and read-only routable cat contact rows', async () => {
+    const contactList = await import('../../../packages/contacts-vue/src/views/ContactList.vue?raw')
+
+    expect(contactList.default).toContain('useClowderStore')
+    expect(contactList.default).toContain('loadCatContactDirectory')
+    expect(contactList.default).toContain('handleConnectCat')
+    expect(contactList.default).toContain('handleCreateCatAndConnect')
+    expect(contactList.default).toContain('Clowder 猫猫')
+    expect(contactList.default).toContain('添加已有猫猫')
+    expect(contactList.default).toContain('创建猫猫并连接')
+    expect(contactList.default).toContain('clowder-cat-contact')
+    expect(contactList.default).toContain('cat.personalitySummary')
+    expect(contactList.default).toContain('cat.capabilitySummary')
+    expect(contactList.default).toContain('router.push(`/chat/conversation/${cat.directConversationId}/1`)')
+  })
+
   it('provides stable channel metadata for the Clowder AI direct conversation without remote lookup', async () => {
     const { useChannelStore } = await import('@tsdaodao/datasource-vue')
     const store = useChannelStore()

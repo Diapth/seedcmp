@@ -9,6 +9,7 @@ export type ClowderBindingStatus = 'active' | 'disabled' | 'orphaned' | 'failed'
 export type ClowderDeliveryState = 'queued' | 'dispatched' | 'streaming' | 'delivered' | 'skipped' | 'duplicate' | 'failed' | 'full';
 export type ClowderRoutingMode = 'mention' | 'ask' | 'focus' | 'preferred' | 'last-active' | 'default';
 export type ClowderStreamState = 'placeholder' | 'chunk' | 'final' | 'cleanup';
+export type ClowderCatSource = 'existing' | 'runtime-created' | 'disconnected' | 'stale';
 
 export interface ClowderConversationRef {
   channelId: string;
@@ -42,8 +43,15 @@ export interface IMConnectorBinding {
 export interface ClowderAgent {
   catId: string;
   displayName: string;
+  aliases?: string[];
   mentionPatterns: string[];
+  avatar?: string;
+  personalitySummary?: string;
+  capabilitySummary?: string;
   available: boolean;
+  availabilityState?: 'available' | 'unavailable' | 'stale';
+  source?: ClowderCatSource;
+  connected?: boolean;
   lastActiveAt?: number;
   messageCount?: number;
   preferred?: boolean;
@@ -87,6 +95,10 @@ export interface ClowderAgentDirectoryResponse {
   lastActiveCatId?: string;
 }
 
+export interface ClowderCatDirectoryResponse {
+  agents: ClowderAgent[];
+}
+
 export interface ClowderBindRequest extends ClowderConversationRef {
   threadId?: string;
   title?: string;
@@ -98,6 +110,32 @@ export interface ClowderFocusRequest extends ClowderConversationRef {
 
 export interface ClowderMessageRequest extends ClowderConversationRef {
   text: string;
+  directCatId?: string;
+  targetCatIds?: string[];
+  promptContext?: string;
+}
+
+export interface ClowderCreateCatRequest {
+  name: string;
+  alias?: string;
+  personality?: string;
+  capabilities?: string[];
+}
+
+export interface ClowderCatContactResponse {
+  agent: ClowderAgent;
+  contact?: {
+    connected?: boolean;
+    source?: ClowderCatSource;
+  };
+}
+
+export interface ClowderGroupCatSyncRequest {
+  groupId: string;
+  groupName: string;
+  catIds: string[];
+  prompt: string;
+  proactiveReplies?: boolean;
 }
 
 export const clowderApi = {
@@ -110,6 +148,15 @@ export const clowderApi = {
   getAgentDirectory(params: ClowderConversationRef) {
     return apiClient.get<ClowderAgentDirectoryResponse>('clowder/conversation/agents', { params });
   },
+  getCatDirectory(params?: { query?: string; includeUnavailable?: boolean }) {
+    return apiClient.get<ClowderCatDirectoryResponse>('clowder/cats', { params });
+  },
+  connectCatContact(data: { catId: string }) {
+    return apiClient.post<ClowderCatContactResponse>('clowder/cats/connect', data);
+  },
+  createCatAndConnect(data: ClowderCreateCatRequest) {
+    return apiClient.post<ClowderCatContactResponse>('clowder/cats', data);
+  },
   bindConversation(data: ClowderBindRequest) {
     return apiClient.post<IMConnectorBinding>('clowder/conversation/bind', data);
   },
@@ -121,6 +168,9 @@ export const clowderApi = {
   },
   sendConversationMessage(data: ClowderMessageRequest) {
     return apiClient.post<Record<string, unknown>>('clowder/conversation/message', data);
+  },
+  syncGroupCats(data: ClowderGroupCatSyncRequest) {
+    return apiClient.post<Record<string, unknown>>('clowder/group/cats/sync', data);
   },
   allowGroup(params: ClowderConversationRef) {
     return apiClient.post<IMConnectorPermission>('clowder/group/allow', params);
