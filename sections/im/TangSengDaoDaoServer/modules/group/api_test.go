@@ -43,6 +43,30 @@ func TestGroupCreate(t *testing.T) {
 	time.Sleep(time.Millisecond * 200)
 }
 
+func TestGroupCreateAllowsCreatorOnlyGroup(t *testing.T) {
+	s, ctx := testutil.NewTestServer()
+	f := New(ctx)
+	f.Route(s.GetRoute())
+
+	w := httptest.NewRecorder()
+	req, err := http.NewRequest("POST", "/v1/group/create", bytes.NewReader([]byte(util.ToJson(map[string]interface{}{
+		"name":    "猫猫群",
+		"members": []string{},
+	}))))
+	req.Header.Set("token", testutil.Token)
+	assert.NoError(t, err)
+	s.GetRoute().ServeHTTP(w, req)
+	assert.Equal(t, http.StatusOK, w.Code)
+	assert.Contains(t, w.Body.String(), `"name":"猫猫群"`)
+}
+
+func TestGroupReqAllowsEmptyMembersForCreatorOnlyGroup(t *testing.T) {
+	assert.NoError(t, groupReq{
+		Name:    "猫猫群",
+		Members: []string{},
+	}.Check())
+}
+
 func TestGroupGet(t *testing.T) {
 	s, ctx := testutil.NewTestServer()
 	f := New(ctx)

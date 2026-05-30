@@ -76,6 +76,59 @@ func TestOutboundPayloadBuildsImageMessage(t *testing.T) {
 	assert.Equal(t, "布偶猫", body["cat_display_name"])
 }
 
+func TestOutboundPayloadBuildsFileMessage(t *testing.T) {
+	payload := OutboundPayload{
+		ConnectorID:    ConnectorID,
+		ExternalChatID: "2:group-cat-cafe",
+		CatID:          "codex",
+		CatDisplayName: "Codex",
+		Content:        "我整理了一份会议纪要。",
+		Media: &OutboundMediaPayload{
+			Type:     "file",
+			URL:      "http://100.79.157.76:3003/api/connector-media/notes.md",
+			FileName: "notes.md",
+			Size:     2048,
+		},
+	}
+
+	req, err := BuildOutboundMessage(payload)
+
+	require.NoError(t, err)
+	assert.Equal(t, "group-cat-cafe", req.ChannelID)
+	assert.Equal(t, common.ChannelTypeGroup.Uint8(), req.ChannelType)
+	assert.Equal(t, "clowder:codex", req.FromUID)
+
+	var body map[string]interface{}
+	require.NoError(t, json.Unmarshal(req.Payload, &body))
+	assert.Equal(t, float64(common.File), body["type"])
+	assert.Equal(t, "http://100.79.157.76:3003/api/connector-media/notes.md", body["url"])
+	assert.Equal(t, "notes.md", body["name"])
+	assert.Equal(t, "我整理了一份会议纪要。", body["content"])
+	assert.Equal(t, "im-web", body["connector_id"])
+	assert.Equal(t, "codex", body["cat_id"])
+	assert.Equal(t, "Codex", body["cat_display_name"])
+}
+
+func TestApplyGroupOutboundSubscribersForVirtualCatGroupMessage(t *testing.T) {
+	payload := OutboundPayload{
+		ConnectorID:    ConnectorID,
+		ExternalChatID: "2:group-cat-cafe",
+		CatID:          "codex",
+		CatDisplayName: "Codex",
+		Content:        "我在群里回复。",
+		Format:         "markdown",
+	}
+	req, err := BuildOutboundMessage(payload)
+	require.NoError(t, err)
+
+	applied := applyGroupOutboundSubscribers(req, []string{"creator", "clowder:codex", "", "member", "creator"})
+
+	require.True(t, applied)
+	assert.Equal(t, "creator", req.FromUID)
+	assert.Equal(t, common.ChannelTypeGroup.Uint8(), req.ChannelType)
+	assert.Empty(t, req.Subscribers)
+}
+
 func TestOutboundPayloadBuildsVirtualClowderDirectMessageForUser(t *testing.T) {
 	userID := "u_1"
 	payload := OutboundPayload{
@@ -92,6 +145,50 @@ func TestOutboundPayloadBuildsVirtualClowderDirectMessageForUser(t *testing.T) {
 	assert.Equal(t, userID, req.ChannelID)
 	assert.Equal(t, common.ChannelTypePerson.Uint8(), req.ChannelType)
 	assert.Equal(t, "clowder_ai", req.FromUID)
+}
+
+func TestOutboundPayloadBuildsVirtualClowderCatDirectMessageForUser(t *testing.T) {
+	userID := "u_1"
+	catChannelID := "clowder_cat:opus"
+	payload := OutboundPayload{
+		ConnectorID:    ConnectorID,
+		ExternalChatID: "1:" + common.GetFakeChannelIDWith(userID, catChannelID),
+		CatID:          "opus",
+		CatDisplayName: "布偶猫",
+		Content:        "收到，可以在单独会话里响应。",
+		Format:         "markdown",
+	}
+
+	req, err := BuildOutboundMessage(payload)
+
+	require.NoError(t, err)
+	assert.Equal(t, userID, req.ChannelID)
+	assert.Equal(t, common.ChannelTypePerson.Uint8(), req.ChannelType)
+	assert.Equal(t, catChannelID, req.FromUID)
+
+	var body map[string]interface{}
+	require.NoError(t, json.Unmarshal(req.Payload, &body))
+	assert.Equal(t, "opus", body["cat_id"])
+	assert.Equal(t, "布偶猫", body["cat_display_name"])
+	assert.Equal(t, "im-web", body["connector_id"])
+}
+
+func TestOutboundPayloadKeepsVirtualCatDirectWhenDefaultRecipientConfigured(t *testing.T) {
+	userID := "u_1"
+	catChannelID := "clowder_cat:opus"
+	req, err := BuildOutboundMessageWithDefaultRecipient(OutboundPayload{
+		ConnectorID:    ConnectorID,
+		ExternalChatID: "1:" + common.GetFakeChannelIDWith(userID, catChannelID),
+		CatID:          "opus",
+		CatDisplayName: "布偶猫",
+		Content:        "应该回到布偶猫直聊。",
+		Format:         "markdown",
+	}, "default-owner")
+
+	require.NoError(t, err)
+	assert.Equal(t, userID, req.ChannelID)
+	assert.Equal(t, common.ChannelTypePerson.Uint8(), req.ChannelType)
+	assert.Equal(t, catChannelID, req.FromUID)
 }
 
 func TestOutboundPayloadUsesReplySenderForDirectMessage(t *testing.T) {
@@ -136,6 +233,7 @@ func TestVirtualClowderExternalChatIDIncludesUserFakeChannel(t *testing.T) {
 	got := externalChatIDForUser("clowder_ai", common.ChannelTypePerson.Uint8(), userID)
 
 	assert.Equal(t, "1:"+common.GetFakeChannelIDWith(userID, "clowder_ai"), got)
+	assert.Equal(t, "1:"+common.GetFakeChannelIDWith(userID, "clowder_cat:opus"), externalChatIDForUser("clowder_cat:opus", common.ChannelTypePerson.Uint8(), userID))
 	assert.Equal(t, "2:group-clowder", externalChatIDForUser("group-clowder", common.ChannelTypeGroup.Uint8(), userID))
 }
 

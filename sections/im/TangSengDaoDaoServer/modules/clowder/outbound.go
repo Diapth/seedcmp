@@ -51,10 +51,24 @@ func BuildOutboundMessageWithDefaultRecipient(payload OutboundPayload, defaultRe
 		return nil, err
 	}
 	directRecipientUID := ""
+	directVirtualSenderUID := ""
 	if channelType == common.ChannelTypePerson.Uint8() {
-		directRecipientUID = outboundDirectRecipientUID(payload, defaultRecipientUID)
-		if directRecipientUID != "" {
-			channelID = directRecipientUID
+		if common.IsFakeChannel(channelID) {
+			uids := strings.Split(channelID, "@")
+			if len(uids) == 2 {
+				if isClowderVirtualDirectChannelID(uids[0]) {
+					directVirtualSenderUID = uids[0]
+					directRecipientUID = uids[1]
+				} else if isClowderVirtualDirectChannelID(uids[1]) {
+					directVirtualSenderUID = uids[1]
+					directRecipientUID = uids[0]
+				}
+			}
+		} else {
+			if isClowderVirtualDirectChannelID(channelID) {
+				directVirtualSenderUID = channelID
+			}
+			directRecipientUID = outboundDirectRecipientUID(payload, defaultRecipientUID)
 		}
 	}
 	content := strings.TrimSpace(payload.Content)
@@ -74,18 +88,10 @@ func BuildOutboundMessageWithDefaultRecipient(payload OutboundPayload, defaultRe
 		fromUID = "clowder:" + catID
 	}
 	if directRecipientUID != "" {
+		channelID = directRecipientUID
 		fromUID = clowderAIDirectChannelID
-	}
-	if channelType == common.ChannelTypePerson.Uint8() && common.IsFakeChannel(channelID) {
-		uids := strings.Split(channelID, "@")
-		if len(uids) == 2 {
-			if uids[0] == clowderAIDirectChannelID {
-				fromUID = clowderAIDirectChannelID
-				channelID = uids[1]
-			} else if uids[1] == clowderAIDirectChannelID {
-				fromUID = clowderAIDirectChannelID
-				channelID = uids[0]
-			}
+		if directVirtualSenderUID != "" {
+			fromUID = directVirtualSenderUID
 		}
 	}
 	platformMessageID := payload.PlatformMessageID
@@ -138,6 +144,31 @@ func BuildOutboundMessageWithDefaultRecipient(payload OutboundPayload, defaultRe
 	}, nil
 }
 
+func applyGroupOutboundSubscribers(req *config.MsgSendReq, subscribers []string) bool {
+	if req == nil || req.ChannelType != common.ChannelTypeGroup.Uint8() || !isClowderVirtualSenderUID(req.FromUID) {
+		return false
+	}
+	seen := map[string]struct{}{}
+	realSubscribers := make([]string, 0, len(subscribers))
+	for _, subscriber := range subscribers {
+		uid := strings.TrimSpace(subscriber)
+		if uid == "" || isClowderVirtualSenderUID(uid) {
+			continue
+		}
+		if _, ok := seen[uid]; ok {
+			continue
+		}
+		seen[uid] = struct{}{}
+		realSubscribers = append(realSubscribers, uid)
+	}
+	if len(realSubscribers) == 0 {
+		return false
+	}
+	req.FromUID = realSubscribers[0]
+	req.Subscribers = nil
+	return true
+}
+
 func outboundDirectRecipientUID(payload OutboundPayload, defaultRecipientUID string) string {
 	for _, key := range []string{"replyToSender", "reply_to_sender"} {
 		if value, ok := payload.Metadata[key]; ok {
@@ -169,6 +200,13 @@ func nestedString(value interface{}, keys ...string) string {
 	return ""
 }
 
+func isClowderVirtualDirectChannelID(uid string) bool {
+	trimmed := strings.TrimSpace(uid)
+	return trimmed == clowderAIDirectChannelID ||
+		strings.HasPrefix(trimmed, "clowder_cat:") ||
+		strings.HasPrefix(trimmed, "clowder:")
+}
+
 func buildOutboundMessageBody(payload OutboundPayload, content string, format string) map[string]interface{} {
 	body := map[string]interface{}{
 		"type":         common.Text,
@@ -187,6 +225,20 @@ func buildOutboundMessageBody(payload OutboundPayload, content string, format st
 	mediaURL := strings.TrimSpace(payload.Media.URL)
 	if mediaType == "image" && mediaURL != "" {
 		body["type"] = common.Image
+		body["url"] = mediaURL
+		if payload.Media.FileName != "" {
+			body["name"] = payload.Media.FileName
+		}
+		if payload.Media.Size > 0 {
+			body["size"] = payload.Media.Size
+		}
+		if content == "" && payload.Media.Alt != "" {
+			body["content"] = payload.Media.Alt
+			body["text"] = payload.Media.Alt
+		}
+	}
+	if mediaType == "file" && mediaURL != "" {
+		body["type"] = common.File
 		body["url"] = mediaURL
 		if payload.Media.FileName != "" {
 			body["name"] = payload.Media.FileName

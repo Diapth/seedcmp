@@ -483,7 +483,7 @@ func (g *Group) groupCreate(c *wkhttp.Context) {
 		return
 	}
 	realUids := make([]string, 0)
-	if g.ctx.GetConfig().Group.CreateGroupVerifyFriendOn {
+	if len(req.Members) > 0 && g.ctx.GetConfig().Group.CreateGroupVerifyFriendOn {
 		friends := make([]*model.FriendResp, 0)
 		// 验证好友关系
 		modules := register.GetModules(g.ctx)
@@ -502,20 +502,18 @@ func (g *Group) groupCreate(c *wkhttp.Context) {
 			c.ResponseError(errors.New("添加用户非好友关系，请先添加好友"))
 			return
 		}
-		if len(req.Members) > 0 {
-			for _, uid := range req.Members {
-				for _, friend := range friends {
-					if uid == friend.ToUID {
-						realUids = append(realUids, uid)
-						break
-					}
+		for _, uid := range req.Members {
+			for _, friend := range friends {
+				if uid == friend.ToUID {
+					realUids = append(realUids, uid)
+					break
 				}
 			}
 		}
-	} else {
+	} else if len(req.Members) > 0 {
 		realUids = req.Members
 	}
-	if len(realUids) == 0 {
+	if len(req.Members) > 0 && len(realUids) == 0 {
 		c.ResponseError(errors.New("添加用户非好友关系，请先添加好友"))
 		return
 	}
@@ -2941,9 +2939,6 @@ type groupReq struct {
 }
 
 func (g groupReq) Check() error {
-	if len(g.Members) <= 0 {
-		return errors.New("群成员不能为空！")
-	}
 	return nil
 }
 

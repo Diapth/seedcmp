@@ -34,20 +34,23 @@ type Attachment struct {
 }
 
 type InboundMessage struct {
-	ConnectorID    string       `json:"connectorId"`
-	ExternalChatID string       `json:"externalChatId"`
-	ChannelID      string       `json:"channelId"`
-	ChannelType    uint8        `json:"channelType"`
-	ChatType       string       `json:"chatType"`
-	ChatName       string       `json:"chatName,omitempty"`
-	MessageID      string       `json:"messageId"`
-	ClientMsgNo    string       `json:"clientMsgNo"`
-	MessageSeq     uint32       `json:"messageSeq"`
-	Text           string       `json:"text"`
-	Timestamp      int64        `json:"timestamp"`
-	Sender         Sender       `json:"sender"`
-	Attachments    []Attachment `json:"attachments,omitempty"`
-	Mentions       []string     `json:"mentions,omitempty"`
+	ConnectorID    string             `json:"connectorId"`
+	ExternalChatID string             `json:"externalChatId"`
+	ChannelID      string             `json:"channelId"`
+	ChannelType    uint8              `json:"channelType"`
+	ChatType       string             `json:"chatType"`
+	ChatName       string             `json:"chatName,omitempty"`
+	MessageID      string             `json:"messageId"`
+	ClientMsgNo    string             `json:"clientMsgNo"`
+	MessageSeq     uint32             `json:"messageSeq"`
+	Text           string             `json:"text"`
+	Timestamp      int64              `json:"timestamp"`
+	Sender         Sender             `json:"sender"`
+	Attachments    []Attachment       `json:"attachments,omitempty"`
+	Mentions       []string           `json:"mentions,omitempty"`
+	DirectCatID    string             `json:"directCatId,omitempty"`
+	TargetCatIDs   []string           `json:"targetCatIds,omitempty"`
+	PromptContext  string             `json:"promptContext,omitempty"`
 	Role           *GroupRoleSnapshot `json:"sourceRoleSnapshot,omitempty"`
 }
 
