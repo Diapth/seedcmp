@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, onMounted, watch } from 'vue';
+import { ref, onBeforeUnmount, onMounted, watch } from 'vue';
 import { useRouter, useRoute } from 'vue-router';
 import { useConversationStore } from '@tsdaodao/datasource-vue';
 import { useUserStore } from '@tsdaodao/datasource-vue';
@@ -12,6 +12,8 @@ const conversationStore = useConversationStore();
 const userStore = useUserStore();
 
 const loading = ref(false);
+const syncError = ref('');
+const syncRetryCount = ref(0);
 const showContextMenu = ref(false);
 const contextMenuX = ref(0);
 const contextMenuY = ref(0);
@@ -33,19 +35,15 @@ const digestFallbackByType: Record<number, string> = {
   1000: '[系统消息]'
 };
 
+let syncRetryTimer: ReturnType<typeof setTimeout> | null = null;
+
 onMounted(async () => {
   syncNotificationPermission();
-  if (conversationStore.conversations.length === 0) {
-    loading.value = true;
-    try {
-      await conversationStore.syncGroupConversations();
-      await conversationStore.syncConversations();
-    } catch (e) {
-      console.error(e);
-    } finally {
-      loading.value = false;
-    }
-  }
+  await loadConversationList();
+});
+
+onBeforeUnmount(() => {
+  clearSyncRetryTimer();
 });
 
 function syncNotificationPermission() {
@@ -62,6 +60,58 @@ async function requestNotificationPermission() {
     return;
   }
   notificationPermissionState.value = await Notification.requestPermission();
+}
+
+function formatSyncError(err: any) {
+  if (!err) return '请稍后重试';
+  if (typeof err === 'string') return err;
+  if (err instanceof Error && err.message) return err.message;
+  const nested = err.error;
+  const message = err.msg || err.message || nested?.msg || nested?.message;
+  if (message && typeof message === 'string') return message;
+  if (err.status) return `接口返回 ${err.status}`;
+  return '请检查后端服务后重试';
+}
+
+function clearSyncRetryTimer() {
+  if (syncRetryTimer) {
+    clearTimeout(syncRetryTimer);
+    syncRetryTimer = null;
+  }
+}
+
+function scheduleSyncRetry() {
+  clearSyncRetryTimer();
+  if (syncRetryCount.value >= 5) return;
+  const delay = Math.min(3000 * (syncRetryCount.value + 1), 15000);
+  syncRetryTimer = setTimeout(() => {
+    syncRetryTimer = null;
+    if (conversationStore.conversations.length === 0) {
+      void loadConversationList({ retry: true });
+    }
+  }, delay);
+}
+
+async function loadConversationList(options: { retry?: boolean } = {}) {
+  if (loading.value) return;
+  if (!options.retry) {
+    syncRetryCount.value = 0;
+  }
+  loading.value = true;
+  syncError.value = '';
+  clearSyncRetryTimer();
+  try {
+    await conversationStore.syncGroupConversations({ throwOnError: true });
+    await conversationStore.syncConversations({ throwOnError: true });
+    syncRetryCount.value = 0;
+  } catch (e) {
+    console.error(e);
+    syncRetryCount.value += 1;
+    syncError.value = formatSyncError(e);
+    scheduleSyncRetry();
+  } finally {
+    loading.value = false;
+  }
 }
 
 watch(
@@ -188,9 +238,43 @@ function getSenderUid(lastMessage: any): string {
   return String(lastMessage?.fromUID || lastMessage?.from_uid || lastMessage?.from || '');
 }
 
+function stripClowderCatDecorations(value: string) {
+  return String(value || '').replace(/[🐱🐈🐾\s]+$/g, '').trim();
+}
+
+function extractClowderCatDisplayNameFromText(text: string) {
+  const value = String(text || '').trim();
+  const prefixMatch = value.match(/^【([^】]{1,40}?)】/);
+  if (prefixMatch) return stripClowderCatDecorations(prefixMatch[1]);
+
+  const suffixMatch = value.match(/[［\[]([^\]/\]］\n]{1,40})\/[^\]］\n]{1,120}[］\]]\s*$/);
+  if (suffixMatch) return stripClowderCatDecorations(suffixMatch[1]);
+
+  return '';
+}
+
+function getClowderDigestSenderName(lastMessage: any): string {
+  const payload = parseDigestContent(lastMessage?.payload ?? lastMessage?.content ?? lastMessage?.contentObj);
+  if (!payload || typeof payload !== 'object') return '';
+  const isClowder = payload.connectorId === 'im-web' ||
+    payload.connector_id === 'im-web' ||
+    payload.ai === true ||
+    !!payload.catDisplayName ||
+    !!payload.cat_display_name;
+  if (!isClowder) return '';
+  return String(
+    payload.catDisplayName ||
+    payload.cat_display_name ||
+    payload.catName ||
+    payload.cat_name ||
+    ''
+  ).trim() || extractClowderCatDisplayNameFromText(String(payload.text || payload.content || ''));
+}
+
 function getSenderName(lastMessage: any): string {
   const uid = getSenderUid(lastMessage);
-  return lastMessage?.fromName ||
+  return getClowderDigestSenderName(lastMessage) ||
+    lastMessage?.fromName ||
     lastMessage?.from_name ||
     lastMessage?.sender_name ||
     lastMessage?.senderName ||
@@ -304,6 +388,12 @@ function getDigestPresentation(conv: any) {
       :count="6" 
     />
     
+    <div v-else-if="conversationStore.conversations.length === 0 && syncError" class="empty-conversations sync-error">
+      <p>会话同步失败</p>
+      <span>{{ syncError }}</span>
+      <button @click="loadConversationList()">重试</button>
+    </div>
+
     <div v-else-if="conversationStore.conversations.length === 0" class="empty-conversations">
       <p>暂无聊天会话</p>
     </div>
@@ -396,6 +486,35 @@ function getDigestPresentation(conv: any) {
   text-align: center;
   color: var(--text-secondary);
   font-size: 13px;
+}
+
+.sync-error {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 10px;
+}
+
+.sync-error p {
+  margin: 0;
+  color: var(--text-primary);
+  font-weight: 500;
+}
+
+.sync-error span {
+  max-width: 220px;
+  line-height: 1.5;
+}
+
+.sync-error button {
+  height: 28px;
+  padding: 0 12px;
+  border: var(--border-hairline);
+  border-radius: var(--radius-sm);
+  background: var(--bg-primary);
+  color: var(--text-primary);
+  font-size: 12px;
+  cursor: pointer;
 }
 
 .list-wrapper {

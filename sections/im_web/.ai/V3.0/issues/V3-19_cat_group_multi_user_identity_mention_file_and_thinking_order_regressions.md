@@ -2,7 +2,7 @@
 
 ## Status
 
-Open.
+Fixed and verified on 2026-05-30.
 
 ## Created
 
@@ -98,16 +98,26 @@ sections/im/TangSengDaoDaoServer/modules/clowder/outbound.go
 sections/im/TangSengDaoDaoServer/modules/clowder/api.go
 ```
 
-## Initial Analysis
+## Root Cause
 
-Root cause is not confirmed yet. Likely failure modes to investigate:
+- Clowder group replies use a real WuKongIM sender as transport metadata. `MessageList.vue` resolved the Clowder display name, but when the Clowder payload did not include an avatar it fell back to the transport user's cached avatar, so a cat could visually wear a human user's avatar.
+- Follow-up Clowder attachment/media rows can arrive as separate connector messages with `connectorId: im-web` but without repeated `catDisplayName` metadata. Those rows were still connector messages, but the sender label fell back to the transport user, so a file card sent by `布偶猫` could render as `yunyi`.
+- `MessageInput.vue` mention detection only considered `@` at the beginning or after whitespace. The watcher also re-opened the popup immediately after `selectMember()` changed `inputText`, so choosing a target could leave the popup visible.
+- Clowder file rich blocks with a local upload path were delivered to the IM Web adapter with `absPath` but without a browser-usable `url`. The TangSeng callback contract can render file cards from URL metadata, so missing URL caused downstream filename/path text fallback.
+- `messageStore.ts` always forced active Clowder thinking placeholders after any nearby non-assistant message in a group. That made the placeholder act bottom-pinned even when the nearby message was a newer unrelated human message rather than the original prompt.
 
-- Cat group outbounds may still use a real group member as the WuKongIM transport sender, and some UI paths may fall back to that transport user's avatar/id instead of Clowder cat metadata.
-- Cat identity inference may depend on each viewer's local channel/contact cache, causing different users to resolve the same cat message differently.
-- Mention parsing may use a regex or cursor check that only recognizes `@` at the beginning of the input, instead of the active token before the caret.
-- Mention selection state may not reset `mentionVisible`, query text, selected index, or composition/caret state after insertion.
-- Clowder outbound file normalization may be receiving text-only file references, relative `/uploads/...` paths, or unsupported media block shapes and falling back to text instead of a file content type.
-- Group stream/thinking placeholder sorting may treat active placeholders as bottom-pinned assistant rows instead of normal timestamped rows, or may merge persisted placeholders/finals using a sort key that ignores newer human messages.
+## Fix Record
+
+- `sections/im_web/apps/chat/src/components/MessageList.vue`
+  - Clowder connector messages no longer fall back to `userStore.userCache[msg.fromUID].avatar` when no cat avatar is present. They render through the stable Clowder name plus deterministic fallback avatar instead of a human avatar.
+  - Follow-up connector rows without repeated cat metadata now inherit nearby Clowder cat sender context when adjacent messages come from the same transport sender in the same short time window. This keeps file cards such as `ordering-demo.tar.gz` labeled as `布偶猫`.
+- `sections/im_web/apps/chat/src/components/MessageInput.vue`
+  - Added caret-based active mention token detection so `@` works at the start, middle, and end of a group draft.
+  - Mention selection now replaces only the active token, restores the caret, clears the query, and suppresses the watcher once so the popup stays closed.
+- `sections/im_web/packages/datasource-vue/src/stores/messageStore.ts`
+  - Group placeholder ordering now only applies the prompt-before-placeholder special case when the neighboring user message looks like the prompt for that placeholder's cat. Newer unrelated user messages sort normally below the older thinking row.
+- `/media/leng/DiskB1/exp/clowder-ai/packages/api/src/infrastructure/connectors/OutboundDeliveryHook.ts`
+  - File rich blocks now include `url: resolveInternalRouteUrl(fileUrl)` alongside `absPath` and filename when sent to the IM Web adapter, preserving proper file attachment metadata for the bridge.
 
 ## Acceptance Criteria
 
@@ -126,46 +136,89 @@ Root cause is not confirmed yet. Likely failure modes to investigate:
   - refresh/reconnect preserves the same order and does not resurrect stale thinking rows.
 - The fix includes focused regression tests for identity mapping, mention parsing/closing, file outbound normalization, and group placeholder ordering.
 
-## Suggested Regression Coverage
+## Regression Coverage Added
 
-- Add a store/presentation test proving the same Clowder group message resolves the same cat identity for two simulated viewers with different local human user/channel caches.
-- Add `MessageInput` tests for mention detection in:
-  - `@布偶猫 你好`
-  - `你好 @布偶猫`
-  - `请 @布偶猫 看看`
-  - trailing `你好 @`
-- Add a mention selection test that verifies the popup closes after target insertion.
-- Add bridge/outbound tests for file media blocks and text-only file references, including relative `/uploads/...` URLs if those are expected from Clowder.
-- Add `messageStore` sorting tests where:
-  - user prompt at T1 creates thinking placeholder at T2.
-  - another user message arrives at T3.
-  - the list order is prompt, thinking placeholder, newer user message.
-  - final reply at T4 removes/merges the placeholder without leaving stale rows.
+- `sections/im_web/apps/chat/tests/clowderMessagePresentation.test.ts`
+  - Covers a group Clowder cat reply sent through a human transport sender with no cat avatar and verifies the rendered avatar does not use the human cached avatar.
+  - Covers a follow-up connector attachment message without repeated cat metadata and verifies it still renders as the nearby Clowder cat (`布偶猫`) instead of the transport user.
+- `sections/im_web/apps/chat/tests/clowderAiContactRouting.test.ts`
+  - Covers mention popup visibility for `@` in the middle/end of group drafts.
+  - Covers selecting a mention target and verifies the popup closes after insertion.
+- `sections/im_web/apps/chat/tests/clowderStreamingMerge.test.ts`
+  - Covers a user prompt, an older Clowder thinking placeholder, and a newer human message, expecting the newer message to push the placeholder upward.
+- `/media/leng/DiskB1/exp/clowder-ai/packages/api/test/outbound-delivery-hook.test.js`
+  - Covers file rich-block delivery and verifies the IM Web adapter receives both `url` and `absPath`.
 
-## Verification Plan
+## Verification Results
 
-1. Reproduce with two live browser accounts in the same group.
-2. Capture before/after screenshots under `assets/screenshots/`.
-3. Run focused Vitest coverage for the touched store/component contracts.
-4. Run:
+Automated red/green:
 
 ```bash
-cd sections/im_web && pnpm type-check
-cd sections/im_web && pnpm build
+cd sections/im_web/apps/chat
+pnpm exec vitest run tests/clowderMessagePresentation.test.ts tests/clowderStreamingMerge.test.ts tests/clowderAiContactRouting.test.ts --config vitest.config.ts
 ```
 
-5. If bridge code changes:
+Result: PASS, 3 files / 26 tests.
+
+Follow-up sender-context regression:
 
 ```bash
-cd sections/im/TangSengDaoDaoServer && go test ./modules/clowder
+cd sections/im_web/apps/chat
+pnpm exec vitest run tests/messageStoreDailyMessaging.test.ts tests/clowderMessagePresentation.test.ts tests/clowderMessageStore.test.ts tests/clowderStreamingMerge.test.ts tests/groupOfflineUnreadRetention.test.ts --config vitest.config.ts
 ```
 
-6. If Clowder connector behavior changes:
+Result: PASS, 5 files / 45 tests.
 
 ```bash
-cd /media/leng/DiskB1/exp/clowder-ai/packages/api && pnpm build
+cd sections/im_web
+pnpm type-check
+pnpm test:unit
+pnpm build
 ```
+
+Results:
+
+- `pnpm type-check`: PASS.
+- `pnpm test:unit`: PASS, 57 files / 195 tests.
+- `pnpm build`: PASS. Vite emitted the existing chunk-size warning for the large app bundle.
+
+Clowder connector verification:
+
+```bash
+cd /media/leng/DiskB1/exp/clowder-ai/packages/api
+pnpm build
+CAT_CAFE_DISABLE_SHARED_STATE_PREFLIGHT=1 bash ./scripts/with-test-home.sh node --import $(pwd)/test/helpers/setup-cat-registry.js --test --test-timeout=60000 test/outbound-delivery-hook.test.js
+```
+
+Results:
+
+- `pnpm build`: PASS.
+- `outbound-delivery-hook.test.js`: PASS, 30 tests.
+
+Browser smoke:
+
+```bash
+TARGET_URL=http://localhost:3002 node /home/leng/.codex/skills/playwright-skill/run.js /tmp/playwright-v3-19-mention-smoke.js
+```
+
+Result: PASS. The smoke logged in, opened the group chat, verified a middle-position `@` opens the mention popup, selected a target, and verified the popup closes.
+
+Evidence:
+
+- `sections/im_web/assets/screenshots/v3-19-mention-smoke-20260530153114-middle.png`
+- `sections/im_web/assets/screenshots/v3-19-mention-smoke-20260530153114-selected.png`
+- `sections/im_web/assets/screenshots/v3-19-mention-smoke-20260530153114-result.json`
+
+Note: the browser smoke was intentionally non-sending and only mutated the draft field, then cleared it. File delivery and placeholder ordering were verified by focused unit/connector tests rather than by sending another live cat file into the shared group.
+
+Follow-up browser evidence for account `18337488675` and group `集群`:
+
+- `sections/im_web/.ai/V3.0/tests-e2e/v3-20-history-20260531000045/summary.md`
+- `sections/im_web/.ai/V3.0/tests-e2e/v3-20-history-20260531000045/result.json`
+- `sections/im_web/.ai/V3.0/tests-e2e/v3-20-history-20260531000045/group-history.png`
+
+The audit found all visible `ordering-demo.tar.gz` file rows labeled `布偶猫` with `布` fallback avatar text.
 
 ## Close Notes
 
-Pending.
+Resolved. The four reported regressions are covered by focused automated tests, IM Web type/unit/build gates, Clowder connector build/test gates, and a non-sending browser smoke for the mention popup behavior.

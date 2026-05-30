@@ -259,6 +259,109 @@ describe('clowder message presentation', () => {
     expect(document.querySelector('.msg-avatar.channel-avatar')).toHaveAttribute('data-name', '布偶猫')
   })
 
+  it('does not fall back to the transport user avatar for group Clowder cat replies', async () => {
+    const { default: MessageList } = await import('../src/components/MessageList.vue')
+    const { useMessageStore } = await import('../../../packages/datasource-vue/src/stores/messageStore.ts')
+    const { useUserStore } = await import('../../../packages/datasource-vue/src/stores/userStore.ts')
+    const messageStore = useMessageStore()
+    const userStore = useUserStore()
+    userStore.currentUser = { uid: 'viewer', name: 'Viewer' }
+    userStore.userCache.creator = {
+      uid: 'creator',
+      name: 'Creator',
+      avatar: 'https://example.test/human-creator.png'
+    }
+
+    messageStore.addMessage('group-cat-cafe', 2, {
+      messageID: 'm-cat-group-no-avatar',
+      messageSeq: 24,
+      clientMsgNo: 'clowder-group-ragdoll-no-avatar',
+      fromUID: 'creator',
+      timestamp: 100,
+      content: {
+        type: 1,
+        text: '【布偶猫🐱】我用猫猫身份回复。',
+        connectorId: 'im-web',
+        catId: 'ragdoll-kn9a',
+        catDisplayName: '布偶猫',
+        markdown: true
+      },
+      isRevoked: false,
+      status: 'success'
+    }, { countUnread: false })
+
+    render(MessageList, {
+      props: {
+        channelId: 'group-cat-cafe',
+        channelType: 2
+      }
+    })
+
+    const avatar = document.querySelector('.msg-avatar.channel-avatar')
+    expect(avatar).toHaveAttribute('data-name', '布偶猫')
+    expect(avatar).toHaveAttribute('data-avatar', '')
+  })
+
+  it('uses nearby Clowder cat context for follow-up connector attachment messages without repeated cat metadata', async () => {
+    const { default: MessageList } = await import('../src/components/MessageList.vue')
+    const { useMessageStore } = await import('../../../packages/datasource-vue/src/stores/messageStore.ts')
+    const { useUserStore } = await import('../../../packages/datasource-vue/src/stores/userStore.ts')
+    const messageStore = useMessageStore()
+    const userStore = useUserStore()
+    userStore.currentUser = { uid: 'viewer', name: 'Viewer' }
+    userStore.userCache.creator = {
+      uid: 'creator',
+      name: 'yunyi',
+      avatar: 'https://example.test/yunyi.png'
+    }
+
+    messageStore.addMessage('group-cat-cafe', 2, {
+      messageID: 'm-cat-rich-text',
+      messageSeq: 81,
+      clientMsgNo: 'cat-rich-text',
+      fromUID: 'creator',
+      timestamp: 100,
+      content: {
+        type: 1,
+        text: '文件刚才已经发到聊天里了。',
+        connectorId: 'im-web',
+        catId: 'ragdoll-kn9a',
+        catDisplayName: '布偶猫',
+        markdown: true
+      },
+      isRevoked: false,
+      status: 'success'
+    }, { countUnread: false })
+    messageStore.addMessage('group-cat-cafe', 2, {
+      messageID: 'm-cat-file-followup',
+      messageSeq: 82,
+      clientMsgNo: 'cat-file-followup',
+      fromUID: 'creator',
+      timestamp: 100,
+      content: {
+        type: 1,
+        text: 'ordering-demo.tar.gz',
+        connectorId: 'im-web',
+        markdown: true
+      },
+      isRevoked: false,
+      status: 'success'
+    }, { countUnread: false })
+
+    render(MessageList, {
+      props: {
+        channelId: 'group-cat-cafe',
+        channelType: 2
+      }
+    })
+
+    const labels = [...document.querySelectorAll('.user-name-label')].map(item => item.textContent?.trim())
+    const avatars = [...document.querySelectorAll('.msg-avatar.channel-avatar')]
+    expect(labels).toEqual(['布偶猫', '布偶猫'])
+    expect(avatars[1]).toHaveAttribute('data-name', '布偶猫')
+    expect(avatars[1]).toHaveAttribute('data-avatar', '')
+  })
+
   it('infers group Clowder cat identity from final reply suffix when transport sender is current user', async () => {
     const { default: MessageList } = await import('../src/components/MessageList.vue')
     const { useMessageStore } = await import('../../../packages/datasource-vue/src/stores/messageStore.ts')
@@ -332,6 +435,60 @@ describe('clowder message presentation', () => {
     expect(document.querySelector('.user-name-label')).toHaveTextContent('布偶猫')
   })
 
+  it('prefers final reply signatures over incidental slash text for group cat sender labels', async () => {
+    const { default: MessageList } = await import('../src/components/MessageList.vue')
+    const { useMessageStore } = await import('../../../packages/datasource-vue/src/stores/messageStore.ts')
+    const { useUserStore } = await import('../../../packages/datasource-vue/src/stores/userStore.ts')
+    const messageStore = useMessageStore()
+    const userStore = useUserStore()
+    userStore.currentUser = { uid: 'viewer', name: 'Viewer' }
+    userStore.userCache.creator = { uid: 'creator', name: 'yunyi', avatar: 'https://example.test/yunyi.png' }
+
+    messageStore.addMessage('group-cat-cafe', 2, {
+      messageID: 'm-ragdoll-incidental-slash',
+      messageSeq: 56,
+      clientMsgNo: 'ragdoll-incidental-slash',
+      fromUID: 'creator',
+      timestamp: 100,
+      content: {
+        type: 1,
+        text: '你好呀！这里要确认：是给餐厅/食堂用的真实点餐系统？\n[布偶猫/宪宪🐾 deepseek-v4-flash]',
+        connectorId: 'im-web',
+        markdown: true
+      },
+      isRevoked: false,
+      status: 'success'
+    }, { countUnread: false })
+    messageStore.addMessage('group-cat-cafe', 2, {
+      messageID: 'm-codex-incidental-mention-slash',
+      messageSeq: 58,
+      clientMsgNo: 'codex-incidental-mention-slash',
+      fromUID: 'creator',
+      timestamp: 101,
+      content: {
+        type: 1,
+        text: '知道呀，我刚读完整个 thread。铲屎官让 @ragdoll-kn9a（布偶猫/宪宪）做一个桌面 Web 点餐 demo。[Codex/deepseek-v4-flash🐾]',
+        connectorId: 'im-web',
+        markdown: true
+      },
+      isRevoked: false,
+      status: 'success'
+    }, { countUnread: false })
+
+    render(MessageList, {
+      props: {
+        channelId: 'group-cat-cafe',
+        channelType: 2
+      }
+    })
+
+    const labels = [...document.querySelectorAll('.user-name-label')].map(item => item.textContent?.trim())
+    const avatars = [...document.querySelectorAll('.msg-avatar.channel-avatar')]
+    expect(labels).toEqual(['布偶猫', 'Codex'])
+    expect(avatars[0]).toHaveAttribute('data-name', '布偶猫')
+    expect(avatars[1]).toHaveAttribute('data-name', 'Codex')
+  })
+
   it('infers the Clowder bubble cat label from a final reply suffix', () => {
     render(TextCell, {
       props: {
@@ -368,6 +525,25 @@ describe('clowder message presentation', () => {
     })
 
     expect(document.querySelector('.clowder-cat')).toHaveTextContent('布偶猫')
+  })
+
+  it('prefers final reply signatures over incidental slash text for Clowder bubble labels', () => {
+    render(TextCell, {
+      props: {
+        isMe: false,
+        message: {
+          fromUID: 'creator',
+          content: {
+            type: 1,
+            text: '知道呀，我刚读完整个 thread。铲屎官让 @ragdoll-kn9a（布偶猫/宪宪）做一个桌面 Web 点餐 demo。[Codex/deepseek-v4-flash🐾]',
+            connectorId: 'im-web',
+            markdown: true
+          }
+        }
+      }
+    })
+
+    expect(document.querySelector('.clowder-cat')).toHaveTextContent('Codex')
   })
 
   it('renders all visible Clowder thought and transcript blocks from array aliases', () => {

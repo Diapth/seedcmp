@@ -23,6 +23,17 @@ export const useSdkStore = defineStore('sdk', () => {
   let initializedUid = '';
   let initializedToken = '';
 
+  function formatSdkError(err: any, fallback: string) {
+    if (!err) return fallback;
+    if (typeof err === 'string') return err;
+    if (err instanceof Error && err.message) return err.message;
+    const nested = err.error;
+    const message = err.msg || err.message || nested?.msg || nested?.message;
+    if (message && typeof message === 'string') return message;
+    if (err.status) return `${fallback} (${err.status})`;
+    return fallback;
+  }
+
   function setConnectionState(state: typeof connectionState.value, error = '') {
     connectionState.value = state;
     lastError.value = error;
@@ -43,7 +54,7 @@ export const useSdkStore = defineStore('sdk', () => {
       markRecovered();
     } catch (err: any) {
       recoveryState.value = 'failed';
-      lastError.value = err?.message || String(err || 'Recovery failed');
+      lastError.value = formatSdkError(err, 'Recovery failed');
     }
   }
 
@@ -105,7 +116,7 @@ export const useSdkStore = defineStore('sdk', () => {
         cb(resolveWebsocketConnectAddr(res?.ws_addr));
       } catch (err) {
         console.error('[SDK] Failed to get connect address, falling back', err);
-        lastError.value = err instanceof Error ? err.message : String(err || 'connect address failed');
+        lastError.value = formatSdkError(err, 'connect address failed');
         cb(resolveWebsocketConnectAddr(''));
       }
     };

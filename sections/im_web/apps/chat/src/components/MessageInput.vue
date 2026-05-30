@@ -55,6 +55,7 @@ const CLOWDER_AI_ROBOT_ID = 'clowder_ai';
 const showMentionPopup = ref(false);
 const mentionQuery = ref('');
 const mentionedUids = ref<string[]>([]);
+let suppressMentionPopupOnce = false;
 
 // Reply targetcomputed fields
 const replyUser = computed(() => {
@@ -168,22 +169,37 @@ watch(inputText, (newVal) => {
   triggerTyping();
 
   if (props.channelType !== 2) return;
+  if (suppressMentionPopupOnce) {
+    suppressMentionPopupOnce = false;
+    showMentionPopup.value = false;
+    mentionQuery.value = '';
+    return;
+  }
 
   const caretPos = textareaRef.value?.selectionStart || 0;
-  const textBeforeCaret = newVal.substring(0, caretPos);
-  const lastAtIdx = textBeforeCaret.lastIndexOf('@');
+  const mentionToken = findActiveMentionToken(newVal, caretPos);
 
-  if (lastAtIdx !== -1 && (lastAtIdx === 0 || textBeforeCaret[lastAtIdx - 1] === ' ' || textBeforeCaret[lastAtIdx - 1] === '\n')) {
-    const query = textBeforeCaret.substring(lastAtIdx + 1);
-    if (!query.includes(' ')) {
-      showMentionPopup.value = true;
-      mentionQuery.value = query;
-      void ensureGroupMentionMembersLoaded();
-      return;
-    }
+  if (mentionToken) {
+    showMentionPopup.value = true;
+    mentionQuery.value = mentionToken.query;
+    void ensureGroupMentionMembersLoaded();
+    return;
   }
   showMentionPopup.value = false;
 });
+
+function findActiveMentionToken(text: string, caretPos: number) {
+  const safeCaret = Math.max(0, Math.min(caretPos, text.length));
+  const textBeforeCaret = text.substring(0, safeCaret);
+  const lastAtIdx = textBeforeCaret.lastIndexOf('@');
+  if (lastAtIdx === -1) return null;
+  const query = textBeforeCaret.substring(lastAtIdx + 1);
+  if (/[\s@]/.test(query)) return null;
+  return {
+    start: lastAtIdx,
+    query
+  };
+}
 
 function triggerTyping() {
   if (typingTimeout) return;
@@ -201,20 +217,32 @@ function triggerTyping() {
 
 function selectMember(member: any) {
   const caretPos = textareaRef.value?.selectionStart || 0;
-  const textBeforeCaret = inputText.value.substring(0, caretPos);
+  const mentionToken = findActiveMentionToken(inputText.value, caretPos);
+  if (!mentionToken) {
+    showMentionPopup.value = false;
+    mentionQuery.value = '';
+    textareaRef.value?.focus();
+    return;
+  }
+  const textBeforeMention = inputText.value.substring(0, mentionToken.start);
   const textAfterCaret = inputText.value.substring(caretPos);
-  const lastAtIdx = textBeforeCaret.lastIndexOf('@');
-
-  if (lastAtIdx !== -1) {
-    const uid = getMemberUid(member);
-    const name = getMemberDisplayName(member);
-    const newText = textBeforeCaret.substring(0, lastAtIdx) + `@${name} ` + textAfterCaret;
-    inputText.value = newText;
-    if (uid && !mentionedUids.value.includes(uid)) {
-      mentionedUids.value.push(uid);
-    }
+  const uid = getMemberUid(member);
+  const name = getMemberDisplayName(member);
+  const insertedMention = `@${name} `;
+  const newText = textBeforeMention + insertedMention + textAfterCaret;
+  const nextCaretPos = textBeforeMention.length + insertedMention.length;
+  suppressMentionPopupOnce = true;
+  inputText.value = newText;
+  if (uid && !mentionedUids.value.includes(uid)) {
+    mentionedUids.value.push(uid);
   }
   showMentionPopup.value = false;
+  mentionQuery.value = '';
+  void nextTick(() => {
+    textareaRef.value?.setSelectionRange(nextCaretPos, nextCaretPos);
+    showMentionPopup.value = false;
+    mentionQuery.value = '';
+  });
   textareaRef.value?.focus();
 }
 
@@ -301,7 +329,7 @@ function scheduleClowderConversationSync(channelId: string, channelType: number)
   const delays = [750, 2500, 10000, 30000, 90000, 180000, 300000];
   clowderSyncTimers = delays.map((delay) =>
     window.setTimeout(() => {
-      void messageStore.syncMessages(channelId, channelType);
+      void messageStore.syncMessages(channelId, channelType, { hydrateVisibleHistory: true });
     }, delay),
   );
 }

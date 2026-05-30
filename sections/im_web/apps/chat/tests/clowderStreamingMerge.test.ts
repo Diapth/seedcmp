@@ -109,6 +109,54 @@ describe('clowder streaming merge contracts', () => {
     expect(texts).toEqual(['@布偶猫 收到请确认。', '【布偶猫🐱】🤔 思考中...'])
   })
 
+  it('lets newer group user messages push an older Clowder thinking placeholder upward', async () => {
+    const { useMessageStore } = await import('../../../packages/datasource-vue/src/stores/messageStore.ts')
+    const { useUserStore } = await import('../../../packages/datasource-vue/src/stores/userStore.ts')
+    const messageStore = useMessageStore()
+    const userStore = useUserStore()
+    userStore.currentUser = { uid: 'creator', name: 'Creator' }
+
+    messageStore.addMessage('group-cat-cafe', 2, {
+      messageID: 'placeholder',
+      messageSeq: 1,
+      clientMsgNo: 'server-random-placeholder',
+      fromUID: 'creator',
+      timestamp: 100,
+      content: {
+        type: 1,
+        text: '【布偶猫🐱】🤔 思考中...',
+        connectorId: 'im-web',
+        streaming: true,
+        stream: { state: 'placeholder' }
+      },
+      isRevoked: false,
+      status: 'success'
+    }, { countUnread: false })
+    messageStore.addMessage('group-cat-cafe', 2, {
+      messageID: 'question',
+      messageSeq: 3,
+      clientMsgNo: 'question-client',
+      fromUID: 'creator',
+      timestamp: 101,
+      content: { type: 1, text: '@布偶猫 文件发给我' },
+      isRevoked: false,
+      status: 'success'
+    }, { countUnread: false })
+    messageStore.addMessage('group-cat-cafe', 2, {
+      messageID: 'newer-human',
+      messageSeq: 4,
+      clientMsgNo: 'newer-human-client',
+      fromUID: 'member',
+      timestamp: 102,
+      content: { type: 1, text: '我补充一个信息' },
+      isRevoked: false,
+      status: 'success'
+    }, { countUnread: false })
+
+    const texts = messageStore.getChannelMessages('group-cat-cafe', 2).map(item => item.content.text)
+    expect(texts).toEqual(['@布偶猫 文件发给我', '【布偶猫🐱】🤔 思考中...', '我补充一个信息'])
+  })
+
   it('merges a persisted Clowder placeholder into the final streamed group reply', async () => {
     const { useMessageStore } = await import('../../../packages/datasource-vue/src/stores/messageStore.ts')
     const messageStore = useMessageStore()

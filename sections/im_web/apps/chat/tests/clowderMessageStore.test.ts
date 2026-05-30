@@ -313,6 +313,30 @@ describe('clowder message store contracts', () => {
     expect(channelStore.channels['clowder_cat:opus-1']?.name).toBe('宪宪')
   })
 
+  it('does not derive direct-cat titles from incidental slash text before final signatures', async () => {
+    const { useConversationStore } = await import('../../../packages/datasource-vue/src/stores/conversationStore.ts')
+    const { useChannelStore } = await import('../../../packages/datasource-vue/src/stores/channelStore.ts')
+    const conversationStore = useConversationStore()
+    const channelStore = useChannelStore()
+
+    await conversationStore.ensureConversation('clowder_cat:opus', 1, {
+      messageSeq: 11,
+      timestamp: 104,
+      fromUID: 'clowder_cat:opus',
+      isUnreadCleared: true,
+      content: {
+        type: 1,
+        text: '你好呀！这里要确认：是给餐厅/食堂用的真实点餐系统？\n[宪宪/deepseek-v4-flash🐾]',
+        connector_id: 'im-web',
+        ai: true
+      }
+    })
+
+    const conv = conversationStore.sortedConversations.find(item => item.channel_id === 'clowder_cat:opus')
+    expect(conv?.name).toBe('宪宪')
+    expect(channelStore.channels['clowder_cat:opus-1']?.name).toBe('宪宪')
+  })
+
   it('keeps existing direct-cat summaries on the cat display name after message updates', async () => {
     const { useMessageStore } = await import('../../../packages/datasource-vue/src/stores/messageStore.ts')
     const { useConversationStore } = await import('../../../packages/datasource-vue/src/stores/conversationStore.ts')

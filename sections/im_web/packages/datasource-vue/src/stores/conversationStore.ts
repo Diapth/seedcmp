@@ -206,6 +206,12 @@ export const useConversationStore = defineStore('conversation', () => {
     return [99, 1000].includes(type) && text.includes('你已加入群聊');
   }
 
+  function needsClowderDigestIdentityRecovery(conv?: Conversation) {
+    if (!conv || Number(conv.channel_type) !== 2) return false;
+    const payload = normalizeMessagePayload(conv.last_message || {});
+    return isClowderPayload(payload) && !getClowderCatDisplayNameFromPayload(payload);
+  }
+
   function getLastMessageSource(item: any) {
     const recents = Array.isArray(item.recents) ? item.recents : [];
     const messages = Array.isArray(item.messages) ? item.messages : [];
@@ -223,7 +229,7 @@ export const useConversationStore = defineStore('conversation', () => {
     const raw = getLastMessageSource(item);
     if (!raw) return undefined;
 
-    const content = normalizeMessagePayload(raw);
+    const content = withClowderCatDisplayName(normalizeMessagePayload(raw));
 
     return {
       ...raw,
@@ -240,13 +246,53 @@ export const useConversationStore = defineStore('conversation', () => {
     const prefixMatch = value.match(/^【([^】]{1,40}?)】/);
     if (prefixMatch) return prefixMatch[1].replace(/[🐱🐈🐾\s]+$/g, '').trim();
 
-    const inlineSlashMatch = value.match(/(?:^|[\s，。:：])([^\s/［\[\]］，。:：]{1,40})\/[^\s/［\[\]］，。:：]{1,40}(?=[\s，。:：]|已|收|回|确|$)/u);
-    if (inlineSlashMatch) return inlineSlashMatch[1].replace(/[🐱🐈🐾\s]+$/g, '').trim();
+    const leadingSlashMatch = value.match(/^([^\s/@/［\[\]］，。:：！？?（）()]{1,40})\/[^\s/［\[\]］，。:：]{1,40}(?=[\s，。:：！？?）)]|已|收|回|确|$)/u);
+    if (leadingSlashMatch) return leadingSlashMatch[1].replace(/[🐱🐈🐾\s]+$/g, '').trim();
 
     const suffixMatch = value.match(/[［\[]([^\]/\]］\n]{1,40})\/[^\]］\n]{1,120}[］\]]\s*$/);
     if (suffixMatch) return suffixMatch[1].replace(/[🐱🐈🐾\s]+$/g, '').trim();
 
     return '';
+  }
+
+  function getClowderCatDisplayNameFromPayload(payload: any) {
+    if (!payload || typeof payload !== 'object') return '';
+    const explicit = String(
+      payload.catDisplayName ||
+      payload.cat_display_name ||
+      payload.catName ||
+      payload.cat_name ||
+      ''
+    ).trim();
+    if (explicit) return explicit;
+    return extractClowderCatDisplayNameFromText(String(payload.text || payload.content || ''));
+  }
+
+  function isClowderPayload(payload: any) {
+    if (!payload || typeof payload !== 'object') return false;
+    return payload.connectorId === 'im-web' ||
+      payload.connector_id === 'im-web' ||
+      payload.ai === true ||
+      !!payload.catDisplayName ||
+      !!payload.cat_display_name;
+  }
+
+  function withClowderCatDisplayName(payload: any, fallbackDisplayName = '') {
+    if (!payload || typeof payload !== 'object') return payload;
+    if (!isClowderPayload(payload)) return payload;
+    const displayName = getClowderCatDisplayNameFromPayload(payload) || String(fallbackDisplayName || '').trim();
+    if (!displayName) return payload;
+    return {
+      ...payload,
+      catDisplayName: payload.catDisplayName || displayName,
+      cat_display_name: payload.cat_display_name || displayName
+    };
+  }
+
+  function getClowderCatDisplayNameFromHistory(list: any[]) {
+    return [...list].reverse()
+      .map(item => getClowderCatDisplayNameFromPayload(item.content || item.payload))
+      .find(Boolean) || '';
   }
 
   function resolveClowderConversationName(channelId: string, currentName: string, lastMessage?: any) {
@@ -272,25 +318,51 @@ export const useConversationStore = defineStore('conversation', () => {
   }
 
   function normalizeSyncedMessage(item: any) {
+    const content = withClowderCatDisplayName(normalizeMessagePayload(item));
     return {
       ...item,
-      payload: normalizeMessagePayload(item),
-      content: normalizeMessagePayload(item),
+      payload: content,
+      content,
       messageSeq: item.messageSeq || item.message_seq || 0,
       timestamp: item.timestamp || 0,
       fromUID: item.fromUID || item.from_uid || item.from || ''
     };
   }
 
-  function getLatestConversationMessageFromHistory(list: any[]) {
-    const normalized = list
+  function normalizeConversationHistory(list: any[]) {
+    return list
       .filter(item => item && item.is_deleted !== 1 && item.is_revoked !== 1 && item.revoke !== 1)
-      .map(normalizeSyncedMessage);
+      .map(normalizeSyncedMessage)
+      .sort((a, b) => Number(a.messageSeq || 0) - Number(b.messageSeq || 0));
+  }
+
+  function getLatestConversationMessageFromNormalizedHistory(normalized: any[]) {
     return [...normalized].reverse().find(isConversationDigestSource) || [...normalized].reverse()[0];
   }
 
+  function getLatestConversationMessageFromHistory(list: any[]) {
+    return getLatestConversationMessageFromNormalizedHistory(normalizeConversationHistory(list));
+  }
+
+  function applyHistoryClowderIdentity(lastMessage: any, normalized: any[]) {
+    if (!lastMessage?.content || !isClowderPayload(lastMessage.content)) return lastMessage;
+    const displayName = getClowderCatDisplayNameFromPayload(lastMessage.content) ||
+      getClowderCatDisplayNameFromHistory(normalized);
+    if (!displayName) return lastMessage;
+    const content = withClowderCatDisplayName(lastMessage.content, displayName);
+    return {
+      ...lastMessage,
+      payload: content,
+      content
+    };
+  }
+
   async function ensureConversationFromSyncedMessages(channelId: string, channelType: number, list: any[]) {
-    const lastMessage = getLatestConversationMessageFromHistory(list);
+    const normalized = normalizeConversationHistory(list);
+    const lastMessage = applyHistoryClowderIdentity(
+      getLatestConversationMessageFromNormalizedHistory(normalized),
+      normalized
+    );
     if (!lastMessage) return;
     await ensureConversation(channelId, channelType, {
       messageSeq: lastMessage.messageSeq,
@@ -440,6 +512,18 @@ export const useConversationStore = defineStore('conversation', () => {
     if (manuallyDeletedConversationKeys.value[key]) return;
 
     const conv = findConversation(next.channel_id, next.channel_type);
+    if (conv?.last_message && next.last_message?.content && isClowderPayload(next.last_message.content)) {
+      const existingName = getClowderCatDisplayNameFromPayload(conv.last_message.content || conv.last_message.payload);
+      const nextName = getClowderCatDisplayNameFromPayload(next.last_message.content);
+      if (existingName && !nextName) {
+        const content = withClowderCatDisplayName(next.last_message.content, existingName);
+        next.last_message = {
+          ...next.last_message,
+          payload: content,
+          content
+        };
+      }
+    }
     if (conv) {
       Object.assign(conv, {
         ...next,
@@ -497,6 +581,7 @@ export const useConversationStore = defineStore('conversation', () => {
       await syncExtra();
       if (version !== resetVersion.value) return;
       ensureGroupConversations();
+      await prefetchMissingGroupConversationSummaries();
     } catch (e) {
       console.error('[ConversationStore] Failed to sync conversations', e);
       if (options.throwOnError) {
@@ -526,7 +611,10 @@ export const useConversationStore = defineStore('conversation', () => {
     const groups = Object.values(groupStore.groups);
     await Promise.all(groups.map(async (group) => {
       const conv = findConversation(group.group_no, 2);
-      if (conv && !isGroupJoinPlaceholder(conv)) return;
+      const shouldPrefetch = !conv ||
+        isGroupJoinPlaceholder(conv) ||
+        needsClowderDigestIdentityRecovery(conv);
+      if (!shouldPrefetch) return;
 
       try {
         const res: any = await syncApi.syncMessages({
@@ -538,7 +626,7 @@ export const useConversationStore = defineStore('conversation', () => {
           pull_mode: 1
         });
         const list = Array.isArray(res?.messages) ? res.messages : [];
-        if (!conv || isGroupJoinPlaceholder(conv)) {
+        if (shouldPrefetch) {
           await ensureConversationFromSyncedMessages(group.group_no, 2, list);
         }
       } catch (e) {

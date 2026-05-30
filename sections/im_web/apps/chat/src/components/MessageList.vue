@@ -134,7 +134,7 @@ function isMe(msg: any): boolean {
   return msg.fromUID === userStore.currentUser?.uid;
 }
 
-function getClowderSenderName(msg: any): string {
+function getClowderSenderNameFromMessage(msg: any): string {
   const content = msg?.content || msg?.payload || {};
   const connectorId = content.connectorId || content.connector_id;
   const isDirectCatChannel = props.channelType === 1 && String(props.channelId || '').startsWith('clowder_cat:');
@@ -156,13 +156,48 @@ function getClowderSenderName(msg: any): string {
   return String(content.catId || content.cat_id || '');
 }
 
+function getMessageStableKey(msg: any) {
+  return String(msg?.clientMsgNo || msg?.messageID || `${msg?.fromUID || ''}:${msg?.messageSeq || ''}:${msg?.timestamp || ''}`);
+}
+
+function getNearbyClowderSenderName(msg: any): string {
+  if (!isClowderConnectorMessage(msg)) return '';
+  const currentKey = getMessageStableKey(msg);
+  const index = renderableMessages.value.findIndex(item => item === msg || getMessageStableKey(item) === currentKey);
+  if (index <= 0) return '';
+
+  const currentFrom = String(msg?.fromUID || '');
+  const currentTimestamp = Number(msg?.timestamp || 0);
+  for (let i = index - 1; i >= 0; i--) {
+    const candidate = renderableMessages.value[i];
+    if (!isClowderConnectorMessage(candidate)) {
+      break;
+    }
+    if (currentFrom && String(candidate.fromUID || '') !== currentFrom) {
+      break;
+    }
+    const candidateTimestamp = Number(candidate.timestamp || 0);
+    if (currentTimestamp && candidateTimestamp && Math.abs(currentTimestamp - candidateTimestamp) > 180) {
+      break;
+    }
+    const name = getClowderSenderNameFromMessage(candidate);
+    if (name) return name;
+  }
+
+  return '';
+}
+
+function getClowderSenderName(msg: any): string {
+  return getClowderSenderNameFromMessage(msg) || getNearbyClowderSenderName(msg);
+}
+
 function extractClowderCatDisplayNameFromText(text: string) {
   const value = String(text || '').trim();
   const prefixMatch = value.match(/^【([^】]{1,40}?)】/);
   if (prefixMatch) return prefixMatch[1].replace(/[🐱🐈🐾\s]+$/g, '').trim();
 
-  const inlineSlashMatch = value.match(/(?:^|[\s，。:：])([^\s/［\[\]］，。:：]{1,40})\/[^\s/［\[\]］，。:：]{1,40}(?=[\s，。:：]|已|收|回|确|$)/u);
-  if (inlineSlashMatch) return inlineSlashMatch[1].replace(/[🐱🐈🐾\s]+$/g, '').trim();
+  const leadingSlashMatch = value.match(/^([^\s/@/［\[\]］，。:：！？?（）()]{1,40})\/[^\s/［\[\]］，。:：]{1,40}(?=[\s，。:：！？?）)]|已|收|回|确|$)/u);
+  if (leadingSlashMatch) return leadingSlashMatch[1].replace(/[🐱🐈🐾\s]+$/g, '').trim();
 
   const suffixMatch = value.match(/[［\[]([^\]/\]］\n]{1,40})\/[^\]］\n]{1,120}[］\]]\s*$/);
   if (suffixMatch) return suffixMatch[1].replace(/[🐱🐈🐾\s]+$/g, '').trim();
@@ -197,6 +232,7 @@ function getMessageSenderName(msg: any): string {
 function getMessageSenderAvatar(msg: any): string {
   const clowderAvatar = getClowderSenderAvatar(msg);
   if (clowderAvatar) return clowderAvatar;
+  if (isClowderConnectorMessage(msg)) return '';
   return userStore.userCache[msg.fromUID]?.avatar || '';
 }
 

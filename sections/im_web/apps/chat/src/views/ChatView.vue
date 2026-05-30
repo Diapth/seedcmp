@@ -75,7 +75,7 @@ async function loadChannelDetails() {
     channelStore.getChannelInfo(cid, ctype);
   }
 
-  await messageStore.syncMessages(cid, ctype);
+  await messageStore.syncMessages(cid, ctype, { hydrateVisibleHistory: true });
   if (isChatViewActive(cid, ctype)) {
     await conversationStore.clearUnread(cid, ctype);
   }

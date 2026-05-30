@@ -1,5 +1,6 @@
 import { computed, ref } from 'vue';
 import { defineStore } from 'pinia';
+import { syncApi } from '../api';
 import {
   clowderApi,
   type ClowderAgent,
@@ -78,6 +79,94 @@ function normalizeAgentDirectory(response: ClowderAgentDirectoryResponse): Clowd
       .filter(agent => agent.lastActiveAt)
       .sort((a, b) => Number(b.lastActiveAt || 0) - Number(a.lastActiveAt || 0))[0]
   };
+}
+
+function normalizeHistoryPayload(raw: any) {
+  const payload = raw?.payload ?? raw?.content ?? raw?.contentObj;
+  if (payload === undefined || payload === null) return undefined;
+  if (typeof payload !== 'string') return payload;
+  try {
+    return JSON.parse(payload);
+  } catch {
+    return { type: 1, text: payload };
+  }
+}
+
+function stripCatDecorations(value: string) {
+  return String(value || '').replace(/[🐱🐈🐾\s]+$/g, '').trim();
+}
+
+function extractClowderCatDisplayNameFromText(text: string) {
+  const value = String(text || '').trim();
+  const prefixMatch = value.match(/^【([^】]{1,40}?)】/);
+  if (prefixMatch) return stripCatDecorations(prefixMatch[1]);
+
+  const suffixMatch = value.match(/[［\[]([^\]/\]］\n]{1,40})\/[^\]］\n]{1,120}[］\]]\s*$/);
+  if (suffixMatch) return stripCatDecorations(suffixMatch[1]);
+
+  return '';
+}
+
+function getClowderCatDisplayName(payload: any) {
+  if (!payload || typeof payload !== 'object') return '';
+  const explicit = String(
+    payload.catDisplayName ||
+    payload.cat_display_name ||
+    payload.catName ||
+    payload.cat_name ||
+    ''
+  ).trim();
+  if (explicit) return explicit;
+  return extractClowderCatDisplayNameFromText(String(payload.text || payload.content || ''));
+}
+
+function isClowderHistoryPayload(payload: any) {
+  if (!payload || typeof payload !== 'object') return false;
+  return payload.connectorId === 'im-web' ||
+    payload.connector_id === 'im-web' ||
+    payload.ai === true ||
+    !!payload.catDisplayName ||
+    !!payload.cat_display_name;
+}
+
+function normalizeLookupToken(value: string) {
+  return stripCatDecorations(value)
+    .replace(/^@/, '')
+    .trim()
+    .toLocaleLowerCase();
+}
+
+function contactMatchesDisplayName(contact: ClowderCatContact, displayName: string) {
+  const needle = normalizeLookupToken(displayName);
+  if (!needle) return false;
+  const tokens = [
+    contact.catId,
+    contact.displayName,
+    contact.name,
+    ...contact.aliases,
+    ...contact.mentionNames
+  ].map(normalizeLookupToken);
+  return tokens.includes(needle);
+}
+
+function buildStaleHistoryContact(displayName: string) {
+  const normalized = normalizeLookupToken(displayName) || 'history-cat';
+  const catId = normalized.replace(/[^a-z0-9_-]+/gi, '-') || 'history-cat';
+  return toClowderCatContact({
+    catId,
+    displayName,
+    aliases: [`@${displayName}`],
+    mentionPatterns: [`@${displayName}`],
+    available: false,
+    availabilityState: 'stale',
+    source: 'stale',
+    connected: true
+  }, {
+    connected: true,
+    source: 'stale',
+    availabilityState: 'stale',
+    available: false
+  });
 }
 
 export const useClowderStore = defineStore('clowder', () => {
@@ -328,6 +417,77 @@ export const useClowderStore = defineStore('clowder', () => {
     return prompt;
   }
 
+  async function ensureCatDirectoryForHistoryLookup() {
+    if (catContactDirectory.value.length > 0 || connectedCatContacts.value.length > 0) return;
+    try {
+      await loadCatContactDirectory({ includeUnavailable: true });
+    } catch (e) {
+      console.warn('[ClowderStore] Failed to load cat directory for group history recovery', e);
+    }
+  }
+
+  async function inferGroupCatsFromMessageHistory(groupId: string) {
+    let list: any[] = [];
+    try {
+      const res: any = await syncApi.syncMessages({
+        channel_id: groupId,
+        channel_type: 2,
+        limit: 30,
+        start_message_seq: 0,
+        end_message_seq: 0,
+        pull_mode: 1
+      });
+      list = Array.isArray(res?.messages) ? res.messages : [];
+    } catch (e) {
+      console.warn(`[ClowderStore] Failed to inspect group history for ${groupId}`, e);
+      return [];
+    }
+
+    const displayNames = Array.from(new Set(list
+      .map(normalizeHistoryPayload)
+      .filter(isClowderHistoryPayload)
+      .map(getClowderCatDisplayName)
+      .map(name => String(name || '').trim())
+      .filter(Boolean)));
+
+    if (displayNames.length === 0) return [];
+
+    await ensureCatDirectoryForHistoryLookup();
+
+    const knownContacts = [
+      ...connectedCatContacts.value,
+      ...catContactDirectory.value
+    ];
+    const nextCats: ClowderCatContact[] = [];
+    for (const displayName of displayNames) {
+      const matched = knownContacts.find(contact => contactMatchesDisplayName(contact, displayName));
+      const contact = matched
+        ? { ...matched, connected: true }
+        : buildStaleHistoryContact(displayName);
+      if (!nextCats.some(cat => cat.catId === contact.catId)) {
+        nextCats.push(contact);
+      }
+    }
+    return nextCats;
+  }
+
+  async function persistRecoveredGroupCats(groupId: string, groupName: string, cats: ClowderCatContact[]) {
+    if (cats.length === 0) return;
+    const prompt = buildCurrentGroupPrompt(groupId, groupName || groupId, cats);
+    try {
+      await clowderApi.syncGroupCats({
+        groupId,
+        groupName: groupName || groupId,
+        catIds: cats.map(cat => cat.catId),
+        cats: serializeGroupCatsForSync(cats),
+        proactiveReplies: false,
+        prompt
+      });
+    } catch (e) {
+      console.warn(`[ClowderStore] Failed to persist recovered group cats for ${groupId}`, e);
+    }
+  }
+
   async function loadGroupCats(groupId: string) {
     const response = await clowderApi.getGroupCats({ groupId }) as unknown as ClowderGroupCatStateResponse;
     let cats = (response.cats || []).map(agent => toClowderCatContact(agent, {
@@ -346,8 +506,16 @@ export const useClowderStore = defineStore('clowder', () => {
         cats = [];
       }
     }
+    if (cats.length === 0) {
+      cats = await inferGroupCatsFromMessageHistory(groupId);
+      if (cats.length > 0) {
+        await persistRecoveredGroupCats(groupId, response.groupName || groupId, cats);
+      }
+    }
     groupCatMemberships.value[groupId] = cats;
-    groupPrompts.value[groupId] = response.prompt || '';
+    if (response.prompt || cats.length === 0) {
+      groupPrompts.value[groupId] = response.prompt || '';
+    }
     return cats;
   }
 

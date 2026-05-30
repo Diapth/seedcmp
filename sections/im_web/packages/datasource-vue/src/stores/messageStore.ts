@@ -46,6 +46,8 @@ export interface Reaction {
 const MEDIA_UPLOAD_TYPE = 'chat';
 const DEEPSEEK_AI_ROBOT_ID = 'deepseek_ai_robot';
 const CLOWDER_CONNECTOR_ID = 'im-web';
+const MESSAGE_SYNC_LIMIT = 30;
+const VISIBLE_HISTORY_WINDOW_LIMIT = 300;
 
 interface SendMessageOptions {
   mention?: { all?: boolean; uids?: string[] };
@@ -54,6 +56,10 @@ interface SendMessageOptions {
     robotId: string;
     command: string;
   };
+}
+
+interface SyncMessagesOptions {
+  hydrateVisibleHistory?: boolean;
 }
 
 export class RobotCommandContent extends MessageContent {
@@ -270,6 +276,33 @@ export const useMessageStore = defineStore('message', () => {
     return msg.content?.streaming === true && (state === 'placeholder' || state === 'chunk');
   }
 
+  function extractClowderPlaceholderNames(msg: Message) {
+    const content = msg.content || {};
+    const names = [
+      content.catDisplayName,
+      content.cat_display_name,
+      content.catId,
+      content.cat_id
+    ].map(value => String(value || '').replace(/[🐱🐈🐾\s]+$/g, '').trim()).filter(Boolean);
+    const text = getMessageText(msg);
+    const prefixMatch = text.match(/^【([^】]{1,40}?)】/);
+    if (prefixMatch) {
+      const prefixName = prefixMatch[1].replace(/[🐱🐈🐾\s]+$/g, '').trim();
+      if (prefixName) names.push(prefixName);
+    }
+    return [...new Set(names)];
+  }
+
+  function isLikelyPromptForClowderPlaceholder(prompt: Message, placeholder: Message) {
+    const text = getMessageText(prompt).toLowerCase();
+    if (!text.includes('@')) return false;
+    const names = extractClowderPlaceholderNames(placeholder)
+      .map(name => name.toLowerCase())
+      .filter(Boolean);
+    if (!names.length) return true;
+    return names.some(name => text.includes(`@${name}`));
+  }
+
   function isLocalStreamingAiMessage(msg: Message) {
     const clientMsgNo = String(msg.clientMsgNo || '');
     const messageID = String(msg.messageID || '');
@@ -415,7 +448,13 @@ export const useMessageStore = defineStore('message', () => {
           const aAssistant = isAiAssistantSource(a.fromUID, a.content);
           const bAssistant = isAiAssistantSource(b.fromUID, b.content);
           const nearSameTurn = Math.abs(Number(a.timestamp || 0) - Number(b.timestamp || 0)) <= 120;
-          if (nearSameTurn && aAssistant !== bAssistant) {
+          const prompt = aPlaceholder ? b : a;
+          const placeholder = aPlaceholder ? a : b;
+          if (
+            nearSameTurn &&
+            aAssistant !== bAssistant &&
+            isLikelyPromptForClowderPlaceholder(prompt, placeholder)
+          ) {
             return aPlaceholder ? 1 : -1;
           }
         }
@@ -521,9 +560,20 @@ export const useMessageStore = defineStore('message', () => {
     return extractClowderCatDisplayNameFromText(String(content.text || content.content || ''));
   }
 
-  function getClowderDisplayNameFromMessageList(channelId: string, list: Message[]) {
-    if (!getClowderCatIdFromContactId(channelId)) return '';
+  function isClowderMessageContent(content: any) {
+    if (!content || typeof content !== 'object') return false;
+    return content.connectorId === CLOWDER_CONNECTOR_ID ||
+      content.connector_id === CLOWDER_CONNECTOR_ID ||
+      content.ai === true ||
+      !!content.catDisplayName ||
+      !!content.cat_display_name;
+  }
+
+  function getClowderDisplayNameFromMessageList(channelId: string, channelType: number, list: Message[]) {
+    const canUseHistory = !!getClowderCatIdFromContactId(channelId) || Number(channelType) === 2;
+    if (!canUseHistory) return '';
     for (const message of [...list].reverse()) {
+      if (Number(channelType) === 2 && !isClowderMessageContent(message.content)) continue;
       const name = getClowderDisplayNameFromMessage(message);
       if (name) return name;
     }
@@ -543,7 +593,7 @@ export const useMessageStore = defineStore('message', () => {
 
   function updateExistingConversationSummary(channelId: string, channelType: number, lastMessage: Message, options: ConversationSummaryOptions = {}) {
     const key = getChannelKey(channelId, channelType);
-    const historyName = getClowderDisplayNameFromMessageList(channelId, messages.value[key] || []);
+    const historyName = getClowderDisplayNameFromMessageList(channelId, channelType, messages.value[key] || []);
     const matching = conversationStore.conversations.filter(item =>
       String(item.channel_id) === String(channelId) &&
       Number(item.channel_type) === Number(channelType)
@@ -551,10 +601,21 @@ export const useMessageStore = defineStore('message', () => {
     const conv = matching[0];
     if (!conv) return false;
 
+    const lastContent = lastMessage.content || {};
+    const shouldBackfillClowderName = historyName &&
+      isClowderMessageContent(lastContent) &&
+      !getClowderDisplayNameFromMessage(lastMessage);
+    const summaryContent = shouldBackfillClowderName
+      ? {
+          ...lastContent,
+          catDisplayName: lastContent.catDisplayName || historyName,
+          cat_display_name: lastContent.cat_display_name || historyName
+        }
+      : lastContent;
     const summary = {
       ...lastMessage,
-      payload: lastMessage.content,
-      content: lastMessage.content,
+      payload: summaryContent,
+      content: summaryContent,
       messageSeq: lastMessage.messageSeq,
       timestamp: lastMessage.timestamp,
       fromUID: lastMessage.fromUID
@@ -605,89 +666,145 @@ export const useMessageStore = defineStore('message', () => {
     });
   }
 
-  async function syncMessages(channelId: string, channelType: number) {
+  function normalizeSyncedMessage(item: any): Message {
+    const remoteExtra = normalizeRemoteExtra(item.message_extra);
+    const fromUID = item.from_uid;
+
+    const message: Message = {
+      messageID: String(item.message_idstr || item.message_id || ''),
+      messageSeq: item.message_seq,
+      clientMsgNo: String(item.client_msg_no || ''),
+      fromUID,
+      timestamp: item.timestamp,
+      content: normalizeAiRobotMessageContent(fromUID, normalizeSyncedPayload(item.payload), false),
+      isRevoked: item.revoke === 1 || item.is_revoked === 1 || remoteExtra?.revoke === true,
+      revokeUID: remoteExtra?.revoker,
+      status: 'success',
+      reactions: item.reactions || [],
+      remoteExtra
+    };
+    if (remoteExtra?.contentEdit) {
+      message.content = normalizeMessageContent(remoteExtra.contentEdit);
+    }
+    return message;
+  }
+
+  async function mergeSyncedMessages(channelId: string, channelType: number, key: string, rawMessages: any[]) {
+    const synced: Message[] = rawMessages.filter((item: any) => item.is_deleted !== 1).map(normalizeSyncedMessage);
+    const currentList = messages.value[key] || [];
+    const mergedMap = new Map<string, Message>();
+    currentList.forEach(m => mergedMap.set(getMessageMergeKey(m), m));
+
+    // Build a messageID -> local merge-key index for deduplication.
+    // When the server returns a message whose messageID already exists locally
+    // (but with a different clientMsgNo, e.g. our web-xxx vs SDK's wk-xxx),
+    // update the local entry in-place instead of adding a duplicate.
+    const localByMsgId = new Map<string, string>(); // messageID -> merge key
+    currentList.forEach(m => {
+      const messageID = String(m.messageID || '');
+      if (messageID) localByMsgId.set(messageID, getMessageMergeKey(m));
+    });
+
+    synced.forEach(m => {
+      if (m.messageID && localByMsgId.has(m.messageID)) {
+        const localKey = localByMsgId.get(m.messageID)!;
+        const existing = mergedMap.get(localKey);
+        if (existing) {
+          mergedMap.set(localKey, { ...existing, ...m, clientMsgNo: existing.clientMsgNo || m.clientMsgNo });
+          return;
+        }
+      }
+      const localOwn = findMergeableLocalOwnMessage(Array.from(mergedMap.values()), m);
+      if (localOwn) {
+        const localKey = getMessageMergeKey(localOwn);
+        mergedMap.set(localKey, mergePersistedOwnMessageIntoLocal(localOwn, m));
+        removePendingMessage(localOwn.clientMsgNo);
+        return;
+      }
+      const localStreamingAi = findMergeableLocalAiStream(Array.from(mergedMap.values()), m, { protectHistory: true });
+      if (localStreamingAi) {
+        mergedMap.set(getMessageMergeKey(localStreamingAi), mergePersistedAiIntoLocal(localStreamingAi, m));
+        return;
+      }
+      mergedMap.set(getMessageMergeKey(m), m);
+    });
+
+    const nextList = Array.from(mergedMap.values());
+    sortMessagesForChannel(nextList, channelId, channelType);
+    messages.value[key] = nextList;
+    await ensureConversationFromMessages(channelId, channelType, { countUnread: false });
+  }
+
+  async function fetchMessageWindow(channelId: string, channelType: number, startSeq: number) {
+    return syncApi.syncMessages({
+      channel_id: channelId,
+      channel_type: channelType,
+      limit: MESSAGE_SYNC_LIMIT,
+      start_message_seq: startSeq,
+      end_message_seq: 0,
+      pull_mode: 1
+    });
+  }
+
+  function getPositiveMessageSeqs(list: Message[]) {
+    return list
+      .map(item => Number(item.messageSeq || 0))
+      .filter(seq => seq > 0);
+  }
+
+  async function backfillVisibleHistoryWindow(channelId: string, channelType: number, key: string, version: number) {
+    let guard = 0;
+    let nextStart = 0;
+
+    while (version === resetVersion.value && guard < Math.ceil(VISIBLE_HISTORY_WINDOW_LIMIT / MESSAGE_SYNC_LIMIT) + 2) {
+      guard++;
+      const list = messages.value[key] || [];
+      const seqs = getPositiveMessageSeqs(list);
+      if (!seqs.length) return;
+
+      const maxSeq = Math.max(...seqs);
+      const minSeq = Math.min(...seqs);
+      const targetStart = Math.max(1, maxSeq - VISIBLE_HISTORY_WINDOW_LIMIT + 1);
+      const targetCount = Math.min(VISIBLE_HISTORY_WINDOW_LIMIT, maxSeq - targetStart + 1);
+
+      if (seqs.length >= targetCount && minSeq <= targetStart) return;
+
+      if (nextStart <= 0 || nextStart < targetStart) {
+        nextStart = targetStart;
+      }
+      if (nextStart > maxSeq) return;
+
+      const res: any = await fetchMessageWindow(channelId, channelType, nextStart);
+      if (version !== resetVersion.value) return;
+      const rawMessages = Array.isArray(res?.messages) ? res.messages : [];
+      if (!rawMessages.length) return;
+
+      await mergeSyncedMessages(channelId, channelType, key, rawMessages);
+      const returnedSeqs = rawMessages
+        .map((item: any) => Number(item.message_seq || item.messageSeq || 0))
+        .filter((seq: number) => seq > 0);
+      const maxReturnedSeq = returnedSeqs.length ? Math.max(...returnedSeqs) : 0;
+      if (maxReturnedSeq < nextStart) return;
+      nextStart = maxReturnedSeq + 1;
+    }
+  }
+
+  async function syncMessages(channelId: string, channelType: number, options: SyncMessagesOptions = {}) {
     const version = resetVersion.value;
     const key = `${channelId}-${channelType}`;
     const list = messages.value[key] || [];
     const startSeq = list.reduce((max, item) => Math.max(max, Number(item.messageSeq || 0)), 0);
 
     try {
-      const res: any = await syncApi.syncMessages({
-        channel_id: channelId,
-        channel_type: channelType,
-        limit: 30,
-        start_message_seq: startSeq,
-        end_message_seq: 0,
-        pull_mode: 1
-      });
+      const res: any = await fetchMessageWindow(channelId, channelType, startSeq);
 
       if (version !== resetVersion.value) return;
       if (res && Array.isArray(res.messages)) {
-        const synced: Message[] = res.messages.filter((item: any) => item.is_deleted !== 1).map((item: any) => {
-          const remoteExtra = normalizeRemoteExtra(item.message_extra);
-          const fromUID = item.from_uid;
+        await mergeSyncedMessages(channelId, channelType, key, res.messages);
+      }
 
-          const message: Message = {
-            messageID: String(item.message_idstr || item.message_id || ''),
-            messageSeq: item.message_seq,
-            clientMsgNo: String(item.client_msg_no || ''),
-            fromUID,
-            timestamp: item.timestamp,
-            content: normalizeAiRobotMessageContent(fromUID, normalizeSyncedPayload(item.payload), false),
-            isRevoked: item.revoke === 1 || item.is_revoked === 1 || remoteExtra?.revoke === true,
-            revokeUID: remoteExtra?.revoker,
-            status: 'success',
-            reactions: item.reactions || [],
-            remoteExtra
-          };
-          if (remoteExtra?.contentEdit) {
-            message.content = normalizeMessageContent(remoteExtra.contentEdit);
-          }
-          return message;
-        });
-
-        const currentList = messages.value[key] || [];
-        const mergedMap = new Map<string, Message>();
-        currentList.forEach(m => mergedMap.set(getMessageMergeKey(m), m));
-
-        // Build a messageID -> local merge-key index for deduplication.
-        // When the server returns a message whose messageID already exists locally
-        // (but with a different clientMsgNo, e.g. our web-xxx vs SDK's wk-xxx),
-        // update the local entry in-place instead of adding a duplicate.
-        const localByMsgId = new Map<string, string>(); // messageID -> merge key
-        currentList.forEach(m => {
-          const messageID = String(m.messageID || '');
-          if (messageID) localByMsgId.set(messageID, getMessageMergeKey(m));
-        });
-
-        synced.forEach(m => {
-          if (m.messageID && localByMsgId.has(m.messageID)) {
-            const localKey = localByMsgId.get(m.messageID)!;
-            const existing = mergedMap.get(localKey);
-            if (existing) {
-              mergedMap.set(localKey, { ...existing, ...m, clientMsgNo: existing.clientMsgNo || m.clientMsgNo });
-              return;
-            }
-          }
-          const localOwn = findMergeableLocalOwnMessage(Array.from(mergedMap.values()), m);
-          if (localOwn) {
-            const localKey = getMessageMergeKey(localOwn);
-            mergedMap.set(localKey, mergePersistedOwnMessageIntoLocal(localOwn, m));
-            removePendingMessage(localOwn.clientMsgNo);
-            return;
-          }
-          const localStreamingAi = findMergeableLocalAiStream(Array.from(mergedMap.values()), m, { protectHistory: true });
-          if (localStreamingAi) {
-            mergedMap.set(getMessageMergeKey(localStreamingAi), mergePersistedAiIntoLocal(localStreamingAi, m));
-            return;
-          }
-          mergedMap.set(getMessageMergeKey(m), m);
-        });
-
-        const nextList = Array.from(mergedMap.values());
-        sortMessagesForChannel(nextList, channelId, channelType);
-        messages.value[key] = nextList;
-        await ensureConversationFromMessages(channelId, channelType, { countUnread: false });
+      if (options.hydrateVisibleHistory) {
+        await backfillVisibleHistoryWindow(channelId, channelType, key, version);
       }
     } catch (e) {
       console.error(`[MessageStore] Failed to sync messages for channel ${key}`, e);

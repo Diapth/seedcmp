@@ -125,6 +125,173 @@ describe('message store daily messaging normalization', () => {
     })
   })
 
+  it('backfills the recent history window when local channel state only has newer realtime messages', async () => {
+    const { useMessageStore } = await import('../../../packages/datasource-vue/src/stores/messageStore.ts')
+    const store = useMessageStore()
+
+    store.addRealtimeMessage('group-history', 2, {
+      messageID: 'm-40',
+      messageSeq: 40,
+      clientMsgNo: 'client-40',
+      fromUID: 'friend-a',
+      timestamp: 400,
+      status: 1,
+      reactions: [],
+      remoteExtra: undefined,
+      content: { contentType: 1, contentObj: { text: 'latest realtime only' } }
+    } as any, { isUnreadCleared: true })
+
+    syncMessages.mockImplementation(async (params: any) => {
+      if (params.start_message_seq === 40) {
+        return { messages: [] }
+      }
+      if (params.start_message_seq === 1) {
+        return {
+          messages: [
+            {
+              message_idstr: 'm-1',
+              message_seq: 1,
+              client_msg_no: 'client-1',
+              from_uid: 'friend-a',
+              timestamp: 100,
+              payload: JSON.stringify({ type: 1, text: 'oldest visible message' })
+            },
+            {
+              message_idstr: 'm-20',
+              message_seq: 20,
+              client_msg_no: 'client-20',
+              from_uid: 'friend-b',
+              timestamp: 200,
+              payload: JSON.stringify({ type: 1, text: 'older visible message' })
+            }
+          ]
+        }
+      }
+      if (params.start_message_seq === 21) {
+        return {
+          messages: [
+            {
+              message_idstr: 'm-21',
+              message_seq: 21,
+              client_msg_no: 'client-21',
+              from_uid: 'friend-a',
+              timestamp: 210,
+              payload: JSON.stringify({ type: 1, text: 'bridge visible message' })
+            },
+            {
+              message_idstr: 'm-30',
+              message_seq: 30,
+              client_msg_no: 'client-30',
+              from_uid: 'friend-b',
+              timestamp: 300,
+              payload: JSON.stringify({ type: 1, text: 'middle visible message' })
+            },
+            {
+              message_idstr: 'm-40',
+              message_seq: 40,
+              client_msg_no: 'client-40',
+              from_uid: 'friend-a',
+              timestamp: 400,
+              payload: JSON.stringify({ type: 1, text: 'latest realtime only' })
+            }
+          ]
+        }
+      }
+      return { messages: [] }
+    })
+
+    await store.syncMessages('group-history', 2, { hydrateVisibleHistory: true })
+
+    expect(syncMessages).toHaveBeenCalledWith(expect.objectContaining({
+      channel_id: 'group-history',
+      channel_type: 2,
+      start_message_seq: 1
+    }))
+    expect(syncMessages).toHaveBeenCalledWith(expect.objectContaining({
+      channel_id: 'group-history',
+      channel_type: 2,
+      start_message_seq: 21
+    }))
+    expect(store.getChannelMessages('group-history', 2).map(item => item.content.text)).toEqual([
+      'oldest visible message',
+      'older visible message',
+      'bridge visible message',
+      'middle visible message',
+      'latest realtime only'
+    ])
+  })
+
+  it('hydrates the visible recent history when the server latest window starts after earlier messages', async () => {
+    const { useMessageStore } = await import('../../../packages/datasource-vue/src/stores/messageStore.ts')
+    const store = useMessageStore()
+
+    const makeRawMessage = (seq: number) => ({
+      message_idstr: `m-${seq}`,
+      message_seq: seq,
+      client_msg_no: `client-${seq}`,
+      from_uid: seq % 2 === 0 ? 'friend-a' : 'friend-b',
+      timestamp: 1000 + seq,
+      payload: JSON.stringify({ type: 1, text: `message-${seq}` })
+    })
+
+    syncMessages.mockImplementation(async (params: any) => {
+      if (params.start_message_seq === 0) {
+        return { messages: Array.from({ length: 30 }, (_, index) => makeRawMessage(index + 72)) }
+      }
+      if (params.start_message_seq === 1) {
+        return { messages: Array.from({ length: 30 }, (_, index) => makeRawMessage(index + 1)) }
+      }
+      if (params.start_message_seq === 31) {
+        return { messages: Array.from({ length: 30 }, (_, index) => makeRawMessage(index + 31)) }
+      }
+      if (params.start_message_seq === 61) {
+        return { messages: Array.from({ length: 30 }, (_, index) => makeRawMessage(index + 61)) }
+      }
+      if (params.start_message_seq === 91) {
+        return { messages: Array.from({ length: 11 }, (_, index) => makeRawMessage(index + 91)) }
+      }
+      return { messages: [] }
+    })
+
+    await store.syncMessages('group-long-history', 2, { hydrateVisibleHistory: true })
+
+    expect(syncMessages).toHaveBeenCalledWith(expect.objectContaining({ start_message_seq: 0 }))
+    expect(syncMessages).toHaveBeenCalledWith(expect.objectContaining({ start_message_seq: 1 }))
+    expect(syncMessages).toHaveBeenCalledWith(expect.objectContaining({ start_message_seq: 31 }))
+    expect(store.getChannelMessages('group-long-history', 2).map(item => item.content.text)).toEqual(
+      Array.from({ length: 101 }, (_, index) => `message-${index + 1}`)
+    )
+  })
+
+  it('keeps background sync to the latest page unless visible history hydration is requested', async () => {
+    const { useMessageStore } = await import('../../../packages/datasource-vue/src/stores/messageStore.ts')
+    const store = useMessageStore()
+
+    syncMessages.mockImplementation(async (params: any) => {
+      if (params.start_message_seq === 0) {
+        return {
+          messages: [{
+            message_idstr: 'm-72',
+            message_seq: 72,
+            client_msg_no: 'client-72',
+            from_uid: 'friend-a',
+            timestamp: 1072,
+            payload: JSON.stringify({ type: 1, text: 'latest page only' })
+          }]
+        }
+      }
+      throw new Error(`unexpected backfill start ${params.start_message_seq}`)
+    })
+
+    await store.syncMessages('group-background-sync', 2)
+
+    expect(syncMessages).toHaveBeenCalledTimes(1)
+    expect(syncMessages).toHaveBeenCalledWith(expect.objectContaining({ start_message_seq: 0 }))
+    expect(store.getChannelMessages('group-background-sync', 2).map(item => item.content.text)).toEqual([
+      'latest page only'
+    ])
+  })
+
   it('increments unread when an existing non-active conversation receives a realtime message', async () => {
     const { useMessageStore } = await import('../../../packages/datasource-vue/src/stores/messageStore.ts')
     const { useConversationStore } = await import('../../../packages/datasource-vue/src/stores/conversationStore.ts')

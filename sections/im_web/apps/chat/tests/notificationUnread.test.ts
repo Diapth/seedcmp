@@ -9,6 +9,10 @@ describe('notification and unread contracts', () => {
     expect(text).toContain('requestNotificationPermission')
     expect(text).toContain('muted-unread')
     expect(text).toContain('getUnreadCount')
+    expect(text).toContain('syncError')
+    expect(text).toContain('loadConversationList')
+    expect(text).toContain('throwOnError: true')
+    expect(text).toContain('会话同步失败')
   })
 
   it('keeps desktop notification unavailable and denied states in profile settings', async () => {

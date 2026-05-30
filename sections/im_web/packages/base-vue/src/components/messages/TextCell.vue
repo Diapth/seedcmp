@@ -62,8 +62,8 @@ function inferClowderCatDisplayName(text: string) {
   const prefixMatch = value.match(/^【([^】]{1,40}?)】/);
   if (prefixMatch) return prefixMatch[1].replace(/[🐱🐈🐾\s]+$/g, '').trim();
 
-  const inlineSlashMatch = value.match(/(?:^|[\s，。:：])([^\s/［\[\]］，。:：]{1,40})\/[^\s/［\[\]］，。:：]{1,40}(?=[\s，。:：]|已|收|回|确|$)/u);
-  if (inlineSlashMatch) return inlineSlashMatch[1].replace(/[🐱🐈🐾\s]+$/g, '').trim();
+  const leadingSlashMatch = value.match(/^([^\s/@/［\[\]］，。:：！？?（）()]{1,40})\/[^\s/［\[\]］，。:：]{1,40}(?=[\s，。:：！？?）)]|已|收|回|确|$)/u);
+  if (leadingSlashMatch) return leadingSlashMatch[1].replace(/[🐱🐈🐾\s]+$/g, '').trim();
 
   const suffixMatch = value.match(/[［\[]([^\]/\]］\n]{1,40})\/[^\]］\n]{1,120}[］\]]\s*$/);
   if (suffixMatch) return suffixMatch[1].replace(/[🐱🐈🐾\s]+$/g, '').trim();

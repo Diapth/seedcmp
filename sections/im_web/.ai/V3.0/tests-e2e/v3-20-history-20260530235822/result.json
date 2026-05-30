@@ -1,0 +1,1669 @@
+{
+  "targetUrl": "http://127.0.0.1:5174",
+  "groupId": "cec409c5b5db4399a27358e76eb587b1",
+  "loginResult": {
+    "ok": true,
+    "uid": "6db8b65b3ae94092badfeb82e47c06f7",
+    "name": "leng_test_updated",
+    "hasToken": true
+  },
+  "syncRequests": [
+    {
+      "url": "http://127.0.0.1:5174/v1/message/channel/sync",
+      "method": "POST",
+      "body": {
+        "channel_id": "cec409c5b5db4399a27358e76eb587b1",
+        "channel_type": 2,
+        "limit": 30,
+        "start_message_seq": 0,
+        "end_message_seq": 0,
+        "pull_mode": 1
+      }
+    },
+    {
+      "url": "http://127.0.0.1:5174/v1/message/channel/sync",
+      "method": "POST",
+      "body": {
+        "channel_id": "311e44befed248d7ac4357b1527dacd2",
+        "channel_type": 2,
+        "limit": 30,
+        "start_message_seq": 0,
+        "end_message_seq": 0,
+        "pull_mode": 1
+      }
+    },
+    {
+      "url": "http://127.0.0.1:5174/v1/message/channel/sync",
+      "method": "POST",
+      "body": {
+        "channel_id": "3073c1c63b8d479281ef5f0ad2f8dd56",
+        "channel_type": 2,
+        "limit": 30,
+        "start_message_seq": 0,
+        "end_message_seq": 0,
+        "pull_mode": 1
+      }
+    },
+    {
+      "url": "http://127.0.0.1:5174/v1/message/channel/sync",
+      "method": "POST",
+      "body": {
+        "channel_id": "a0f4ab3335294580835d19d294653bc8",
+        "channel_type": 2,
+        "limit": 30,
+        "start_message_seq": 0,
+        "end_message_seq": 0,
+        "pull_mode": 1
+      }
+    },
+    {
+      "url": "http://127.0.0.1:5174/v1/message/channel/sync",
+      "method": "POST",
+      "body": {
+        "channel_id": "5c9870c2956b40b0b5fe74c1e843efb4",
+        "channel_type": 2,
+        "limit": 30,
+        "start_message_seq": 0,
+        "end_message_seq": 0,
+        "pull_mode": 1
+      }
+    },
+    {
+      "url": "http://127.0.0.1:5174/v1/message/channel/sync",
+      "method": "POST",
+      "body": {
+        "channel_id": "ce0bd7ff8bae4432903dc5bab916ffdd",
+        "channel_type": 2,
+        "limit": 30,
+        "start_message_seq": 0,
+        "end_message_seq": 0,
+        "pull_mode": 1
+      }
+    },
+    {
+      "url": "http://127.0.0.1:5174/v1/message/channel/sync",
+      "method": "POST",
+      "body": {
+        "channel_id": "f69afa7fe9e9466d8ece02637c9a6765",
+        "channel_type": 2,
+        "limit": 30,
+        "start_message_seq": 0,
+        "end_message_seq": 0,
+        "pull_mode": 1
+      }
+    },
+    {
+      "url": "http://127.0.0.1:5174/v1/message/channel/sync",
+      "method": "POST",
+      "body": {
+        "channel_id": "7059baa93ec24e7e88665444e5ca10b4",
+        "channel_type": 2,
+        "limit": 30,
+        "start_message_seq": 0,
+        "end_message_seq": 0,
+        "pull_mode": 1
+      }
+    },
+    {
+      "url": "http://127.0.0.1:5174/v1/message/channel/sync",
+      "method": "POST",
+      "body": {
+        "channel_id": "22cedd21db254fd092f921de9e3c713f",
+        "channel_type": 2,
+        "limit": 30,
+        "start_message_seq": 0,
+        "end_message_seq": 0,
+        "pull_mode": 1
+      }
+    },
+    {
+      "url": "http://127.0.0.1:5174/v1/message/channel/sync",
+      "method": "POST",
+      "body": {
+        "channel_id": "f5b8acca54dd4bfba2b295a09463c419",
+        "channel_type": 2,
+        "limit": 30,
+        "start_message_seq": 0,
+        "end_message_seq": 0,
+        "pull_mode": 1
+      }
+    },
+    {
+      "url": "http://127.0.0.1:5174/v1/message/channel/sync",
+      "method": "POST",
+      "body": {
+        "channel_id": "9ad1435f0a5b4d9f9d4040d54a939cf4",
+        "channel_type": 2,
+        "limit": 30,
+        "start_message_seq": 0,
+        "end_message_seq": 0,
+        "pull_mode": 1
+      }
+    },
+    {
+      "url": "http://127.0.0.1:5174/v1/message/channel/sync",
+      "method": "POST",
+      "body": {
+        "channel_id": "aca2ab6d300b4134a98b5487c04684ba",
+        "channel_type": 2,
+        "limit": 30,
+        "start_message_seq": 0,
+        "end_message_seq": 0,
+        "pull_mode": 1
+      }
+    },
+    {
+      "url": "http://127.0.0.1:5174/v1/message/channel/sync",
+      "method": "POST",
+      "body": {
+        "channel_id": "69de49e3392d48528e4b0a88d1e692c4",
+        "channel_type": 2,
+        "limit": 30,
+        "start_message_seq": 0,
+        "end_message_seq": 0,
+        "pull_mode": 1
+      }
+    },
+    {
+      "url": "http://127.0.0.1:5174/v1/message/channel/sync",
+      "method": "POST",
+      "body": {
+        "channel_id": "41beab9cdf584493b2708a04573f367e",
+        "channel_type": 2,
+        "limit": 30,
+        "start_message_seq": 0,
+        "end_message_seq": 0,
+        "pull_mode": 1
+      }
+    },
+    {
+      "url": "http://127.0.0.1:5174/v1/message/channel/sync",
+      "method": "POST",
+      "body": {
+        "channel_id": "75ab7c536d4b4c4eb21639df828dbedd",
+        "channel_type": 2,
+        "limit": 30,
+        "start_message_seq": 0,
+        "end_message_seq": 0,
+        "pull_mode": 1
+      }
+    },
+    {
+      "url": "http://127.0.0.1:5174/v1/message/channel/sync",
+      "method": "POST",
+      "body": {
+        "channel_id": "88399bbd0d0342c9b41c97cb6385a032",
+        "channel_type": 2,
+        "limit": 30,
+        "start_message_seq": 0,
+        "end_message_seq": 0,
+        "pull_mode": 1
+      }
+    },
+    {
+      "url": "http://127.0.0.1:5174/v1/message/channel/sync",
+      "method": "POST",
+      "body": {
+        "channel_id": "05fc38114d844399ab56ef0bee99a2e6",
+        "channel_type": 2,
+        "limit": 30,
+        "start_message_seq": 0,
+        "end_message_seq": 0,
+        "pull_mode": 1
+      }
+    },
+    {
+      "url": "http://127.0.0.1:5174/v1/message/channel/sync",
+      "method": "POST",
+      "body": {
+        "channel_id": "cec409c5b5db4399a27358e76eb587b1",
+        "channel_type": 2,
+        "limit": 30,
+        "start_message_seq": 0,
+        "end_message_seq": 0,
+        "pull_mode": 1
+      }
+    },
+    {
+      "url": "http://127.0.0.1:5174/v1/message/channel/sync",
+      "method": "POST",
+      "body": {
+        "channel_id": "cec409c5b5db4399a27358e76eb587b1",
+        "channel_type": 2,
+        "limit": 30,
+        "start_message_seq": 1,
+        "end_message_seq": 0,
+        "pull_mode": 1
+      }
+    },
+    {
+      "url": "http://127.0.0.1:5174/v1/message/channel/sync",
+      "method": "POST",
+      "body": {
+        "channel_id": "cec409c5b5db4399a27358e76eb587b1",
+        "channel_type": 2,
+        "limit": 30,
+        "start_message_seq": 31,
+        "end_message_seq": 0,
+        "pull_mode": 1
+      }
+    },
+    {
+      "url": "http://127.0.0.1:5174/v1/message/channel/sync",
+      "method": "POST",
+      "body": {
+        "channel_id": "cec409c5b5db4399a27358e76eb587b1",
+        "channel_type": 2,
+        "limit": 30,
+        "start_message_seq": 61,
+        "end_message_seq": 0,
+        "pull_mode": 1
+      }
+    },
+    {
+      "url": "http://127.0.0.1:5174/v1/message/channel/sync",
+      "method": "POST",
+      "body": {
+        "channel_id": "cec409c5b5db4399a27358e76eb587b1",
+        "channel_type": 2,
+        "limit": 30,
+        "start_message_seq": 91,
+        "end_message_seq": 0,
+        "pull_mode": 1
+      }
+    },
+    {
+      "url": "http://127.0.0.1:5174/v1/message/channel/sync",
+      "method": "POST",
+      "body": {
+        "channel_id": "ce0bd7ff8bae4432903dc5bab916ffdd",
+        "channel_type": 2,
+        "limit": 30,
+        "start_message_seq": 0,
+        "end_message_seq": 0,
+        "pull_mode": 1
+      }
+    },
+    {
+      "url": "http://127.0.0.1:5174/v1/message/channel/sync",
+      "method": "POST",
+      "body": {
+        "channel_id": "f69afa7fe9e9466d8ece02637c9a6765",
+        "channel_type": 2,
+        "limit": 30,
+        "start_message_seq": 0,
+        "end_message_seq": 0,
+        "pull_mode": 1
+      }
+    },
+    {
+      "url": "http://127.0.0.1:5174/v1/message/channel/sync",
+      "method": "POST",
+      "body": {
+        "channel_id": "7059baa93ec24e7e88665444e5ca10b4",
+        "channel_type": 2,
+        "limit": 30,
+        "start_message_seq": 0,
+        "end_message_seq": 0,
+        "pull_mode": 1
+      }
+    },
+    {
+      "url": "http://127.0.0.1:5174/v1/message/channel/sync",
+      "method": "POST",
+      "body": {
+        "channel_id": "22cedd21db254fd092f921de9e3c713f",
+        "channel_type": 2,
+        "limit": 30,
+        "start_message_seq": 0,
+        "end_message_seq": 0,
+        "pull_mode": 1
+      }
+    },
+    {
+      "url": "http://127.0.0.1:5174/v1/message/channel/sync",
+      "method": "POST",
+      "body": {
+        "channel_id": "f5b8acca54dd4bfba2b295a09463c419",
+        "channel_type": 2,
+        "limit": 30,
+        "start_message_seq": 0,
+        "end_message_seq": 0,
+        "pull_mode": 1
+      }
+    },
+    {
+      "url": "http://127.0.0.1:5174/v1/message/channel/sync",
+      "method": "POST",
+      "body": {
+        "channel_id": "311e44befed248d7ac4357b1527dacd2",
+        "channel_type": 2,
+        "limit": 30,
+        "start_message_seq": 0,
+        "end_message_seq": 0,
+        "pull_mode": 1
+      }
+    },
+    {
+      "url": "http://127.0.0.1:5174/v1/message/channel/sync",
+      "method": "POST",
+      "body": {
+        "channel_id": "3073c1c63b8d479281ef5f0ad2f8dd56",
+        "channel_type": 2,
+        "limit": 30,
+        "start_message_seq": 0,
+        "end_message_seq": 0,
+        "pull_mode": 1
+      }
+    },
+    {
+      "url": "http://127.0.0.1:5174/v1/message/channel/sync",
+      "method": "POST",
+      "body": {
+        "channel_id": "a0f4ab3335294580835d19d294653bc8",
+        "channel_type": 2,
+        "limit": 30,
+        "start_message_seq": 0,
+        "end_message_seq": 0,
+        "pull_mode": 1
+      }
+    },
+    {
+      "url": "http://127.0.0.1:5174/v1/message/channel/sync",
+      "method": "POST",
+      "body": {
+        "channel_id": "5c9870c2956b40b0b5fe74c1e843efb4",
+        "channel_type": 2,
+        "limit": 30,
+        "start_message_seq": 0,
+        "end_message_seq": 0,
+        "pull_mode": 1
+      }
+    },
+    {
+      "url": "http://127.0.0.1:5174/v1/message/channel/sync",
+      "method": "POST",
+      "body": {
+        "channel_id": "ce0bd7ff8bae4432903dc5bab916ffdd",
+        "channel_type": 2,
+        "limit": 30,
+        "start_message_seq": 0,
+        "end_message_seq": 0,
+        "pull_mode": 1
+      }
+    },
+    {
+      "url": "http://127.0.0.1:5174/v1/message/channel/sync",
+      "method": "POST",
+      "body": {
+        "channel_id": "f69afa7fe9e9466d8ece02637c9a6765",
+        "channel_type": 2,
+        "limit": 30,
+        "start_message_seq": 0,
+        "end_message_seq": 0,
+        "pull_mode": 1
+      }
+    },
+    {
+      "url": "http://127.0.0.1:5174/v1/message/channel/sync",
+      "method": "POST",
+      "body": {
+        "channel_id": "7059baa93ec24e7e88665444e5ca10b4",
+        "channel_type": 2,
+        "limit": 30,
+        "start_message_seq": 0,
+        "end_message_seq": 0,
+        "pull_mode": 1
+      }
+    },
+    {
+      "url": "http://127.0.0.1:5174/v1/message/channel/sync",
+      "method": "POST",
+      "body": {
+        "channel_id": "22cedd21db254fd092f921de9e3c713f",
+        "channel_type": 2,
+        "limit": 30,
+        "start_message_seq": 0,
+        "end_message_seq": 0,
+        "pull_mode": 1
+      }
+    },
+    {
+      "url": "http://127.0.0.1:5174/v1/message/channel/sync",
+      "method": "POST",
+      "body": {
+        "channel_id": "f5b8acca54dd4bfba2b295a09463c419",
+        "channel_type": 2,
+        "limit": 30,
+        "start_message_seq": 0,
+        "end_message_seq": 0,
+        "pull_mode": 1
+      }
+    },
+    {
+      "url": "http://127.0.0.1:5174/v1/message/channel/sync",
+      "method": "POST",
+      "body": {
+        "channel_id": "9ad1435f0a5b4d9f9d4040d54a939cf4",
+        "channel_type": 2,
+        "limit": 30,
+        "start_message_seq": 0,
+        "end_message_seq": 0,
+        "pull_mode": 1
+      }
+    },
+    {
+      "url": "http://127.0.0.1:5174/v1/message/channel/sync",
+      "method": "POST",
+      "body": {
+        "channel_id": "aca2ab6d300b4134a98b5487c04684ba",
+        "channel_type": 2,
+        "limit": 30,
+        "start_message_seq": 0,
+        "end_message_seq": 0,
+        "pull_mode": 1
+      }
+    },
+    {
+      "url": "http://127.0.0.1:5174/v1/message/channel/sync",
+      "method": "POST",
+      "body": {
+        "channel_id": "69de49e3392d48528e4b0a88d1e692c4",
+        "channel_type": 2,
+        "limit": 30,
+        "start_message_seq": 0,
+        "end_message_seq": 0,
+        "pull_mode": 1
+      }
+    },
+    {
+      "url": "http://127.0.0.1:5174/v1/message/channel/sync",
+      "method": "POST",
+      "body": {
+        "channel_id": "41beab9cdf584493b2708a04573f367e",
+        "channel_type": 2,
+        "limit": 30,
+        "start_message_seq": 0,
+        "end_message_seq": 0,
+        "pull_mode": 1
+      }
+    },
+    {
+      "url": "http://127.0.0.1:5174/v1/message/channel/sync",
+      "method": "POST",
+      "body": {
+        "channel_id": "75ab7c536d4b4c4eb21639df828dbedd",
+        "channel_type": 2,
+        "limit": 30,
+        "start_message_seq": 0,
+        "end_message_seq": 0,
+        "pull_mode": 1
+      }
+    },
+    {
+      "url": "http://127.0.0.1:5174/v1/message/channel/sync",
+      "method": "POST",
+      "body": {
+        "channel_id": "88399bbd0d0342c9b41c97cb6385a032",
+        "channel_type": 2,
+        "limit": 30,
+        "start_message_seq": 0,
+        "end_message_seq": 0,
+        "pull_mode": 1
+      }
+    },
+    {
+      "url": "http://127.0.0.1:5174/v1/message/channel/sync",
+      "method": "POST",
+      "body": {
+        "channel_id": "05fc38114d844399ab56ef0bee99a2e6",
+        "channel_type": 2,
+        "limit": 30,
+        "start_message_seq": 0,
+        "end_message_seq": 0,
+        "pull_mode": 1
+      }
+    },
+    {
+      "url": "http://127.0.0.1:5174/v1/message/channel/sync",
+      "method": "POST",
+      "body": {
+        "channel_id": "cec409c5b5db4399a27358e76eb587b1",
+        "channel_type": 2,
+        "limit": 30,
+        "start_message_seq": 101,
+        "end_message_seq": 0,
+        "pull_mode": 1
+      }
+    },
+    {
+      "url": "http://127.0.0.1:5174/v1/message/channel/sync",
+      "method": "POST",
+      "body": {
+        "channel_id": "clowder_cat:opus",
+        "channel_type": 1,
+        "limit": 30,
+        "start_message_seq": 0,
+        "end_message_seq": 0,
+        "pull_mode": 1
+      }
+    },
+    {
+      "url": "http://127.0.0.1:5174/v1/message/channel/sync",
+      "method": "POST",
+      "body": {
+        "channel_id": "clowder_ai",
+        "channel_type": 1,
+        "limit": 30,
+        "start_message_seq": 0,
+        "end_message_seq": 0,
+        "pull_mode": 1
+      }
+    },
+    {
+      "url": "http://127.0.0.1:5174/v1/message/channel/sync",
+      "method": "POST",
+      "body": {
+        "channel_id": "clowder_cat:ragdoll-kn9a",
+        "channel_type": 1,
+        "limit": 30,
+        "start_message_seq": 0,
+        "end_message_seq": 0,
+        "pull_mode": 1
+      }
+    },
+    {
+      "url": "http://127.0.0.1:5174/v1/message/channel/sync",
+      "method": "POST",
+      "body": {
+        "channel_id": "clowder:bot",
+        "channel_type": 1,
+        "limit": 30,
+        "start_message_seq": 0,
+        "end_message_seq": 0,
+        "pull_mode": 1
+      }
+    },
+    {
+      "url": "http://127.0.0.1:5174/v1/message/channel/sync",
+      "method": "POST",
+      "body": {
+        "channel_id": "deepseek_ai_robot",
+        "channel_type": 1,
+        "limit": 30,
+        "start_message_seq": 0,
+        "end_message_seq": 0,
+        "pull_mode": 1
+      }
+    },
+    {
+      "url": "http://127.0.0.1:5174/v1/message/channel/sync",
+      "method": "POST",
+      "body": {
+        "channel_id": "filehelper",
+        "channel_type": 1,
+        "limit": 30,
+        "start_message_seq": 0,
+        "end_message_seq": 0,
+        "pull_mode": 1
+      }
+    },
+    {
+      "url": "http://127.0.0.1:5174/v1/message/channel/sync",
+      "method": "POST",
+      "body": {
+        "channel_id": "u_10000",
+        "channel_type": 1,
+        "limit": 30,
+        "start_message_seq": 0,
+        "end_message_seq": 0,
+        "pull_mode": 1
+      }
+    },
+    {
+      "url": "http://127.0.0.1:5174/v1/message/channel/sync",
+      "method": "POST",
+      "body": {
+        "channel_id": "989ec1fc79664ede9ff9008831d76337",
+        "channel_type": 1,
+        "limit": 30,
+        "start_message_seq": 0,
+        "end_message_seq": 0,
+        "pull_mode": 1
+      }
+    },
+    {
+      "url": "http://127.0.0.1:5174/v1/message/channel/sync",
+      "method": "POST",
+      "body": {
+        "channel_id": "31af7b0cdb1042be9b29b8660a862fb0",
+        "channel_type": 1,
+        "limit": 30,
+        "start_message_seq": 0,
+        "end_message_seq": 0,
+        "pull_mode": 1
+      }
+    },
+    {
+      "url": "http://127.0.0.1:5174/v1/message/channel/sync",
+      "method": "POST",
+      "body": {
+        "channel_id": "00cc4f31ecfb4d8298b82065a513c552",
+        "channel_type": 1,
+        "limit": 30,
+        "start_message_seq": 0,
+        "end_message_seq": 0,
+        "pull_mode": 1
+      }
+    },
+    {
+      "url": "http://127.0.0.1:5174/v1/message/channel/sync",
+      "method": "POST",
+      "body": {
+        "channel_id": "fileHelper",
+        "channel_type": 1,
+        "limit": 30,
+        "start_message_seq": 0,
+        "end_message_seq": 0,
+        "pull_mode": 1
+      }
+    },
+    {
+      "url": "http://127.0.0.1:5174/v1/message/channel/sync",
+      "method": "POST",
+      "body": {
+        "channel_id": "9d97387230a544dcba955a6266ee6285",
+        "channel_type": 1,
+        "limit": 30,
+        "start_message_seq": 0,
+        "end_message_seq": 0,
+        "pull_mode": 1
+      }
+    },
+    {
+      "url": "http://127.0.0.1:5174/v1/message/channel/sync",
+      "method": "POST",
+      "body": {
+        "channel_id": "311e44befed248d7ac4357b1527dacd2",
+        "channel_type": 2,
+        "limit": 30,
+        "start_message_seq": 1,
+        "end_message_seq": 0,
+        "pull_mode": 1
+      }
+    },
+    {
+      "url": "http://127.0.0.1:5174/v1/message/channel/sync",
+      "method": "POST",
+      "body": {
+        "channel_id": "5c9870c2956b40b0b5fe74c1e843efb4",
+        "channel_type": 2,
+        "limit": 30,
+        "start_message_seq": 1,
+        "end_message_seq": 0,
+        "pull_mode": 1
+      }
+    },
+    {
+      "url": "http://127.0.0.1:5174/v1/message/channel/sync",
+      "method": "POST",
+      "body": {
+        "channel_id": "88399bbd0d0342c9b41c97cb6385a032",
+        "channel_type": 2,
+        "limit": 30,
+        "start_message_seq": 1,
+        "end_message_seq": 0,
+        "pull_mode": 1
+      }
+    },
+    {
+      "url": "http://127.0.0.1:5174/v1/message/channel/sync",
+      "method": "POST",
+      "body": {
+        "channel_id": "75ab7c536d4b4c4eb21639df828dbedd",
+        "channel_type": 2,
+        "limit": 30,
+        "start_message_seq": 1,
+        "end_message_seq": 0,
+        "pull_mode": 1
+      }
+    },
+    {
+      "url": "http://127.0.0.1:5174/v1/message/channel/sync",
+      "method": "POST",
+      "body": {
+        "channel_id": "05fc38114d844399ab56ef0bee99a2e6",
+        "channel_type": 2,
+        "limit": 30,
+        "start_message_seq": 1,
+        "end_message_seq": 0,
+        "pull_mode": 1
+      }
+    },
+    {
+      "url": "http://127.0.0.1:5174/v1/message/channel/sync",
+      "method": "POST",
+      "body": {
+        "channel_id": "cec409c5b5db4399a27358e76eb587b1",
+        "channel_type": 2,
+        "limit": 30,
+        "start_message_seq": 1,
+        "end_message_seq": 0,
+        "pull_mode": 1
+      }
+    },
+    {
+      "url": "http://127.0.0.1:5174/v1/message/channel/sync",
+      "method": "POST",
+      "body": {
+        "channel_id": "clowder_cat:opus",
+        "channel_type": 1,
+        "limit": 30,
+        "start_message_seq": 1,
+        "end_message_seq": 0,
+        "pull_mode": 1
+      }
+    },
+    {
+      "url": "http://127.0.0.1:5174/v1/message/channel/sync",
+      "method": "POST",
+      "body": {
+        "channel_id": "clowder_ai",
+        "channel_type": 1,
+        "limit": 30,
+        "start_message_seq": 95,
+        "end_message_seq": 0,
+        "pull_mode": 1
+      }
+    },
+    {
+      "url": "http://127.0.0.1:5174/v1/message/channel/sync",
+      "method": "POST",
+      "body": {
+        "channel_id": "deepseek_ai_robot",
+        "channel_type": 1,
+        "limit": 30,
+        "start_message_seq": 1,
+        "end_message_seq": 0,
+        "pull_mode": 1
+      }
+    },
+    {
+      "url": "http://127.0.0.1:5174/v1/message/channel/sync",
+      "method": "POST",
+      "body": {
+        "channel_id": "989ec1fc79664ede9ff9008831d76337",
+        "channel_type": 1,
+        "limit": 30,
+        "start_message_seq": 1,
+        "end_message_seq": 0,
+        "pull_mode": 1
+      }
+    },
+    {
+      "url": "http://127.0.0.1:5174/v1/message/channel/sync",
+      "method": "POST",
+      "body": {
+        "channel_id": "cec409c5b5db4399a27358e76eb587b1",
+        "channel_type": 2,
+        "limit": 30,
+        "start_message_seq": 31,
+        "end_message_seq": 0,
+        "pull_mode": 1
+      }
+    },
+    {
+      "url": "http://127.0.0.1:5174/v1/message/channel/sync",
+      "method": "POST",
+      "body": {
+        "channel_id": "clowder_cat:opus",
+        "channel_type": 1,
+        "limit": 30,
+        "start_message_seq": 31,
+        "end_message_seq": 0,
+        "pull_mode": 1
+      }
+    },
+    {
+      "url": "http://127.0.0.1:5174/v1/message/channel/sync",
+      "method": "POST",
+      "body": {
+        "channel_id": "clowder_ai",
+        "channel_type": 1,
+        "limit": 30,
+        "start_message_seq": 125,
+        "end_message_seq": 0,
+        "pull_mode": 1
+      }
+    },
+    {
+      "url": "http://127.0.0.1:5174/v1/message/channel/sync",
+      "method": "POST",
+      "body": {
+        "channel_id": "deepseek_ai_robot",
+        "channel_type": 1,
+        "limit": 30,
+        "start_message_seq": 31,
+        "end_message_seq": 0,
+        "pull_mode": 1
+      }
+    },
+    {
+      "url": "http://127.0.0.1:5174/v1/message/channel/sync",
+      "method": "POST",
+      "body": {
+        "channel_id": "989ec1fc79664ede9ff9008831d76337",
+        "channel_type": 1,
+        "limit": 30,
+        "start_message_seq": 31,
+        "end_message_seq": 0,
+        "pull_mode": 1
+      }
+    },
+    {
+      "url": "http://127.0.0.1:5174/v1/message/channel/sync",
+      "method": "POST",
+      "body": {
+        "channel_id": "cec409c5b5db4399a27358e76eb587b1",
+        "channel_type": 2,
+        "limit": 30,
+        "start_message_seq": 61,
+        "end_message_seq": 0,
+        "pull_mode": 1
+      }
+    },
+    {
+      "url": "http://127.0.0.1:5174/v1/message/channel/sync",
+      "method": "POST",
+      "body": {
+        "channel_id": "clowder_ai",
+        "channel_type": 1,
+        "limit": 30,
+        "start_message_seq": 155,
+        "end_message_seq": 0,
+        "pull_mode": 1
+      }
+    },
+    {
+      "url": "http://127.0.0.1:5174/v1/message/channel/sync",
+      "method": "POST",
+      "body": {
+        "channel_id": "deepseek_ai_robot",
+        "channel_type": 1,
+        "limit": 30,
+        "start_message_seq": 61,
+        "end_message_seq": 0,
+        "pull_mode": 1
+      }
+    },
+    {
+      "url": "http://127.0.0.1:5174/v1/message/channel/sync",
+      "method": "POST",
+      "body": {
+        "channel_id": "deepseek_ai_robot",
+        "channel_type": 1,
+        "limit": 30,
+        "start_message_seq": 91,
+        "end_message_seq": 0,
+        "pull_mode": 1
+      }
+    },
+    {
+      "url": "http://127.0.0.1:5174/v1/message/channel/sync",
+      "method": "POST",
+      "body": {
+        "channel_id": "clowder_ai",
+        "channel_type": 1,
+        "limit": 30,
+        "start_message_seq": 185,
+        "end_message_seq": 0,
+        "pull_mode": 1
+      }
+    },
+    {
+      "url": "http://127.0.0.1:5174/v1/message/channel/sync",
+      "method": "POST",
+      "body": {
+        "channel_id": "deepseek_ai_robot",
+        "channel_type": 1,
+        "limit": 30,
+        "start_message_seq": 121,
+        "end_message_seq": 0,
+        "pull_mode": 1
+      }
+    },
+    {
+      "url": "http://127.0.0.1:5174/v1/message/channel/sync",
+      "method": "POST",
+      "body": {
+        "channel_id": "clowder_ai",
+        "channel_type": 1,
+        "limit": 30,
+        "start_message_seq": 215,
+        "end_message_seq": 0,
+        "pull_mode": 1
+      }
+    },
+    {
+      "url": "http://127.0.0.1:5174/v1/message/channel/sync",
+      "method": "POST",
+      "body": {
+        "channel_id": "clowder_ai",
+        "channel_type": 1,
+        "limit": 30,
+        "start_message_seq": 245,
+        "end_message_seq": 0,
+        "pull_mode": 1
+      }
+    },
+    {
+      "url": "http://127.0.0.1:5174/v1/message/channel/sync",
+      "method": "POST",
+      "body": {
+        "channel_id": "clowder_ai",
+        "channel_type": 1,
+        "limit": 30,
+        "start_message_seq": 275,
+        "end_message_seq": 0,
+        "pull_mode": 1
+      }
+    },
+    {
+      "url": "http://127.0.0.1:5174/v1/message/channel/sync",
+      "method": "POST",
+      "body": {
+        "channel_id": "clowder_ai",
+        "channel_type": 1,
+        "limit": 30,
+        "start_message_seq": 305,
+        "end_message_seq": 0,
+        "pull_mode": 1
+      }
+    },
+    {
+      "url": "http://127.0.0.1:5174/v1/message/channel/sync",
+      "method": "POST",
+      "body": {
+        "channel_id": "clowder_ai",
+        "channel_type": 1,
+        "limit": 30,
+        "start_message_seq": 335,
+        "end_message_seq": 0,
+        "pull_mode": 1
+      }
+    },
+    {
+      "url": "http://127.0.0.1:5174/v1/message/channel/sync",
+      "method": "POST",
+      "body": {
+        "channel_id": "clowder_ai",
+        "channel_type": 1,
+        "limit": 30,
+        "start_message_seq": 365,
+        "end_message_seq": 0,
+        "pull_mode": 1
+      }
+    }
+  ],
+  "syncResponses": [
+    {
+      "url": "http://127.0.0.1:5174/v1/message/channel/sync",
+      "status": 200,
+      "count": 30,
+      "minSeq": 15,
+      "maxSeq": 44
+    },
+    {
+      "url": "http://127.0.0.1:5174/v1/message/channel/sync",
+      "status": 200,
+      "count": 30,
+      "minSeq": 72,
+      "maxSeq": 101
+    },
+    {
+      "url": "http://127.0.0.1:5174/v1/message/channel/sync",
+      "status": 200,
+      "count": 15,
+      "minSeq": 1,
+      "maxSeq": 15
+    },
+    {
+      "url": "http://127.0.0.1:5174/v1/message/channel/sync",
+      "status": 200,
+      "count": 11,
+      "minSeq": 1,
+      "maxSeq": 11
+    },
+    {
+      "url": "http://127.0.0.1:5174/v1/message/channel/sync",
+      "status": 200,
+      "count": 30,
+      "minSeq": 22,
+      "maxSeq": 51
+    },
+    {
+      "url": "http://127.0.0.1:5174/v1/message/channel/sync",
+      "status": 200,
+      "count": 0,
+      "minSeq": null,
+      "maxSeq": null
+    },
+    {
+      "url": "http://127.0.0.1:5174/v1/message/channel/sync",
+      "status": 200,
+      "count": 0,
+      "minSeq": null,
+      "maxSeq": null
+    },
+    {
+      "url": "http://127.0.0.1:5174/v1/message/channel/sync",
+      "status": 200,
+      "count": 0,
+      "minSeq": null,
+      "maxSeq": null
+    },
+    {
+      "url": "http://127.0.0.1:5174/v1/message/channel/sync",
+      "status": 200,
+      "count": 0,
+      "minSeq": null,
+      "maxSeq": null
+    },
+    {
+      "url": "http://127.0.0.1:5174/v1/message/channel/sync",
+      "status": 200,
+      "count": 0,
+      "minSeq": null,
+      "maxSeq": null
+    },
+    {
+      "url": "http://127.0.0.1:5174/v1/message/channel/sync",
+      "status": 200,
+      "count": 17,
+      "minSeq": 1,
+      "maxSeq": 17
+    },
+    {
+      "url": "http://127.0.0.1:5174/v1/message/channel/sync",
+      "status": 200,
+      "count": 2,
+      "minSeq": 1,
+      "maxSeq": 2
+    },
+    {
+      "url": "http://127.0.0.1:5174/v1/message/channel/sync",
+      "status": 200,
+      "count": 2,
+      "minSeq": 1,
+      "maxSeq": 2
+    },
+    {
+      "url": "http://127.0.0.1:5174/v1/message/channel/sync",
+      "status": 200,
+      "count": 2,
+      "minSeq": 1,
+      "maxSeq": 2
+    },
+    {
+      "url": "http://127.0.0.1:5174/v1/message/channel/sync",
+      "status": 200,
+      "count": 4,
+      "minSeq": 1,
+      "maxSeq": 4
+    },
+    {
+      "url": "http://127.0.0.1:5174/v1/message/channel/sync",
+      "status": 200,
+      "count": 21,
+      "minSeq": 1,
+      "maxSeq": 21
+    },
+    {
+      "url": "http://127.0.0.1:5174/v1/message/channel/sync",
+      "status": 200,
+      "count": 12,
+      "minSeq": 1,
+      "maxSeq": 12
+    },
+    {
+      "url": "http://127.0.0.1:5174/v1/message/channel/sync",
+      "status": 200,
+      "count": 30,
+      "minSeq": 72,
+      "maxSeq": 101
+    },
+    {
+      "url": "http://127.0.0.1:5174/v1/message/channel/sync",
+      "status": 200,
+      "count": 30,
+      "minSeq": 1,
+      "maxSeq": 30
+    },
+    {
+      "url": "http://127.0.0.1:5174/v1/message/channel/sync",
+      "status": 200,
+      "count": 30,
+      "minSeq": 31,
+      "maxSeq": 60
+    },
+    {
+      "url": "http://127.0.0.1:5174/v1/message/channel/sync",
+      "status": 200,
+      "count": 30,
+      "minSeq": 61,
+      "maxSeq": 90
+    },
+    {
+      "url": "http://127.0.0.1:5174/v1/message/channel/sync",
+      "status": 200,
+      "count": 11,
+      "minSeq": 91,
+      "maxSeq": 101
+    },
+    {
+      "url": "http://127.0.0.1:5174/v1/message/channel/sync",
+      "status": 200,
+      "count": 0,
+      "minSeq": null,
+      "maxSeq": null
+    },
+    {
+      "url": "http://127.0.0.1:5174/v1/message/channel/sync",
+      "status": 200,
+      "count": 0,
+      "minSeq": null,
+      "maxSeq": null
+    },
+    {
+      "url": "http://127.0.0.1:5174/v1/message/channel/sync",
+      "status": 200,
+      "count": 0,
+      "minSeq": null,
+      "maxSeq": null
+    },
+    {
+      "url": "http://127.0.0.1:5174/v1/message/channel/sync",
+      "status": 200,
+      "count": 0,
+      "minSeq": null,
+      "maxSeq": null
+    },
+    {
+      "url": "http://127.0.0.1:5174/v1/message/channel/sync",
+      "status": 200,
+      "count": 0,
+      "minSeq": null,
+      "maxSeq": null
+    },
+    {
+      "url": "http://127.0.0.1:5174/v1/message/channel/sync",
+      "status": 200,
+      "count": 0,
+      "minSeq": null,
+      "maxSeq": null
+    },
+    {
+      "url": "http://127.0.0.1:5174/v1/message/channel/sync",
+      "status": 200,
+      "count": 0,
+      "minSeq": null,
+      "maxSeq": null
+    },
+    {
+      "url": "http://127.0.0.1:5174/v1/message/channel/sync",
+      "status": 200,
+      "count": 11,
+      "minSeq": 1,
+      "maxSeq": 11
+    },
+    {
+      "url": "http://127.0.0.1:5174/v1/message/channel/sync",
+      "status": 200,
+      "count": 15,
+      "minSeq": 1,
+      "maxSeq": 15
+    },
+    {
+      "url": "http://127.0.0.1:5174/v1/message/channel/sync",
+      "status": 200,
+      "count": 30,
+      "minSeq": 15,
+      "maxSeq": 44
+    },
+    {
+      "url": "http://127.0.0.1:5174/v1/message/channel/sync",
+      "status": 200,
+      "count": 30,
+      "minSeq": 22,
+      "maxSeq": 51
+    },
+    {
+      "url": "http://127.0.0.1:5174/v1/message/channel/sync",
+      "status": 200,
+      "count": 0,
+      "minSeq": null,
+      "maxSeq": null
+    },
+    {
+      "url": "http://127.0.0.1:5174/v1/message/channel/sync",
+      "status": 200,
+      "count": 0,
+      "minSeq": null,
+      "maxSeq": null
+    },
+    {
+      "url": "http://127.0.0.1:5174/v1/message/channel/sync",
+      "status": 200,
+      "count": 0,
+      "minSeq": null,
+      "maxSeq": null
+    },
+    {
+      "url": "http://127.0.0.1:5174/v1/message/channel/sync",
+      "status": 200,
+      "count": 2,
+      "minSeq": 1,
+      "maxSeq": 2
+    },
+    {
+      "url": "http://127.0.0.1:5174/v1/message/channel/sync",
+      "status": 200,
+      "count": 2,
+      "minSeq": 1,
+      "maxSeq": 2
+    },
+    {
+      "url": "http://127.0.0.1:5174/v1/message/channel/sync",
+      "status": 200,
+      "count": 17,
+      "minSeq": 1,
+      "maxSeq": 17
+    },
+    {
+      "url": "http://127.0.0.1:5174/v1/message/channel/sync",
+      "status": 200,
+      "count": 2,
+      "minSeq": 1,
+      "maxSeq": 2
+    },
+    {
+      "url": "http://127.0.0.1:5174/v1/message/channel/sync",
+      "status": 200,
+      "count": 4,
+      "minSeq": 1,
+      "maxSeq": 4
+    },
+    {
+      "url": "http://127.0.0.1:5174/v1/message/channel/sync",
+      "status": 200,
+      "count": 21,
+      "minSeq": 1,
+      "maxSeq": 21
+    },
+    {
+      "url": "http://127.0.0.1:5174/v1/message/channel/sync",
+      "status": 200,
+      "count": 12,
+      "minSeq": 1,
+      "maxSeq": 12
+    },
+    {
+      "url": "http://127.0.0.1:5174/v1/message/channel/sync",
+      "status": 200,
+      "count": 1,
+      "minSeq": 101,
+      "maxSeq": 101
+    },
+    {
+      "url": "http://127.0.0.1:5174/v1/message/channel/sync",
+      "status": 200,
+      "count": 30,
+      "minSeq": 19,
+      "maxSeq": 48
+    },
+    {
+      "url": "http://127.0.0.1:5174/v1/message/channel/sync",
+      "status": 200,
+      "count": 4,
+      "minSeq": 1,
+      "maxSeq": 4
+    },
+    {
+      "url": "http://127.0.0.1:5174/v1/message/channel/sync",
+      "status": 200,
+      "count": 4,
+      "minSeq": 1,
+      "maxSeq": 4
+    },
+    {
+      "url": "http://127.0.0.1:5174/v1/message/channel/sync",
+      "status": 200,
+      "count": 30,
+      "minSeq": 365,
+      "maxSeq": 394
+    },
+    {
+      "url": "http://127.0.0.1:5174/v1/message/channel/sync",
+      "status": 200,
+      "count": 30,
+      "minSeq": 123,
+      "maxSeq": 152
+    },
+    {
+      "url": "http://127.0.0.1:5174/v1/message/channel/sync",
+      "status": 200,
+      "count": 30,
+      "minSeq": 1,
+      "maxSeq": 30
+    },
+    {
+      "url": "http://127.0.0.1:5174/v1/message/channel/sync",
+      "status": 200,
+      "count": 30,
+      "minSeq": 1,
+      "maxSeq": 30
+    },
+    {
+      "url": "http://127.0.0.1:5174/v1/message/channel/sync",
+      "status": 200,
+      "count": 30,
+      "minSeq": 53,
+      "maxSeq": 82
+    },
+    {
+      "url": "http://127.0.0.1:5174/v1/message/channel/sync",
+      "status": 200,
+      "count": 17,
+      "minSeq": 1,
+      "maxSeq": 17
+    },
+    {
+      "url": "http://127.0.0.1:5174/v1/message/channel/sync",
+      "status": 200,
+      "count": 27,
+      "minSeq": 1,
+      "maxSeq": 27
+    },
+    {
+      "url": "http://127.0.0.1:5174/v1/message/channel/sync",
+      "status": 200,
+      "count": 17,
+      "minSeq": 1,
+      "maxSeq": 17
+    },
+    {
+      "url": "http://127.0.0.1:5174/v1/message/channel/sync",
+      "status": 200,
+      "count": 23,
+      "minSeq": 1,
+      "maxSeq": 23
+    },
+    {
+      "url": "http://127.0.0.1:5174/v1/message/channel/sync",
+      "status": 200,
+      "count": 30,
+      "minSeq": 1,
+      "maxSeq": 30
+    },
+    {
+      "url": "http://127.0.0.1:5174/v1/message/channel/sync",
+      "status": 200,
+      "count": 30,
+      "minSeq": 1,
+      "maxSeq": 30
+    },
+    {
+      "url": "http://127.0.0.1:5174/v1/message/channel/sync",
+      "status": 200,
+      "count": 4,
+      "minSeq": 1,
+      "maxSeq": 4
+    },
+    {
+      "url": "http://127.0.0.1:5174/v1/message/channel/sync",
+      "status": 200,
+      "count": 21,
+      "minSeq": 1,
+      "maxSeq": 21
+    },
+    {
+      "url": "http://127.0.0.1:5174/v1/message/channel/sync",
+      "status": 200,
+      "count": 12,
+      "minSeq": 1,
+      "maxSeq": 12
+    },
+    {
+      "url": "http://127.0.0.1:5174/v1/message/channel/sync",
+      "status": 200,
+      "count": 30,
+      "minSeq": 1,
+      "maxSeq": 30
+    },
+    {
+      "url": "http://127.0.0.1:5174/v1/message/channel/sync",
+      "status": 200,
+      "count": 30,
+      "minSeq": 1,
+      "maxSeq": 30
+    },
+    {
+      "url": "http://127.0.0.1:5174/v1/message/channel/sync",
+      "status": 200,
+      "count": 30,
+      "minSeq": 95,
+      "maxSeq": 124
+    },
+    {
+      "url": "http://127.0.0.1:5174/v1/message/channel/sync",
+      "status": 200,
+      "count": 30,
+      "minSeq": 1,
+      "maxSeq": 30
+    },
+    {
+      "url": "http://127.0.0.1:5174/v1/message/channel/sync",
+      "status": 200,
+      "count": 30,
+      "minSeq": 1,
+      "maxSeq": 30
+    },
+    {
+      "url": "http://127.0.0.1:5174/v1/message/channel/sync",
+      "status": 200,
+      "count": 30,
+      "minSeq": 31,
+      "maxSeq": 60
+    },
+    {
+      "url": "http://127.0.0.1:5174/v1/message/channel/sync",
+      "status": 200,
+      "count": 18,
+      "minSeq": 31,
+      "maxSeq": 48
+    },
+    {
+      "url": "http://127.0.0.1:5174/v1/message/channel/sync",
+      "status": 200,
+      "count": 30,
+      "minSeq": 125,
+      "maxSeq": 154
+    },
+    {
+      "url": "http://127.0.0.1:5174/v1/message/channel/sync",
+      "status": 200,
+      "count": 30,
+      "minSeq": 31,
+      "maxSeq": 60
+    },
+    {
+      "url": "http://127.0.0.1:5174/v1/message/channel/sync",
+      "status": 200,
+      "count": 30,
+      "minSeq": 31,
+      "maxSeq": 60
+    },
+    {
+      "url": "http://127.0.0.1:5174/v1/message/channel/sync",
+      "status": 200,
+      "count": 30,
+      "minSeq": 61,
+      "maxSeq": 90
+    },
+    {
+      "url": "http://127.0.0.1:5174/v1/message/channel/sync",
+      "status": 200,
+      "count": 30,
+      "minSeq": 61,
+      "maxSeq": 90
+    },
+    {
+      "url": "http://127.0.0.1:5174/v1/message/channel/sync",
+      "status": 200,
+      "count": 30,
+      "minSeq": 155,
+      "maxSeq": 184
+    },
+    {
+      "url": "http://127.0.0.1:5174/v1/message/channel/sync",
+      "status": 200,
+      "count": 30,
+      "minSeq": 91,
+      "maxSeq": 120
+    },
+    {
+      "url": "http://127.0.0.1:5174/v1/message/channel/sync",
+      "status": 200,
+      "count": 30,
+      "minSeq": 185,
+      "maxSeq": 214
+    },
+    {
+      "url": "http://127.0.0.1:5174/v1/message/channel/sync",
+      "status": 200,
+      "count": 30,
+      "minSeq": 121,
+      "maxSeq": 150
+    },
+    {
+      "url": "http://127.0.0.1:5174/v1/message/channel/sync",
+      "status": 200,
+      "count": 30,
+      "minSeq": 215,
+      "maxSeq": 244
+    },
+    {
+      "url": "http://127.0.0.1:5174/v1/message/channel/sync",
+      "status": 200,
+      "count": 30,
+      "minSeq": 245,
+      "maxSeq": 274
+    },
+    {
+      "url": "http://127.0.0.1:5174/v1/message/channel/sync",
+      "status": 200,
+      "count": 30,
+      "minSeq": 275,
+      "maxSeq": 304
+    },
+    {
+      "url": "http://127.0.0.1:5174/v1/message/channel/sync",
+      "status": 200,
+      "count": 30,
+      "minSeq": 305,
+      "maxSeq": 334
+    },
+    {
+      "url": "http://127.0.0.1:5174/v1/message/channel/sync",
+      "status": 200,
+      "count": 30,
+      "minSeq": 335,
+      "maxSeq": 364
+    },
+    {
+      "url": "http://127.0.0.1:5174/v1/message/channel/sync",
+      "status": 200,
+      "count": 30,
+      "minSeq": 365,
+      "maxSeq": 394
+    }
+  ],
+  "snapshot": {
+    "title": "唐僧叨叨 - 极简重构版",
+    "path": "/chat/conversation/cec409c5b5db4399a27358e76eb587b1/2",
+    "rowCount": 34,
+    "bodyIncludesEarlyGreeting": true,
+    "bodyIncludesEarlyProgramRequest": true,
+    "bodyIncludesScenarioQuestion": true,
+    "bodyIncludesFileName": true,
+    "header": "集群",
+    "visibleLabels": [
+      "yunyi",
+      "布偶猫",
+      "布偶猫",
+      "yunyi",
+      "是给餐厅",
+      "yunyi",
+      "yunyi",
+      "布偶猫",
+      "布偶猫",
+      "布偶猫",
+      "yunyi",
+      "布偶猫",
+      "yunyi",
+      "布偶猫",
+      "布偶猫",
+      "yunyi",
+      "data",
+      "Codex",
+      "@ragdoll-kn9a（布偶猫",
+      "yunyi",
+      "布偶猫",
+      "布偶猫",
+      "布偶猫",
+      "yunyi",
+      "布偶猫",
+      "布偶猫",
+      "布偶猫",
+      "yunyi",
+      "布偶猫",
+      "布偶猫"
+    ],
+    "fileRows": [
+      {
+        "index": 21,
+        "label": "布偶猫",
+        "avatarText": "布",
+        "text": "布布偶猫Clowder布偶猫好嘞，先打个包！现在通过 IM 把文件发给你～打包文件已经发到聊天里了！📦 文件内容： 点餐 Demo 完整项目（不含 node_modules 和数据库文件） 拿到后解压： bash复制tar -xzf ordering-demo.tar.gz cd ordering-demo # 分别安装依赖 cd server && npm install && cd ../client && npm install && cd .. # 跑起来 # 终端1: cd server && npm run dev # 终端2: cd client && npm run dev 还有什么需要调整或补充的？比如加个 README、加功能、或者再做个别的什么？😊 [布偶猫/宪宪🐾 deepseek-v4-flash]富内容ordering-demo.tar.gz/uploads/ordering-demo.tar.gz"
+      },
+      {
+        "index": 22,
+        "label": "布偶猫",
+        "avatarText": "布",
+        "text": "布布偶猫ClowderClowderordering-demo.tar.gz"
+      },
+      {
+        "index": 25,
+        "label": "布偶猫",
+        "avatarText": "布",
+        "text": "布布偶猫Clowder布偶猫文件刚才已经发到聊天里了——你应该能看到上面那条带文件附件的消息？就是一个叫 ordering-demo.tar.gz 的下载链接 📦 如果聊天里没显示出来，我再发一次：重新发了一次，应该出现在聊天里了 👆 看到文件附件了吗？ 解压方式： bash复制tar -xzf ordering-demo.tar.gz cd ordering-demo # 分别安装依赖再跑 如果还是收不到，可能 IM 客户端对文件类型有限制，我也可以换成其他方式发给你～ [布偶猫/宪宪🐾 deepseek-v4-flash]富内容ordering-demo.tar.gz/uploads/ordering-demo.tar.gz"
+      },
+      {
+        "index": 26,
+        "label": "布偶猫",
+        "avatarText": "布",
+        "text": "布布偶猫ClowderClowderordering-demo.tar.gz"
+      },
+      {
+        "index": 29,
+        "label": "布偶猫",
+        "avatarText": "布",
+        "text": "布布偶猫Clowder布偶猫好，我把项目跑起来截个图给你看！两个服务都跑起来了！现在来截图：预览已打开在右侧面板里了！现在来截图。让我看看有没有截图的 API：Puppeteer 可用，我写个脚本自动截图：截图完成！来看看效果：截图发到聊天里了 👆 来看看四个运行界面： 截图 说明 🏠 主页面 分类栏（凉菜/热菜/主食/饮品）+ 菜品网格卡片 🔥 热菜分类 点击分类筛选，只显示对应菜品 🛒 购物车 多分类选菜，购物车侧栏实时合计、可调数量 📋 下单表单 弹窗确认订单 + 填写姓名/桌号/备注 另外前面发的那个 ordering-demo.tar.gz 压缩包也收到了吗？项目跑起来就能看到截图里的效果啦～ 要不要再调整点什么，或者接着加点什么功能？😊 [布偶猫/宪宪🐾 deepseek-v4-flash]富内容🍜 美食小馆 — 运行截图🏠 主页面：分类栏 + 菜品网格 🔥 热菜分类筛选 🛒 多分类选菜，购物车实时合计 📋 下单弹窗：确认清单 + 填写信息"
+      }
+    ]
+  },
+  "consoleErrors": [],
+  "pageErrors": [],
+  "failedRequests": [],
+  "screenshotPath": "/media/leng/DiskB1/exp/seedcmp/sections/im_web/.ai/V3.0/tests-e2e/v3-20-history-20260530235822/group-history.png"
+}
