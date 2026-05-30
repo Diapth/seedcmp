@@ -125,6 +125,10 @@ func (s *Service) GetAllUsers() ([]*Resp, error) {
 	return list, nil
 }
 func (s *Service) GetUserDetail(uid string, loginUID string) (*UserDetailResp, error) {
+	if detail := newVirtualUserDetailResp(uid); detail != nil {
+		return detail, nil
+	}
+
 	model, err := s.db.QueryDetailByUID(uid, loginUID)
 	if err != nil {
 		s.Error("查询用户信息失败！", zap.Error(err), zap.String("uid", uid))
@@ -226,16 +230,20 @@ func (s *Service) GetUserDetail(uid string, loginUID string) (*UserDetailResp, e
 }
 
 func (s *Service) GetUserDetails(uids []string, loginUID string) ([]*UserDetailResp, error) {
+	virtualUsers, regularUIDs := splitVirtualUserDetails(uids)
+	if len(regularUIDs) == 0 {
+		return virtualUsers, nil
+	}
 
-	userDetails, err := s.db.QueryDetailByUIDs(uids, loginUID)
+	userDetails, err := s.db.QueryDetailByUIDs(regularUIDs, loginUID)
 	if err != nil {
 		s.Error("查询用户详情失败！")
 		return nil, err
 	}
 	if userDetails == nil {
-		return nil, nil
+		return virtualUsers, nil
 	}
-	onlineStatusResults, err := s.onlineDB.queryUserLastNewOnlines(uids)
+	onlineStatusResults, err := s.onlineDB.queryUserLastNewOnlines(regularUIDs)
 	if err != nil {
 		s.Error("查询用户在线状态失败", zap.Error(err))
 		return nil, err
@@ -247,7 +255,7 @@ func (s *Service) GetUserDetails(uids []string, loginUID string) ([]*UserDetailR
 		}
 	}
 	// 查询loginUID用户对uids的设置
-	settings, err := s.settingDB.QueryUserSettings(uids, loginUID)
+	settings, err := s.settingDB.QueryUserSettings(regularUIDs, loginUID)
 	if err != nil {
 		return nil, err
 	}
@@ -259,7 +267,7 @@ func (s *Service) GetUserDetails(uids []string, loginUID string) ([]*UserDetailR
 	}
 
 	// 查询uids对loginUID的设置
-	toSettings, err := s.settingDB.QueryWithUidsAndToUID(uids, loginUID)
+	toSettings, err := s.settingDB.QueryWithUidsAndToUID(regularUIDs, loginUID)
 	if err != nil {
 		return nil, err
 	}
@@ -270,7 +278,7 @@ func (s *Service) GetUserDetails(uids []string, loginUID string) ([]*UserDetailR
 		}
 	}
 	// 查询loginUID与uids的好友
-	friends, err := s.friendDB.queryWithToUIDsAndUID(uids, loginUID)
+	friends, err := s.friendDB.queryWithToUIDsAndUID(regularUIDs, loginUID)
 	if err != nil {
 		return nil, err
 	}
@@ -297,7 +305,7 @@ func (s *Service) GetUserDetails(uids []string, loginUID string) ([]*UserDetailR
 	}
 
 	// 查询uids内与loginUID的好友 （查询uids与loginUID的好友）
-	toFriends, err := s.friendDB.queryWithToUIDAndUIDs(loginUID, uids)
+	toFriends, err := s.friendDB.queryWithToUIDAndUIDs(loginUID, regularUIDs)
 	if err != nil {
 		return nil, err
 	}
@@ -308,7 +316,8 @@ func (s *Service) GetUserDetails(uids []string, loginUID string) ([]*UserDetailR
 		}
 	}
 
-	userDetailResps := make([]*UserDetailResp, 0)
+	userDetailResps := make([]*UserDetailResp, 0, len(virtualUsers)+len(userDetails))
+	userDetailResps = append(userDetailResps, virtualUsers...)
 
 	for _, userDetail := range userDetails {
 		uid := userDetail.UID

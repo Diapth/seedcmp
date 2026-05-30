@@ -83,3 +83,8 @@ func TestNormalizeInboundMessageMapsAttachments(t *testing.T) {
 	assert.Equal(t, "image.png", normalized.Attachments[0].FileName)
 	assert.Equal(t, int64(12345), normalized.Attachments[0].Size)
 }
+
+func TestStableStreamClientMsgNo(t *testing.T) {
+	assert.Equal(t, "platform-1", StableStreamClientMsgNo("invoke-1", "platform-1"))
+	assert.Equal(t, "clowder-stream-invoke-1", StableStreamClientMsgNo("invoke-1", ""))
+}

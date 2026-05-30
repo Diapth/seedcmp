@@ -24,7 +24,18 @@ func (m *Message) registerClowderBridgeListener() {
 	bridge.SetConfig(bridgeConfig)
 	client := clowder.NewClient(bridgeConfig.APIBaseURL, bridgeConfig.ConnectorSecret, bridgeConfig.RequestTimeout)
 	m.ctx.AddMessagesListener(func(messages []*config.MessageResp) {
-		bridge.MessagesListen(messages, client)
+		bridge.MessagesListenWithRoles(messages, client, func(groupNo string, uid string) (*clowder.GroupRoleSnapshot, error) {
+			member, err := m.groupService.GetMember(groupNo, uid)
+			if err != nil {
+				return nil, err
+			}
+			if member == nil {
+				snapshot := clowder.NormalizeGroupRoleSnapshot(groupNo, uid, 0, false)
+				return &snapshot, nil
+			}
+			snapshot := clowder.NormalizeGroupRoleSnapshot(groupNo, uid, member.Role, true)
+			return &snapshot, nil
+		})
 	})
 	m.Info("Clowder bridge listener registered")
 }
