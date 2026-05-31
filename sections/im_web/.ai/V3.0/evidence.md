@@ -111,6 +111,46 @@ Baseline command inventory captured during Phase 1 setup, with final V3 implemen
 
 ## Browser Acceptance
 
+### Multi-Account Visual Regression Run - v3-multi-account-visual-20260531081933
+
+- Date/time: 2026-05-31 16:19 CST
+- IM Web URL: `http://localhost:3000`
+- TangSeng API preflight: `GET http://100.79.157.76:8090/v1/health` returned 200 with `db/redis/status: up`
+- Clowder URL: `http://localhost:3003`
+- Clowder preflight: `GET /api/connectors/im-web/status` returned 200 with `connectorId: im-web`, `enabled/configured/reachable: true`
+- Accounts: `18337488675`, `13733632709`
+- Shared group used for the successful two-account visual flow: `TestGroup1`
+- Command: `TARGET_URL=http://localhost:3000 TEST_USERNAME=18337488675 TEST_PASSWORD=123456 TEST_B_USERNAME=13733632709 TEST_B_PASSWORD=123456 TEST_GROUP_CONVERSATION=TestGroup1 node /home/leng/.codex/skills/playwright-skill/run.js /tmp/playwright-v3-multi-account-visual.js`
+- Result: Pass. A and B both logged in, opened the same group, A sent a namespaced message, B received it, B still saw it after reload, middle-position `@` mention popup was visible, Clowder panel opened with width 419px, console errors 0, page errors 0, failed network requests 0.
+- Evidence directory: `sections/im_web/.ai/V3.0/tests-e2e/v3-multi-account-visual-20260531081933/`
+  - `00-a-after-login.png`
+  - `00-b-after-login.png`
+  - `01-a-group-open.png`
+  - `02-b-group-open.png`
+  - `03-a-after-send.png`
+  - `04-b-after-receive.png`
+  - `05-b-after-reload.png`
+  - `06-a-mention-middle.png`
+  - `07-a-clowder-panel.png`
+  - `result.json`
+
+### V3 Live Smoke Suite Attempt - 2026-05-31 16:14 CST
+
+- Command: `RUN_V3_CLOWDER_SMOKE=1 TARGET_URL=http://localhost:3000 CLOWDER_URL=http://localhost:3003 TEST_USERNAME=18337488675 TEST_PASSWORD=123456 TEST_B_USERNAME=13733632709 TEST_B_PASSWORD=123456 TEST_GROUP_CONVERSATION=集群 TEST_AGENT_A=codex TEST_AGENT_B=ragdoll CLOWDER_TEST_USER=18337488675 CLOWDER_CONNECTOR_SECRET=dev-im-web-secret pnpm exec playwright test tests-e2e/smoke-v3-clowder-panel.spec.ts tests-e2e/smoke-v3-clowder-binding.spec.ts tests-e2e/smoke-v3-clowder-multi-agent.spec.ts tests-e2e/smoke-v3-clowder-permissions.spec.ts tests-e2e/smoke-v3-clowder-streaming-media.spec.ts tests-e2e/smoke-v3-clowder-v2-regression.spec.ts tests-e2e/smoke-v3-clowder-thread-lifecycle.spec.ts --config playwright.config.ts --reporter=line`
+- Result: Fail - 7 tests total, 5 failed, 2 skipped.
+- Failure summary:
+  - Binding smoke timed out waiting for an additional Clowder reply count after sending `@codex ... direct binding smoke`.
+  - Multi-agent smoke expected the latest cat badge to contain `codex`, but the last visible cat was `布偶猫`.
+  - Panel smoke found `.clowder-panel` width `249.609375`, below the test threshold of 260.
+  - Streaming/media degraded-mode route interception did not surface `error|unavailable|clowder_unavailable` text.
+  - V2 regression smoke sent a non-Clowder message but did not find it after reload.
+- Error contexts: `sections/im_web/apps/chat/test-results/*/error-context.md`
+
+### Default E2E Regression Run - 2026-05-31 16:13 CST
+
+- Command: `cd sections/im_web/apps/chat && pnpm exec playwright test --config playwright.config.ts --reporter=line`
+- Result: Pass for default runnable suite: 8 passed, 11 skipped. V3 live specs remained skipped because `RUN_V3_CLOWDER_SMOKE` was not set for this baseline run.
+
 ### V3 Browser Integration Run - v3-smoke-20260528-1715
 
 - Date/time: 2026-05-28 17:15 CST
