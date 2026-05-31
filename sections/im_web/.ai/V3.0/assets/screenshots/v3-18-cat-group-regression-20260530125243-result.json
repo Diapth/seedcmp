@@ -1,0 +1,62 @@
+{
+  "runId": "v3-18-cat-group-regression-20260530125243",
+  "target": "http://100.79.157.76:3000",
+  "username": "18337488675",
+  "groupName": "V3-18猫群回归-1780145563388",
+  "catName": "布偶猫",
+  "message": "@ragdoll-kn9a V3-18回归：请一句话确认你收到了这个群聊消息。",
+  "timestamp": "2026-05-30T12:52:43.389Z",
+  "failedRequests": [
+    "POST http://100.79.157.76:3000/v1/message/channel/sync net::ERR_ABORTED",
+    "POST http://100.79.157.76:3000/v1/message/channel/sync net::ERR_ABORTED",
+    "GET http://100.79.157.76:3000/v1/clowder/cats?includeUnavailable=true net::ERR_ABORTED",
+    "POST http://100.79.157.76:3000/v1/message/channel/sync net::ERR_ABORTED",
+    "POST http://100.79.157.76:3000/v1/message/channel/sync net::ERR_ABORTED",
+    "POST http://100.79.157.76:3000/v1/message/channel/sync net::ERR_ABORTED"
+  ],
+  "consoleErrors": [
+    "Failed to load resource: the server responded with a status of 400 (Bad Request)",
+    "Failed to load resource: the server responded with a status of 400 (Bad Request)",
+    "Failed to load resource: the server responded with a status of 400 (Bad Request)"
+  ],
+  "screenshots": {
+    "mention": "/media/leng/DiskB1/exp/seedcmp/sections/im_web/.ai/V3.0/assets/screenshots/v3-18-cat-group-regression-20260530125243-01-mention.png",
+    "afterSend": "/media/leng/DiskB1/exp/seedcmp/sections/im_web/.ai/V3.0/assets/screenshots/v3-18-cat-group-regression-20260530125243-02-after-send.png",
+    "afterWait": "/media/leng/DiskB1/exp/seedcmp/sections/im_web/.ai/V3.0/assets/screenshots/v3-18-cat-group-regression-20260530125243-03-after-wait.png",
+    "members": "/media/leng/DiskB1/exp/seedcmp/sections/im_web/.ai/V3.0/assets/screenshots/v3-18-cat-group-regression-20260530125243-04-members.png"
+  },
+  "observations": {
+    "groupUrl": "http://100.79.157.76:3000/chat/conversation/05fc38114d844399ab56ef0bee99a2e6/2",
+    "groupId": "05fc38114d844399ab56ef0bee99a2e6",
+    "mentionCatVisibleBeforeOpeningDetails": true,
+    "rowsAfterWait": [
+      {
+        "index": 0,
+        "className": "msg-row is-me",
+        "text": "@ragdoll-kn9a V3-18回归：请一句话确认你收到了这个群聊消息。"
+      },
+      {
+        "index": 1,
+        "className": "msg-row",
+        "text": "布布偶猫Clowder布偶猫收到，V3-18 回归群聊消息确认无误 🐾 [布偶猫/宪宪 · deepseek-v4-flash🐾]"
+      }
+    ],
+    "clowderRows": [
+      {
+        "index": 0,
+        "className": "msg-row is-me",
+        "text": "@ragdoll-kn9a V3-18回归：请一句话确认你收到了这个群聊消息。"
+      },
+      {
+        "index": 1,
+        "className": "msg-row",
+        "text": "布布偶猫Clowder布偶猫收到，V3-18 回归群聊消息确认无误 🐾 [布偶猫/宪宪 · deepseek-v4-flash🐾]"
+      }
+    ],
+    "questionIndex": 0,
+    "firstThinkingIndex": -1,
+    "placeholderAfterQuestion": true,
+    "catAddControlVisible": true,
+    "catRemoveControlCount": 1
+  }
+}

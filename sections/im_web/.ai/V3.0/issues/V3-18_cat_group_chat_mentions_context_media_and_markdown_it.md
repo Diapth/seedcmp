@@ -332,17 +332,17 @@ Several V3 cat paths were present but stopped short of the product behavior requ
   - Ran the markdown table check headless because the current environment has no XServer:
     - `cd /home/leng/.codex/skills/playwright-skill && TARGET_URL=http://127.0.0.1:3000 node run.js /tmp/playwright-test-v3-18-markdown-table.js`
     - Result: exit 0; `PASS v3-18-markdown-table`.
-    - Screenshot: `assets/screenshots/v3-18-markdown-it-table.png`.
+    - Screenshot: `sections/im_web/.ai/V3.0/assets/screenshots/v3-18-markdown-it-table.png`.
   - Ran live cat-only group create/send smoke on `http://100.79.157.76:3000` as `18337488675`:
     - `TARGET_URL=http://100.79.157.76:3000 TEST_USERNAME=18337488675 TEST_PASSWORD=123456 node /home/leng/.codex/skills/playwright-skill/run.js /tmp/playwright-v3-18-cat-only-create-send.js`
     - Result: exit 0; group `V3-18猫群自动-1780143214098`, group id `75ab7c536d4b4c4eb21639df828dbedd`.
     - Evidence showed placeholder, user message, and final cat reply present in the group timeline.
     - Screenshots:
-      - `assets/screenshots/v3-18-cat-only-create-send-20260530121334-01-picker.png`
-      - `assets/screenshots/v3-18-cat-only-create-send-20260530121334-02-created.png`
-      - `assets/screenshots/v3-18-cat-only-create-send-20260530121334-03-after-send.png`
-      - `assets/screenshots/v3-18-cat-only-create-send-20260530121334-04-after-wait.png`
-      - `assets/screenshots/v3-18-cat-only-create-send-20260530121334-result.json`
+      - `sections/im_web/.ai/V3.0/assets/screenshots/v3-18-cat-only-create-send-20260530121334-01-picker.png`
+      - `sections/im_web/.ai/V3.0/assets/screenshots/v3-18-cat-only-create-send-20260530121334-02-created.png`
+      - `sections/im_web/.ai/V3.0/assets/screenshots/v3-18-cat-only-create-send-20260530121334-03-after-send.png`
+      - `sections/im_web/.ai/V3.0/assets/screenshots/v3-18-cat-only-create-send-20260530121334-04-after-wait.png`
+      - `sections/im_web/.ai/V3.0/assets/screenshots/v3-18-cat-only-create-send-20260530121334-result.json`
   - Ran follow-up live cat group regression smoke for the 2026-05-30 bug list:
     - `TARGET_URL=http://100.79.157.76:3000 TEST_USERNAME=18337488675 TEST_PASSWORD=123456 node /home/leng/.codex/skills/playwright-skill/run.js /tmp/playwright-v3-18-cat-group-regression.js`
     - Result: exit 0; group `V3-18猫群回归-1780145563388`, group id `05fc38114d844399ab56ef0bee99a2e6`.
@@ -352,30 +352,30 @@ Several V3 cat paths were present but stopped short of the product behavior requ
       - `catAddControlVisible = true`.
       - `catRemoveControlCount = 1`.
     - Screenshots:
-      - `assets/screenshots/v3-18-cat-group-regression-20260530125243-01-mention.png`
-      - `assets/screenshots/v3-18-cat-group-regression-20260530125243-02-after-send.png`
-      - `assets/screenshots/v3-18-cat-group-regression-20260530125243-03-after-wait.png`
-      - `assets/screenshots/v3-18-cat-group-regression-20260530125243-04-members.png`
-      - `assets/screenshots/v3-18-cat-group-regression-20260530125243-result.json`
+      - `sections/im_web/.ai/V3.0/assets/screenshots/v3-18-cat-group-regression-20260530125243-01-mention.png`
+      - `sections/im_web/.ai/V3.0/assets/screenshots/v3-18-cat-group-regression-20260530125243-02-after-send.png`
+      - `sections/im_web/.ai/V3.0/assets/screenshots/v3-18-cat-group-regression-20260530125243-03-after-wait.png`
+      - `sections/im_web/.ai/V3.0/assets/screenshots/v3-18-cat-group-regression-20260530125243-04-members.png`
+      - `sections/im_web/.ai/V3.0/assets/screenshots/v3-18-cat-group-regression-20260530125243-result.json`
     - Note: browser network log includes expected aborts from navigation/closing the page and three existing 400 console entries; the verified V3-18 assertions above passed and the screenshots show the corrected user-visible state.
   - Reopened the same live group after the final sender-attribution UI fix:
     - `TARGET_URL=http://100.79.157.76:3000 TEST_USERNAME=18337488675 TEST_PASSWORD=123456 TEST_GROUP_ID=75ab7c536d4b4c4eb21639df828dbedd node /home/leng/.codex/skills/playwright-skill/run.js /tmp/playwright-v3-18-open-existing-cat-group.js`
     - Result: exit 0.
     - Row evidence: both placeholder and final reply are left-side `.msg-row`, with `senderLabel = 布偶猫` and `clowderCat = 布偶猫`; the user prompt remains `.msg-row is-me`.
-    - Screenshot: `assets/screenshots/v3-18-existing-cat-group-20260530122640.png`.
-    - Result JSON: `assets/screenshots/v3-18-existing-cat-group-20260530122640-result.json`.
+    - Screenshot: `sections/im_web/.ai/V3.0/assets/screenshots/v3-18-existing-cat-group-20260530122640.png`.
+    - Result JSON: `sections/im_web/.ai/V3.0/assets/screenshots/v3-18-existing-cat-group-20260530122640-result.json`.
   - Opened the live direct cat conversation `clowder_cat:opus` after the direct title/cache fix:
     - `TARGET_URL=http://100.79.157.76:3000 TEST_USERNAME=18337488675 TEST_PASSWORD=123456 node /home/leng/.codex/skills/playwright-skill/run.js /tmp/playwright-v3-18-direct-cat-identity.js`
     - Result: exit 0.
     - Evidence: `headerCandidates` contains `宪宪`, `leftCandidates` contains `宪宪`, and `hasOpusExact = false`.
-    - Screenshot: `assets/screenshots/v3-18-direct-cat-identity-20260530132902.png`.
-    - Result JSON: `assets/screenshots/v3-18-direct-cat-identity-20260530132902-result.json`.
+    - Screenshot: `sections/im_web/.ai/V3.0/assets/screenshots/v3-18-direct-cat-identity-20260530132902.png`.
+    - Result JSON: `sections/im_web/.ai/V3.0/assets/screenshots/v3-18-direct-cat-identity-20260530132902-result.json`.
   - Opened the live new-cat console after the platform fix:
     - `TARGET_URL=http://100.79.157.76:3000 TEST_USERNAME=18337488675 TEST_PASSWORD=123456 node /home/leng/.codex/skills/playwright-skill/run.js /tmp/playwright-v3-18-cat-console-platform.js`
     - Result: exit 0.
     - Evidence: selector options are `请选择 Codex 或 Claude Code`, `Codex`, and `Claude Code`; create button is disabled before platform selection and enabled after entering a name and selecting Codex.
-    - Screenshot: `assets/screenshots/v3-18-cat-console-platform-20260530T143250.png`.
-    - Result JSON: `assets/screenshots/v3-18-cat-console-platform-20260530T143250-result.json`.
+    - Screenshot: `sections/im_web/.ai/V3.0/assets/screenshots/v3-18-cat-console-platform-20260530T143250.png`.
+    - Result JSON: `sections/im_web/.ai/V3.0/assets/screenshots/v3-18-cat-console-platform-20260530T143250-result.json`.
 - Environment-limited check:
   - `cd sections/im/TangSengDaoDaoServer && go test -count=1 ./modules/clowder ./modules/group`
     - Result: exit 1 in `modules/group` before exercising this issue's assertions because the broader package test opens local MySQL as `root`: `Access denied for user 'root'@'localhost'`.

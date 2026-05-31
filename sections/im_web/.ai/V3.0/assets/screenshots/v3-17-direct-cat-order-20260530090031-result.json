@@ -1,0 +1,62 @@
+{
+  "targetUrl": "http://127.0.0.1:3000",
+  "prompt": "V3-17 顺序验证 1780131631147",
+  "thinking": "【布偶猫🐱】🤔 思考中...",
+  "promptY": 120.640625,
+  "thinkingY": 169.640625,
+  "checks": [
+    {
+      "name": "Prompt row is visible",
+      "status": "passed"
+    },
+    {
+      "name": "Clowder thinking row is visible",
+      "status": "passed"
+    },
+    {
+      "name": "Prompt row renders above Clowder thinking row",
+      "status": "passed"
+    }
+  ],
+  "requests": {
+    "clowderMessages": [
+      {
+        "channelId": "clowder_cat:opus",
+        "channelType": 1,
+        "directCatId": "opus",
+        "targetCatIds": [],
+        "text": "V3-17 顺序验证 1780131631147"
+      }
+    ],
+    "syncRequests": [
+      {
+        "channel_id": "clowder_cat:opus",
+        "channel_type": 1,
+        "limit": 30,
+        "start_message_seq": 0,
+        "end_message_seq": 0,
+        "pull_mode": 1
+      },
+      {
+        "channel_id": "clowder_cat:opus",
+        "channel_type": 1,
+        "limit": 30,
+        "start_message_seq": 0,
+        "end_message_seq": 0,
+        "pull_mode": 1
+      },
+      {
+        "channel_id": "clowder_cat:opus",
+        "channel_type": 1,
+        "limit": 30,
+        "start_message_seq": 0,
+        "end_message_seq": 0,
+        "pull_mode": 1
+      }
+    ],
+    "consoleErrors": [],
+    "failedRequests": []
+  },
+  "screenshot": "/media/leng/DiskB1/exp/seedcmp/sections/im_web/.ai/V3.0/assets/screenshots/v3-17-direct-cat-order-20260530090031.png",
+  "timestamp": "2026-05-30T09:00:32.765Z"
+}

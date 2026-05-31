@@ -97,6 +97,6 @@ The existing DeepSeek direct AI conversation already used a time-first ordering 
   - Started Vite locally at `http://127.0.0.1:3000`.
   - Command: `cd /home/leng/.codex/skills/playwright-skill && TARGET_URL=http://127.0.0.1:3000 node run.js /tmp/playwright-test-v3-17-direct-cat-order.js`
   - Result: exit 0; `PASS v3-17-direct-cat-order-20260530090031`.
-  - Screenshot: `assets/screenshots/v3-17-direct-cat-order-20260530090031.png`
-  - Result JSON: `assets/screenshots/v3-17-direct-cat-order-20260530090031-result.json`
+  - Screenshot: `sections/im_web/.ai/V3.0/assets/screenshots/v3-17-direct-cat-order-20260530090031.png`
+  - Result JSON: `sections/im_web/.ai/V3.0/assets/screenshots/v3-17-direct-cat-order-20260530090031-result.json`
   - Browser measured prompt row `y = 120.640625` and Clowder thinking row `y = 169.640625`, confirming the user prompt renders above the assistant thinking row.

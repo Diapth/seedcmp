@@ -86,11 +86,11 @@ Checks:
 
 Artifacts:
 
-- `assets/screenshots/v3-16-direct-cat-regression-current-a-one-send.png`
-- `assets/screenshots/v3-16-direct-cat-regression-current-a-direct-reply.png`
-- `assets/screenshots/v3-16-direct-cat-regression-current-clowder-ai-clean.png`
-- `assets/screenshots/v3-16-direct-cat-regression-current-b-direct-reply.png`
-- `assets/screenshots/v3-16-direct-cat-regression-current-result.json`
+- `sections/im_web/.ai/V3.0/assets/screenshots/v3-16-direct-cat-regression-current-a-one-send.png`
+- `sections/im_web/.ai/V3.0/assets/screenshots/v3-16-direct-cat-regression-current-a-direct-reply.png`
+- `sections/im_web/.ai/V3.0/assets/screenshots/v3-16-direct-cat-regression-current-clowder-ai-clean.png`
+- `sections/im_web/.ai/V3.0/assets/screenshots/v3-16-direct-cat-regression-current-b-direct-reply.png`
+- `sections/im_web/.ai/V3.0/assets/screenshots/v3-16-direct-cat-regression-current-result.json`
 
 The browser probe reproduced the duplicate outgoing row before the message-store merge fix, then passed after the merge fix.
 
@@ -100,24 +100,24 @@ The user reported the mock/multi-account probe was insufficient, so the flow was
 
 Failed/partial artifacts kept for regression context:
 
-- `assets/screenshots/v3-16-real-18337488675-20260530082524-result.json`
+- `sections/im_web/.ai/V3.0/assets/screenshots/v3-16-real-18337488675-20260530082524-result.json`
   - Before restarting the updated backend, the running server still sent `/ask`; `Clowder AI` received three historical `当前没有绑定的 thread` errors.
-- `assets/screenshots/v3-16-real-18337488675-20260530082715-result.json`
+- `sections/im_web/.ai/V3.0/assets/screenshots/v3-16-real-18337488675-20260530082715-result.json`
   - After restarting the backend, direct-cat send was no longer duplicated and the `/ask` thread error was no longer created, but the final AI reply for `V3-16真实账号复测-1780129635323` still landed in `Clowder AI`.
 
 Passing artifacts after the outbound fake-channel fix:
 
-- `assets/screenshots/v3-16-real-18337488675-20260530083115-result.json`
+- `sections/im_web/.ai/V3.0/assets/screenshots/v3-16-real-18337488675-20260530083115-result.json`
   - Sent `V3-16真实账号复测-1780129875021` to `clowder_cat:opus`.
   - Direct cat visible send count: `1`.
   - Direct cat thread error count: `0`.
   - Clowder AI count for the new unique text: `0`.
-- `assets/screenshots/v3-16-real-18337488675-inspect-20260530083205-result.json`
+- `sections/im_web/.ai/V3.0/assets/screenshots/v3-16-real-18337488675-inspect-20260530083205-result.json`
   - Read-only follow-up after the final callback completed.
   - Direct cat count for the unique text: `2` (`1` user message plus `1` final cat reply quoting the text).
   - Clowder AI count for the unique text: `0`.
   - Direct cat thread error count: `0`.
-- `assets/screenshots/v3-16-real-cat-display-20260530084910-result.json`
+- `sections/im_web/.ai/V3.0/assets/screenshots/v3-16-real-cat-display-20260530084910-result.json`
   - Read-only real-account check after the display-name fix.
   - Header name: `布偶猫`.
   - Active sidebar conversation name: `布偶猫`.

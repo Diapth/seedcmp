@@ -1,0 +1,18 @@
+{
+  "targetUrl": "http://localhost:3002",
+  "screenshots": [
+    "/media/leng/DiskB1/exp/seedcmp/sections/im_web/.ai/V3.0/assets/screenshots/v3-19-mention-smoke-20260530153114-middle.png",
+    "/media/leng/DiskB1/exp/seedcmp/sections/im_web/.ai/V3.0/assets/screenshots/v3-19-mention-smoke-20260530153114-selected.png"
+  ],
+  "steps": [
+    "login-ok",
+    "group-opened",
+    "middle-at-popup-visible",
+    "popup-closed-after-select"
+  ],
+  "consoleMessages": [],
+  "conversationText": "集群23:0200cc4f31ecfb4d8298b82065a513c552： 图片",
+  "popupFirstText": "yunyi群主",
+  "inputAfterSelect": "浏览器验证 @yunyi ",
+  "ok": true
+}

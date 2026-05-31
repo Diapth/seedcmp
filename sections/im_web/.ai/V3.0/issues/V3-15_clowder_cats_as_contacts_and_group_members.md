@@ -8,15 +8,15 @@ Browser evidence uses mocked TangSeng/Clowder bridge responses for the new front
 
 Acceptance phases and product decisions were closed on 2026-05-30 after the focused browser visual smoke re-run:
 
-- `assets/screenshots/v3-15-clowder-cat-contacts-current.png`
-- `assets/screenshots/v3-15-mixed-group-picker-current.png`
-- `assets/screenshots/v3-15-clowder-cat-console-current.png`
-- `assets/screenshots/v3-15-cat-lifecycle-01-ragdoll-found.png`
-- `assets/screenshots/v3-15-cat-lifecycle-02-direct-chat.png`
-- `assets/screenshots/v3-15-cat-lifecycle-03-created-cat-direct-chat.png`
-- `assets/screenshots/v3-15-cat-lifecycle-04-created-cat-in-group-picker.png`
-- `assets/screenshots/v3-15-cat-lifecycle-result.json`
-- `assets/screenshots/v3-15-visual-result.json`
+- `sections/im_web/.ai/V3.0/assets/screenshots/v3-15-clowder-cat-contacts-current.png`
+- `sections/im_web/.ai/V3.0/assets/screenshots/v3-15-mixed-group-picker-current.png`
+- `sections/im_web/.ai/V3.0/assets/screenshots/v3-15-clowder-cat-console-current.png`
+- `sections/im_web/.ai/V3.0/assets/screenshots/v3-15-cat-lifecycle-01-ragdoll-found.png`
+- `sections/im_web/.ai/V3.0/assets/screenshots/v3-15-cat-lifecycle-02-direct-chat.png`
+- `sections/im_web/.ai/V3.0/assets/screenshots/v3-15-cat-lifecycle-03-created-cat-direct-chat.png`
+- `sections/im_web/.ai/V3.0/assets/screenshots/v3-15-cat-lifecycle-04-created-cat-in-group-picker.png`
+- `sections/im_web/.ai/V3.0/assets/screenshots/v3-15-cat-lifecycle-result.json`
+- `sections/im_web/.ai/V3.0/assets/screenshots/v3-15-visual-result.json`
 
 ## Implementation Record
 
@@ -94,8 +94,8 @@ The remote-display hardening pass found a second direct-chat root cause: Clowder
 - `cd /home/leng/.codex/skills/playwright-skill && node run.js /tmp/playwright-test-v3-15-clowder-cats.js`
   - Result: exit 0.
   - Screenshots:
-    - `assets/screenshots/v3-15-clowder-cat-contacts.png`
-    - `assets/screenshots/v3-15-mixed-group-picker.png`
+    - `sections/im_web/.ai/V3.0/assets/screenshots/v3-15-clowder-cat-contacts.png`
+    - `sections/im_web/.ai/V3.0/assets/screenshots/v3-15-mixed-group-picker.png`
 - `cd sections/im_web/apps/chat && pnpm exec vitest run tests/clowderCatConsole.test.ts --config vitest.config.ts`
   - Result: exit 0; 1 test file, 2 tests passed.
 - `cd sections/im_web && pnpm type-check`
@@ -106,7 +106,7 @@ The remote-display hardening pass found a second direct-chat root cause: Clowder
 - `cd /home/leng/.codex/skills/playwright-skill && TARGET_URL=http://localhost:3000 node run.js /tmp/playwright-test-clowder-cat-console.js`
   - Result: exit 0.
   - Screenshot:
-    - `assets/screenshots/v3-15-clowder-cat-console-current.png`
+    - `sections/im_web/.ai/V3.0/assets/screenshots/v3-15-clowder-cat-console-current.png`
 - `cd sections/im/TangSengDaoDaoServer && go test ./modules/clowder`
   - Result: exit 0.
   - Covered existing Clowder cat directory proxying, `布偶猫` contact response, and `/ask <catId>` direct/single-target routing.
@@ -122,12 +122,12 @@ The remote-display hardening pass found a second direct-chat root cause: Clowder
 - `cd /home/leng/.codex/skills/playwright-skill && TARGET_URL=http://localhost:3000 node run.js /tmp/playwright-test-v3-15-cat-lifecycle.js`
   - Result: exit 0.
   - Screenshots:
-    - `assets/screenshots/v3-15-cat-lifecycle-01-ragdoll-found.png`
-    - `assets/screenshots/v3-15-cat-lifecycle-02-direct-chat.png`
-    - `assets/screenshots/v3-15-cat-lifecycle-03-created-cat-direct-chat.png`
-    - `assets/screenshots/v3-15-cat-lifecycle-04-created-cat-in-group-picker.png`
+    - `sections/im_web/.ai/V3.0/assets/screenshots/v3-15-cat-lifecycle-01-ragdoll-found.png`
+    - `sections/im_web/.ai/V3.0/assets/screenshots/v3-15-cat-lifecycle-02-direct-chat.png`
+    - `sections/im_web/.ai/V3.0/assets/screenshots/v3-15-cat-lifecycle-03-created-cat-direct-chat.png`
+    - `sections/im_web/.ai/V3.0/assets/screenshots/v3-15-cat-lifecycle-04-created-cat-in-group-picker.png`
   - Request evidence:
-    - `assets/screenshots/v3-15-cat-lifecycle-result.json`
+    - `sections/im_web/.ai/V3.0/assets/screenshots/v3-15-cat-lifecycle-result.json`
 - `cd sections/im/TangSengDaoDaoServer && go test ./modules/clowder`
   - Result: exit 0.
   - Covered user-scoped direct cat `externalChatId`, fake direct-channel outbound mapping, virtual Clowder sender creation, and existing cat directory/routing contracts.
@@ -148,11 +148,11 @@ The remote-display hardening pass found a second direct-chat root cause: Clowder
   - Accounts: `acct_a`, `acct_b`.
   - Checks: Account B direct cat history did not include Account A history; group remote cat reply displayed cat metadata; no console errors or failed requests.
   - Screenshots:
-    - `assets/screenshots/v3-15-multi-account-current-a-direct-cat.png`
-    - `assets/screenshots/v3-15-multi-account-current-b-direct-cat.png`
-    - `assets/screenshots/v3-15-multi-account-current-b-group-remote-cat.png`
+    - `sections/im_web/.ai/V3.0/assets/screenshots/v3-15-multi-account-current-a-direct-cat.png`
+    - `sections/im_web/.ai/V3.0/assets/screenshots/v3-15-multi-account-current-b-direct-cat.png`
+    - `sections/im_web/.ai/V3.0/assets/screenshots/v3-15-multi-account-current-b-group-remote-cat.png`
   - Request evidence:
-    - `assets/screenshots/v3-15-multi-account-current-result.json`
+    - `sections/im_web/.ai/V3.0/assets/screenshots/v3-15-multi-account-current-result.json`
 
 ## Labels
 

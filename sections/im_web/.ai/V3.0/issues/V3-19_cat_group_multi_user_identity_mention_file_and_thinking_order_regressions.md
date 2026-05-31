@@ -205,9 +205,9 @@ Result: PASS. The smoke logged in, opened the group chat, verified a middle-posi
 
 Evidence:
 
-- `sections/im_web/assets/screenshots/v3-19-mention-smoke-20260530153114-middle.png`
-- `sections/im_web/assets/screenshots/v3-19-mention-smoke-20260530153114-selected.png`
-- `sections/im_web/assets/screenshots/v3-19-mention-smoke-20260530153114-result.json`
+- `sections/im_web/.ai/V3.0/assets/screenshots/v3-19-mention-smoke-20260530153114-middle.png`
+- `sections/im_web/.ai/V3.0/assets/screenshots/v3-19-mention-smoke-20260530153114-selected.png`
+- `sections/im_web/.ai/V3.0/assets/screenshots/v3-19-mention-smoke-20260530153114-result.json`
 
 Note: the browser smoke was intentionally non-sending and only mutated the draft field, then cleared it. File delivery and placeholder ordering were verified by focused unit/connector tests rather than by sending another live cat file into the shared group.
 
