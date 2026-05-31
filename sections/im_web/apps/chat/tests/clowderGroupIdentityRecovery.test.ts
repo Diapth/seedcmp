@@ -181,7 +181,8 @@ function clowderFileFallbackMessages() {
             v: 1,
             kind: 'file',
             fileName: 'ordering-demo.tar.gz',
-            url: '/uploads/ordering-demo.tar.gz'
+            url: '/uploads/ordering-demo.tar.gz',
+            fileSize: 86660
           }
         ]
       })
@@ -401,6 +402,7 @@ describe('Clowder group identity recovery', () => {
       type: 8,
       name: 'ordering-demo.tar.gz',
       url: 'http://localhost:3003/uploads/ordering-demo.tar.gz',
+      size: 86660,
       connector_id: 'im-web',
       catDisplayName: '布偶猫'
     })

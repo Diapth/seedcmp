@@ -2,7 +2,7 @@
 
 ## Status
 
-Fixed and verified on 2026-05-30.
+Fixed and re-verified on 2026-05-31.
 
 ## Created
 
@@ -300,3 +300,76 @@ Results:
 
 - `pnpm run build`: PASS.
 - Connector tests: PASS, 2 suites / 35 tests.
+
+## Follow-Up: 2026-05-31 File Card Download And Size Hardening
+
+### User Follow-Up
+
+Manual testing showed Clowder file cards still had two user-facing defects:
+
+- The file card action was labeled `打开`, but the expected action for generated archives is `下载`.
+- A delivered `ordering-demo.tar.gz` card displayed `0 B`, while the served file was non-empty.
+
+### Additional Root Cause
+
+- IM Web recovered Clowder filename-only callback rows into native file cards, but the corresponding rich file block only carried `fileName` and `url`. The recovery path ignored later `fileSize` metadata and defaulted missing size to `0`, so the UI displayed a false `0 B`.
+- The Clowder outbound hook could resolve local `/uploads/...` paths to real files, but did not stat those files or attach the byte size to rich file blocks and `sendMedia` payloads.
+- Historical cards can still lack stored size metadata. Browser-side `HEAD` can recover the size when CORS allows it; when it cannot, the UI must show `大小未知` instead of pretending the file is zero bytes.
+
+### Additional Fix Record
+
+- `sections/im_web/packages/base-vue/src/components/messages/FileCell.vue`
+  - Renamed the external file action from `打开` to `下载`.
+  - Downloads through an anchor with the `download` attribute instead of directly opening a new window.
+  - Uses declared message size when present; otherwise performs a no-store `HEAD` request and reads `content-length`.
+  - Shows `大小未知` if neither persisted metadata nor a successful `HEAD` response can provide a size.
+- `sections/im_web/packages/base-vue/src/utils/clowderMessageIdentity.ts`
+  - Recovers file size from `size`, `fileSize`, `file_size`, or `bytes` fields in Clowder rich file blocks.
+- `/media/leng/DiskB1/exp/clowder-ai/packages/api/src/infrastructure/connectors/OutboundDeliveryHook.ts`
+  - Stats locally resolved file rich blocks and adds `fileSize` before `sendRichMessage`.
+  - Adds `size` to file `sendMedia` payloads when the byte size is known.
+
+### Additional Regression Coverage
+
+- `sections/im_web/apps/chat/tests/messageMediaCells.test.ts`
+  - Verifies file cards expose a `下载` action and recover a missing displayed size from `content-length`.
+- `sections/im_web/apps/chat/tests/clowderGroupIdentityRecovery.test.ts`
+  - Verifies recovered `ordering-demo.tar.gz` file cards keep the byte size from the Clowder rich file block.
+- `/media/leng/DiskB1/exp/clowder-ai/packages/api/test/outbound-delivery-hook.test.js`
+  - Verifies local file rich blocks are enriched with `fileSize` and file media payloads include `size`.
+
+### Additional Verification Results
+
+```bash
+cd sections/im_web/apps/chat
+pnpm exec vitest run tests/messageMediaCells.test.ts tests/clowderGroupIdentityRecovery.test.ts --config vitest.config.ts --pool=threads --poolOptions.threads.singleThread=true
+```
+
+Result: PASS, 2 files / 12 tests.
+
+```bash
+cd sections/im_web
+pnpm type-check
+pnpm build
+```
+
+Results:
+
+- `pnpm type-check`: PASS.
+- `pnpm build`: PASS. Vite emitted the existing chunk-size warning for the large app bundle.
+
+```bash
+cd /media/leng/DiskB1/exp/clowder-ai/packages/api
+pnpm run build
+CAT_CAFE_DISABLE_SHARED_STATE_PREFLIGHT=1 bash ./scripts/with-test-home.sh node --import $(pwd)/test/helpers/setup-cat-registry.js --test --test-timeout=60000 test/outbound-delivery-hook.test.js test/im-web-outbound-adapter.test.js
+```
+
+Results:
+
+- `pnpm run build`: PASS.
+- Connector tests: PASS, 2 suites / 36 tests.
+
+Runtime checks:
+
+- `http://localhost:3003/uploads/ordering-demo.tar.gz` returns `content-length: 86660`.
+- Clowder API health on `http://127.0.0.1:3004/health` returns `{"status":"ok"}`.

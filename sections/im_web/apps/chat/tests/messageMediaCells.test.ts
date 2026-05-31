@@ -1,4 +1,10 @@
-import { describe, expect, it } from 'vitest'
+import { render, screen, waitFor } from '@testing-library/vue'
+import { afterEach, describe, expect, it, vi } from 'vitest'
+
+afterEach(() => {
+  vi.unstubAllGlobals()
+  vi.restoreAllMocks()
+})
 
 describe('message media cells', () => {
   it('image cells expose load/error preview states with stable sizing', async () => {
@@ -34,5 +40,36 @@ describe('message media cells', () => {
     expect(voice.default).toContain('语音不可用')
     expect(video.default).toContain('isAvailable')
     expect(video.default).toContain('视频不可用')
+  })
+
+  it('file cells label the external action as download and resolve missing size from the file response', async () => {
+    const FileCell = (await import('../../../packages/base-vue/src/components/messages/FileCell.vue')).default
+    vi.stubGlobal('fetch', vi.fn(async () => new Response(null, {
+      status: 200,
+      headers: { 'content-length': '86660' }
+    })))
+
+    render(FileCell, {
+      props: {
+        isMe: false,
+        message: {
+          content: {
+            type: 8,
+            url: 'http://localhost:3003/uploads/ordering-demo.tar.gz',
+            name: 'ordering-demo.tar.gz',
+            size: 0
+          }
+        }
+      }
+    })
+
+    expect(screen.getByRole('button', { name: '下载' })).toBeInTheDocument()
+    expect(fetch).toHaveBeenCalledWith(
+      'http://localhost:3003/uploads/ordering-demo.tar.gz',
+      expect.objectContaining({ method: 'HEAD', cache: 'no-store' })
+    )
+    await waitFor(() => {
+      expect(screen.getByText(/84\.63 KB · 点击下载/)).toBeInTheDocument()
+    })
   })
 })

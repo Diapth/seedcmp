@@ -152,7 +152,7 @@ export function getClowderFileBlocksFromPayload(payload: any): ClowderFileBlock[
     .map(block => {
       const name = normalizeFileName(block.fileName || block.filename || block.name || block.title || '');
       const url = normalizeClowderFileUrl(block.url || block.href || block.downloadUrl || block.download_url || '');
-      const size = Number(block.size || block.bytes || 0);
+      const size = Number(block.size || block.fileSize || block.file_size || block.bytes || 0);
       return {
         name,
         url,

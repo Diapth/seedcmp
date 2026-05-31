@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed } from 'vue';
+import { computed, ref, watch } from 'vue';
 import { normalizeMediaUrl } from '../../service/mediaUrl';
 
 const props = defineProps<{
@@ -26,15 +26,24 @@ const emit = defineEmits<{
 
 const url = computed(() => normalizeMediaUrl(props.message.content?.url || props.message.payload?.url || ''));
 const name = computed(() => props.message.content?.name || props.message.payload?.name || '未知文件');
-const size = computed(() => props.message.content?.size || props.message.payload?.size || 0);
 const isAvailable = computed(() => !!url.value);
+const fetchedSize = ref<number | undefined>(undefined);
+
+const declaredSize = computed(() => {
+  const raw = props.message.content?.size ?? props.message.payload?.size;
+  const numeric = Number(raw);
+  return Number.isFinite(numeric) && numeric > 0 ? numeric : undefined;
+});
+
+const displaySize = computed(() => declaredSize.value ?? fetchedSize.value);
 
 const sizeStr = computed(() => {
-  if (size.value === 0) return '0 B';
+  if (displaySize.value === undefined) return '大小未知';
+  if (displaySize.value === 0) return '0 B';
   const k = 1024;
   const sizes = ['B', 'KB', 'MB', 'GB'];
-  const i = Math.floor(Math.log(size.value) / Math.log(k));
-  return parseFloat((size.value / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
+  const i = Math.min(Math.floor(Math.log(displaySize.value) / Math.log(k)), sizes.length - 1);
+  return parseFloat((displaySize.value / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
 });
 
 const extension = computed(() => {
@@ -54,10 +63,34 @@ const previewKind = computed<'markdown' | 'text' | 'html' | 'pdf' | 'office' | '
 });
 
 const canPreview = computed(() => isAvailable.value && previewKind.value !== 'unsupported');
+const fileHint = computed(() => canPreview.value ? '可预览' : '点击下载');
+
+watch([url, declaredSize], async ([nextUrl, nextDeclaredSize]) => {
+  fetchedSize.value = undefined;
+  if (!nextUrl || nextDeclaredSize !== undefined || typeof fetch !== 'function') return;
+  try {
+    const response = await fetch(nextUrl, { method: 'HEAD', cache: 'no-store' });
+    if (!response.ok) return;
+    const contentLength = response.headers.get('content-length');
+    const numeric = Number(contentLength);
+    if (Number.isFinite(numeric) && numeric >= 0 && url.value === nextUrl) {
+      fetchedSize.value = numeric;
+    }
+  } catch {
+    // Cross-origin file hosts may block HEAD; keep the UI honest with "大小未知".
+  }
+}, { immediate: true });
 
 function handleDownload() {
   if (!isAvailable.value) return;
-  window.open(url.value, '_blank');
+  const link = document.createElement('a');
+  link.href = url.value;
+  link.download = name.value;
+  link.target = '_blank';
+  link.rel = 'noopener noreferrer';
+  document.body.appendChild(link);
+  link.click();
+  link.remove();
 }
 
 function openPreview() {
@@ -69,7 +102,7 @@ function openPreview() {
     kind: previewKind.value,
     url: url.value,
     name: name.value,
-    size: size.value,
+    size: displaySize.value ?? 0,
     extension: extension.value
   });
 }
@@ -80,7 +113,7 @@ function openPreview() {
     <div class="bubble">
       <div class="file-details">
         <span class="file-name" :title="name">{{ name }}</span>
-        <span class="file-size">{{ isAvailable ? `${sizeStr} · ${canPreview ? '可预览' : '点击打开'}` : '下载不可用' }}</span>
+        <span class="file-size">{{ isAvailable ? `${sizeStr} · ${fileHint}` : '下载不可用' }}</span>
       </div>
       <div class="file-icon-wrapper">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" class="file-svg">
@@ -93,7 +126,7 @@ function openPreview() {
       </div>
       <div class="file-actions">
         <button class="file-action" :disabled="!isAvailable" title="预览文件" @click.stop="openPreview">预览</button>
-        <button class="file-action" :disabled="!isAvailable" title="打开或下载文件" @click.stop="handleDownload">打开</button>
+        <button class="file-action" :disabled="!isAvailable" title="下载文件" @click.stop="handleDownload">下载</button>
       </div>
     </div>
   </div>

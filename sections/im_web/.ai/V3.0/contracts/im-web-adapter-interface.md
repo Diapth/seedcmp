@@ -30,6 +30,7 @@ interface IOutboundAdapter {
       type: 'image' | 'file' | 'audio';
       catId?: string;
       catDisplayName?: string;
+      size?: number;
       metadata?: Record<string, unknown>;
       [key: string]: unknown;
     }
@@ -101,6 +102,7 @@ TangSeng maps the stable platform ID to one `clientMsgNo`; IM Web then merges lo
 
 - Supported image, file, and audio attachments should be normalized into TangSeng-native media payloads when URL and metadata are available.
 - Media payloads sent through `sendMedia` must preserve the originating cat identity with `catId` and `catDisplayName`; media callbacks are separate durable IM rows and cannot rely on the previous text/rich-block row for sender identity.
+- File rich blocks should include `fileSize` when the bridge can resolve the local file, and file `sendMedia` payloads should include `size` in bytes when available. Consumers must not turn missing size metadata into a false `0 B`.
 - Unsupported media and rich blocks must produce visible plaintext/markdown fallback content.
 - If media cannot be downloaded or normalized, the bridge should surface a `media_download_failed` or `unsupported_media` delivery state rather than silently dropping the reply.
 
