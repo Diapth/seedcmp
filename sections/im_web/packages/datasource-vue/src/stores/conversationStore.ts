@@ -1,5 +1,11 @@
 import { defineStore } from 'pinia';
 import { ref, computed } from 'vue';
+import {
+  getClowderCatDisplayNameFromHistory,
+  getClowderCatDisplayNameFromPayload,
+  isClowderPayload,
+  withClowderCatDisplayName
+} from '@tsdaodao/base-vue/utils/clowderMessageIdentity';
 import { groupApi, syncApi } from '../api';
 import { useChannelStore } from './channelStore';
 import { useGroupStore } from './groupStore';
@@ -241,66 +247,11 @@ export const useConversationStore = defineStore('conversation', () => {
     };
   }
 
-  function extractClowderCatDisplayNameFromText(text: string) {
-    const value = String(text || '').trim();
-    const prefixMatch = value.match(/^【([^】]{1,40}?)】/);
-    if (prefixMatch) return prefixMatch[1].replace(/[🐱🐈🐾\s]+$/g, '').trim();
-
-    const leadingSlashMatch = value.match(/^([^\s/@/［\[\]］，。:：！？?（）()]{1,40})\/[^\s/［\[\]］，。:：]{1,40}(?=[\s，。:：！？?）)]|已|收|回|确|$)/u);
-    if (leadingSlashMatch) return leadingSlashMatch[1].replace(/[🐱🐈🐾\s]+$/g, '').trim();
-
-    const suffixMatch = value.match(/[［\[]([^\]/\]］\n]{1,40})\/[^\]］\n]{1,120}[］\]]\s*$/);
-    if (suffixMatch) return suffixMatch[1].replace(/[🐱🐈🐾\s]+$/g, '').trim();
-
-    return '';
-  }
-
-  function getClowderCatDisplayNameFromPayload(payload: any) {
-    if (!payload || typeof payload !== 'object') return '';
-    const explicit = String(
-      payload.catDisplayName ||
-      payload.cat_display_name ||
-      payload.catName ||
-      payload.cat_name ||
-      ''
-    ).trim();
-    if (explicit) return explicit;
-    return extractClowderCatDisplayNameFromText(String(payload.text || payload.content || ''));
-  }
-
-  function isClowderPayload(payload: any) {
-    if (!payload || typeof payload !== 'object') return false;
-    return payload.connectorId === 'im-web' ||
-      payload.connector_id === 'im-web' ||
-      payload.ai === true ||
-      !!payload.catDisplayName ||
-      !!payload.cat_display_name;
-  }
-
-  function withClowderCatDisplayName(payload: any, fallbackDisplayName = '') {
-    if (!payload || typeof payload !== 'object') return payload;
-    if (!isClowderPayload(payload)) return payload;
-    const displayName = getClowderCatDisplayNameFromPayload(payload) || String(fallbackDisplayName || '').trim();
-    if (!displayName) return payload;
-    return {
-      ...payload,
-      catDisplayName: payload.catDisplayName || displayName,
-      cat_display_name: payload.cat_display_name || displayName
-    };
-  }
-
-  function getClowderCatDisplayNameFromHistory(list: any[]) {
-    return [...list].reverse()
-      .map(item => getClowderCatDisplayNameFromPayload(item.content || item.payload))
-      .find(Boolean) || '';
-  }
-
   function resolveClowderConversationName(channelId: string, currentName: string, lastMessage?: any) {
     const catId = getClowderCatIdFromContactId(channelId);
     if (!catId) return currentName;
     const payload = lastMessage?.content || lastMessage?.payload || {};
-    const catName = String(payload.catDisplayName || payload.cat_display_name || '').trim() ||
-      extractClowderCatDisplayNameFromText(String(payload.text || payload.content || ''));
+    const catName = getClowderCatDisplayNameFromPayload(payload);
     if (catName) return catName;
     const catContactName = String(clowderStore.getCatContactById(channelId)?.displayName || '').trim();
     if (catContactName) return catContactName;

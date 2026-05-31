@@ -222,3 +222,81 @@ The audit found all visible `ordering-demo.tar.gz` file rows labeled `布偶猫`
 ## Close Notes
 
 Resolved. The four reported regressions are covered by focused automated tests, IM Web type/unit/build gates, Clowder connector build/test gates, and a non-sending browser smoke for the mention popup behavior.
+
+## Follow-Up: 2026-05-31 Identity Mapper And File Recovery Hardening
+
+### User Follow-Up
+
+Manual testing in group `集群` showed the same class of issue could still recur:
+
+- Some Clowder file callbacks persisted as plain text filename rows such as `ordering-demo.tar.gz`.
+- Those rows and some cat replies still displayed with the human transport sender (`yunyi`) instead of the originating cat.
+- Slash text inside normal Chinese prose, for example `是给餐厅/食堂`, could be misread as a cat display name.
+- The mapping logic was duplicated across message store, conversation store, message list, text bubble, and Clowder group recovery paths, making small fixes fragile.
+
+### Additional Root Cause
+
+- Clowder identity extraction existed in several separate implementations. They did not all agree on which metadata fields, signatures, or history fallbacks were authoritative.
+- The media callback row can arrive after a rich Clowder text row and contain only the filename. The previous rich row already had a `rich_blocks` file entry with the real `/uploads/...` URL, but the message merge path did not use that history to recover a native file message.
+- The Clowder API media path delivered media without repeating `catId` and `catDisplayName`, so new media rows depended on fragile UI-side nearby-message inference.
+
+### Additional Fix Record
+
+- `sections/im_web/packages/base-vue/src/utils/clowderMessageIdentity.ts`
+  - Added a shared Clowder identity utility for cat display-name extraction, payload detection, metadata backfill, rich-block file extraction, and filename-text-to-file recovery.
+  - Removed broad inline `A/B` inference so ordinary prose such as `是给餐厅/食堂` is no longer treated as a cat identity.
+  - Normalizes Clowder `/uploads/...` file URLs to the Clowder public origin before the browser media URL layer rewrites localhost for remote browsers.
+- `sections/im_web/packages/datasource-vue/src/stores/messageStore.ts`
+  - Applies Clowder history recovery after sync/realtime merge, so a persisted filename-only row can become a durable IM file message with `type: 8`, `url`, `name`, and cat identity.
+- `sections/im_web/packages/datasource-vue/src/stores/conversationStore.ts`
+- `sections/im_web/packages/datasource-vue/src/stores/clowderStore.ts`
+- `sections/im_web/apps/chat/src/components/MessageList.vue`
+- `sections/im_web/apps/chat/src/views/ConversationList.vue`
+- `sections/im_web/packages/base-vue/src/components/messages/TextCell.vue`
+  - Replaced duplicated cat-name parsing with the shared mapper.
+- `/media/leng/DiskB1/exp/clowder-ai/packages/api/src/infrastructure/connectors/OutboundDeliveryHook.ts`
+  - Media sends now carry the current `catId` and registry display name to adapters.
+- `/media/leng/DiskB1/exp/clowder-ai/packages/api/src/infrastructure/connectors/adapters/ImWebAdapter.ts`
+  - File/image/audio media payloads now preserve `catId` and `catDisplayName` at the TangSeng outbound callback boundary.
+
+### Additional Regression Coverage
+
+- `sections/im_web/apps/chat/tests/clowderGroupIdentityRecovery.test.ts`
+  - Adds a real-history regression for `ordering-demo.tar.gz`: rich-block file row followed by filename-only media callback now recovers to a file message card and keeps `布偶猫`.
+- `sections/im_web/apps/chat/tests/clowderMessagePresentation.test.ts`
+  - Verifies final Clowder signatures win over incidental slash text in prose.
+- `/media/leng/DiskB1/exp/clowder-ai/packages/api/test/im-web-outbound-adapter.test.js`
+  - Verifies file media payloads sent to TangSeng include Clowder cat identity.
+- `/media/leng/DiskB1/exp/clowder-ai/packages/api/test/outbound-delivery-hook.test.js`
+  - Verifies file rich blocks pass cat identity into `sendMedia`.
+
+### Additional Verification Results
+
+```bash
+cd sections/im_web/apps/chat
+pnpm exec vitest run tests/clowderGroupIdentityRecovery.test.ts tests/clowderMessagePresentation.test.ts tests/clowderMessageStore.test.ts tests/messageMediaSending.test.ts tests/runtimeEnvironmentConfig.test.ts --config vitest.config.ts --pool=threads --poolOptions.threads.singleThread=true
+```
+
+Result: PASS, 5 files / 49 tests.
+
+```bash
+cd sections/im_web
+pnpm type-check
+pnpm build
+```
+
+Results:
+
+- `pnpm type-check`: PASS.
+- `pnpm build`: PASS. Vite emitted the existing chunk-size warning for the large app bundle.
+
+```bash
+cd /media/leng/DiskB1/exp/clowder-ai/packages/api
+pnpm run build
+CAT_CAFE_DISABLE_SHARED_STATE_PREFLIGHT=1 bash ./scripts/with-test-home.sh node --import $(pwd)/test/helpers/setup-cat-registry.js --test --test-timeout=60000 test/im-web-outbound-adapter.test.js test/outbound-delivery-hook.test.js
+```
+
+Results:
+
+- `pnpm run build`: PASS.
+- Connector tests: PASS, 2 suites / 35 tests.

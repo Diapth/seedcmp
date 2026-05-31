@@ -1,5 +1,10 @@
 import { computed, ref } from 'vue';
 import { defineStore } from 'pinia';
+import {
+  getClowderCatDisplayNameFromPayload,
+  isClowderPayload,
+  stripClowderCatDecorations
+} from '@tsdaodao/base-vue/utils/clowderMessageIdentity';
 import { syncApi } from '../api';
 import {
   clowderApi,
@@ -92,45 +97,8 @@ function normalizeHistoryPayload(raw: any) {
   }
 }
 
-function stripCatDecorations(value: string) {
-  return String(value || '').replace(/[🐱🐈🐾\s]+$/g, '').trim();
-}
-
-function extractClowderCatDisplayNameFromText(text: string) {
-  const value = String(text || '').trim();
-  const prefixMatch = value.match(/^【([^】]{1,40}?)】/);
-  if (prefixMatch) return stripCatDecorations(prefixMatch[1]);
-
-  const suffixMatch = value.match(/[［\[]([^\]/\]］\n]{1,40})\/[^\]］\n]{1,120}[］\]]\s*$/);
-  if (suffixMatch) return stripCatDecorations(suffixMatch[1]);
-
-  return '';
-}
-
-function getClowderCatDisplayName(payload: any) {
-  if (!payload || typeof payload !== 'object') return '';
-  const explicit = String(
-    payload.catDisplayName ||
-    payload.cat_display_name ||
-    payload.catName ||
-    payload.cat_name ||
-    ''
-  ).trim();
-  if (explicit) return explicit;
-  return extractClowderCatDisplayNameFromText(String(payload.text || payload.content || ''));
-}
-
-function isClowderHistoryPayload(payload: any) {
-  if (!payload || typeof payload !== 'object') return false;
-  return payload.connectorId === 'im-web' ||
-    payload.connector_id === 'im-web' ||
-    payload.ai === true ||
-    !!payload.catDisplayName ||
-    !!payload.cat_display_name;
-}
-
 function normalizeLookupToken(value: string) {
-  return stripCatDecorations(value)
+  return stripClowderCatDecorations(value)
     .replace(/^@/, '')
     .trim()
     .toLocaleLowerCase();
@@ -445,8 +413,8 @@ export const useClowderStore = defineStore('clowder', () => {
 
     const displayNames = Array.from(new Set(list
       .map(normalizeHistoryPayload)
-      .filter(isClowderHistoryPayload)
-      .map(getClowderCatDisplayName)
+      .filter(isClowderPayload)
+      .map(getClowderCatDisplayNameFromPayload)
       .map(name => String(name || '').trim())
       .filter(Boolean)));
 

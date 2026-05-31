@@ -26,7 +26,13 @@ interface IOutboundAdapter {
   ): Promise<void>;
   sendMedia?(
     externalChatId: string,
-    payload: { type: 'image' | 'file' | 'audio'; [key: string]: unknown }
+    payload: {
+      type: 'image' | 'file' | 'audio';
+      catId?: string;
+      catDisplayName?: string;
+      metadata?: Record<string, unknown>;
+      [key: string]: unknown;
+    }
   ): Promise<void>;
   onDeliveryBatchDone?(externalChatId: string, chainDone: boolean): Promise<void>;
 }
@@ -94,6 +100,7 @@ TangSeng maps the stable platform ID to one `clientMsgNo`; IM Web then merges lo
 ## Rich Block and Media Fallback
 
 - Supported image, file, and audio attachments should be normalized into TangSeng-native media payloads when URL and metadata are available.
+- Media payloads sent through `sendMedia` must preserve the originating cat identity with `catId` and `catDisplayName`; media callbacks are separate durable IM rows and cannot rely on the previous text/rich-block row for sender identity.
 - Unsupported media and rich blocks must produce visible plaintext/markdown fallback content.
 - If media cannot be downloaded or normalized, the bridge should surface a `media_download_failed` or `unsupported_media` delivery state rather than silently dropping the reply.
 

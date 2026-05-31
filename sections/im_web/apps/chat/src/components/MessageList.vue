@@ -3,6 +3,10 @@ import { ref, onMounted, watch, nextTick, computed } from 'vue';
 import { useChannelStore, useMessageStore, useUserStore } from '@tsdaodao/datasource-vue';
 import { useRemoteConfig } from '@tsdaodao/base-vue';
 import {
+  getClowderCatDisplayNameFromPayload,
+  isClowderPayload
+} from '@tsdaodao/base-vue/utils/clowderMessageIdentity';
+import {
   TextCell,
   ImageCell,
   SystemCell,
@@ -124,9 +128,7 @@ function shouldShowTime(msg: any, index: number): boolean {
 
 function isClowderConnectorMessage(msg: any): boolean {
   const content = msg?.content || msg?.payload || {};
-  return content.connectorId === 'im-web' ||
-    content.connector_id === 'im-web' ||
-    Boolean(content.catDisplayName || content.cat_display_name || content.catId || content.cat_id);
+  return isClowderPayload(content);
 }
 
 function isMe(msg: any): boolean {
@@ -141,11 +143,8 @@ function getClowderSenderNameFromMessage(msg: any): string {
   if (connectorId !== 'im-web' && !content.catDisplayName && !content.cat_display_name && !content.catId && !content.cat_id && !isDirectCatChannel) {
     return '';
   }
-  const explicitName = String(content.catDisplayName || content.cat_display_name || '').trim();
+  const explicitName = getClowderCatDisplayNameFromPayload(content);
   if (explicitName) return explicitName;
-
-  const prefixName = extractClowderCatDisplayNameFromText(String(content.text || content.content || ''));
-  if (prefixName) return prefixName;
 
   if (isDirectCatChannel) {
     const catId = String(props.channelId || '').slice('clowder_cat:'.length);
@@ -189,20 +188,6 @@ function getNearbyClowderSenderName(msg: any): string {
 
 function getClowderSenderName(msg: any): string {
   return getClowderSenderNameFromMessage(msg) || getNearbyClowderSenderName(msg);
-}
-
-function extractClowderCatDisplayNameFromText(text: string) {
-  const value = String(text || '').trim();
-  const prefixMatch = value.match(/^【([^】]{1,40}?)】/);
-  if (prefixMatch) return prefixMatch[1].replace(/[🐱🐈🐾\s]+$/g, '').trim();
-
-  const leadingSlashMatch = value.match(/^([^\s/@/［\[\]］，。:：！？?（）()]{1,40})\/[^\s/［\[\]］，。:：]{1,40}(?=[\s，。:：！？?）)]|已|收|回|确|$)/u);
-  if (leadingSlashMatch) return leadingSlashMatch[1].replace(/[🐱🐈🐾\s]+$/g, '').trim();
-
-  const suffixMatch = value.match(/[［\[]([^\]/\]］\n]{1,40})\/[^\]］\n]{1,120}[］\]]\s*$/);
-  if (suffixMatch) return suffixMatch[1].replace(/[🐱🐈🐾\s]+$/g, '').trim();
-
-  return '';
 }
 
 function getClowderSenderAvatar(msg: any): string {

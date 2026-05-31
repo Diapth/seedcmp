@@ -1,6 +1,13 @@
 import { defineStore } from 'pinia';
 import { ref } from 'vue';
 import WKSDK, { Message as WKMessage, MessageContent, MessageImage } from 'wukongimjssdk';
+import {
+  getClowderCatDisplayNameFromHistory,
+  getClowderCatDisplayNameFromPayload,
+  isClowderPayload,
+  recoverClowderFileContentFromHistory,
+  withClowderCatDisplayName
+} from '@tsdaodao/base-vue/utils/clowderMessageIdentity';
 import { commonApi, resolveApiAssetUrl, syncApi } from '../api';
 import { MessageFile, MessageVoice } from '../contentTypes/index';
 import { getClowderCatIdFromContactId, isClowderAiContactId, isClowderCatContactId } from './clowderCatContacts';
@@ -279,17 +286,12 @@ export const useMessageStore = defineStore('message', () => {
   function extractClowderPlaceholderNames(msg: Message) {
     const content = msg.content || {};
     const names = [
+      getClowderCatDisplayNameFromPayload(content),
       content.catDisplayName,
       content.cat_display_name,
       content.catId,
       content.cat_id
     ].map(value => String(value || '').replace(/[🐱🐈🐾\s]+$/g, '').trim()).filter(Boolean);
-    const text = getMessageText(msg);
-    const prefixMatch = text.match(/^【([^】]{1,40}?)】/);
-    if (prefixMatch) {
-      const prefixName = prefixMatch[1].replace(/[🐱🐈🐾\s]+$/g, '').trim();
-      if (prefixName) names.push(prefixName);
-    }
     return [...new Set(names)];
   }
 
@@ -539,45 +541,21 @@ export const useMessageStore = defineStore('message', () => {
     return getLatestConversationDigestMessage(list) || [...list].reverse().find(msg => msg && !msg.isRevoked);
   }
 
-  function extractClowderCatDisplayNameFromText(text: string) {
-    const value = String(text || '').trim();
-    const prefixMatch = value.match(/^【([^】]{1,40}?)】/);
-    if (prefixMatch) return prefixMatch[1].replace(/[🐱🐈🐾\s]+$/g, '').trim();
-
-    const inlineSlashMatch = value.match(/(?:^|[\s，。:：])([^\s/［\[\]］，。:：]{1,40})\/[^\s/［\[\]］，。:：]{1,40}(?=[\s，。:：]|已|收|回|确|$)/u);
-    if (inlineSlashMatch) return inlineSlashMatch[1].replace(/[🐱🐈🐾\s]+$/g, '').trim();
-
-    const suffixMatch = value.match(/[［\[]([^\]/\]］\n]{1,40})\/[^\]］\n]{1,120}[］\]]\s*$/);
-    if (suffixMatch) return suffixMatch[1].replace(/[🐱🐈🐾\s]+$/g, '').trim();
-
-    return '';
-  }
-
   function getClowderDisplayNameFromMessage(message?: Message) {
-    const content = message?.content || {};
-    const metadataName = String(content.catDisplayName || content.cat_display_name || '').trim();
-    if (metadataName) return metadataName;
-    return extractClowderCatDisplayNameFromText(String(content.text || content.content || ''));
+    return getClowderCatDisplayNameFromPayload(message?.content || {});
   }
 
   function isClowderMessageContent(content: any) {
-    if (!content || typeof content !== 'object') return false;
-    return content.connectorId === CLOWDER_CONNECTOR_ID ||
-      content.connector_id === CLOWDER_CONNECTOR_ID ||
-      content.ai === true ||
-      !!content.catDisplayName ||
-      !!content.cat_display_name;
+    return isClowderPayload(content);
   }
 
   function getClowderDisplayNameFromMessageList(channelId: string, channelType: number, list: Message[]) {
     const canUseHistory = !!getClowderCatIdFromContactId(channelId) || Number(channelType) === 2;
     if (!canUseHistory) return '';
-    for (const message of [...list].reverse()) {
-      if (Number(channelType) === 2 && !isClowderMessageContent(message.content)) continue;
-      const name = getClowderDisplayNameFromMessage(message);
-      if (name) return name;
-    }
-    return '';
+    const payloads = list
+      .filter(message => Number(channelType) !== 2 || isClowderMessageContent(message.content))
+      .map(message => message.content);
+    return getClowderCatDisplayNameFromHistory(payloads);
   }
 
   function resolveClowderConversationName(channelId: string, currentName: string, lastMessage: Message, fallbackName = '') {
@@ -589,6 +567,36 @@ export const useMessageStore = defineStore('message', () => {
     if (catContactName) return catContactName;
     if (currentName && currentName !== catId) return currentName;
     return catId;
+  }
+
+  function canUseClowderHistory(channelId: string, channelType: number) {
+    return Number(channelType) === 2 ||
+      isClowderAiContactId(String(channelId || '')) ||
+      isClowderCatContactId(String(channelId || '')) ||
+      !!getClowderCatIdFromContactId(channelId);
+  }
+
+  function applyClowderHistoryRecovery(channelId: string, channelType: number, list: Message[]) {
+    const canRecoverFromHistory = canUseClowderHistory(channelId, channelType);
+    if (!canRecoverFromHistory) return;
+
+    const previousPayloads: any[] = [];
+    let lastDisplayName = '';
+    for (const msg of list) {
+      if (msg.content && typeof msg.content === 'object' && isClowderMessageContent(msg.content)) {
+        const namedContent = withClowderCatDisplayName(msg.content, lastDisplayName);
+        const recoveredContent = recoverClowderFileContentFromHistory(namedContent, previousPayloads, lastDisplayName);
+        msg.content = normalizeMessageContent(recoveredContent);
+      }
+
+      if (msg.content && typeof msg.content === 'object') {
+        const displayName = getClowderDisplayNameFromMessage(msg);
+        if (isClowderMessageContent(msg.content) && displayName) {
+          lastDisplayName = displayName;
+        }
+        previousPayloads.push(msg.content);
+      }
+    }
   }
 
   function updateExistingConversationSummary(channelId: string, channelType: number, lastMessage: Message, options: ConversationSummaryOptions = {}) {
@@ -731,6 +739,7 @@ export const useMessageStore = defineStore('message', () => {
 
     const nextList = Array.from(mergedMap.values());
     sortMessagesForChannel(nextList, channelId, channelType);
+    applyClowderHistoryRecovery(channelId, channelType, nextList);
     messages.value[key] = nextList;
     await ensureConversationFromMessages(channelId, channelType, { countUnread: false });
   }
@@ -858,6 +867,7 @@ export const useMessageStore = defineStore('message', () => {
     pruneDuplicateAiStreams(list);
 
     sortMessagesForChannel(list, channelId, channelType);
+    applyClowderHistoryRecovery(channelId, channelType, list);
 
     if (isConversationDigestMessage(msg)) {
       ensureConversationFromMessages(channelId, channelType, options);

@@ -4,6 +4,10 @@ import { useRouter, useRoute } from 'vue-router';
 import { useConversationStore } from '@tsdaodao/datasource-vue';
 import { useUserStore } from '@tsdaodao/datasource-vue';
 import { ChannelAvatar, ContextMenu, SkeletonScreen } from '@tsdaodao/base-vue';
+import {
+  getClowderCatDisplayNameFromPayload,
+  isClowderPayload
+} from '@tsdaodao/base-vue/utils/clowderMessageIdentity';
 import { buildDigestPresentation, formatConversationTime } from '../utils/conversationPresentation';
 
 const router = useRouter();
@@ -238,37 +242,11 @@ function getSenderUid(lastMessage: any): string {
   return String(lastMessage?.fromUID || lastMessage?.from_uid || lastMessage?.from || '');
 }
 
-function stripClowderCatDecorations(value: string) {
-  return String(value || '').replace(/[🐱🐈🐾\s]+$/g, '').trim();
-}
-
-function extractClowderCatDisplayNameFromText(text: string) {
-  const value = String(text || '').trim();
-  const prefixMatch = value.match(/^【([^】]{1,40}?)】/);
-  if (prefixMatch) return stripClowderCatDecorations(prefixMatch[1]);
-
-  const suffixMatch = value.match(/[［\[]([^\]/\]］\n]{1,40})\/[^\]］\n]{1,120}[］\]]\s*$/);
-  if (suffixMatch) return stripClowderCatDecorations(suffixMatch[1]);
-
-  return '';
-}
-
 function getClowderDigestSenderName(lastMessage: any): string {
   const payload = parseDigestContent(lastMessage?.payload ?? lastMessage?.content ?? lastMessage?.contentObj);
   if (!payload || typeof payload !== 'object') return '';
-  const isClowder = payload.connectorId === 'im-web' ||
-    payload.connector_id === 'im-web' ||
-    payload.ai === true ||
-    !!payload.catDisplayName ||
-    !!payload.cat_display_name;
-  if (!isClowder) return '';
-  return String(
-    payload.catDisplayName ||
-    payload.cat_display_name ||
-    payload.catName ||
-    payload.cat_name ||
-    ''
-  ).trim() || extractClowderCatDisplayNameFromText(String(payload.text || payload.content || ''));
+  if (!isClowderPayload(payload)) return '';
+  return getClowderCatDisplayNameFromPayload(payload);
 }
 
 function getSenderName(lastMessage: any): string {

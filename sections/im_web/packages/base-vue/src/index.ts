@@ -8,6 +8,7 @@ export * from './service/EventBus';
 export * from './service/Const';
 export * from './service/mediaUrl';
 export * from './utils/markdown';
+export * from './utils/clowderMessageIdentity';
 export * from './composables/useRemoteConfig';
 export { default as KickoutOverlay } from './components/KickoutOverlay.vue';
 export { default as ChannelAvatar } from './components/ChannelAvatar.vue';

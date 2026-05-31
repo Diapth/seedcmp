@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { computed } from 'vue';
+import { getClowderCatDisplayNameFromPayload, isClowderPayload } from '../../utils/clowderMessageIdentity';
 import { renderMarkdown } from '../../utils/markdown';
 
 const props = defineProps<{
@@ -46,30 +47,14 @@ const isMarkdown = computed(() => {
 const clowderMeta = computed(() => {
   const content = messageContent.value;
   const connectorId = content.connectorId || content.connector_id;
-  const catDisplayName = content.catDisplayName || content.cat_display_name;
   const catId = content.catId || content.cat_id;
-  if (connectorId !== 'im-web' && !catDisplayName && !catId) return undefined;
-  const inferredDisplayName = inferClowderCatDisplayName(displayText.value);
+  if (!isClowderPayload(content) && connectorId !== 'im-web' && !catId) return undefined;
   return {
     connectorId,
-    catDisplayName: catDisplayName || inferredDisplayName || catId || 'Clowder',
+    catDisplayName: getClowderCatDisplayNameFromPayload(content) || catId || 'Clowder',
     catId
   };
 });
-
-function inferClowderCatDisplayName(text: string) {
-  const value = String(text || '').trim();
-  const prefixMatch = value.match(/^【([^】]{1,40}?)】/);
-  if (prefixMatch) return prefixMatch[1].replace(/[🐱🐈🐾\s]+$/g, '').trim();
-
-  const leadingSlashMatch = value.match(/^([^\s/@/［\[\]］，。:：！？?（）()]{1,40})\/[^\s/［\[\]］，。:：]{1,40}(?=[\s，。:：！？?）)]|已|收|回|确|$)/u);
-  if (leadingSlashMatch) return leadingSlashMatch[1].replace(/[🐱🐈🐾\s]+$/g, '').trim();
-
-  const suffixMatch = value.match(/[［\[]([^\]/\]］\n]{1,40})\/[^\]］\n]{1,120}[］\]]\s*$/);
-  if (suffixMatch) return suffixMatch[1].replace(/[🐱🐈🐾\s]+$/g, '').trim();
-
-  return '';
-}
 
 const unsupportedMedia = computed(() => {
   const content = messageContent.value;

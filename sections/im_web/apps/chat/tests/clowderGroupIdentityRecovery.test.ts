@@ -153,6 +153,54 @@ function clowderHistoryMessageObjects() {
   }))
 }
 
+function clowderFileFallbackMessages() {
+  return [
+    {
+      message_seq: 115,
+      timestamp: 1780000115,
+      from_uid: 'me',
+      payload: JSON.stringify({
+        type: 1,
+        content: '@布偶猫 把昨天你做的代码打包成压缩包发出来'
+      })
+    },
+    {
+      message_seq: 117,
+      timestamp: 1780000117,
+      from_uid: 'yunyi',
+      payload: JSON.stringify({
+        type: 1,
+        text: '好嘞，压缩包发到聊天里了。\n\n[布偶猫/宪宪🐾 deepseek-v4-flash]',
+        content: '好嘞，压缩包发到聊天里了。\n\n[布偶猫/宪宪🐾 deepseek-v4-flash]',
+        connector_id: 'im-web',
+        ai: true,
+        cat_display_name: '布偶猫',
+        rich_blocks: [
+          {
+            id: 'file-ordering-demo',
+            v: 1,
+            kind: 'file',
+            fileName: 'ordering-demo.tar.gz',
+            url: '/uploads/ordering-demo.tar.gz'
+          }
+        ]
+      })
+    },
+    {
+      message_seq: 118,
+      timestamp: 1780000118,
+      from_uid: 'yunyi',
+      payload: JSON.stringify({
+        type: 1,
+        text: 'ordering-demo.tar.gz',
+        content: 'ordering-demo.tar.gz',
+        connector_id: 'im-web',
+        ai: true
+      })
+    }
+  ]
+}
+
 describe('Clowder group identity recovery', () => {
   beforeEach(() => {
     setActivePinia(createPinia())
@@ -319,6 +367,48 @@ describe('Clowder group identity recovery', () => {
       type: 2,
       text: '图片',
       connector_id: 'im-web',
+      catDisplayName: '布偶猫'
+    })
+  })
+
+  it('recovers a Clowder file attachment and cat identity when the media callback persisted as filename text', async () => {
+    const api = await import('@tsdaodao/datasource-vue/api')
+    vi.mocked(api.syncApi.syncMessages).mockResolvedValueOnce({ messages: clowderFileFallbackMessages() })
+
+    const { useConversationStore } = await import('../../../packages/datasource-vue/src/stores/conversationStore.ts')
+    const { useMessageStore } = await import('../../../packages/datasource-vue/src/stores/messageStore.ts')
+    const conversationStore = useConversationStore()
+    const messageStore = useMessageStore()
+    conversationStore.conversations.push({
+      channel_id: 'group-clowder',
+      channel_type: 2,
+      unread: 0,
+      last_msg_seq: 0,
+      last_msg_time: 0,
+      last_message: undefined,
+      top: 0,
+      mute: 0,
+      draft: '',
+      name: '集群',
+      avatar: ''
+    })
+
+    await messageStore.syncMessages('group-clowder', 2)
+
+    const list = messageStore.getChannelMessages('group-clowder', 2)
+    const recoveredFile = list.find(message => message.messageSeq === 118)
+    expect(recoveredFile?.content).toMatchObject({
+      type: 8,
+      name: 'ordering-demo.tar.gz',
+      url: 'http://localhost:3003/uploads/ordering-demo.tar.gz',
+      connector_id: 'im-web',
+      catDisplayName: '布偶猫'
+    })
+
+    const group = conversationStore.conversations.find(conv => conv.channel_id === 'group-clowder' && Number(conv.channel_type) === 2)
+    expect(group?.last_message?.content).toMatchObject({
+      type: 8,
+      name: 'ordering-demo.tar.gz',
       catDisplayName: '布偶猫'
     })
   })
