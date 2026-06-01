@@ -10,7 +10,9 @@ Medium
 
 ## Finding
 
-The IM Web side now exposes the fixed `Clowder AI` contact, opens the `clowder_ai` direct conversation, and renders the unified right dock. This issue originally tracked the live Clowder runtime reporting the `im-web` connector as disabled/unconfigured; later verification narrowed the remaining gap to bound IM Web agent-directory authorization for group/direct cat conversations.
+The final live failure was caused by stale runtime state, not by the current checked-in bridge code: `localhost:8090` was still served by a TangSeng bridge process started on 2026-05-31, before the owner-header fix was deployed, and that process still had `CLOWDER_DEFAULT_OWNER_USER_ID=6db8b65b3ae94092badfeb82e47c06f7`. The live Clowder connector bindings are owned by `default-user`, so the stale bridge kept proxying agent-directory requests with the wrong Clowder identity and group/direct cat conversations could return `403 Forbidden` through TangSeng as `agent_directory_unavailable`.
+
+The IM Web side now exposes the fixed `Clowder AI` contact, opens the `clowder_ai` direct conversation, and renders the unified right dock. This issue originally tracked the live Clowder runtime reporting the `im-web` connector as disabled/unconfigured; later verification narrowed the remaining gap to bound IM Web agent-directory authorization and finally to the stale `localhost:8090` TangSeng bridge process described above.
 
 ## Original Evidence
 
