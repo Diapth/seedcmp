@@ -43,16 +43,17 @@ export async function openConversation(
   page: Page,
   options: {
     name?: string;
+    item?: Locator;
     fallbackPattern?: RegExp;
     reason?: string;
   } = {},
 ) {
   await expect(page.locator('.conversation-list-container')).toBeVisible({ timeout: 10000 });
-  const item = options.name
+  const item = options.item || (options.name
     ? page.locator('.conversation-item', { hasText: options.name }).first()
     : options.fallbackPattern
       ? page.locator('.conversation-item', { hasText: options.fallbackPattern }).first()
-      : page.locator('.conversation-item').first();
+      : page.locator('.conversation-item').first());
 
   await skipIfNotVisible(item, options.reason || 'Required test conversation is not available.');
   await item.click();
@@ -61,24 +62,67 @@ export async function openConversation(
 }
 
 export async function openDirectConversation(page: Page) {
+  const configured = env('TEST_DIRECT_CONVERSATION');
+  if (configured) {
+    await openConversation(page, {
+      name: configured,
+      reason: `Direct conversation ${configured} is not visible for V3 binding smoke.`,
+    });
+    return;
+  }
+
+  const directItems = page.locator('.conversation-item[data-channel-type="1"]');
+  const clowderCapableDirect = directItems.filter({ hasText: /Clowder AI|Codex|布偶猫|宪宪|clowder/i }).first();
+  if (await clowderCapableDirect.isVisible().catch(() => false)) {
+    await openConversation(page, {
+      item: clowderCapableDirect,
+      reason: 'A Clowder-capable direct conversation is not visible for V3 binding smoke.',
+    });
+    return;
+  }
+
   await openConversation(page, {
-    name: env('TEST_DIRECT_CONVERSATION'),
+    item: directItems.first(),
     reason: 'Set TEST_DIRECT_CONVERSATION or provide at least one visible direct conversation for V3 binding smoke.',
   });
 }
 
 export async function openGroupConversation(page: Page) {
+  const configured = env('TEST_GROUP_CONVERSATION');
   await openConversation(page, {
-    name: env('TEST_GROUP_CONVERSATION'),
+    name: configured,
+    item: configured ? undefined : page.locator('.conversation-item[data-channel-type="2"]').filter({ hasText: /群|Group|测试链条/i }).first(),
     fallbackPattern: /群|Group|测试链条/i,
     reason: 'Set TEST_GROUP_CONVERSATION or provide a visible group conversation for V3 group smoke.',
   });
 }
 
 export async function openV2Conversation(page: Page) {
+  const configured = env('TEST_V2_CONVERSATION');
+  if (configured) {
+    await openConversation(page, {
+      name: configured,
+      reason: `V2 conversation ${configured} is not visible.`,
+    });
+    return;
+  }
+
+  const stableDirect = page
+    .locator('.conversation-item[data-channel-type="1"]')
+    .filter({ hasNotText: /Clowder AI|DeepSeek AI|Clowder|Codex|布偶猫|宪宪|clowder|DeepSeek|文件传输助手|系统账号|\[草稿\]/i });
+  const preferredV2ConversationNames = ['123', 'TestFriend2', 'TestFriend', 'yunyi', '逐味魔'];
+  let nonClowderDirect = stableDirect.first();
+  for (const name of preferredV2ConversationNames) {
+    const candidate = stableDirect.filter({ hasText: new RegExp(name, 'i') }).first();
+    if (await candidate.isVisible().catch(() => false)) {
+      nonClowderDirect = candidate;
+      break;
+    }
+  }
+
   await openConversation(page, {
-    name: env('TEST_V2_CONVERSATION'),
-    reason: 'Set TEST_V2_CONVERSATION or provide a visible non-Clowder conversation for V2 regression smoke.',
+    item: nonClowderDirect,
+    reason: 'Set TEST_V2_CONVERSATION or provide a visible non-Clowder direct conversation for V2 regression smoke.',
   });
 }
 
@@ -98,6 +142,18 @@ export async function sendChatMessage(page: Page, message: string) {
   await input.fill(message);
   await input.press('Enter');
   await expect(page.locator('.message-list').getByText(message, { exact: true }).last()).toBeVisible({ timeout: 10000 });
+}
+
+export async function waitForSentMessagePersisted(page: Page, message: string) {
+  const row = page.locator('.message-list .msg-row', { hasText: message }).last();
+  await expect(row).toBeVisible({ timeout: 10000 });
+  await expect
+    .poll(async () => {
+      const status = await row.getAttribute('data-message-status').catch(() => '');
+      const seq = Number(await row.getAttribute('data-message-seq').catch(() => '0'));
+      return status === 'success' && seq > 0;
+    }, { timeout: 20000 })
+    .toBe(true);
 }
 
 export async function openClowderPanel(page: Page) {
@@ -144,11 +200,20 @@ export async function waitForNewClowderReply(page: Page, previousCount: number, 
   await expect(meta.last()).toBeVisible({ timeout: 5000 });
 }
 
+export async function expectClowderReplyContaining(page: Page, text: string | RegExp, timeout = 60000) {
+  const reply = page.locator('.message-list .msg-row', {
+    has: page.locator('.clowder-meta, [data-testid="clowder-message-badge"]'),
+    hasText: text,
+  }).last();
+  await expect(reply).toBeVisible({ timeout });
+}
+
 export async function clowderReplyCount(page: Page) {
   return page.getByTestId('clowder-message-badge').or(page.locator('.message-list .clowder-meta')).count();
 }
 
 export async function expectTextOnceAfterReload(page: Page, text: string) {
+  await waitForSentMessagePersisted(page, text);
   await page.reload();
   await expect(page.locator('.message-list')).toBeVisible({ timeout: 15000 });
   await expect(page.locator('.message-list').getByText(text, { exact: true })).toHaveCount(1, { timeout: 15000 });

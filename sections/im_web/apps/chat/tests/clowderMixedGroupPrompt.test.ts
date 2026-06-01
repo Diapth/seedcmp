@@ -191,4 +191,102 @@ describe('Clowder mixed human and cat group prompt', () => {
     expect(cats.map(cat => cat.displayName)).toEqual(['布偶猫'])
     expect(clowderStore.groupCatMemberships['group-legacy'].map(cat => cat.catId)).toEqual(['opus'])
   })
+
+  it('merges current agent directory into stale durable group membership', async () => {
+    get
+      .mockResolvedValueOnce({
+        groupId: 'group-stale',
+        catIds: ['ragdoll'],
+        cats: [
+          {
+            catId: 'ragdoll',
+            displayName: '布偶猫',
+            aliases: ['@布偶猫'],
+            mentionPatterns: ['@布偶猫'],
+            available: true,
+            connected: true
+          }
+        ],
+        prompt: 'Group: stale group'
+      })
+      .mockResolvedValueOnce({
+        agents: [
+          {
+            catId: 'codex',
+            displayName: 'Codex',
+            aliases: ['@codex'],
+            mentionPatterns: ['@codex', '@Codex'],
+            available: true
+          },
+          {
+            catId: 'ragdoll',
+            displayName: '布偶猫',
+            aliases: ['@布偶猫'],
+            mentionPatterns: ['@布偶猫'],
+            available: true
+          }
+        ]
+      })
+    const { useClowderStore } = await import('../../../packages/datasource-vue/src/stores/clowderStore.ts')
+    const clowderStore = useClowderStore()
+
+    const cats = await clowderStore.loadGroupCats('group-stale')
+
+    expect(get).toHaveBeenNthCalledWith(1, 'clowder/group/cats', { params: { groupId: 'group-stale' } })
+    expect(get).toHaveBeenNthCalledWith(2, 'clowder/conversation/agents', { params: { channelId: 'group-stale', channelType: 2 } })
+    expect(cats.map(cat => cat.catId)).toEqual(['ragdoll', 'codex'])
+    expect(cats.find(cat => cat.catId === 'codex')?.mentionNames).toContain('@codex')
+    expect(clowderStore.groupCatMemberships['group-stale'].map(cat => cat.catId)).toEqual(['ragdoll', 'codex'])
+  })
+
+  it('falls back to the global cat directory when group agent directory is unavailable', async () => {
+    get
+      .mockResolvedValueOnce({
+        groupId: 'group-stale',
+        catIds: ['ragdoll'],
+        cats: [
+          {
+            catId: 'ragdoll',
+            displayName: '布偶猫',
+            aliases: ['@ragdoll-kn9a'],
+            mentionPatterns: ['@ragdoll-kn9a'],
+            available: true,
+            connected: true
+          }
+        ],
+        prompt: 'Group: stale group'
+      })
+      .mockRejectedValueOnce(new Error('agent directory forbidden'))
+      .mockResolvedValueOnce({
+        agents: [
+          {
+            catId: 'ragdoll',
+            displayName: '布偶猫',
+            aliases: ['@ragdoll-kn9a'],
+            mentionPatterns: ['@ragdoll-kn9a'],
+            available: true,
+            connected: true
+          },
+          {
+            catId: 'codex',
+            displayName: 'Codex',
+            aliases: ['@codex'],
+            mentionPatterns: ['@codex'],
+            available: true,
+            connected: true
+          }
+        ]
+      })
+    const { useClowderStore } = await import('../../../packages/datasource-vue/src/stores/clowderStore.ts')
+    const clowderStore = useClowderStore()
+
+    const cats = await clowderStore.loadGroupCats('group-stale')
+
+    expect(get).toHaveBeenNthCalledWith(1, 'clowder/group/cats', { params: { groupId: 'group-stale' } })
+    expect(get).toHaveBeenNthCalledWith(2, 'clowder/conversation/agents', { params: { channelId: 'group-stale', channelType: 2 } })
+    expect(get).toHaveBeenNthCalledWith(3, 'clowder/cats', { params: { includeUnavailable: true } })
+    expect(cats.map(cat => cat.catId)).toEqual(['ragdoll', 'codex'])
+    expect(clowderStore.groupCatMemberships['group-stale'].map(cat => cat.catId)).toEqual(['ragdoll', 'codex'])
+    expect(clowderStore.groupPrompts['group-stale']).toContain('Allowed @ targets: @ragdoll-kn9a, @codex')
+  })
 })

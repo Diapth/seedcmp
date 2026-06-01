@@ -125,4 +125,41 @@ describe('message listener own echo handling', () => {
     expect(useMessageStore().getChannelMessages('clowder_ai', 1)).toHaveLength(1)
     expect(useMessageStore().getChannelMessages('me', 1)).toHaveLength(0)
   })
+
+  it('applies send ACKs to the local pending row through the registered SDK clientSeq alias', async () => {
+    const { registerMessageListeners } = await import('../../../packages/datasource-vue/src/cmd/index.ts')
+    const { useMessageStore } = await import('../../../packages/datasource-vue/src/stores/messageStore.ts')
+    const { useUserStore } = await import('../../../packages/datasource-vue/src/stores/userStore.ts')
+
+    const userStore = useUserStore()
+    userStore.currentUser = { uid: 'me', name: 'Me' }
+    const messageStore = useMessageStore()
+    messageStore.addMessage('friend-a', 1, {
+      messageID: '',
+      messageSeq: 0,
+      clientMsgNo: 'local-client-7',
+      fromUID: 'me',
+      timestamp: 100,
+      content: { type: 1, text: 'hello ack' },
+      isRevoked: false,
+      status: 'sending'
+    })
+    messageStore.registerPendingAckAlias(7, 'local-client-7')
+
+    registerMessageListeners()
+    const statusListener = addMessageStatusListener.mock.calls[0][0]
+    statusListener({
+      clientSeq: 7,
+      messageID: 'm-ack-7',
+      messageSeq: 77,
+      reasonCode: 1
+    })
+
+    expect(messageStore.getChannelMessages('friend-a', 1)[0]).toMatchObject({
+      messageID: 'm-ack-7',
+      messageSeq: 77,
+      clientMsgNo: 'local-client-7',
+      status: 'success'
+    })
+  })
 })

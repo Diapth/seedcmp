@@ -2,6 +2,7 @@ import { expect, test } from '@playwright/test';
 import {
   clowderReplyCount,
   env,
+  expectClowderReplyContaining,
   expectCommandResponse,
   expectNoDeepSeekFallback,
   login,
@@ -13,6 +14,8 @@ import {
 } from './helpers/v3-clowder';
 
 test.describe('V3 Clowder multi-agent smoke', () => {
+  test.describe.configure({ timeout: 180000 });
+
   test.skip(
     !process.env.RUN_V3_CLOWDER_SMOKE,
     'Requires TangSeng, WuKongIM, Clowder API, signed bridge env, and two configured Clowder agents.',
@@ -38,9 +41,7 @@ test.describe('V3 Clowder multi-agent smoke', () => {
     count = await clowderReplyCount(page);
     await sendChatMessage(page, `/ask ${normalizedAgentB} ${id} agent-b`);
     await waitForNewClowderReply(page, count);
-    await expect(page.locator('.message-list .clowder-cat').last()).toContainText(new RegExp(normalizedAgentB, 'i'), {
-      timeout: 10000,
-    });
+    await expectClowderReplyContaining(page, new RegExp(normalizedAgentB, 'i'), 90000);
 
     await sendChatMessage(page, `/focus ${agentA}`);
     await expectCommandResponse(page, /focus|preferred|已设置|聚焦|默认/i);

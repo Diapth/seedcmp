@@ -12,4 +12,12 @@ describe('clowder conversation panel component', () => {
     expect(source.default).toContain('setFocus')
     expect(source.default).not.toContain('card')
   })
+
+  it('refreshes connector health before conversation data and keeps degraded status visible', async () => {
+    const source = await import('../src/components/ClowderConversationPanel.vue?raw')
+
+    expect(source.default).toContain('clowderStore.refreshStatus')
+    expect(source.default).toContain('statusReason')
+    expect(source.default).toContain('clowder_unavailable')
+  })
 })

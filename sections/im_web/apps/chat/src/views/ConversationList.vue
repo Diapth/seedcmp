@@ -392,6 +392,8 @@ function getDigestPresentation(conv: any) {
           pinned: conv.top === 1,
           active: isActiveConversation(conv)
         }"
+        :data-channel-id="conv.channel_id"
+        :data-channel-type="conv.channel_type"
         @click="handleSelect(conv.channel_id, conv.channel_type)"
         @contextmenu.prevent="handleConversationContextMenu($event, conv)"
       >

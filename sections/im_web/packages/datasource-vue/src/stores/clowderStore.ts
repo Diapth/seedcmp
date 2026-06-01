@@ -137,6 +137,32 @@ function buildStaleHistoryContact(displayName: string) {
   });
 }
 
+function uniqueNonEmptyStrings(values: Array<string | undefined | null>) {
+  return Array.from(new Set(values
+    .map(value => String(value || '').trim())
+    .filter(Boolean)));
+}
+
+function mergeClowderCatContacts(existing: ClowderCatContact[], additions: ClowderCatContact[]) {
+  const next = [...existing];
+  for (const contact of additions) {
+    const index = next.findIndex(item => item.catId === contact.catId);
+    if (index === -1) {
+      next.push(contact);
+      continue;
+    }
+    const current = next[index];
+    next[index] = {
+      ...current,
+      ...contact,
+      aliases: uniqueNonEmptyStrings([...current.aliases, ...contact.aliases]),
+      mentionNames: uniqueNonEmptyStrings([...current.mentionNames, ...contact.mentionNames]),
+      connected: current.connected || contact.connected
+    };
+  }
+  return next;
+}
+
 export const useClowderStore = defineStore('clowder', () => {
   const status = ref<ClowderConnectionStatus>(defaultStatus());
   const conversations = ref<Record<string, ClowderConversationStateResponse>>({});
@@ -461,19 +487,29 @@ export const useClowderStore = defineStore('clowder', () => {
     let cats = (response.cats || []).map(agent => toClowderCatContact(agent, {
       connected: true
     }));
-    if (cats.length === 0) {
+    let directoryCats: ClowderCatContact[] = [];
+    try {
+      const directory = await clowderApi.getAgentDirectory({
+        channelId: groupId,
+        channelType: 2
+      }) as unknown as ClowderAgentDirectoryResponse | undefined;
+      directoryCats = (directory?.agents || []).map(agent => toClowderCatContact(agent, {
+        connected: true
+      }));
+    } catch (_err) {
+      directoryCats = [];
+    }
+    if (directoryCats.length === 0) {
       try {
-        const directory = await clowderApi.getAgentDirectory({
-          channelId: groupId,
-          channelType: 2
-        }) as unknown as ClowderAgentDirectoryResponse;
-        cats = (directory.agents || []).map(agent => toClowderCatContact(agent, {
-          connected: true
+        const directory = await clowderApi.getCatDirectory({ includeUnavailable: true }) as unknown as ClowderCatDirectoryResponse | undefined;
+        directoryCats = (directory?.agents || []).map(agent => toClowderCatContact(agent, {
+          connected: agent.connected === true
         }));
       } catch (_err) {
-        cats = [];
+        directoryCats = [];
       }
     }
+    cats = mergeClowderCatContacts(cats, directoryCats);
     if (cats.length === 0) {
       cats = await inferGroupCatsFromMessageHistory(groupId);
       if (cats.length > 0) {
@@ -481,8 +517,10 @@ export const useClowderStore = defineStore('clowder', () => {
       }
     }
     groupCatMemberships.value[groupId] = cats;
-    if (response.prompt || cats.length === 0) {
-      groupPrompts.value[groupId] = response.prompt || '';
+    if (cats.length > 0) {
+      buildCurrentGroupPrompt(groupId, response.groupName || groupId, cats);
+    } else if (response.prompt) {
+      groupPrompts.value[groupId] = response.prompt;
     }
     return cats;
   }

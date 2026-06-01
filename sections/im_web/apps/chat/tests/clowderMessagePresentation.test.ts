@@ -546,6 +546,21 @@ describe('clowder message presentation', () => {
     expect(document.querySelector('.clowder-cat')).toHaveTextContent('Codex')
   })
 
+  it('does not backfill stale group cat labels over an explicit current cat id', async () => {
+    const { withClowderCatDisplayName } = await import('../../../packages/base-vue/src/utils/clowderMessageIdentity.ts')
+
+    const content = withClowderCatDisplayName({
+      type: 1,
+      text: '收到，我来处理这个请求。',
+      connectorId: 'im-web',
+      catId: 'codex',
+      markdown: true
+    }, '布偶猫')
+
+    expect(content.catDisplayName).toBe('codex')
+    expect(content.cat_display_name).toBe('codex')
+  })
+
   it('renders all visible Clowder thought and transcript blocks from array aliases', () => {
     render(TextCell, {
       props: {

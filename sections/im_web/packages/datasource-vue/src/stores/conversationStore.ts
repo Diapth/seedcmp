@@ -757,12 +757,18 @@ export const useConversationStore = defineStore('conversation', () => {
     }
 
     if (conv) {
-      conv.last_msg_seq = message.messageSeq || conv.last_msg_seq;
-      conv.last_msg_time = message.timestamp || Math.floor(Date.now() / 1000);
-      if (isDigest) {
+      const currentSeq = Number(conv.last_msg_seq || 0);
+      const shouldUseMessageAsLatest = messageSeq === 0 || messageSeq >= currentSeq;
+      conv.last_msg_seq = Math.max(currentSeq, messageSeq);
+      conv.last_msg_time = messageSeq >= currentSeq
+        ? (message.timestamp || Math.floor(Date.now() / 1000))
+        : (conv.last_msg_time || message.timestamp || Math.floor(Date.now() / 1000));
+      if (isDigest && shouldUseMessageAsLatest) {
         conv.last_message = normalizedMsg;
       }
-      applyClowderConversationName(channelId, channelType, conv, normalizedMsg);
+      if (shouldUseMessageAsLatest) {
+        applyClowderConversationName(channelId, channelType, conv, normalizedMsg);
+      }
       if (message.isUnreadCleared && isDigest) {
         conv.unread = 0;
         unreadMap.value[key] = 0;
@@ -800,15 +806,22 @@ export const useConversationStore = defineStore('conversation', () => {
     const isOwnMessage = message?.isOwnMessage === true || message?.fromUID === userStore.currentUser?.uid;
     const isDigest = message ? isConversationDigestSource(message) : false;
     const normalizedMsg = message ? normalizeLastMessage({ last_message: message }) : undefined;
+    const messageSeq = Number(message?.messageSeq || 0);
 
     if (conv) {
       if (message) {
-        conv.last_msg_seq = message.messageSeq || conv.last_msg_seq;
-        conv.last_msg_time = message.timestamp || conv.last_msg_time || Math.floor(Date.now() / 1000);
-        if (isDigest || !conv.last_message) {
+        const currentSeq = Number(conv.last_msg_seq || 0);
+        const shouldUseMessageAsLatest = messageSeq === 0 || messageSeq >= currentSeq;
+        conv.last_msg_seq = Math.max(currentSeq, messageSeq);
+        conv.last_msg_time = messageSeq >= currentSeq
+          ? (message.timestamp || conv.last_msg_time || Math.floor(Date.now() / 1000))
+          : (conv.last_msg_time || message.timestamp || Math.floor(Date.now() / 1000));
+        if ((isDigest && shouldUseMessageAsLatest) || !conv.last_message) {
           conv.last_message = normalizedMsg;
         }
-        applyClowderConversationName(channelId, channelType, conv, normalizedMsg);
+        if (shouldUseMessageAsLatest) {
+          applyClowderConversationName(channelId, channelType, conv, normalizedMsg);
+        }
         if (message.isUnreadCleared && isDigest) {
           conv.unread = 0;
           unreadMap.value[key] = 0;

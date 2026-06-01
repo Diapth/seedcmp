@@ -13,8 +13,9 @@ describe('right dock preview and Clowder layout', () => {
     expect(chatView.default).toContain('style="{ width: `${rightDockWidth}px` }"')
     expect(chatView.default).toContain('<ChatSidePreview')
     expect(chatView.default).toContain('<ClowderConversationPanel')
+    expect(chatView.default).toContain('max(280px, 75vw)')
+    expect(panel.default).toContain('min-width: 264px')
     expect(preview.default).not.toContain('<aside')
     expect(panel.default).not.toContain('<aside')
   })
 })
-

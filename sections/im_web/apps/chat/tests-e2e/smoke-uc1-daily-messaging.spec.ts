@@ -37,7 +37,8 @@ test('UC-1 daily messaging: send text and expose action affordances', async ({ p
     clientX: Math.round((box?.x || 0) + (box?.width || 1) / 2),
     clientY: Math.round((box?.y || 0) + (box?.height || 1) / 2)
   })
-  await expect(page.getByText('回复')).toBeVisible({ timeout: 3000 })
-  await expect(page.getByText(/设为置顶|取消置顶/)).toBeVisible()
-  await expect(page.getByText('查看回执')).toBeVisible()
+  const contextMenu = page.locator('.context-menu')
+  await expect(contextMenu.getByText('回复', { exact: true })).toBeVisible({ timeout: 3000 })
+  await expect(contextMenu.getByText(/设为置顶|取消置顶/)).toBeVisible()
+  await expect(contextMenu.getByText('查看回执', { exact: true })).toBeVisible()
 })

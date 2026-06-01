@@ -24,14 +24,31 @@ const conversationRef = computed(() => ({
 
 const conversation = computed(() => clowderStore.getConversation(props.channelId, props.channelType));
 const directory = computed(() => clowderStore.agentDirectories[`${props.channelId}-${props.channelType}`]);
-const status = computed(() => conversation.value?.status || clowderStore.status);
+const groupAgents = computed(() => props.channelType === 2 ? clowderStore.groupCatMemberships[props.channelId] || [] : []);
+const status = computed(() => {
+  if (clowderStore.status.state === 'error' || clowderStore.status.reachable === false) {
+    return clowderStore.status;
+  }
+  return conversation.value?.status || clowderStore.status;
+});
 const disabledReason = computed(() => conversation.value?.disabledReason || clowderStore.error);
-const agents = computed(() => directory.value?.agents || conversation.value?.agents || []);
+const statusReason = computed(() => {
+  const rawStatus = status.value as typeof status.value & { reason?: string; error?: string; message?: string };
+  if (disabledReason.value) return disabledReason.value;
+  return rawStatus.reason || rawStatus.lastError || rawStatus.error || rawStatus.message ||
+    (rawStatus.state === 'error' ? 'clowder_unavailable' : '');
+});
+const agents = computed(() => directory.value?.agents || conversation.value?.agents || groupAgents.value);
 const currentFocus = computed(() => conversation.value?.focusCatId);
 
 async function refresh() {
   if (!props.visible || !props.channelId) return;
+  const health = await clowderStore.refreshStatus().catch(() => clowderStore.status);
+  if (health.state === 'error' || health.reachable === false) return;
   await clowderStore.loadConversation(conversationRef.value).catch(() => undefined);
+  if (props.channelType === 2) {
+    await clowderStore.loadGroupCats(props.channelId).catch(() => undefined);
+  }
   await clowderStore.loadAgentDirectory(conversationRef.value).catch(() => undefined);
 }
 
@@ -62,6 +79,7 @@ watch(() => [props.visible, props.channelId, props.channelType], refresh);
       <section class="panel-section">
         <div class="section-label">Thread</div>
         <div class="thread-id">{{ conversation?.binding?.threadId || 'Not bound' }}</div>
+        <div v-if="statusReason" class="error-text">error: {{ statusReason }}</div>
         <div v-if="conversation?.lastDelivery" class="muted">Delivery: {{ conversation.lastDelivery.state }}</div>
       </section>
 
@@ -75,9 +93,9 @@ watch(() => [props.visible, props.channelId, props.channelType], refresh);
 
       <section class="panel-section">
         <div class="section-label">Agents</div>
-        <div v-if="clowderStore.loading" class="muted">loading</div>
-        <div v-else-if="clowderStore.error" class="error-text">error: {{ clowderStore.error }}</div>
-        <div v-else-if="disabledReason" class="muted">disabled: {{ disabledReason }}</div>
+        <div v-if="clowderStore.loading && agents.length === 0" class="muted">loading</div>
+        <div v-else-if="clowderStore.error && agents.length === 0" class="error-text">error: {{ clowderStore.error }}</div>
+        <div v-else-if="disabledReason && agents.length === 0" class="muted">disabled: {{ disabledReason }}</div>
         <button
           v-for="agent in agents"
           :key="agent.catId"
@@ -89,6 +107,7 @@ watch(() => [props.visible, props.channelId, props.channelType], refresh);
           <span class="agent-name">{{ agent.displayName }}</span>
           <span class="agent-state">{{ agent.available ? 'ready' : 'disabled' }}</span>
         </button>
+        <div v-if="clowderStore.error && agents.length > 0" class="muted">directory fallback: {{ clowderStore.error }}</div>
       </section>
     </div>
   </section>
@@ -97,6 +116,7 @@ watch(() => [props.visible, props.channelId, props.channelType], refresh);
 <style scoped>
 .clowder-panel {
   width: 100%;
+  min-width: 264px;
   height: 100%;
   background: var(--bg-primary);
   color: var(--text-primary);

@@ -6,8 +6,6 @@ import { useUserStore } from '../stores/userStore';
 import { useGroupStore } from '../stores/groupStore';
 import { userApi } from '../api';
 
-const pendingClientMsgNoBySeq = new Map<number, string>();
-
 export function resolveVisibleMessageChannel(
   channelId: string,
   channelType: number,
@@ -192,10 +190,6 @@ export function registerMessageListeners() {
     const currentPath = typeof window !== 'undefined' ? window.location.pathname : '';
     const isViewingChannel = currentPath.includes(`/chat/conversation/${channelId}/${channelType}`);
 
-    if (message.clientSeq && message.clientMsgNo) {
-      pendingClientMsgNoBySeq.set(message.clientSeq, message.clientMsgNo);
-    }
-
     // Own messages are skipped here entirely.
     // sendMessage / sendMediaMessage call addRealtimeMessage themselves after
     // WKSDK.send() resolves, merging the pending entry via our clientMsgNo.
@@ -214,11 +208,10 @@ export function registerMessageListeners() {
   });
 
   WKSDK.shared().chatManager.addMessageStatusListener((ack: SendackPacket) => {
-    const clientMsgNo = pendingClientMsgNoBySeq.get(ack.clientSeq);
-    if (!clientMsgNo) return;
-    pendingClientMsgNoBySeq.delete(ack.clientSeq);
-
     const messageStore = useMessageStore();
+    const clientMsgNo = messageStore.resolvePendingAckClientMsgNo(ack.clientSeq);
+    if (!clientMsgNo) return;
+
     messageStore.updateMessageStatus(clientMsgNo, {
       messageID: String(ack.messageID || ''),
       messageSeq: ack.messageSeq || 0,

@@ -89,7 +89,10 @@ export function withClowderCatDisplayName(payload: any, fallbackDisplayName = ''
   if (!payload || typeof payload !== 'object') return payload;
   if (!isClowderPayload(payload)) return payload;
 
-  const displayName = getClowderCatDisplayNameFromPayload(payload) || stripClowderCatDecorations(String(fallbackDisplayName || ''));
+  const catId = stripClowderCatDecorations(String(payload.catId || payload.cat_id || ''));
+  const displayName = getClowderCatDisplayNameFromPayload(payload) ||
+    catId ||
+    stripClowderCatDecorations(String(fallbackDisplayName || ''));
   const next = { ...payload };
   if (next.connectorId === undefined && next.connector_id !== undefined) next.connectorId = next.connector_id;
   if (next.connector_id === undefined && next.connectorId !== undefined) next.connector_id = next.connectorId;

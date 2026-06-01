@@ -28,6 +28,7 @@ const imageLightbox = ref({
   title: ''
 });
 const sidePreviewRequestId = ref(0);
+let visibleHistoryTimers: number[] = [];
 const sidePreview = ref({
   visible: false,
   type: 'file-text' as ChatSidePreviewKind,
@@ -66,6 +67,22 @@ function isChatViewActive(cid: string, ctype: number) {
     Number(route.params.channelType || 0) === Number(ctype);
 }
 
+function clearVisibleHistoryTimers() {
+  for (const timer of visibleHistoryTimers) window.clearTimeout(timer);
+  visibleHistoryTimers = [];
+}
+
+function scheduleVisibleHistoryRefresh(cid: string, ctype: number) {
+  clearVisibleHistoryTimers();
+  visibleHistoryTimers = [2500, 10000, 30000].map(delay =>
+    window.setTimeout(() => {
+      if (isChatViewActive(cid, ctype)) {
+        void messageStore.syncMessages(cid, ctype, { hydrateVisibleHistory: true });
+      }
+    }, delay),
+  );
+}
+
 async function loadChannelDetails() {
   const cid = channelId.value;
   const ctype = channelType.value;
@@ -76,6 +93,7 @@ async function loadChannelDetails() {
   }
 
   await messageStore.syncMessages(cid, ctype, { hydrateVisibleHistory: true });
+  scheduleVisibleHistoryRefresh(cid, ctype);
   if (isChatViewActive(cid, ctype)) {
     await conversationStore.clearUnread(cid, ctype);
   }
@@ -86,6 +104,7 @@ onMounted(() => {
 });
 
 onBeforeUnmount(() => {
+  clearVisibleHistoryTimers();
   stopRightDockResize();
 });
 
@@ -452,8 +471,8 @@ function startRightDockResize(event: MouseEvent) {
   position: relative;
   display: grid;
   grid-template-rows: auto minmax(0, 1fr);
-  min-width: 360px;
-  max-width: 75vw;
+  min-width: 280px;
+  max-width: max(280px, 75vw);
   height: 100%;
   border-left: var(--border-hairline);
   background: var(--bg-primary);

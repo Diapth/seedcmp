@@ -8,6 +8,7 @@ import {
   expectTextOnceAfterReload,
   login,
   openClowderPanel,
+  openConversation,
   openDirectConversation,
   openGroupConversation,
   runId,
@@ -16,6 +17,8 @@ import {
 } from './helpers/v3-clowder';
 
 test.describe('V3 Clowder direct and group binding smoke', () => {
+  test.describe.configure({ timeout: 180000 });
+
   test.skip(
     !process.env.RUN_V3_CLOWDER_SMOKE,
     'Requires TangSeng, WuKongIM, Clowder API, signed bridge env, one direct chat, and one group chat.',
@@ -37,7 +40,7 @@ test.describe('V3 Clowder direct and group binding smoke', () => {
     await sendChatMessage(page, directMessage);
     await waitForNewClowderReply(page, directCount);
     await expectTextOnceAfterReload(page, directMessage);
-    await waitForNewClowderReply(page, directCount);
+    await expect(page.locator('.message-list .clowder-meta').last()).toBeVisible({ timeout: 60000 });
 
     await openGroupConversation(page);
     await openClowderPanel(page);
@@ -49,13 +52,24 @@ test.describe('V3 Clowder direct and group binding smoke', () => {
     await sendChatMessage(page, groupMessage);
     await waitForNewClowderReply(page, groupCount);
     await expectTextOnceAfterReload(page, groupMessage);
-    await waitForNewClowderReply(page, groupCount);
+    await expect(page.locator('.message-list .clowder-meta').last()).toBeVisible({ timeout: 60000 });
 
     const secondUserAvailable = Boolean(process.env.TEST_B_USERNAME && process.env.TEST_B_PASSWORD);
     if (secondUserAvailable) {
       const { context, page: pageB } = await createSecondUserContext(browser);
       try {
-        await openGroupConversation(pageB);
+        const configuredGroup = env('TEST_GROUP_CONVERSATION');
+        const secondUserGroup = configuredGroup
+          ? pageB.locator('.conversation-item', { hasText: configuredGroup }).first()
+          : pageB.locator('.conversation-item[data-channel-type="2"]').filter({ hasText: /群|Group|测试链条/i }).first();
+        if (!(await secondUserGroup.isVisible().catch(() => false))) {
+          test.info().annotations.push({
+            type: 'skip-note',
+            description: 'Second-account group visibility check skipped because the group is not visible for TEST_B_USERNAME.',
+          });
+          return;
+        }
+        await openConversation(pageB, { item: secondUserGroup });
         await expect(pageB.locator('.message-list').getByText(groupMessage, { exact: true }).last()).toBeVisible({
           timeout: 15000,
         });

@@ -312,7 +312,7 @@ export const syncApi = {
     return apiDelete(`conversations/${channelId}/${channelType}`);
   },
   // 消息通道增量同步
-  syncMessages(data: { channel_id: string; channel_type: number; limit: number; start_message_seq: number; end_message_seq: number; pull_mode: number }) {
+  syncMessages(data: { channel_id: string; channel_type: number; limit: number; start_message_seq: number; end_message_seq: number; pull_mode: number; device_uuid?: string }) {
     return apiClient.post('message/channel/sync', data);
   },
   // 撤销消息

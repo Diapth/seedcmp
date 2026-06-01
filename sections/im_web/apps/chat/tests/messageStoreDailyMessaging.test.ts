@@ -263,6 +263,134 @@ describe('message store daily messaging normalization', () => {
     )
   })
 
+  it('starts cold visible-history sync from the known latest conversation sequence', async () => {
+    const { useMessageStore } = await import('../../../packages/datasource-vue/src/stores/messageStore.ts')
+    const { useConversationStore } = await import('../../../packages/datasource-vue/src/stores/conversationStore.ts')
+    const store = useMessageStore()
+    const conversationStore = useConversationStore()
+    conversationStore.conversations.push({
+      channel_id: 'friend-long',
+      channel_type: 1,
+      unread: 0,
+      last_msg_seq: 120,
+      last_msg_time: 1200,
+      last_message: {},
+      top: 0,
+      mute: 0,
+      name: 'Long Friend',
+      avatar: ''
+    })
+
+    const makeRawMessage = (seq: number) => ({
+      message_idstr: `m-${seq}`,
+      message_seq: seq,
+      client_msg_no: `client-${seq}`,
+      from_uid: 'friend-long',
+      timestamp: 1000 + seq,
+      payload: JSON.stringify({ type: 1, text: `message-${seq}` })
+    })
+
+    syncMessages.mockImplementation(async (params: any) => {
+      if (params.pull_mode === 0 && params.start_message_seq === 120) {
+        return { messages: [118, 119, 120].map(makeRawMessage) }
+      }
+      return { messages: [] }
+    })
+
+    await store.syncMessages('friend-long', 1, { hydrateVisibleHistory: true })
+
+    expect(syncMessages).toHaveBeenNthCalledWith(1, expect.objectContaining({
+      channel_id: 'friend-long',
+      channel_type: 1,
+      start_message_seq: 120,
+      pull_mode: 0
+    }))
+    expect(store.getChannelMessages('friend-long', 1).map(item => item.content.text)).toEqual([
+      'message-118',
+      'message-119',
+      'message-120'
+    ])
+  })
+
+  it('uses a history-only device id for visible channel history sync', async () => {
+    const { useMessageStore } = await import('../../../packages/datasource-vue/src/stores/messageStore.ts')
+    const store = useMessageStore()
+
+    syncMessages.mockResolvedValue({
+      messages: [{
+        message_idstr: 'm-1',
+        message_seq: 1,
+        client_msg_no: 'client-1',
+        from_uid: 'friend-history',
+        timestamp: 1001,
+        payload: JSON.stringify({ type: 1, text: 'history visible message' })
+      }]
+    })
+
+    await store.syncMessages('friend-history', 1, { hydrateVisibleHistory: true })
+
+    expect(syncMessages).toHaveBeenCalledWith(expect.objectContaining({
+      channel_id: 'friend-history',
+      channel_type: 1,
+      device_uuid: 'im-web-history'
+    }))
+  })
+
+  it('refreshes a stale local visible-history window from the known latest conversation sequence', async () => {
+    const { useMessageStore } = await import('../../../packages/datasource-vue/src/stores/messageStore.ts')
+    const { useConversationStore } = await import('../../../packages/datasource-vue/src/stores/conversationStore.ts')
+    const store = useMessageStore()
+    const conversationStore = useConversationStore()
+    conversationStore.conversations.push({
+      channel_id: 'group-stale-window',
+      channel_type: 2,
+      unread: 0,
+      last_msg_seq: 120,
+      last_msg_time: 1200,
+      last_message: {},
+      top: 0,
+      mute: 0,
+      name: 'Stale Group',
+      avatar: ''
+    })
+    store.addMessage('group-stale-window', 2, {
+      messageID: 'm-20',
+      messageSeq: 20,
+      clientMsgNo: 'client-20',
+      fromUID: 'friend-a',
+      timestamp: 1020,
+      content: { type: 1, text: 'old local window' },
+      isRevoked: false,
+      status: 'success'
+    })
+
+    const makeRawMessage = (seq: number) => ({
+      message_idstr: `m-${seq}`,
+      message_seq: seq,
+      client_msg_no: `client-${seq}`,
+      from_uid: 'friend-a',
+      timestamp: 1000 + seq,
+      payload: JSON.stringify({ type: 1, text: `message-${seq}` })
+    })
+
+    syncMessages.mockImplementation(async (params: any) => {
+      if (params.pull_mode === 0 && params.start_message_seq === 120) {
+        return { messages: [118, 119, 120].map(makeRawMessage) }
+      }
+      return { messages: [] }
+    })
+
+    await store.syncMessages('group-stale-window', 2, { hydrateVisibleHistory: true })
+
+    expect(syncMessages).toHaveBeenNthCalledWith(1, expect.objectContaining({
+      channel_id: 'group-stale-window',
+      channel_type: 2,
+      start_message_seq: 120,
+      pull_mode: 0
+    }))
+    expect(store.getChannelMessages('group-stale-window', 2).map(item => item.content.text)).toContain('message-120')
+  })
+
   it('keeps background sync to the latest page unless visible history hydration is requested', async () => {
     const { useMessageStore } = await import('../../../packages/datasource-vue/src/stores/messageStore.ts')
     const store = useMessageStore()

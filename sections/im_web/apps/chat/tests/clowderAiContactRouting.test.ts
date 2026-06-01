@@ -69,6 +69,15 @@ describe('Clowder AI contact routing', () => {
     expect(source.default).toContain('clowderStore.sendConversationMessage')
   })
 
+  it('routes slash ask and focus commands through Clowder target cat ids', async () => {
+    const source = await import('../src/components/MessageInput.vue?raw')
+
+    expect(source.default).toContain('getCommandTargetCatIds')
+    expect(source.default).toContain('/^\\/(ask|focus)\\s+')
+    expect(source.default).toContain('matchesCatTargetToken')
+    expect(source.default).toContain('targetCatIds = Array.from(new Set')
+  })
+
   it('loads group cat memberships from the chat input before showing mention targets', async () => {
     const source = await import('../src/components/MessageInput.vue?raw')
 

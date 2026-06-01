@@ -139,9 +139,7 @@ async function ensureGroupMentionMembersLoaded() {
   if (currentGroupMembers.value.length === 0) {
     tasks.push(groupStore.fetchGroupMembers(props.channelId));
   }
-  if (clowderStore.groupCatMemberships[props.channelId] === undefined) {
-    tasks.push(clowderStore.loadGroupCats(props.channelId).catch(() => undefined));
-  }
+  tasks.push(clowderStore.loadGroupCats(props.channelId).catch(() => undefined));
   if (tasks.length > 0) {
     await Promise.allSettled(tasks);
   }
@@ -255,6 +253,30 @@ function getMentionedTargetCatIds(text: string) {
         .filter(Boolean)
         .map(name => String(name).startsWith('@') ? String(name) : `@${name}`);
       return names.some(name => text.includes(name));
+    })
+    .map(member => member.catContact.catId);
+}
+
+function normalizeCatTargetToken(value: string) {
+  return String(value || '').replace(/^@/, '').trim().toLowerCase();
+}
+
+function matchesCatTargetToken(candidate: string, lookup: string) {
+  const token = normalizeCatTargetToken(candidate);
+  if (!token || !lookup) return false;
+  return token === lookup || token.startsWith(`${lookup}-`) || lookup.startsWith(`${token}-`);
+}
+
+function getCommandTargetCatIds(text: string) {
+  const match = text.match(/^\/(ask|focus)\s+([^\s]+)/i);
+  const lookup = normalizeCatTargetToken(match?.[2] || '');
+  if (!lookup) return [];
+  return catMentionMembers.value
+    .filter(member => {
+      const cat = member.catContact;
+      if (!cat) return false;
+      const tokens = [cat.catId, cat.displayName, ...cat.aliases, ...cat.mentionNames];
+      return tokens.some(token => matchesCatTargetToken(token, lookup));
     })
     .map(member => member.catContact.catId);
 }
@@ -684,7 +706,12 @@ async function handleSend() {
   const options: any = {};
   
   // Build Mention
-  const targetCatIds = props.channelType === 2 ? getMentionedTargetCatIds(text) : [];
+  if (props.channelType === 2) {
+    await ensureGroupMentionMembersLoaded();
+  }
+  const targetCatIds = Array.from(new Set(props.channelType === 2
+    ? [...getMentionedTargetCatIds(text), ...getCommandTargetCatIds(text)]
+    : []));
 
   if (props.channelType === 2) {
     if (text.includes('@所有人') || text.includes('@all')) {

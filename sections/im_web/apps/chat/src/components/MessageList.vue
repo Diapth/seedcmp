@@ -520,6 +520,8 @@ function handleCodePreview(payload: any) {
         v-else
         class="msg-row"
         :class="{ 'is-me': isMe(item.msg) }"
+        :data-message-status="item.msg.status"
+        :data-message-seq="item.msg.messageSeq"
         @contextmenu="handleRightClick($event, item.msg)"
         @mousedown.right.prevent="handleRightClick($event, item.msg)"
       >

@@ -255,6 +255,35 @@ describe('message action state', () => {
     })
   })
 
+  it('remembers the SDK clientSeq alias when text send resolves before a durable seq', async () => {
+    const { useMessageStore } = await import('../../../packages/datasource-vue/src/stores/messageStore.ts')
+    const { useUserStore } = await import('../../../packages/datasource-vue/src/stores/userStore.ts')
+    const messageStore = useMessageStore()
+    const userStore = useUserStore()
+    userStore.currentUser = { uid: 'me', name: 'Me' }
+
+    send.mockResolvedValueOnce({
+      messageID: '',
+      messageSeq: 0,
+      clientSeq: 42,
+      clientMsgNo: 'sdk-client-42',
+      fromUID: 'me',
+      timestamp: 103,
+      status: 1,
+      content: { contentType: 1, contentObj: { text: 'hello before ack' } }
+    })
+
+    await messageStore.sendMessage('friend-a', 1, 'hello before ack')
+
+    const [local] = messageStore.getChannelMessages('friend-a', 1)
+    expect(local).toMatchObject({
+      messageSeq: 0,
+      status: 'success',
+      content: { type: 1, text: 'hello before ack' }
+    })
+    expect(messageStore.resolvePendingAckClientMsgNo(42)).toBe(local.clientMsgNo)
+  })
+
   it('merges local streaming AI replies with the persisted robot message returned by sync', async () => {
     const api = await import('@tsdaodao/datasource-vue/api')
     const { useMessageStore } = await import('../../../packages/datasource-vue/src/stores/messageStore.ts')

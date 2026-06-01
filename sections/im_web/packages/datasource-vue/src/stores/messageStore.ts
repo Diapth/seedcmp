@@ -41,6 +41,7 @@ export interface Message {
 
 interface ConversationSummaryOptions {
   countUnread?: boolean;
+  allowOlderLatest?: boolean;
 }
 
 export interface Reaction {
@@ -55,6 +56,7 @@ const DEEPSEEK_AI_ROBOT_ID = 'deepseek_ai_robot';
 const CLOWDER_CONNECTOR_ID = 'im-web';
 const MESSAGE_SYNC_LIMIT = 30;
 const VISIBLE_HISTORY_WINDOW_LIMIT = 300;
+const MESSAGE_HISTORY_DEVICE_UUID = 'im-web-history';
 
 interface SendMessageOptions {
   mention?: { all?: boolean; uids?: string[] };
@@ -159,6 +161,7 @@ export const useMessageStore = defineStore('message', () => {
   // Tracks clientMsgNos currently being sent from THIS browser tab.
   // Used by the global messageListener to skip own-message duplicates.
   const sendingFromThisTab = new Set<string>();
+  const pendingAckClientMsgNoBySeq = new Map<number, string>();
 
   const conversationStore = useConversationStore();
   const channelStore = useChannelStore();
@@ -517,6 +520,21 @@ export const useMessageStore = defineStore('message', () => {
     sendingFromThisTab.delete(clientMsgNo);
   }
 
+  function registerPendingAckAlias(clientSeq: number | string | undefined, clientMsgNo: string) {
+    const seq = Number(clientSeq || 0);
+    if (seq > 0 && clientMsgNo) {
+      pendingAckClientMsgNoBySeq.set(seq, clientMsgNo);
+    }
+  }
+
+  function resolvePendingAckClientMsgNo(clientSeq: number | string | undefined) {
+    const seq = Number(clientSeq || 0);
+    if (seq <= 0) return '';
+    const clientMsgNo = pendingAckClientMsgNoBySeq.get(seq) || '';
+    pendingAckClientMsgNoBySeq.delete(seq);
+    return clientMsgNo;
+  }
+
   function markPendingFailed(clientMsgNo: string) {
     for (const key of Object.keys(messages.value)) {
       const msg = messages.value[key]?.find(item => item.clientMsgNo === clientMsgNo);
@@ -629,13 +647,22 @@ export const useMessageStore = defineStore('message', () => {
       fromUID: lastMessage.fromUID
     };
     for (const item of matching) {
-      item.name = resolveClowderConversationName(channelId, item.name || '', lastMessage, historyName);
+      const currentSeq = Number(item.last_msg_seq || 0);
+      const nextSeq = Number(lastMessage.messageSeq || 0);
+      const shouldUseMessageAsLatest = options.allowOlderLatest === true || nextSeq === 0 || nextSeq >= currentSeq;
+      if (shouldUseMessageAsLatest) {
+        item.name = resolveClowderConversationName(channelId, item.name || '', lastMessage, historyName);
+      }
       if (Number(channelType) === 1 && isClowderCatContactId(channelId) && item.name) {
         channelStore.updateChannelInfo(channelId, channelType, { name: item.name });
       }
-      item.last_msg_seq = lastMessage.messageSeq || item.last_msg_seq;
-      item.last_msg_time = lastMessage.timestamp || item.last_msg_time;
-      item.last_message = summary;
+      item.last_msg_seq = options.allowOlderLatest === true ? nextSeq : Math.max(currentSeq, nextSeq);
+      item.last_msg_time = options.allowOlderLatest === true || nextSeq >= currentSeq
+        ? (lastMessage.timestamp || item.last_msg_time)
+        : (item.last_msg_time || lastMessage.timestamp);
+      if (shouldUseMessageAsLatest) {
+        item.last_message = summary;
+      }
       if (lastMessage.isUnreadCleared) {
         item.unread = 0;
       } else if (options.countUnread === true && lastMessage.fromUID !== userStore.currentUser?.uid) {
@@ -751,8 +778,29 @@ export const useMessageStore = defineStore('message', () => {
       limit: MESSAGE_SYNC_LIMIT,
       start_message_seq: startSeq,
       end_message_seq: 0,
-      pull_mode: 1
+      pull_mode: 1,
+      device_uuid: MESSAGE_HISTORY_DEVICE_UUID
     });
+  }
+
+  async function fetchMessageWindowBefore(channelId: string, channelType: number, startSeq: number) {
+    return syncApi.syncMessages({
+      channel_id: channelId,
+      channel_type: channelType,
+      limit: MESSAGE_SYNC_LIMIT,
+      start_message_seq: startSeq,
+      end_message_seq: 0,
+      pull_mode: 0,
+      device_uuid: MESSAGE_HISTORY_DEVICE_UUID
+    });
+  }
+
+  function getLatestKnownConversationSeq(channelId: string, channelType: number) {
+    const conversation = conversationStore.conversations.find(item =>
+      String(item.channel_id) === String(channelId) &&
+      Number(item.channel_type) === Number(channelType)
+    );
+    return Number(conversation?.last_msg_seq || 0);
   }
 
   function getPositiveMessageSeqs(list: Message[]) {
@@ -803,9 +851,15 @@ export const useMessageStore = defineStore('message', () => {
     const key = `${channelId}-${channelType}`;
     const list = messages.value[key] || [];
     const startSeq = list.reduce((max, item) => Math.max(max, Number(item.messageSeq || 0)), 0);
+    const latestKnownSeq = getLatestKnownConversationSeq(channelId, channelType);
+    const shouldLoadLatestWindow = options.hydrateVisibleHistory &&
+      latestKnownSeq > 0 &&
+      (list.length === 0 || latestKnownSeq - startSeq > MESSAGE_SYNC_LIMIT);
 
     try {
-      const res: any = await fetchMessageWindow(channelId, channelType, startSeq);
+      const res: any = shouldLoadLatestWindow
+        ? await fetchMessageWindowBefore(channelId, channelType, latestKnownSeq)
+        : await fetchMessageWindow(channelId, channelType, startSeq);
 
       if (version !== resetVersion.value) return;
       if (res && Array.isArray(res.messages)) {
@@ -1019,7 +1073,7 @@ export const useMessageStore = defineStore('message', () => {
       msg.isRevoked = true;
       const lastMessage = getLatestConversationMessage(list);
       if (lastMessage) {
-        updateExistingConversationSummary(channelId, channelType, lastMessage, { countUnread: false });
+        updateExistingConversationSummary(channelId, channelType, lastMessage, { countUnread: false, allowOlderLatest: true });
       }
     }
   }
@@ -1148,6 +1202,7 @@ export const useMessageStore = defineStore('message', () => {
       const res = await WKSDK.shared().chatManager.send(textMsg, channel);
       if (version !== resetVersion.value) return;
       if (res) {
+        registerPendingAckAlias(res.clientSeq, pending.clientMsgNo);
         // Update the pending message in-place using our own clientMsgNo.
         // Do NOT call addRealtimeMessage(res) — the SDK's res.clientMsgNo is
         // SDK-internal and differs from ours; feeding it into addMessage would
@@ -1252,6 +1307,7 @@ export const useMessageStore = defineStore('message', () => {
       if (version !== resetVersion.value) return;
       if (res) {
         sentMessage = res;
+        registerPendingAckAlias(res.clientSeq, clientMsgNo);
         // Update the pending message in-place: preserve our clientMsgNo so that
         // syncMessages (which sees the SDK's clientMsgNo from the server) doesn't
         // create a second entry for the same message.
@@ -1328,6 +1384,7 @@ export const useMessageStore = defineStore('message', () => {
       if (version !== resetVersion.value) return;
       if (res) {
         sentMessage = res;
+        registerPendingAckAlias(res.clientSeq, clientMsgNo);
         updateMessageStatus(clientMsgNo, {
           messageID: String(res.messageID || ''),
           messageSeq: res.messageSeq || 0,
@@ -1595,6 +1652,7 @@ export const useMessageStore = defineStore('message', () => {
     typingState.value = {};
     replyTarget.value = null;
     sendingFromThisTab.clear();
+    pendingAckClientMsgNoBySeq.clear();
   }
 
   function isFromThisTabSend(clientMsgNo: string): boolean {
@@ -1630,6 +1688,8 @@ export const useMessageStore = defineStore('message', () => {
     retryPendingQueue,
     queuePendingMessage,
     markPendingFailed,
+    registerPendingAckAlias,
+    resolvePendingAckClientMsgNo,
     sendMediaMessage,
     sendVoiceMessage,
     addRealtimeMessage,
