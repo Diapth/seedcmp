@@ -180,6 +180,13 @@ CLOWDER_DEFAULT_OWNER_USER_ID=default-user
 go run . api -config configs/tsdd.yaml
 ```
 
+Durable prevention:
+
+- Added `sections/im_web/scripts/dev-tangseng-clowder.sh` so V3 smoke runs have a single guarded TangSeng bridge entrypoint.
+- The script defaults the local live owner to `default-user`, starts/restarts the `tangseng-v3-seedcmp` tmux session from the current checkout, and checks the process listening on `localhost:8090`.
+- `check` fails if the listener is from the wrong checkout or if `CLOWDER_DEFAULT_OWNER_USER_ID` differs from the expected owner, catching the exact stale-process/stale-owner failure before Playwright/API smoke.
+- Added `sections/im_web/scripts/dev-tangseng-clowder.test.sh` to regress the stale owner case by spawning a fake runtime with `old-owner` and requiring the check to fail with an owner mismatch.
+
 Post-restart verification:
 
 ```bash
@@ -219,6 +226,15 @@ go test ./modules/clowder -run 'TestFetchAgentDirectory|TestFetchCatDirectory' -
 ```
 
 Result: passed.
+
+```bash
+cd /media/leng/DiskB1/exp/seedcmp
+bash sections/im_web/scripts/dev-tangseng-clowder.test.sh
+sections/im_web/scripts/dev-tangseng-clowder.sh restart
+sections/im_web/scripts/dev-tangseng-clowder.sh check
+```
+
+Result: shell regression passed; restart replaced the 8090 listener; check returned `runtime ok` with owner `default-user`.
 
 ```bash
 cd sections/im_web/apps/chat

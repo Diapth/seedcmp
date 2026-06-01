@@ -22,12 +22,22 @@ VITE_TANGSENG_WS_HOST=127.0.0.1
 Set these values in the backend environment that owns the bridge:
 
 ```bash
-CLOWDER_API_BASE_URL=http://127.0.0.1:3000
+CLOWDER_API_BASE_URL=http://127.0.0.1:3004
 CLOWDER_CONNECTOR_ID=im-web
 CLOWDER_CONNECTOR_SECRET=<shared-secret>
 CLOWDER_DEFAULT_OWNER_USER_ID=<clowder-user-id>
 IM_WEB_CLOWDER_ENABLED=true
 ```
+
+For the checked-in local V3 smoke environment, start or repair the TangSeng bridge with the guarded script instead of hand-running `go run`:
+
+```bash
+cd /media/leng/DiskB1/exp/seedcmp
+sections/im_web/scripts/dev-tangseng-clowder.sh restart
+sections/im_web/scripts/dev-tangseng-clowder.sh check
+```
+
+The script defaults `CLOWDER_DEFAULT_OWNER_USER_ID` to `default-user`, checks the process listening on `localhost:8090`, and fails fast if that process was started from the wrong checkout or with a stale owner.
 
 Set these values in the Clowder API process:
 
@@ -64,6 +74,7 @@ pnpm type-check
 pnpm build
 pnpm test:unit
 ./scripts/dev-chat.sh
+./scripts/dev-tangseng-clowder.sh check
 ```
 
 ```bash
