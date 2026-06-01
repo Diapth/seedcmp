@@ -1,0 +1,372 @@
+{
+  "runId": "v3-25-browser-stability-r2-202606011418",
+  "targetUrl": "http://localhost:3016",
+  "accounts": [
+    "18337488675",
+    "13733632709"
+  ],
+  "groupName": "TestGroup1",
+  "checks": [
+    {
+      "name": "A login",
+      "status": "pass",
+      "details": "18337488675"
+    },
+    {
+      "name": "cat console reachable",
+      "status": "pass",
+      "details": ""
+    },
+    {
+      "name": "cat console auth type field",
+      "status": "pass",
+      "details": ""
+    },
+    {
+      "name": "cat console account ref field",
+      "status": "pass",
+      "details": ""
+    },
+    {
+      "name": "api key mode model field",
+      "status": "pass",
+      "details": ""
+    },
+    {
+      "name": "oauth mode hides api model field",
+      "status": "pass",
+      "details": ""
+    },
+    {
+      "name": "conversation context menu labels",
+      "status": "pass",
+      "details": "置顶 / 消息免打扰 / 隐藏会话 / 删除会话"
+    },
+    {
+      "name": "A open group",
+      "status": "pass",
+      "details": "TestGroup114:16leng_test_updated： v3-25-browser-stability-r1-202606011415 猫猫 soft trigger smoke"
+    },
+    {
+      "name": "clowder panel auto reply modes",
+      "status": "pass",
+      "details": ""
+    },
+    {
+      "name": "B login",
+      "status": "pass",
+      "details": "13733632709"
+    },
+    {
+      "name": "B open group",
+      "status": "pass",
+      "details": "TestGroup114:16leng_test_updated： v3-25-browser-stability-r1-202606011415 猫猫 soft trigger smoke"
+    },
+    {
+      "name": "two-account A message visible on B",
+      "status": "pass",
+      "details": "v3-25-browser-stability-r2-202606011418 A-to-B visible"
+    },
+    {
+      "name": "two-account B message visible on A",
+      "status": "pass",
+      "details": "v3-25-browser-stability-r2-202606011418 B-to-A avatar"
+    },
+    {
+      "name": "message context menu labels",
+      "status": "pass",
+      "details": "引用回复 / 复制 / 本地删除"
+    },
+    {
+      "name": "quote reply preview appears",
+      "status": "pass",
+      "details": ""
+    },
+    {
+      "name": "group avatar context menu labels",
+      "status": "pass",
+      "details": "@TA / 查看资料"
+    },
+    {
+      "name": "avatar @TA inserts mention draft",
+      "status": "pass",
+      "details": "@123 "
+    },
+    {
+      "name": "avatar profile drawer opens",
+      "status": "pass",
+      "details": ""
+    },
+    {
+      "name": "A after reload open group",
+      "status": "pass",
+      "details": "TestGroup114:17123： v3-25-browser-stability-r2-202606011418 B-to-A avatar"
+    },
+    {
+      "name": "two-account messages persist after reload",
+      "status": "pass",
+      "details": ""
+    },
+    {
+      "name": "soft 猫猫 trigger produced clowder reply",
+      "status": "skipped",
+      "details": "No Clowder reply observed within 45s in current live backend."
+    }
+  ],
+  "screenshots": {
+    "00-a-after-login": "/home/leng/.config/superpowers/worktrees/seedcmp/v3-25-smoke/sections/im_web/.ai/V3.0/tests-e2e/v3-25-browser-stability-r2-202606011418/00-a-after-login.png",
+    "01-cat-console-auth-methods": "/home/leng/.config/superpowers/worktrees/seedcmp/v3-25-smoke/sections/im_web/.ai/V3.0/tests-e2e/v3-25-browser-stability-r2-202606011418/01-cat-console-auth-methods.png",
+    "02-conversation-menu": "/home/leng/.config/superpowers/worktrees/seedcmp/v3-25-smoke/sections/im_web/.ai/V3.0/tests-e2e/v3-25-browser-stability-r2-202606011418/02-conversation-menu.png",
+    "03-clowder-auto-reply-modes": "/home/leng/.config/superpowers/worktrees/seedcmp/v3-25-smoke/sections/im_web/.ai/V3.0/tests-e2e/v3-25-browser-stability-r2-202606011418/03-clowder-auto-reply-modes.png",
+    "04-b-group-open": "/home/leng/.config/superpowers/worktrees/seedcmp/v3-25-smoke/sections/im_web/.ai/V3.0/tests-e2e/v3-25-browser-stability-r2-202606011418/04-b-group-open.png",
+    "05-a-after-send": "/home/leng/.config/superpowers/worktrees/seedcmp/v3-25-smoke/sections/im_web/.ai/V3.0/tests-e2e/v3-25-browser-stability-r2-202606011418/05-a-after-send.png",
+    "06-b-after-receive": "/home/leng/.config/superpowers/worktrees/seedcmp/v3-25-smoke/sections/im_web/.ai/V3.0/tests-e2e/v3-25-browser-stability-r2-202606011418/06-b-after-receive.png",
+    "07-message-quote-preview": "/home/leng/.config/superpowers/worktrees/seedcmp/v3-25-smoke/sections/im_web/.ai/V3.0/tests-e2e/v3-25-browser-stability-r2-202606011418/07-message-quote-preview.png",
+    "08-avatar-mention-draft": "/home/leng/.config/superpowers/worktrees/seedcmp/v3-25-smoke/sections/im_web/.ai/V3.0/tests-e2e/v3-25-browser-stability-r2-202606011418/08-avatar-mention-draft.png",
+    "09-avatar-profile-drawer": "/home/leng/.config/superpowers/worktrees/seedcmp/v3-25-smoke/sections/im_web/.ai/V3.0/tests-e2e/v3-25-browser-stability-r2-202606011418/09-avatar-profile-drawer.png",
+    "10-a-after-reload": "/home/leng/.config/superpowers/worktrees/seedcmp/v3-25-smoke/sections/im_web/.ai/V3.0/tests-e2e/v3-25-browser-stability-r2-202606011418/10-a-after-reload.png",
+    "11-soft-trigger-after-send": "/home/leng/.config/superpowers/worktrees/seedcmp/v3-25-smoke/sections/im_web/.ai/V3.0/tests-e2e/v3-25-browser-stability-r2-202606011418/11-soft-trigger-after-send.png"
+  },
+  "consoleErrors": [],
+  "pageErrors": [],
+  "failedRequests": [
+    {
+      "account": "A",
+      "url": "http://127.0.0.1:8090/v1/message/pinned/sync",
+      "failure": "net::ERR_ABORTED"
+    },
+    {
+      "account": "A",
+      "url": "http://127.0.0.1:8090/v1/message/pinned/sync",
+      "failure": "net::ERR_ABORTED"
+    },
+    {
+      "account": "A",
+      "url": "http://127.0.0.1:8090/v1/message/pinned/sync",
+      "failure": "net::ERR_ABORTED"
+    },
+    {
+      "account": "A",
+      "url": "http://127.0.0.1:8090/v1/message/pinned/sync",
+      "failure": "net::ERR_ABORTED"
+    },
+    {
+      "account": "B",
+      "url": "http://127.0.0.1:8090/v1/message/channel/sync",
+      "failure": "net::ERR_ABORTED"
+    },
+    {
+      "account": "B",
+      "url": "http://127.0.0.1:8090/v1/message/channel/sync",
+      "failure": "net::ERR_ABORTED"
+    },
+    {
+      "account": "B",
+      "url": "http://127.0.0.1:8090/v1/message/channel/sync",
+      "failure": "net::ERR_ABORTED"
+    },
+    {
+      "account": "B",
+      "url": "http://127.0.0.1:8090/v1/conversation/sync",
+      "failure": "net::ERR_ABORTED"
+    },
+    {
+      "account": "B",
+      "url": "http://127.0.0.1:8090/v1/message/channel/sync",
+      "failure": "net::ERR_ABORTED"
+    },
+    {
+      "account": "B",
+      "url": "http://127.0.0.1:8090/v1/users/6db8b65b3ae94092badfeb82e47c06f7",
+      "failure": "net::ERR_ABORTED"
+    },
+    {
+      "account": "B",
+      "url": "http://127.0.0.1:8090/v1/message/channel/sync",
+      "failure": "net::ERR_ABORTED"
+    },
+    {
+      "account": "B",
+      "url": "http://127.0.0.1:8090/v1/message/channel/sync",
+      "failure": "net::ERR_ABORTED"
+    },
+    {
+      "account": "B",
+      "url": "http://127.0.0.1:8090/v1/message/channel/sync",
+      "failure": "net::ERR_ABORTED"
+    },
+    {
+      "account": "B",
+      "url": "http://127.0.0.1:8090/v1/message/channel/sync",
+      "failure": "net::ERR_ABORTED"
+    },
+    {
+      "account": "B",
+      "url": "http://127.0.0.1:8090/v1/message/channel/sync",
+      "failure": "net::ERR_ABORTED"
+    },
+    {
+      "account": "B",
+      "url": "http://127.0.0.1:8090/v1/message/channel/sync",
+      "failure": "net::ERR_ABORTED"
+    },
+    {
+      "account": "A",
+      "url": "http://127.0.0.1:8090/v1/users/989ec1fc79664ede9ff9008831d76337",
+      "failure": "net::ERR_ABORTED"
+    },
+    {
+      "account": "A",
+      "url": "http://127.0.0.1:8090/v1/message/channel/sync",
+      "failure": "net::ERR_ABORTED"
+    },
+    {
+      "account": "A",
+      "url": "http://127.0.0.1:8090/v1/groups/311e44befed248d7ac4357b1527dacd2/members?page=1&limit=1000",
+      "failure": "net::ERR_ABORTED"
+    },
+    {
+      "account": "A",
+      "url": "http://127.0.0.1:8090/v1/users/989ec1fc79664ede9ff9008831d76337",
+      "failure": "net::ERR_ABORTED"
+    },
+    {
+      "account": "A",
+      "url": "http://127.0.0.1:8090/v1/users/989ec1fc79664ede9ff9008831d76337",
+      "failure": "net::ERR_ABORTED"
+    },
+    {
+      "account": "A",
+      "url": "http://127.0.0.1:8090/v1/users/6db8b65b3ae94092badfeb82e47c06f7",
+      "failure": "net::ERR_ABORTED"
+    },
+    {
+      "account": "A",
+      "url": "http://127.0.0.1:8090/v1/users/989ec1fc79664ede9ff9008831d76337",
+      "failure": "net::ERR_ABORTED"
+    },
+    {
+      "account": "A",
+      "url": "http://127.0.0.1:8090/v1/users/989ec1fc79664ede9ff9008831d76337",
+      "failure": "net::ERR_ABORTED"
+    },
+    {
+      "account": "A",
+      "url": "http://127.0.0.1:8090/v1/users/6db8b65b3ae94092badfeb82e47c06f7",
+      "failure": "net::ERR_ABORTED"
+    },
+    {
+      "account": "A",
+      "url": "http://127.0.0.1:8090/v1/users/989ec1fc79664ede9ff9008831d76337",
+      "failure": "net::ERR_ABORTED"
+    },
+    {
+      "account": "A",
+      "url": "http://127.0.0.1:8090/v1/users/989ec1fc79664ede9ff9008831d76337",
+      "failure": "net::ERR_ABORTED"
+    },
+    {
+      "account": "A",
+      "url": "http://127.0.0.1:8090/v1/coversation/clearUnread",
+      "failure": "net::ERR_ABORTED"
+    },
+    {
+      "account": "A",
+      "url": "http://127.0.0.1:8090/v1/conversation/sync",
+      "failure": "net::ERR_ABORTED"
+    },
+    {
+      "account": "A",
+      "url": "http://127.0.0.1:8090/v1/users/989ec1fc79664ede9ff9008831d76337",
+      "failure": "net::ERR_ABORTED"
+    },
+    {
+      "account": "A",
+      "url": "http://127.0.0.1:8090/v1/users/989ec1fc79664ede9ff9008831d76337",
+      "failure": "net::ERR_ABORTED"
+    },
+    {
+      "account": "A",
+      "url": "http://127.0.0.1:8090/v1/users/6db8b65b3ae94092badfeb82e47c06f7",
+      "failure": "net::ERR_ABORTED"
+    },
+    {
+      "account": "A",
+      "url": "http://127.0.0.1:8090/v1/users/6db8b65b3ae94092badfeb82e47c06f7",
+      "failure": "net::ERR_ABORTED"
+    },
+    {
+      "account": "A",
+      "url": "http://127.0.0.1:8090/v1/users/6db8b65b3ae94092badfeb82e47c06f7",
+      "failure": "net::ERR_ABORTED"
+    },
+    {
+      "account": "A",
+      "url": "http://127.0.0.1:8090/v1/users/6db8b65b3ae94092badfeb82e47c06f7",
+      "failure": "net::ERR_ABORTED"
+    },
+    {
+      "account": "A",
+      "url": "http://127.0.0.1:8090/v1/users/6db8b65b3ae94092badfeb82e47c06f7",
+      "failure": "net::ERR_ABORTED"
+    },
+    {
+      "account": "A",
+      "url": "http://127.0.0.1:8090/v1/message/channel/sync",
+      "failure": "net::ERR_ABORTED"
+    },
+    {
+      "account": "A",
+      "url": "http://127.0.0.1:8090/v1/users/6db8b65b3ae94092badfeb82e47c06f7",
+      "failure": "net::ERR_ABORTED"
+    },
+    {
+      "account": "A",
+      "url": "http://127.0.0.1:8090/v1/users/989ec1fc79664ede9ff9008831d76337",
+      "failure": "net::ERR_ABORTED"
+    },
+    {
+      "account": "A",
+      "url": "http://127.0.0.1:8090/v1/users/989ec1fc79664ede9ff9008831d76337",
+      "failure": "net::ERR_ABORTED"
+    },
+    {
+      "account": "A",
+      "url": "http://127.0.0.1:8090/v1/users/989ec1fc79664ede9ff9008831d76337",
+      "failure": "net::ERR_ABORTED"
+    },
+    {
+      "account": "A",
+      "url": "http://127.0.0.1:8090/v1/users/6db8b65b3ae94092badfeb82e47c06f7",
+      "failure": "net::ERR_ABORTED"
+    },
+    {
+      "account": "A",
+      "url": "http://127.0.0.1:8090/v1/users/6db8b65b3ae94092badfeb82e47c06f7",
+      "failure": "net::ERR_ABORTED"
+    },
+    {
+      "account": "A",
+      "url": "http://127.0.0.1:8090/v1/message/channel/sync",
+      "failure": "net::ERR_ABORTED"
+    },
+    {
+      "account": "A",
+      "url": "http://127.0.0.1:8090/v1/users/6db8b65b3ae94092badfeb82e47c06f7",
+      "failure": "net::ERR_ABORTED"
+    },
+    {
+      "account": "A",
+      "url": "http://127.0.0.1:8090/v1/conversation/sync",
+      "failure": "net::ERR_ABORTED"
+    }
+  ],
+  "summary": {
+    "passed": 20,
+    "failed": 0,
+    "skipped": 1,
+    "consoleErrors": 0,
+    "pageErrors": 0,
+    "failedRequests": 46
+  }
+}

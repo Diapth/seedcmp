@@ -20,4 +20,13 @@ describe('clowder conversation panel component', () => {
     expect(source.default).toContain('statusReason')
     expect(source.default).toContain('clowder_unavailable')
   })
+
+  it('exposes group auto reply mode controls from the clowder panel', async () => {
+    const source = await import('../src/components/ClowderConversationPanel.vue?raw')
+
+    expect(source.default).toContain('setGroupAutoReplyMode')
+    expect(source.default).toContain('仅 @ 时回复')
+    expect(source.default).toContain('提到猫猫时自动回复')
+    expect(source.default).toContain('关闭')
+  })
 })

@@ -13,11 +13,17 @@ const form = reactive({
   name: '',
   alias: '',
   clientId: '' as '' | 'openai' | 'anthropic',
+  authType: '' as '' | 'api_key' | 'oauth',
+  accountRef: '',
+  defaultModel: '',
   personality: '',
   capabilitiesText: ''
 });
 
-const canCreate = computed(() => form.name.trim().length > 0 && form.clientId !== '');
+const canCreate = computed(() => form.name.trim().length > 0 &&
+  form.clientId !== '' &&
+  form.authType !== '' &&
+  form.accountRef.trim().length > 0);
 
 const availableCats = computed(() => {
   const query = searchQuery.value.trim().toLowerCase();
@@ -50,6 +56,9 @@ function resetForm() {
   form.name = '';
   form.alias = '';
   form.clientId = '';
+  form.authType = '';
+  form.accountRef = '';
+  form.defaultModel = '';
   form.personality = '';
   form.capabilitiesText = '';
   feedback.value = '';
@@ -71,7 +80,8 @@ async function connectCat(cat: ClowderCatContact) {
 async function createCatAndConnect() {
   if (!canCreate.value) return;
   const clientId = form.clientId;
-  if (!clientId) return;
+  const authType = form.authType;
+  if (!clientId || !authType) return;
   feedback.value = '';
   const capabilities = form.capabilitiesText
     .split(/[,\n，]/)
@@ -81,6 +91,9 @@ async function createCatAndConnect() {
     name: form.name.trim(),
     alias: form.alias.trim() || undefined,
     clientId,
+    authType,
+    accountRef: form.accountRef.trim(),
+    defaultModel: form.defaultModel.trim() || undefined,
     personality: form.personality.trim() || undefined,
     capabilities: capabilities.length > 0 ? capabilities : undefined
   }).catch(error => {
@@ -132,6 +145,25 @@ function back() {
             <option value="openai">Codex</option>
             <option value="anthropic">Claude Code</option>
           </select>
+        </label>
+        <label class="field">
+          <span>添加方式</span>
+          <select v-model="form.authType">
+            <option value="">请选择 API Key 账号或 OAuth 账号</option>
+            <option value="api_key">API Key 账号</option>
+            <option value="oauth">OAuth 账号</option>
+          </select>
+        </label>
+        <label class="field">
+          <span>账号引用</span>
+          <input
+            v-model="form.accountRef"
+            :placeholder="form.authType === 'oauth' ? '例如：codex / claude' : '例如：openai-prod / anthropic-prod'"
+          />
+        </label>
+        <label v-if="form.authType === 'api_key'" class="field">
+          <span>默认模型</span>
+          <input v-model="form.defaultModel" placeholder="API Key 账号需要时填写，例如 gpt-4.1 或 claude-sonnet-4" />
         </label>
         <label class="field">
           <span>性格设定</span>

@@ -32,6 +32,8 @@ const props = defineProps<{
 
 const emit = defineEmits<{
   (event: 'open-preview', payload: any): void;
+  (event: 'mention-user', payload: { uid: string; name: string }): void;
+  (event: 'view-user-profile', payload: { uid: string }): void;
 }>();
 
 const messageStore = useMessageStore();
@@ -48,6 +50,10 @@ const showMenu = ref(false);
 const menuX = ref(0);
 const menuY = ref(0);
 const selectedMsg = ref<any>(null);
+const showAvatarMenu = ref(false);
+const avatarMenuX = ref(0);
+const avatarMenuY = ref(0);
+const selectedAvatarMsg = ref<any>(null);
 const editDialogVisible = ref(false);
 const editDialogText = ref('');
 const channelKey = computed(() => `${props.channelId}-${props.channelType}`);
@@ -299,10 +305,22 @@ async function copyTextToClipboard(text: string) {
 
 function handleRightClick(e: MouseEvent, msg: any) {
   e.preventDefault();
+  showAvatarMenu.value = false;
   selectedMsg.value = msg;
   menuX.value = e.clientX;
   menuY.value = e.clientY;
   showMenu.value = true;
+}
+
+function handleAvatarContextMenu(e: MouseEvent, msg: any) {
+  e.preventDefault();
+  e.stopPropagation();
+  if (props.channelType !== 2 || isMe(msg)) return;
+  showMenu.value = false;
+  selectedAvatarMsg.value = msg;
+  avatarMenuX.value = e.clientX;
+  avatarMenuY.value = e.clientY;
+  showAvatarMenu.value = true;
 }
 
 const menuReactions = computed(() => {
@@ -345,7 +363,7 @@ const menuItems = computed(() => {
   const isText = msg.content?.type === 1;
   if (isText) {
     items.push({
-      label: '复制文本',
+      label: '复制',
       action: async () => {
         const text = buildMessageCopyText(selectedMsg.value);
         await copyTextToClipboard(text);
@@ -424,7 +442,7 @@ const menuItems = computed(() => {
   });
 
   items.push({
-    label: '回复',
+    label: '引用回复',
     action: () => {
       messageStore.setReplyTarget(msg);
     }
@@ -460,6 +478,32 @@ const menuItems = computed(() => {
     });
   }
 
+  return items;
+});
+
+const avatarMenuItems = computed(() => {
+  if (!selectedAvatarMsg.value) return [];
+  const msg = selectedAvatarMsg.value;
+  const uid = String(msg.fromUID || '');
+  const name = getMessageSenderName(msg);
+  const items: Array<{ label: string; action: () => void; disabled?: boolean }> = [{
+    label: '@TA',
+    disabled: !uid || isClowderConnectorMessage(msg),
+    action: () => {
+      emit('mention-user', { uid, name });
+      showAvatarMenu.value = false;
+    }
+  }];
+  if (!isClowderConnectorMessage(msg)) {
+    items.push({
+      label: '查看资料',
+      disabled: !uid,
+      action: () => {
+        emit('view-user-profile', { uid });
+        showAvatarMenu.value = false;
+      }
+    });
+  }
   return items;
 });
 
@@ -531,6 +575,8 @@ function handleCodePreview(payload: any) {
           :avatar="getMessageSenderAvatar(item.msg)"
           :size="36"
           class="msg-avatar"
+          @contextmenu.stop.prevent="handleAvatarContextMenu($event, item.msg)"
+          @mousedown.right.stop.prevent="handleAvatarContextMenu($event, item.msg)"
         />
 
         <div class="msg-bubble-container">
@@ -626,6 +672,14 @@ function handleCodePreview(payload: any) {
       :items="menuItems"
       :reactions="menuReactions"
       @close="showMenu = false"
+    />
+
+    <ContextMenu
+      v-if="showAvatarMenu && avatarMenuItems.length > 0"
+      :x="avatarMenuX"
+      :y="avatarMenuY"
+      :items="avatarMenuItems"
+      @close="showAvatarMenu = false"
     />
 
     <AppDialog

@@ -226,20 +226,27 @@ func TestBuildCreateCatCommandRequiresAndNormalizesClientPlatform(t *testing.T) 
 		Name:     "测试猫",
 		Alias:    "@testcat",
 		ClientID: "openai",
+		AuthType: "oauth",
+		AccountRef: "codex",
 	})
 
 	require.True(t, ok)
-	assert.Equal(t, "/cats new 测试猫 @testcat --platform codex", command)
+	assert.Equal(t, "/cats new 测试猫 @testcat --platform codex --auth oauth --account codex", command)
 
 	command, ok = buildCreateCatCommand(createCatRequest{
 		Name:     "Claude猫",
 		Alias:    "@claude-cat",
 		ClientID: "anthropic",
+		AuthType: "api_key",
+		AccountRef: "anthropic-prod",
 	})
 
 	require.True(t, ok)
-	assert.Equal(t, "/cats new Claude猫 @claude-cat --platform claude-code", command)
+	assert.Equal(t, "/cats new Claude猫 @claude-cat --platform claude-code --auth api-key --account anthropic-prod", command)
 
 	_, ok = buildCreateCatCommand(createCatRequest{Name: "无平台猫"})
+	assert.False(t, ok)
+
+	_, ok = buildCreateCatCommand(createCatRequest{Name: "无认证猫", ClientID: "openai"})
 	assert.False(t, ok)
 }

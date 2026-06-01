@@ -27,11 +27,13 @@ export interface Conversation {
   draft?: string;
   name?: string;
   avatar?: string;
+  hidden?: number;
 }
 
 const LOCAL_ONLY_DIRECT_CONVERSATION_IDS = new Set(['deepseek_ai_robot', 'clowder_ai']);
 const LOCAL_ONLY_DRAFTS_STORAGE_PREFIX = 'im-web:local-only-drafts';
 const CLEARED_UNREAD_STORAGE_PREFIX = 'im-web:cleared-unread';
+const HIDDEN_CONVERSATIONS_STORAGE_PREFIX = 'im-web:hidden-conversations';
 
 interface ClearedUnreadRecord {
   seq: number;
@@ -45,6 +47,7 @@ export const useConversationStore = defineStore('conversation', () => {
   const syncedDrafts = ref<Record<string, string | undefined>>({});
   const unreadMap = ref<Record<string, number>>({});
   const clearedUnreadSeqs = ref<Record<string, number>>({});
+  const hiddenConversationKeys = ref<Record<string, true>>({});
   const lastSyncVersion = ref<number>(0);
   const manuallyDeletedConversationKeys = ref<Record<string, true>>({});
   const draftSyncTimers = ref<Record<string, ReturnType<typeof setTimeout>>>({});
@@ -118,6 +121,36 @@ export const useConversationStore = defineStore('conversation', () => {
       delete record[key];
     }
     writeScopedRecord(LOCAL_ONLY_DRAFTS_STORAGE_PREFIX, record);
+  }
+
+  function readStoredHiddenConversations() {
+    return readScopedRecord<true>(HIDDEN_CONVERSATIONS_STORAGE_PREFIX);
+  }
+
+  function setStoredConversationHidden(key: string, hidden: boolean) {
+    const record = readStoredHiddenConversations();
+    if (hidden) {
+      record[key] = true;
+    } else {
+      delete record[key];
+    }
+    writeScopedRecord(HIDDEN_CONVERSATIONS_STORAGE_PREFIX, record);
+  }
+
+  function isConversationHidden(key: string) {
+    return hiddenConversationKeys.value[key] === true || readStoredHiddenConversations()[key] === true;
+  }
+
+  function markConversationVisible(channelId: string, channelType: number) {
+    const key = getConversationKey(channelId, channelType);
+    if (!isConversationHidden(key)) return false;
+    delete hiddenConversationKeys.value[key];
+    setStoredConversationHidden(key, false);
+    const conv = findConversation(channelId, channelType);
+    if (conv) {
+      conv.hidden = 0;
+    }
+    return true;
   }
 
   function getStoredClearedUnread(key: string): ClearedUnreadRecord | undefined {
@@ -393,7 +426,10 @@ export const useConversationStore = defineStore('conversation', () => {
   });
 
   const sortedConversations = computed(() => {
-    return [...uniqueConversations.value].sort((a, b) => {
+    return [...uniqueConversations.value].filter(conv => {
+      const key = getConversationKey(conv.channel_id, conv.channel_type);
+      return Number(conv.hidden || 0) !== 1 && !isConversationHidden(key);
+    }).sort((a, b) => {
       if (a.top !== b.top) {
         return b.top - a.top;
       }
@@ -740,6 +776,13 @@ export const useConversationStore = defineStore('conversation', () => {
     channelType = Number(channelType);
     const key = getConversationKey(channelId, channelType);
     delete manuallyDeletedConversationKeys.value[key];
+    if (markConversationVisible(channelId, channelType)) {
+      try {
+        await syncApi.updateConversationExtra(channelId, channelType, { hidden: 0 });
+      } catch (e) {
+        warnRemoteCommandFailure('reveal hidden conversation', e);
+      }
+    }
 
     const conv = findConversation(channelId, channelType);
     const info = await channelStore.getChannelInfo(channelId, channelType);
@@ -872,11 +915,30 @@ export const useConversationStore = defineStore('conversation', () => {
     conversations.value = conversations.value.filter(c => !(String(c.channel_id) === channelId && Number(c.channel_type) === channelType));
     const key = getConversationKey(channelId, channelType);
     manuallyDeletedConversationKeys.value[key] = true;
+    delete hiddenConversationKeys.value[key];
+    setStoredConversationHidden(key, false);
     delete unreadMap.value[key];
     try {
       await syncApi.deleteConversation(channelId, channelType);
     } catch (e) {
       console.error('[ConversationStore] Failed to delete conversation remotely', e);
+    }
+  }
+
+  async function hideConversation(channelId: string, channelType: number) {
+    channelId = String(channelId);
+    channelType = Number(channelType);
+    const key = getConversationKey(channelId, channelType);
+    hiddenConversationKeys.value[key] = true;
+    setStoredConversationHidden(key, true);
+    const conv = findConversation(channelId, channelType);
+    if (conv) {
+      conv.hidden = 1;
+    }
+    try {
+      await syncApi.updateConversationExtra(channelId, channelType, { hidden: 1 });
+    } catch (e) {
+      warnRemoteCommandFailure('hide conversation', e);
     }
   }
 
@@ -909,6 +971,7 @@ export const useConversationStore = defineStore('conversation', () => {
     syncedDrafts.value = {};
     unreadMap.value = {};
     clearedUnreadSeqs.value = {};
+    hiddenConversationKeys.value = {};
     lastSyncVersion.value = 0;
     manuallyDeletedConversationKeys.value = {};
     recoveryState.value = 'idle';
@@ -940,6 +1003,7 @@ export const useConversationStore = defineStore('conversation', () => {
     addOrUpdateConversation,
     ensureConversation,
     deleteConversation,
+    hideConversation,
     recoverAfterReconnect,
     reset
   };

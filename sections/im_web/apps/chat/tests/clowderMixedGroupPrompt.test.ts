@@ -99,7 +99,7 @@ describe('Clowder mixed human and cat group prompt', () => {
     expect(source.default).toContain('Recent messages:')
     expect(source.default).toContain('messageStore.getChannelMessages(props.channelId, props.channelType)')
     expect(source.default).toContain('targetCatIds')
-    expect(source.default).toContain('promptContext: buildClowderPromptContext(text, targetCatIds)')
+    expect(source.default).toContain('promptContext: buildClowderPromptContext(text, targetCatIds, triggerReason)')
   })
 
   it('loads durable group cat membership back from the bridge', async () => {
@@ -128,6 +128,118 @@ describe('Clowder mixed human and cat group prompt', () => {
     expect(cats.map(cat => cat.catId)).toEqual(['codex'])
     expect(clowderStore.groupCatMemberships['group-1'].map(cat => cat.displayName)).toEqual(['Codex'])
     expect(clowderStore.groupPrompts['group-1']).toContain('Launch Room')
+  })
+
+  it('loads the durable group auto reply mode from the bridge', async () => {
+    get
+      .mockResolvedValueOnce({
+        groupId: 'group-1',
+        groupName: 'Launch Room',
+        catIds: ['codex'],
+        autoReplyMode: 'off',
+        proactiveReplies: true,
+        prompt: 'Group: Launch Room\nCats:\n- Codex',
+        cats: [
+          {
+            catId: 'codex',
+            displayName: 'Codex',
+            aliases: ['@codex'],
+            mentionPatterns: ['@codex'],
+            available: true,
+            connected: true
+          }
+        ]
+      })
+      .mockResolvedValueOnce({ agents: [] })
+
+    const { useClowderStore } = await import('../../../packages/datasource-vue/src/stores/clowderStore.ts')
+    const clowderStore = useClowderStore()
+
+    await clowderStore.loadGroupCats('group-1')
+
+    expect(clowderStore.groupAutoReplyModes['group-1']).toBe('off')
+    expect(clowderStore.groupPrompts['group-1']).toContain('Cats may answer only when mentioned or focused.')
+  })
+
+  it('rolls back local group auto reply state when bridge sync fails', async () => {
+    const { useClowderStore } = await import('../../../packages/datasource-vue/src/stores/clowderStore.ts')
+    const clowderStore = useClowderStore()
+    clowderStore.groupCatMemberships['group-1'] = [
+      {
+        id: 'clowder_cat:codex',
+        uid: 'clowder_cat:codex',
+        catId: 'codex',
+        channelId: 'clowder_cat:codex',
+        channelType: 1,
+        directConversationId: 'clowder_cat:codex',
+        outboundSenderId: 'clowder_cat_codex',
+        historyGroupKey: 'clowder-cat:codex',
+        connectorId: 'im-web',
+        category: 'clowder-cat',
+        robot: 1,
+        name: 'Codex',
+        displayName: 'Codex',
+        avatar: '',
+        aliases: ['@codex'],
+        mentionNames: ['@codex'],
+        personalitySummary: 'Careful coding partner',
+        capabilitySummary: 'code, tests',
+        available: true,
+        availabilityState: 'available',
+        source: 'existing',
+        connected: true
+      }
+    ]
+    clowderStore.groupAutoReplyModes['group-1'] = 'mentions_only'
+    clowderStore.groupPrompts['group-1'] = 'previous prompt'
+    post.mockRejectedValueOnce(new Error('sync failed'))
+
+    await expect(clowderStore.setGroupAutoReplyMode('group-1', 'soft_mentions', 'Launch Room')).rejects.toThrow('sync failed')
+
+    expect(clowderStore.groupAutoReplyModes['group-1']).toBe('mentions_only')
+    expect(clowderStore.groupPrompts['group-1']).toBe('previous prompt')
+    expect(clowderStore.error).toBe('sync failed')
+  })
+
+  it('persists group auto reply mode changes to the bridge', async () => {
+    const { useClowderStore } = await import('../../../packages/datasource-vue/src/stores/clowderStore.ts')
+    const clowderStore = useClowderStore()
+    clowderStore.groupCatMemberships['group-1'] = [
+      {
+        id: 'clowder_cat:codex',
+        uid: 'clowder_cat:codex',
+        catId: 'codex',
+        channelId: 'clowder_cat:codex',
+        channelType: 1,
+        directConversationId: 'clowder_cat:codex',
+        outboundSenderId: 'clowder_cat_codex',
+        historyGroupKey: 'clowder-cat:codex',
+        connectorId: 'im-web',
+        category: 'clowder-cat',
+        robot: 1,
+        name: 'Codex',
+        displayName: 'Codex',
+        avatar: '',
+        aliases: ['@codex'],
+        mentionNames: ['@codex'],
+        personalitySummary: 'Careful coding partner',
+        capabilitySummary: 'code, tests',
+        available: true,
+        availabilityState: 'available',
+        source: 'existing',
+        connected: true
+      }
+    ]
+
+    const mode = await clowderStore.setGroupAutoReplyMode('group-1', 'off', 'Launch Room')
+
+    expect(mode).toBe('off')
+    expect(post).toHaveBeenCalledWith('clowder/group/cats/sync', expect.objectContaining({
+      groupId: 'group-1',
+      autoReplyMode: 'off',
+      proactiveReplies: false,
+      prompt: expect.stringContaining('Cats may answer only when mentioned or focused.')
+    }))
   })
 
   it('adds a connected cat to an existing group and syncs the durable membership', async () => {
@@ -285,8 +397,8 @@ describe('Clowder mixed human and cat group prompt', () => {
     expect(get).toHaveBeenNthCalledWith(1, 'clowder/group/cats', { params: { groupId: 'group-stale' } })
     expect(get).toHaveBeenNthCalledWith(2, 'clowder/conversation/agents', { params: { channelId: 'group-stale', channelType: 2 } })
     expect(get).toHaveBeenNthCalledWith(3, 'clowder/cats', { params: { includeUnavailable: true } })
-    expect(cats.map(cat => cat.catId)).toEqual(['ragdoll', 'codex'])
-    expect(clowderStore.groupCatMemberships['group-stale'].map(cat => cat.catId)).toEqual(['ragdoll', 'codex'])
-    expect(clowderStore.groupPrompts['group-stale']).toContain('Allowed @ targets: @ragdoll-kn9a, @codex')
+    expect(cats.map(cat => cat.catId)).toEqual(['ragdoll'])
+    expect(clowderStore.groupCatMemberships['group-stale'].map(cat => cat.catId)).toEqual(['ragdoll'])
+    expect(clowderStore.groupPrompts['group-stale']).toContain('Allowed @ targets: @ragdoll-kn9a')
   })
 })
