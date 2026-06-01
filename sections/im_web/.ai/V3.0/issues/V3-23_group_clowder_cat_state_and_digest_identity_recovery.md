@@ -1,5 +1,9 @@
 # V3-23 Group Clowder Cat State And Digest Identity Recovery
 
+## Status
+
+Resolved on 2026-06-01
+
 ## Problem
 
 During manual testing on `http://100.79.157.76:3000` with account `18337488675`, the `集群` group showed only two human members in the group settings drawer and `猫猫 0`, even though recent group history contained messages sent by `布偶猫`.
@@ -51,3 +55,41 @@ The same group also showed `yunyi： 图片` in the outer conversation list for 
   - observed digest: `布偶猫： 图片`
   - failed request count: `0`
   - console error count: `0`
+
+## 2026-06-01 Reverification And Regression Fix
+
+During the V3 issue sweep, the V3-23 regression suite caught a new interaction with the V3-24 fallback work:
+
+- `loadGroupCats()` fell back to the global `clowder/cats` directory when `clowder/conversation/agents` returned `403`.
+- The global cat directory was then merged as if every cat belonged to the current group.
+- Because the group appeared non-empty, message-history inference did not run and recovered group cats were not persisted back through `clowder/group/cats/sync`.
+
+Fix:
+
+- Updated `sections/im_web/packages/datasource-vue/src/stores/clowderStore.ts` to keep conversation-specific directory cats separate from the global cat directory.
+- The global directory can still seed lookup data for history-name matching, but it no longer becomes group membership by itself.
+- When backend group state and conversation-specific directory data are empty/unavailable, `loadGroupCats()` again infers cats from recent Clowder history and persists the recovered membership.
+
+Verification:
+
+```bash
+cd sections/im_web/apps/chat
+pnpm exec vitest run tests/clowderGroupIdentityRecovery.test.ts --config vitest.config.ts --pool=threads --poolOptions.threads.singleThread=true
+```
+
+Result: 1 file / 8 tests passed.
+
+```bash
+cd sections/im_web/apps/chat
+pnpm exec vitest run tests/notificationUnread.test.ts tests/sdkRecovery.test.ts tests/clowderGroupIdentityRecovery.test.ts tests/clowderAgentDirectory.test.ts tests/clowderGroupMemberList.test.ts tests/conversationPresentation.test.ts tests/clowderMessageStore.test.ts --config vitest.config.ts --pool=threads --poolOptions.threads.singleThread=true
+```
+
+Result: 7 files / 33 tests passed.
+
+```bash
+cd sections/im_web
+pnpm type-check
+pnpm build
+```
+
+Result: type-check passed; build passed with the existing Vite CJS deprecation and chunk-size warnings.

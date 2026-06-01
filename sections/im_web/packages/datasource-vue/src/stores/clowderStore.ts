@@ -487,29 +487,29 @@ export const useClowderStore = defineStore('clowder', () => {
     let cats = (response.cats || []).map(agent => toClowderCatContact(agent, {
       connected: true
     }));
-    let directoryCats: ClowderCatContact[] = [];
+    let conversationDirectoryCats: ClowderCatContact[] = [];
     try {
       const directory = await clowderApi.getAgentDirectory({
         channelId: groupId,
         channelType: 2
       }) as unknown as ClowderAgentDirectoryResponse | undefined;
-      directoryCats = (directory?.agents || []).map(agent => toClowderCatContact(agent, {
+      conversationDirectoryCats = (directory?.agents || []).map(agent => toClowderCatContact(agent, {
         connected: true
       }));
     } catch (_err) {
-      directoryCats = [];
+      conversationDirectoryCats = [];
     }
-    if (directoryCats.length === 0) {
+    if (conversationDirectoryCats.length === 0) {
       try {
         const directory = await clowderApi.getCatDirectory({ includeUnavailable: true }) as unknown as ClowderCatDirectoryResponse | undefined;
-        directoryCats = (directory?.agents || []).map(agent => toClowderCatContact(agent, {
+        catContactDirectory.value = (directory?.agents || []).map(agent => toClowderCatContact(agent, {
           connected: agent.connected === true
         }));
       } catch (_err) {
-        directoryCats = [];
+        // The history recovery path can still fall back to its own directory lookup.
       }
     }
-    cats = mergeClowderCatContacts(cats, directoryCats);
+    cats = mergeClowderCatContacts(cats, conversationDirectoryCats);
     if (cats.length === 0) {
       cats = await inferGroupCatsFromMessageHistory(groupId);
       if (cats.length > 0) {
