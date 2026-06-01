@@ -173,7 +173,7 @@ Runtime fix:
 
 ```bash
 IM_WEB_CLOWDER_ENABLED=true
-CLOWDER_API_BASE_URL=http://127.0.0.1:3004
+CLOWDER_API_BASE_URL=http://127.0.0.1:3000
 CLOWDER_CONNECTOR_ID=im-web
 CLOWDER_CONNECTOR_SECRET=dev-im-web-secret
 CLOWDER_DEFAULT_OWNER_USER_ID=default-user
@@ -183,9 +183,10 @@ go run . api -config configs/tsdd.yaml
 Durable prevention:
 
 - Added `sections/im_web/scripts/dev-tangseng-clowder.sh` so V3 smoke runs have a single guarded TangSeng bridge entrypoint.
-- The script defaults the local live owner to `default-user`, starts/restarts the `tangseng-v3-seedcmp` tmux session from the current checkout, and checks the process listening on `localhost:8090`.
-- `check` fails if the listener is from the wrong checkout or if `CLOWDER_DEFAULT_OWNER_USER_ID` differs from the expected owner, catching the exact stale-process/stale-owner failure before Playwright/API smoke.
-- Added `sections/im_web/scripts/dev-tangseng-clowder.test.sh` to regress the stale owner case by spawning a fake runtime with `old-owner` and requiring the check to fail with an owner mismatch.
+- The script defaults `CLOWDER_API_BASE_URL` to the Clowder AI local entrypoint `http://127.0.0.1:3000` and the local live owner to `default-user`.
+- It starts/restarts the `tangseng-v3-seedcmp` tmux session from the current checkout and checks the process listening on `localhost:8090`.
+- `check` fails if the listener is from the wrong checkout, if `CLOWDER_API_BASE_URL` differs from the expected Clowder AI entrypoint, or if `CLOWDER_DEFAULT_OWNER_USER_ID` differs from the expected owner, catching stale-process/stale-env failures before Playwright/API smoke.
+- Added `sections/im_web/scripts/dev-tangseng-clowder.test.sh` to regress stale owner and stale Clowder URL cases by spawning fake runtimes with `old-owner` / `http://127.0.0.1:3004` and requiring the checks to fail.
 
 Post-restart verification:
 
@@ -236,12 +237,47 @@ sections/im_web/scripts/dev-tangseng-clowder.sh check
 
 Result: shell regression passed; restart replaced the 8090 listener; check returned `runtime ok` with owner `default-user`.
 
+2026-06-01 correction:
+
+- Clowder AI's local browser/API entrypoint for this live stack is `http://localhost:3000`; do not encode the temporary API backend port `3004` into TangSeng's bridge configuration.
+- Restarted Clowder web from `/media/leng/DiskB1/exp/clowder-ai/packages/web` on `PORT=3000`, using the existing live API backend on `3004` behind the web `/api` proxy so the memory-store connector bindings remain available.
+- Restarted TangSeng via `sections/im_web/scripts/dev-tangseng-clowder.sh restart`, which now defaults and verifies `CLOWDER_API_BASE_URL=http://127.0.0.1:3000`.
+- Moved the IM Web Vite runtime off port `3000` for smoke verification; it ran on `http://localhost:3002` during the checks below.
+
+```bash
+curl --noproxy '*' -sS -i http://localhost:3000/api/connectors/im-web/status
+curl --noproxy '*' -sS -i 'http://localhost:3000/api/connectors/im-web/agents?externalChatId=2:cec409c5b5db4399a27358e76eb587b1' -H 'x-cat-cafe-user: default-user'
+```
+
+Result: both returned `200 OK`; status was `state:"ready"` and the group directory returned 6 live agents.
+
+```bash
+cd /media/leng/DiskB1/exp/seedcmp
+sections/im_web/scripts/dev-tangseng-clowder.sh check
+```
+
+Result: `runtime ok` with owner `default-user` and Clowder URL `http://127.0.0.1:3000`.
+
+```bash
+GET /v1/clowder/conversation/agents?channelId=cec409c5b5db4399a27358e76eb587b1&channelType=2
+```
+
+Result after login through TangSeng: `200 OK`, thread `thread_mpu1mp2tfhrabwfx`, 6 live agents.
+
 ```bash
 cd sections/im_web/apps/chat
 RUN_V3_CLOWDER_SMOKE=1 TARGET_URL=http://localhost:3000 CLOWDER_URL=http://localhost:3003 TEST_USERNAME=18337488675 TEST_PASSWORD=123456 TEST_GROUP_CONVERSATION=集群 TEST_AGENT_A=codex TEST_AGENT_B=ragdoll CLOWDER_TEST_USER=default-user CLOWDER_CONNECTOR_SECRET=dev-im-web-secret pnpm exec playwright test tests-e2e/smoke-v3-clowder-panel.spec.ts --config playwright.config.ts --reporter=line
 ```
 
 Result: 1 passed.
+
+```bash
+cd sections/im_web/apps/chat
+CI=1 RUN_V3_CLOWDER_SMOKE=1 TARGET_URL=http://localhost:3002 CLOWDER_URL=http://localhost:3000 TEST_USERNAME=18337488675 TEST_PASSWORD=123456 TEST_GROUP_CONVERSATION=集群 TEST_AGENT_A=codex TEST_AGENT_B=ragdoll CLOWDER_TEST_USER=default-user CLOWDER_CONNECTOR_SECRET=dev-im-web-secret pnpm exec playwright test tests-e2e/smoke-v3-clowder-panel.spec.ts --config playwright.config.ts --reporter=line
+CI=1 RUN_V3_CLOWDER_SMOKE=1 TARGET_URL=http://localhost:3002 CLOWDER_URL=http://localhost:3000 TEST_USERNAME=18337488675 TEST_PASSWORD=123456 TEST_GROUP_CONVERSATION=集群 TEST_AGENT_A=codex CLOWDER_TEST_USER=default-user CLOWDER_CONNECTOR_SECRET=dev-im-web-secret pnpm exec playwright test tests-e2e/smoke-v3-clowder-binding.spec.ts --config playwright.config.ts --reporter=line
+```
+
+Result: both passed.
 
 ```bash
 cd sections/im_web/apps/chat

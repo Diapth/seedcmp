@@ -12,7 +12,7 @@ TANGSENG_API_PORT="${TANGSENG_API_PORT:-8090}"
 TANGSENG_LOG_FILE="${TANGSENG_LOG_FILE:-/tmp/tangsengdaodao-v3-seedcmp.log}"
 
 export IM_WEB_CLOWDER_ENABLED="${IM_WEB_CLOWDER_ENABLED:-true}"
-export CLOWDER_API_BASE_URL="${CLOWDER_API_BASE_URL:-http://127.0.0.1:3004}"
+export CLOWDER_API_BASE_URL="${CLOWDER_API_BASE_URL:-http://127.0.0.1:3000}"
 export CLOWDER_CONNECTOR_ID="${CLOWDER_CONNECTOR_ID:-im-web}"
 export CLOWDER_CONNECTOR_SECRET="${CLOWDER_CONNECTOR_SECRET:-dev-im-web-secret}"
 export CLOWDER_DEFAULT_OWNER_USER_ID="${CLOWDER_DEFAULT_OWNER_USER_ID:-default-user}"
@@ -31,7 +31,7 @@ Commands:
 Defaults:
   TANGSENG_API_PORT=8090
   TANGSENG_TMUX_SESSION=tangseng-v3-seedcmp
-  CLOWDER_API_BASE_URL=http://127.0.0.1:3004
+  CLOWDER_API_BASE_URL=http://127.0.0.1:3000
   CLOWDER_DEFAULT_OWNER_USER_ID=default-user
 EOF
 }
@@ -81,7 +81,7 @@ check_pid() {
   [[ -n "$pid" ]] || die "missing pid"
   [[ -d "/proc/$pid" ]] || die "process $pid is not running"
 
-  local expected_dir actual_dir actual_owner
+  local expected_dir actual_dir actual_owner actual_api_base
   expected_dir="$(expected_tangseng_dir)"
   actual_dir="$(pid_cwd "$pid")"
   if [[ "$actual_dir" != "$expected_dir" ]]; then
@@ -92,8 +92,12 @@ check_pid() {
   if [[ "$actual_owner" != "$CLOWDER_DEFAULT_OWNER_USER_ID" ]]; then
     die "CLOWDER_DEFAULT_OWNER_USER_ID mismatch: pid=$pid actual=$actual_owner expected=$CLOWDER_DEFAULT_OWNER_USER_ID"
   fi
+  actual_api_base="$(env_value_for_pid "$pid" CLOWDER_API_BASE_URL)"
+  if [[ "$actual_api_base" != "$CLOWDER_API_BASE_URL" ]]; then
+    die "CLOWDER_API_BASE_URL mismatch: pid=$pid actual=$actual_api_base expected=$CLOWDER_API_BASE_URL"
+  fi
 
-  printf 'runtime ok: pid=%s cwd=%s owner=%s\n' "$pid" "$actual_dir" "$actual_owner"
+  printf 'runtime ok: pid=%s cwd=%s owner=%s clowder=%s\n' "$pid" "$actual_dir" "$actual_owner" "$actual_api_base"
 }
 
 check_listener() {

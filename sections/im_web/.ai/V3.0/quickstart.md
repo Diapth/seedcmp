@@ -22,7 +22,7 @@ VITE_TANGSENG_WS_HOST=127.0.0.1
 Set these values in the backend environment that owns the bridge:
 
 ```bash
-CLOWDER_API_BASE_URL=http://127.0.0.1:3004
+CLOWDER_API_BASE_URL=http://127.0.0.1:3000
 CLOWDER_CONNECTOR_ID=im-web
 CLOWDER_CONNECTOR_SECRET=<shared-secret>
 CLOWDER_DEFAULT_OWNER_USER_ID=<clowder-user-id>
@@ -37,7 +37,9 @@ sections/im_web/scripts/dev-tangseng-clowder.sh restart
 sections/im_web/scripts/dev-tangseng-clowder.sh check
 ```
 
-The script defaults `CLOWDER_DEFAULT_OWNER_USER_ID` to `default-user`, checks the process listening on `localhost:8090`, and fails fast if that process was started from the wrong checkout or with a stale owner.
+The script defaults `CLOWDER_API_BASE_URL` to the Clowder AI local entrypoint `http://127.0.0.1:3000` and `CLOWDER_DEFAULT_OWNER_USER_ID` to `default-user`, checks the process listening on `localhost:8090`, and fails fast if that process was started from the wrong checkout, with a stale Clowder URL, or with a stale owner.
+
+For local smoke, keep Clowder AI itself on port `3000`. If another dev server is using `3000`, move that server instead of changing TangSeng's Clowder URL. The Clowder config files under `/media/leng/DiskB1/exp/clowder-ai` should not be edited for this; use process-level env overrides when starting the live stack.
 
 Set these values in the Clowder API process:
 
