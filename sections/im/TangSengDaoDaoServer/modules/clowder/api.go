@@ -515,8 +515,12 @@ func (c *Clowder) fetchAgentDirectory(channelID string, channelType uint8, userI
 	if err != nil {
 		return AgentDirectoryResponse{}, err
 	}
-	if strings.TrimSpace(userID) != "" {
-		req.Header.Set("x-cat-cafe-user", strings.TrimSpace(userID))
+	directoryUserID := strings.TrimSpace(c.config.DefaultOwnerUserID)
+	if directoryUserID == "" {
+		directoryUserID = strings.TrimSpace(userID)
+	}
+	if directoryUserID != "" {
+		req.Header.Set("x-cat-cafe-user", directoryUserID)
 	}
 
 	res, err := c.httpClient().Do(req)

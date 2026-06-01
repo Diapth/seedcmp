@@ -57,7 +57,52 @@ func TestFetchAgentDirectoryProxiesExternalChatAndLoginUser(t *testing.T) {
 	assert.Equal(t, []string{"codex"}, directory.PreferredCatIDs)
 	assert.Equal(t, "codex", directory.LastActiveCatID)
 	assert.Equal(t, "/api/connectors/im-web/agents?externalChatId=2%3Agroup-clowder", gotPath)
-	assert.Equal(t, "user-1", gotUser)
+	assert.Equal(t, "owner-1", gotUser)
+}
+
+func TestFetchAgentDirectoryUsesBridgeOwnerForClowderThreadAuth(t *testing.T) {
+	var gotPath string
+	var gotUser string
+	upstream := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		gotPath = r.URL.RequestURI()
+		gotUser = r.Header.Get("x-cat-cafe-user")
+		require.Equal(t, http.MethodGet, r.Method)
+		_ = json.NewEncoder(w).Encode(map[string]interface{}{
+			"threadId":        "thread-1",
+			"preferredCatIds": []string{"codex"},
+			"lastActiveCatId": "codex",
+			"agents": []map[string]interface{}{
+				{
+					"catId":           "codex",
+					"displayName":     "Codex",
+					"mentionPatterns": []string{"@codex"},
+					"available":       true,
+					"preferred":       true,
+				},
+			},
+		})
+	}))
+	defer upstream.Close()
+
+	c := New(nil)
+	c.SetConfig(commonmodule.ClowderBridgeConfig{
+		Enabled:            true,
+		APIBaseURL:         upstream.URL,
+		ConnectorID:        "im-web",
+		ConnectorSecret:    "secret",
+		DefaultOwnerUserID: "default-user",
+		RequestTimeout:     time.Second,
+		SignatureTolerance: time.Minute,
+	})
+
+	directory, err := c.fetchAgentDirectory("clowder_cat:codex", 1, "im-user-1")
+
+	require.NoError(t, err)
+	require.Len(t, directory.Agents, 1)
+	assert.Equal(t, "codex", directory.Agents[0].CatID)
+	assert.Contains(t, gotPath, "/api/connectors/im-web/agents?externalChatId=1%3A")
+	assert.Contains(t, gotPath, "im-user-1")
+	assert.Equal(t, "default-user", gotUser)
 }
 
 func TestFetchCatDirectoryUsesDirectHubAndKeepsExistingRagdoll(t *testing.T) {
@@ -103,7 +148,7 @@ func TestFetchCatDirectoryUsesDirectHubAndKeepsExistingRagdoll(t *testing.T) {
 	assert.Contains(t, gotPath, "/api/connectors/im-web/agents?externalChatId=1%3A")
 	assert.Contains(t, gotPath, "leng_test_updated")
 	assert.NotContains(t, gotPath, "externalChatId=1%3Aclowder_ai&")
-	assert.Equal(t, "leng_test_updated", gotUser)
+	assert.Equal(t, "owner-1", gotUser)
 }
 
 func TestCatContactResponseFindsExistingCatByDisplayNameOrMention(t *testing.T) {
@@ -162,7 +207,7 @@ func TestGroupCatMembershipStoreRoundTripsPromptAndCats(t *testing.T) {
 			MentionPatterns: []string{"@布偶猫"},
 			Available:       true,
 		}},
-		Prompt:    "Group: 猫家庭\nCats:\n- 布偶猫",
+		Prompt: "Group: 猫家庭\nCats:\n- 布偶猫",
 	})
 	loaded, ok := c.loadGroupCats("group-1")
 
