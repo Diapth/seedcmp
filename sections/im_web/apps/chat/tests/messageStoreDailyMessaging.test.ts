@@ -336,6 +336,52 @@ describe('message store daily messaging normalization', () => {
     }))
   })
 
+  it('loads older channel history before the current earliest visible message', async () => {
+    const { useMessageStore } = await import('../../../packages/datasource-vue/src/stores/messageStore.ts')
+    const store = useMessageStore()
+
+    const makeLocalMessage = (seq: number) => ({
+      messageID: `m-${seq}`,
+      messageSeq: seq,
+      clientMsgNo: `client-${seq}`,
+      fromUID: seq % 2 === 0 ? 'friend-a' : 'friend-b',
+      timestamp: 1000 + seq,
+      content: { type: 1, text: `message-${seq}` },
+      isRevoked: false,
+      status: 'success' as const
+    })
+    for (let seq = 199; seq <= 228; seq++) {
+      store.addMessage('group-long-history', 2, makeLocalMessage(seq), { countUnread: false })
+    }
+
+    const makeRawMessage = (seq: number) => ({
+      message_idstr: `m-${seq}`,
+      message_seq: seq,
+      client_msg_no: `client-${seq}`,
+      from_uid: seq % 2 === 0 ? 'friend-a' : 'friend-b',
+      timestamp: 1000 + seq,
+      payload: JSON.stringify({ type: 1, text: `message-${seq}` })
+    })
+    syncMessages.mockResolvedValue({
+      messages: Array.from({ length: 30 }, (_, index) => makeRawMessage(170 + index))
+    })
+
+    const loaded = await store.loadEarlierMessages('group-long-history', 2)
+
+    expect(loaded).toBe(29)
+    expect(syncMessages).toHaveBeenCalledWith(expect.objectContaining({
+      channel_id: 'group-long-history',
+      channel_type: 2,
+      limit: 30,
+      start_message_seq: 199,
+      pull_mode: 0,
+      device_uuid: 'im-web-history'
+    }))
+    expect(store.getChannelMessages('group-long-history', 2).map(item => item.content.text)).toEqual(
+      Array.from({ length: 59 }, (_, index) => `message-${170 + index}`)
+    )
+  })
+
   it('refreshes a stale local visible-history window from the known latest conversation sequence', async () => {
     const { useMessageStore } = await import('../../../packages/datasource-vue/src/stores/messageStore.ts')
     const { useConversationStore } = await import('../../../packages/datasource-vue/src/stores/conversationStore.ts')

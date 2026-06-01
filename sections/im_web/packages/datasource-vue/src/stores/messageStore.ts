@@ -158,6 +158,8 @@ export const useMessageStore = defineStore('message', () => {
   const pendingQueue = ref<Array<{ channelId: string; channelType: number; clientMsgNo: string }>>([]);
   const resetVersion = ref(0);
   const summaryVersions = ref<Record<string, number>>({});
+  const loadingEarlierHistory = ref<Record<string, boolean>>({});
+  const historyStartReached = ref<Record<string, boolean>>({});
   // Tracks clientMsgNos currently being sent from THIS browser tab.
   // Used by the global messageListener to skip own-message duplicates.
   const sendingFromThisTab = new Set<string>();
@@ -871,6 +873,50 @@ export const useMessageStore = defineStore('message', () => {
       }
     } catch (e) {
       console.error(`[MessageStore] Failed to sync messages for channel ${key}`, e);
+    }
+  }
+
+  async function loadEarlierMessages(channelId: string, channelType: number) {
+    const version = resetVersion.value;
+    const key = getChannelKey(channelId, channelType);
+    if (loadingEarlierHistory.value[key] || historyStartReached.value[key]) return 0;
+
+    const seqs = getPositiveMessageSeqs(messages.value[key] || []);
+    if (!seqs.length) return 0;
+
+    const minSeq = Math.min(...seqs);
+    if (minSeq <= 1) {
+      historyStartReached.value[key] = true;
+      return 0;
+    }
+
+    loadingEarlierHistory.value[key] = true;
+    const beforeLength = (messages.value[key] || []).length;
+    try {
+      const res: any = await fetchMessageWindowBefore(channelId, channelType, minSeq);
+      if (version !== resetVersion.value) return 0;
+
+      const rawMessages = Array.isArray(res?.messages) ? res.messages : [];
+      if (!rawMessages.length) {
+        historyStartReached.value[key] = true;
+        return 0;
+      }
+
+      await mergeSyncedMessages(channelId, channelType, key, rawMessages);
+      const afterLength = (messages.value[key] || []).length;
+      const loadedCount = Math.max(0, afterLength - beforeLength);
+      const returnedSeqs = rawMessages
+        .map((item: any) => Number(item.message_seq || item.messageSeq || 0))
+        .filter((seq: number) => seq > 0);
+      if (loadedCount === 0 || (returnedSeqs.length > 0 && Math.min(...returnedSeqs) <= 1)) {
+        historyStartReached.value[key] = true;
+      }
+      return loadedCount;
+    } catch (e) {
+      console.error(`[MessageStore] Failed to load earlier messages for channel ${key}`, e);
+      return 0;
+    } finally {
+      loadingEarlierHistory.value[key] = false;
     }
   }
 
@@ -1641,6 +1687,8 @@ export const useMessageStore = defineStore('message', () => {
     receipts.value = {};
     pinnedMessages.value = {};
     pinnedVersions.value = {};
+    loadingEarlierHistory.value = {};
+    historyStartReached.value = {};
     reminders.value = [];
     reminderVersion.value = 0;
     pendingQueue.value = [];
@@ -1666,9 +1714,12 @@ export const useMessageStore = defineStore('message', () => {
     pinnedMessages,
     reminders,
     pendingQueue,
+    loadingEarlierHistory,
+    historyStartReached,
     replyTarget,
     getChannelMessages,
     syncMessages,
+    loadEarlierMessages,
     addMessage,
     revokeMessage,
     handleMessageRevoked,

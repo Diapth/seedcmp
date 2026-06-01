@@ -1,0 +1,1679 @@
+{
+  "targetUrl": "http://localhost:3000",
+  "username": "18337488675",
+  "groupName": "集群",
+  "beforeScroll": {
+    "count": 235,
+    "min": 199,
+    "max": 498,
+    "firstFive": [
+      199,
+      200,
+      201,
+      202,
+      203
+    ],
+    "lastFive": [
+      493,
+      494,
+      496,
+      497,
+      498
+    ]
+  },
+  "scrollRounds": [
+    {
+      "round": 1,
+      "count": 255,
+      "min": 170,
+      "max": 498,
+      "firstFive": [
+        170,
+        172,
+        174,
+        175,
+        176
+      ],
+      "lastFive": [
+        493,
+        494,
+        496,
+        497,
+        498
+      ]
+    },
+    {
+      "round": 2,
+      "count": 274,
+      "min": 141,
+      "max": 498,
+      "firstFive": [
+        141,
+        143,
+        144,
+        147,
+        149
+      ],
+      "lastFive": [
+        493,
+        494,
+        496,
+        497,
+        498
+      ]
+    },
+    {
+      "round": 3,
+      "count": 289,
+      "min": 115,
+      "max": 498,
+      "firstFive": [
+        115,
+        116,
+        117,
+        118,
+        121
+      ],
+      "lastFive": [
+        493,
+        494,
+        496,
+        497,
+        498
+      ]
+    },
+    {
+      "round": 4,
+      "count": 296,
+      "min": 87,
+      "max": 498,
+      "firstFive": [
+        87,
+        89,
+        90,
+        91,
+        92
+      ],
+      "lastFive": [
+        493,
+        494,
+        496,
+        497,
+        498
+      ]
+    },
+    {
+      "round": 5,
+      "count": 300,
+      "min": 79,
+      "max": 498,
+      "firstFive": [
+        79,
+        80,
+        81,
+        82,
+        87
+      ],
+      "lastFive": [
+        493,
+        494,
+        496,
+        497,
+        498
+      ]
+    },
+    {
+      "round": 6,
+      "count": 300,
+      "min": 79,
+      "max": 498,
+      "firstFive": [
+        79,
+        80,
+        81,
+        82,
+        87
+      ],
+      "lastFive": [
+        493,
+        494,
+        496,
+        497,
+        498
+      ]
+    },
+    {
+      "round": 7,
+      "count": 300,
+      "min": 79,
+      "max": 498,
+      "firstFive": [
+        79,
+        80,
+        81,
+        82,
+        87
+      ],
+      "lastFive": [
+        493,
+        494,
+        496,
+        497,
+        498
+      ]
+    },
+    {
+      "round": 8,
+      "count": 300,
+      "min": 4,
+      "max": 465,
+      "firstFive": [
+        4,
+        5,
+        6,
+        11,
+        13
+      ],
+      "lastFive": [
+        458,
+        459,
+        461,
+        463,
+        465
+      ]
+    },
+    {
+      "round": 9,
+      "count": 300,
+      "min": 4,
+      "max": 465,
+      "firstFive": [
+        4,
+        5,
+        6,
+        11,
+        13
+      ],
+      "lastFive": [
+        458,
+        459,
+        461,
+        463,
+        465
+      ]
+    }
+  ],
+  "afterScroll": {
+    "count": 300,
+    "min": 4,
+    "max": 465,
+    "firstFive": [
+      4,
+      5,
+      6,
+      11,
+      13
+    ],
+    "lastFive": [
+      458,
+      459,
+      461,
+      463,
+      465
+    ]
+  },
+  "syncCalls": [
+    {
+      "status": 200,
+      "postData": {
+        "channel_id": "311e44befed248d7ac4357b1527dacd2",
+        "channel_type": 2,
+        "limit": 30,
+        "start_message_seq": 0,
+        "end_message_seq": 0,
+        "pull_mode": 1
+      },
+      "messageCount": 30,
+      "minSeq": 35,
+      "maxSeq": 64
+    },
+    {
+      "status": 200,
+      "postData": {
+        "channel_id": "3073c1c63b8d479281ef5f0ad2f8dd56",
+        "channel_type": 2,
+        "limit": 30,
+        "start_message_seq": 0,
+        "end_message_seq": 0,
+        "pull_mode": 1
+      },
+      "messageCount": 15,
+      "minSeq": 1,
+      "maxSeq": 15
+    },
+    {
+      "status": 200,
+      "postData": {
+        "channel_id": "a0f4ab3335294580835d19d294653bc8",
+        "channel_type": 2,
+        "limit": 30,
+        "start_message_seq": 0,
+        "end_message_seq": 0,
+        "pull_mode": 1
+      },
+      "messageCount": 11,
+      "minSeq": 1,
+      "maxSeq": 11
+    },
+    {
+      "status": 200,
+      "postData": {
+        "channel_id": "5c9870c2956b40b0b5fe74c1e843efb4",
+        "channel_type": 2,
+        "limit": 30,
+        "start_message_seq": 0,
+        "end_message_seq": 0,
+        "pull_mode": 1
+      },
+      "messageCount": 30,
+      "minSeq": 22,
+      "maxSeq": 51
+    },
+    {
+      "status": 200,
+      "postData": {
+        "channel_id": "ce0bd7ff8bae4432903dc5bab916ffdd",
+        "channel_type": 2,
+        "limit": 30,
+        "start_message_seq": 0,
+        "end_message_seq": 0,
+        "pull_mode": 1
+      },
+      "messageCount": 0,
+      "minSeq": 0,
+      "maxSeq": 0
+    },
+    {
+      "status": 200,
+      "postData": {
+        "channel_id": "f69afa7fe9e9466d8ece02637c9a6765",
+        "channel_type": 2,
+        "limit": 30,
+        "start_message_seq": 0,
+        "end_message_seq": 0,
+        "pull_mode": 1
+      },
+      "messageCount": 0,
+      "minSeq": 0,
+      "maxSeq": 0
+    },
+    {
+      "status": 200,
+      "postData": {
+        "channel_id": "7059baa93ec24e7e88665444e5ca10b4",
+        "channel_type": 2,
+        "limit": 30,
+        "start_message_seq": 0,
+        "end_message_seq": 0,
+        "pull_mode": 1
+      },
+      "messageCount": 0,
+      "minSeq": 0,
+      "maxSeq": 0
+    },
+    {
+      "status": 200,
+      "postData": {
+        "channel_id": "22cedd21db254fd092f921de9e3c713f",
+        "channel_type": 2,
+        "limit": 30,
+        "start_message_seq": 0,
+        "end_message_seq": 0,
+        "pull_mode": 1
+      },
+      "messageCount": 0,
+      "minSeq": 0,
+      "maxSeq": 0
+    },
+    {
+      "status": 200,
+      "postData": {
+        "channel_id": "f5b8acca54dd4bfba2b295a09463c419",
+        "channel_type": 2,
+        "limit": 30,
+        "start_message_seq": 0,
+        "end_message_seq": 0,
+        "pull_mode": 1
+      },
+      "messageCount": 0,
+      "minSeq": 0,
+      "maxSeq": 0
+    },
+    {
+      "status": 200,
+      "postData": {
+        "channel_id": "9ad1435f0a5b4d9f9d4040d54a939cf4",
+        "channel_type": 2,
+        "limit": 30,
+        "start_message_seq": 0,
+        "end_message_seq": 0,
+        "pull_mode": 1
+      },
+      "messageCount": 17,
+      "minSeq": 1,
+      "maxSeq": 17
+    },
+    {
+      "status": 200,
+      "postData": {
+        "channel_id": "aca2ab6d300b4134a98b5487c04684ba",
+        "channel_type": 2,
+        "limit": 30,
+        "start_message_seq": 0,
+        "end_message_seq": 0,
+        "pull_mode": 1
+      },
+      "messageCount": 2,
+      "minSeq": 1,
+      "maxSeq": 2
+    },
+    {
+      "status": 200,
+      "postData": {
+        "channel_id": "69de49e3392d48528e4b0a88d1e692c4",
+        "channel_type": 2,
+        "limit": 30,
+        "start_message_seq": 0,
+        "end_message_seq": 0,
+        "pull_mode": 1
+      },
+      "messageCount": 2,
+      "minSeq": 1,
+      "maxSeq": 2
+    },
+    {
+      "status": 200,
+      "postData": {
+        "channel_id": "41beab9cdf584493b2708a04573f367e",
+        "channel_type": 2,
+        "limit": 30,
+        "start_message_seq": 0,
+        "end_message_seq": 0,
+        "pull_mode": 1
+      },
+      "messageCount": 2,
+      "minSeq": 1,
+      "maxSeq": 2
+    },
+    {
+      "status": 200,
+      "postData": {
+        "channel_id": "88399bbd0d0342c9b41c97cb6385a032",
+        "channel_type": 2,
+        "limit": 30,
+        "start_message_seq": 0,
+        "end_message_seq": 0,
+        "pull_mode": 1
+      },
+      "messageCount": 4,
+      "minSeq": 1,
+      "maxSeq": 4
+    },
+    {
+      "status": 200,
+      "postData": {
+        "channel_id": "75ab7c536d4b4c4eb21639df828dbedd",
+        "channel_type": 2,
+        "limit": 30,
+        "start_message_seq": 0,
+        "end_message_seq": 0,
+        "pull_mode": 1
+      },
+      "messageCount": 21,
+      "minSeq": 1,
+      "maxSeq": 21
+    },
+    {
+      "status": 200,
+      "postData": {
+        "channel_id": "05fc38114d844399ab56ef0bee99a2e6",
+        "channel_type": 2,
+        "limit": 30,
+        "start_message_seq": 0,
+        "end_message_seq": 0,
+        "pull_mode": 1
+      },
+      "messageCount": 12,
+      "minSeq": 1,
+      "maxSeq": 12
+    },
+    {
+      "status": 200,
+      "postData": {
+        "channel_id": "cec409c5b5db4399a27358e76eb587b1",
+        "channel_type": 2,
+        "limit": 30,
+        "start_message_seq": 0,
+        "end_message_seq": 0,
+        "pull_mode": 1
+      },
+      "messageCount": 30,
+      "minSeq": 469,
+      "maxSeq": 498
+    },
+    {
+      "status": 200,
+      "postData": {
+        "channel_id": "ce0bd7ff8bae4432903dc5bab916ffdd",
+        "channel_type": 2,
+        "limit": 30,
+        "start_message_seq": 0,
+        "end_message_seq": 0,
+        "pull_mode": 1
+      },
+      "messageCount": 0,
+      "minSeq": 0,
+      "maxSeq": 0
+    },
+    {
+      "status": 200,
+      "postData": {
+        "channel_id": "f69afa7fe9e9466d8ece02637c9a6765",
+        "channel_type": 2,
+        "limit": 30,
+        "start_message_seq": 0,
+        "end_message_seq": 0,
+        "pull_mode": 1
+      },
+      "messageCount": 0,
+      "minSeq": 0,
+      "maxSeq": 0
+    },
+    {
+      "status": 200,
+      "postData": {
+        "channel_id": "7059baa93ec24e7e88665444e5ca10b4",
+        "channel_type": 2,
+        "limit": 30,
+        "start_message_seq": 0,
+        "end_message_seq": 0,
+        "pull_mode": 1
+      },
+      "messageCount": 0,
+      "minSeq": 0,
+      "maxSeq": 0
+    },
+    {
+      "status": 200,
+      "postData": {
+        "channel_id": "22cedd21db254fd092f921de9e3c713f",
+        "channel_type": 2,
+        "limit": 30,
+        "start_message_seq": 0,
+        "end_message_seq": 0,
+        "pull_mode": 1
+      },
+      "messageCount": 0,
+      "minSeq": 0,
+      "maxSeq": 0
+    },
+    {
+      "status": 200,
+      "postData": {
+        "channel_id": "f5b8acca54dd4bfba2b295a09463c419",
+        "channel_type": 2,
+        "limit": 30,
+        "start_message_seq": 0,
+        "end_message_seq": 0,
+        "pull_mode": 1
+      },
+      "messageCount": 0,
+      "minSeq": 0,
+      "maxSeq": 0
+    },
+    {
+      "status": 200,
+      "postData": {
+        "channel_id": "ce0bd7ff8bae4432903dc5bab916ffdd",
+        "channel_type": 2,
+        "limit": 30,
+        "start_message_seq": 0,
+        "end_message_seq": 0,
+        "pull_mode": 1
+      },
+      "messageCount": 0,
+      "minSeq": 0,
+      "maxSeq": 0
+    },
+    {
+      "status": 200,
+      "postData": {
+        "channel_id": "f69afa7fe9e9466d8ece02637c9a6765",
+        "channel_type": 2,
+        "limit": 30,
+        "start_message_seq": 0,
+        "end_message_seq": 0,
+        "pull_mode": 1
+      },
+      "messageCount": 0,
+      "minSeq": 0,
+      "maxSeq": 0
+    },
+    {
+      "status": 200,
+      "postData": {
+        "channel_id": "22cedd21db254fd092f921de9e3c713f",
+        "channel_type": 2,
+        "limit": 30,
+        "start_message_seq": 0,
+        "end_message_seq": 0,
+        "pull_mode": 1
+      },
+      "messageCount": 0,
+      "minSeq": 0,
+      "maxSeq": 0
+    },
+    {
+      "status": 200,
+      "postData": {
+        "channel_id": "7059baa93ec24e7e88665444e5ca10b4",
+        "channel_type": 2,
+        "limit": 30,
+        "start_message_seq": 0,
+        "end_message_seq": 0,
+        "pull_mode": 1
+      },
+      "messageCount": 0,
+      "minSeq": 0,
+      "maxSeq": 0
+    },
+    {
+      "status": 200,
+      "postData": {
+        "channel_id": "f5b8acca54dd4bfba2b295a09463c419",
+        "channel_type": 2,
+        "limit": 30,
+        "start_message_seq": 0,
+        "end_message_seq": 0,
+        "pull_mode": 1
+      },
+      "messageCount": 0,
+      "minSeq": 0,
+      "maxSeq": 0
+    },
+    {
+      "status": 200,
+      "postData": {
+        "channel_id": "ce0bd7ff8bae4432903dc5bab916ffdd",
+        "channel_type": 2,
+        "limit": 30,
+        "start_message_seq": 0,
+        "end_message_seq": 0,
+        "pull_mode": 1
+      },
+      "messageCount": 0,
+      "minSeq": 0,
+      "maxSeq": 0
+    },
+    {
+      "status": 200,
+      "postData": {
+        "channel_id": "7059baa93ec24e7e88665444e5ca10b4",
+        "channel_type": 2,
+        "limit": 30,
+        "start_message_seq": 0,
+        "end_message_seq": 0,
+        "pull_mode": 1
+      },
+      "messageCount": 0,
+      "minSeq": 0,
+      "maxSeq": 0
+    },
+    {
+      "status": 200,
+      "postData": {
+        "channel_id": "f69afa7fe9e9466d8ece02637c9a6765",
+        "channel_type": 2,
+        "limit": 30,
+        "start_message_seq": 0,
+        "end_message_seq": 0,
+        "pull_mode": 1
+      },
+      "messageCount": 0,
+      "minSeq": 0,
+      "maxSeq": 0
+    },
+    {
+      "status": 200,
+      "postData": {
+        "channel_id": "22cedd21db254fd092f921de9e3c713f",
+        "channel_type": 2,
+        "limit": 30,
+        "start_message_seq": 0,
+        "end_message_seq": 0,
+        "pull_mode": 1
+      },
+      "messageCount": 0,
+      "minSeq": 0,
+      "maxSeq": 0
+    },
+    {
+      "status": 200,
+      "postData": {
+        "channel_id": "f5b8acca54dd4bfba2b295a09463c419",
+        "channel_type": 2,
+        "limit": 30,
+        "start_message_seq": 0,
+        "end_message_seq": 0,
+        "pull_mode": 1
+      },
+      "messageCount": 0,
+      "minSeq": 0,
+      "maxSeq": 0
+    },
+    {
+      "status": 200,
+      "postData": {
+        "channel_id": "f69afa7fe9e9466d8ece02637c9a6765",
+        "channel_type": 2,
+        "limit": 30,
+        "start_message_seq": 0,
+        "end_message_seq": 0,
+        "pull_mode": 1
+      },
+      "messageCount": 0,
+      "minSeq": 0,
+      "maxSeq": 0
+    },
+    {
+      "status": 200,
+      "postData": {
+        "channel_id": "ce0bd7ff8bae4432903dc5bab916ffdd",
+        "channel_type": 2,
+        "limit": 30,
+        "start_message_seq": 0,
+        "end_message_seq": 0,
+        "pull_mode": 1
+      },
+      "messageCount": 0,
+      "minSeq": 0,
+      "maxSeq": 0
+    },
+    {
+      "status": 200,
+      "postData": {
+        "channel_id": "7059baa93ec24e7e88665444e5ca10b4",
+        "channel_type": 2,
+        "limit": 30,
+        "start_message_seq": 0,
+        "end_message_seq": 0,
+        "pull_mode": 1
+      },
+      "messageCount": 0,
+      "minSeq": 0,
+      "maxSeq": 0
+    },
+    {
+      "status": 200,
+      "postData": {
+        "channel_id": "22cedd21db254fd092f921de9e3c713f",
+        "channel_type": 2,
+        "limit": 30,
+        "start_message_seq": 0,
+        "end_message_seq": 0,
+        "pull_mode": 1
+      },
+      "messageCount": 0,
+      "minSeq": 0,
+      "maxSeq": 0
+    },
+    {
+      "status": 200,
+      "postData": {
+        "channel_id": "f5b8acca54dd4bfba2b295a09463c419",
+        "channel_type": 2,
+        "limit": 30,
+        "start_message_seq": 0,
+        "end_message_seq": 0,
+        "pull_mode": 1
+      },
+      "messageCount": 0,
+      "minSeq": 0,
+      "maxSeq": 0
+    },
+    {
+      "status": 200,
+      "postData": {
+        "channel_id": "311e44befed248d7ac4357b1527dacd2",
+        "channel_type": 2,
+        "limit": 30,
+        "start_message_seq": 0,
+        "end_message_seq": 0,
+        "pull_mode": 1,
+        "device_uuid": "im-web-history"
+      },
+      "messageCount": 30,
+      "minSeq": 35,
+      "maxSeq": 64
+    },
+    {
+      "status": 200,
+      "postData": {
+        "channel_id": "f69afa7fe9e9466d8ece02637c9a6765",
+        "channel_type": 2,
+        "limit": 30,
+        "start_message_seq": 0,
+        "end_message_seq": 0,
+        "pull_mode": 1,
+        "device_uuid": "im-web-history"
+      },
+      "messageCount": 0,
+      "minSeq": 0,
+      "maxSeq": 0
+    },
+    {
+      "status": 200,
+      "postData": {
+        "channel_id": "ce0bd7ff8bae4432903dc5bab916ffdd",
+        "channel_type": 2,
+        "limit": 30,
+        "start_message_seq": 0,
+        "end_message_seq": 0,
+        "pull_mode": 1,
+        "device_uuid": "im-web-history"
+      },
+      "messageCount": 0,
+      "minSeq": 0,
+      "maxSeq": 0
+    },
+    {
+      "status": 200,
+      "postData": {
+        "channel_id": "3073c1c63b8d479281ef5f0ad2f8dd56",
+        "channel_type": 2,
+        "limit": 30,
+        "start_message_seq": 0,
+        "end_message_seq": 0,
+        "pull_mode": 1,
+        "device_uuid": "im-web-history"
+      },
+      "messageCount": 15,
+      "minSeq": 1,
+      "maxSeq": 15
+    },
+    {
+      "status": 200,
+      "postData": {
+        "channel_id": "a0f4ab3335294580835d19d294653bc8",
+        "channel_type": 2,
+        "limit": 30,
+        "start_message_seq": 0,
+        "end_message_seq": 0,
+        "pull_mode": 1,
+        "device_uuid": "im-web-history"
+      },
+      "messageCount": 11,
+      "minSeq": 1,
+      "maxSeq": 11
+    },
+    {
+      "status": 200,
+      "postData": {
+        "channel_id": "5c9870c2956b40b0b5fe74c1e843efb4",
+        "channel_type": 2,
+        "limit": 30,
+        "start_message_seq": 0,
+        "end_message_seq": 0,
+        "pull_mode": 1,
+        "device_uuid": "im-web-history"
+      },
+      "messageCount": 30,
+      "minSeq": 22,
+      "maxSeq": 51
+    },
+    {
+      "status": 200,
+      "postData": {
+        "channel_id": "7059baa93ec24e7e88665444e5ca10b4",
+        "channel_type": 2,
+        "limit": 30,
+        "start_message_seq": 0,
+        "end_message_seq": 0,
+        "pull_mode": 1,
+        "device_uuid": "im-web-history"
+      },
+      "messageCount": 0,
+      "minSeq": 0,
+      "maxSeq": 0
+    },
+    {
+      "status": 200,
+      "postData": {
+        "channel_id": "22cedd21db254fd092f921de9e3c713f",
+        "channel_type": 2,
+        "limit": 30,
+        "start_message_seq": 0,
+        "end_message_seq": 0,
+        "pull_mode": 1,
+        "device_uuid": "im-web-history"
+      },
+      "messageCount": 0,
+      "minSeq": 0,
+      "maxSeq": 0
+    },
+    {
+      "status": 200,
+      "postData": {
+        "channel_id": "f5b8acca54dd4bfba2b295a09463c419",
+        "channel_type": 2,
+        "limit": 30,
+        "start_message_seq": 0,
+        "end_message_seq": 0,
+        "pull_mode": 1,
+        "device_uuid": "im-web-history"
+      },
+      "messageCount": 0,
+      "minSeq": 0,
+      "maxSeq": 0
+    },
+    {
+      "status": 200,
+      "postData": {
+        "channel_id": "aca2ab6d300b4134a98b5487c04684ba",
+        "channel_type": 2,
+        "limit": 30,
+        "start_message_seq": 0,
+        "end_message_seq": 0,
+        "pull_mode": 1,
+        "device_uuid": "im-web-history"
+      },
+      "messageCount": 2,
+      "minSeq": 1,
+      "maxSeq": 2
+    },
+    {
+      "status": 200,
+      "postData": {
+        "channel_id": "9ad1435f0a5b4d9f9d4040d54a939cf4",
+        "channel_type": 2,
+        "limit": 30,
+        "start_message_seq": 0,
+        "end_message_seq": 0,
+        "pull_mode": 1,
+        "device_uuid": "im-web-history"
+      },
+      "messageCount": 17,
+      "minSeq": 1,
+      "maxSeq": 17
+    },
+    {
+      "status": 200,
+      "postData": {
+        "channel_id": "69de49e3392d48528e4b0a88d1e692c4",
+        "channel_type": 2,
+        "limit": 30,
+        "start_message_seq": 0,
+        "end_message_seq": 0,
+        "pull_mode": 1,
+        "device_uuid": "im-web-history"
+      },
+      "messageCount": 2,
+      "minSeq": 1,
+      "maxSeq": 2
+    },
+    {
+      "status": 200,
+      "postData": {
+        "channel_id": "41beab9cdf584493b2708a04573f367e",
+        "channel_type": 2,
+        "limit": 30,
+        "start_message_seq": 0,
+        "end_message_seq": 0,
+        "pull_mode": 1,
+        "device_uuid": "im-web-history"
+      },
+      "messageCount": 2,
+      "minSeq": 1,
+      "maxSeq": 2
+    },
+    {
+      "status": 200,
+      "postData": {
+        "channel_id": "88399bbd0d0342c9b41c97cb6385a032",
+        "channel_type": 2,
+        "limit": 30,
+        "start_message_seq": 0,
+        "end_message_seq": 0,
+        "pull_mode": 1,
+        "device_uuid": "im-web-history"
+      },
+      "messageCount": 4,
+      "minSeq": 1,
+      "maxSeq": 4
+    },
+    {
+      "status": 200,
+      "postData": {
+        "channel_id": "75ab7c536d4b4c4eb21639df828dbedd",
+        "channel_type": 2,
+        "limit": 30,
+        "start_message_seq": 0,
+        "end_message_seq": 0,
+        "pull_mode": 1,
+        "device_uuid": "im-web-history"
+      },
+      "messageCount": 21,
+      "minSeq": 1,
+      "maxSeq": 21
+    },
+    {
+      "status": 200,
+      "postData": {
+        "channel_id": "05fc38114d844399ab56ef0bee99a2e6",
+        "channel_type": 2,
+        "limit": 30,
+        "start_message_seq": 0,
+        "end_message_seq": 0,
+        "pull_mode": 1,
+        "device_uuid": "im-web-history"
+      },
+      "messageCount": 12,
+      "minSeq": 1,
+      "maxSeq": 12
+    },
+    {
+      "status": 200,
+      "postData": {
+        "channel_id": "cec409c5b5db4399a27358e76eb587b1",
+        "channel_type": 2,
+        "limit": 30,
+        "start_message_seq": 0,
+        "end_message_seq": 0,
+        "pull_mode": 1,
+        "device_uuid": "im-web-history"
+      },
+      "messageCount": 30,
+      "minSeq": 469,
+      "maxSeq": 498
+    },
+    {
+      "status": 200,
+      "postData": {
+        "channel_id": "989ec1fc79664ede9ff9008831d76337",
+        "channel_type": 1,
+        "limit": 30,
+        "start_message_seq": 0,
+        "end_message_seq": 0,
+        "pull_mode": 1,
+        "device_uuid": "im-web-history"
+      },
+      "messageCount": 30,
+      "minSeq": 71,
+      "maxSeq": 100
+    },
+    {
+      "status": 200,
+      "postData": {
+        "channel_id": "clowder_cat:opus",
+        "channel_type": 1,
+        "limit": 30,
+        "start_message_seq": 0,
+        "end_message_seq": 0,
+        "pull_mode": 1,
+        "device_uuid": "im-web-history"
+      },
+      "messageCount": 30,
+      "minSeq": 95,
+      "maxSeq": 124
+    },
+    {
+      "status": 200,
+      "postData": {
+        "channel_id": "clowder_cat:ragdoll-kn9a",
+        "channel_type": 1,
+        "limit": 30,
+        "start_message_seq": 0,
+        "end_message_seq": 0,
+        "pull_mode": 1,
+        "device_uuid": "im-web-history"
+      },
+      "messageCount": 4,
+      "minSeq": 1,
+      "maxSeq": 4
+    },
+    {
+      "status": 200,
+      "postData": {
+        "channel_id": "clowder:bot",
+        "channel_type": 1,
+        "limit": 30,
+        "start_message_seq": 0,
+        "end_message_seq": 0,
+        "pull_mode": 1,
+        "device_uuid": "im-web-history"
+      },
+      "messageCount": 4,
+      "minSeq": 1,
+      "maxSeq": 4
+    },
+    {
+      "status": 200,
+      "postData": {
+        "channel_id": "clowder_ai",
+        "channel_type": 1,
+        "limit": 30,
+        "start_message_seq": 0,
+        "end_message_seq": 0,
+        "pull_mode": 1,
+        "device_uuid": "im-web-history"
+      },
+      "messageCount": 30,
+      "minSeq": 365,
+      "maxSeq": 394
+    },
+    {
+      "status": 200,
+      "postData": {
+        "channel_id": "deepseek_ai_robot",
+        "channel_type": 1,
+        "limit": 30,
+        "start_message_seq": 0,
+        "end_message_seq": 0,
+        "pull_mode": 1,
+        "device_uuid": "im-web-history"
+      },
+      "messageCount": 30,
+      "minSeq": 123,
+      "maxSeq": 152
+    },
+    {
+      "status": 200,
+      "postData": {
+        "channel_id": "filehelper",
+        "channel_type": 1,
+        "limit": 30,
+        "start_message_seq": 0,
+        "end_message_seq": 0,
+        "pull_mode": 1,
+        "device_uuid": "im-web-history"
+      },
+      "messageCount": 30,
+      "minSeq": 1,
+      "maxSeq": 30
+    },
+    {
+      "status": 200,
+      "postData": {
+        "channel_id": "31af7b0cdb1042be9b29b8660a862fb0",
+        "channel_type": 1,
+        "limit": 30,
+        "start_message_seq": 0,
+        "end_message_seq": 0,
+        "pull_mode": 1,
+        "device_uuid": "im-web-history"
+      },
+      "messageCount": 17,
+      "minSeq": 1,
+      "maxSeq": 17
+    },
+    {
+      "status": 200,
+      "postData": {
+        "channel_id": "u_10000",
+        "channel_type": 1,
+        "limit": 30,
+        "start_message_seq": 0,
+        "end_message_seq": 0,
+        "pull_mode": 1,
+        "device_uuid": "im-web-history"
+      },
+      "messageCount": 30,
+      "minSeq": 1,
+      "maxSeq": 30
+    },
+    {
+      "status": 200,
+      "postData": {
+        "channel_id": "00cc4f31ecfb4d8298b82065a513c552",
+        "channel_type": 1,
+        "limit": 30,
+        "start_message_seq": 0,
+        "end_message_seq": 0,
+        "pull_mode": 1,
+        "device_uuid": "im-web-history"
+      },
+      "messageCount": 27,
+      "minSeq": 1,
+      "maxSeq": 27
+    },
+    {
+      "status": 200,
+      "postData": {
+        "channel_id": "9d97387230a544dcba955a6266ee6285",
+        "channel_type": 1,
+        "limit": 30,
+        "start_message_seq": 0,
+        "end_message_seq": 0,
+        "pull_mode": 1,
+        "device_uuid": "im-web-history"
+      },
+      "messageCount": 17,
+      "minSeq": 1,
+      "maxSeq": 17
+    },
+    {
+      "status": 200,
+      "postData": {
+        "channel_id": "fileHelper",
+        "channel_type": 1,
+        "limit": 30,
+        "start_message_seq": 0,
+        "end_message_seq": 0,
+        "pull_mode": 1,
+        "device_uuid": "im-web-history"
+      },
+      "messageCount": 23,
+      "minSeq": 1,
+      "maxSeq": 23
+    },
+    {
+      "status": 200,
+      "postData": {
+        "channel_id": "cec409c5b5db4399a27358e76eb587b1",
+        "channel_type": 2,
+        "limit": 30,
+        "start_message_seq": 498,
+        "end_message_seq": 0,
+        "pull_mode": 1,
+        "device_uuid": "im-web-history"
+      },
+      "messageCount": 1,
+      "minSeq": 498,
+      "maxSeq": 498
+    },
+    {
+      "status": 200,
+      "postData": {
+        "channel_id": "cec409c5b5db4399a27358e76eb587b1",
+        "channel_type": 2,
+        "limit": 30,
+        "start_message_seq": 199,
+        "end_message_seq": 0,
+        "pull_mode": 1,
+        "device_uuid": "im-web-history"
+      },
+      "messageCount": 30,
+      "minSeq": 199,
+      "maxSeq": 228
+    },
+    {
+      "status": 200,
+      "postData": {
+        "channel_id": "cec409c5b5db4399a27358e76eb587b1",
+        "channel_type": 2,
+        "limit": 30,
+        "start_message_seq": 229,
+        "end_message_seq": 0,
+        "pull_mode": 1,
+        "device_uuid": "im-web-history"
+      },
+      "messageCount": 30,
+      "minSeq": 229,
+      "maxSeq": 258
+    },
+    {
+      "status": 200,
+      "postData": {
+        "channel_id": "cec409c5b5db4399a27358e76eb587b1",
+        "channel_type": 2,
+        "limit": 30,
+        "start_message_seq": 259,
+        "end_message_seq": 0,
+        "pull_mode": 1,
+        "device_uuid": "im-web-history"
+      },
+      "messageCount": 30,
+      "minSeq": 259,
+      "maxSeq": 288
+    },
+    {
+      "status": 200,
+      "postData": {
+        "channel_id": "cec409c5b5db4399a27358e76eb587b1",
+        "channel_type": 2,
+        "limit": 30,
+        "start_message_seq": 289,
+        "end_message_seq": 0,
+        "pull_mode": 1,
+        "device_uuid": "im-web-history"
+      },
+      "messageCount": 30,
+      "minSeq": 289,
+      "maxSeq": 318
+    },
+    {
+      "status": 200,
+      "postData": {
+        "channel_id": "cec409c5b5db4399a27358e76eb587b1",
+        "channel_type": 2,
+        "limit": 30,
+        "start_message_seq": 319,
+        "end_message_seq": 0,
+        "pull_mode": 1,
+        "device_uuid": "im-web-history"
+      },
+      "messageCount": 30,
+      "minSeq": 319,
+      "maxSeq": 348
+    },
+    {
+      "status": 200,
+      "postData": {
+        "channel_id": "cec409c5b5db4399a27358e76eb587b1",
+        "channel_type": 2,
+        "limit": 30,
+        "start_message_seq": 349,
+        "end_message_seq": 0,
+        "pull_mode": 1,
+        "device_uuid": "im-web-history"
+      },
+      "messageCount": 30,
+      "minSeq": 349,
+      "maxSeq": 378
+    },
+    {
+      "status": 200,
+      "postData": {
+        "channel_id": "cec409c5b5db4399a27358e76eb587b1",
+        "channel_type": 2,
+        "limit": 30,
+        "start_message_seq": 379,
+        "end_message_seq": 0,
+        "pull_mode": 1,
+        "device_uuid": "im-web-history"
+      },
+      "messageCount": 30,
+      "minSeq": 379,
+      "maxSeq": 408
+    },
+    {
+      "status": 200,
+      "postData": {
+        "channel_id": "cec409c5b5db4399a27358e76eb587b1",
+        "channel_type": 2,
+        "limit": 30,
+        "start_message_seq": 409,
+        "end_message_seq": 0,
+        "pull_mode": 1,
+        "device_uuid": "im-web-history"
+      },
+      "messageCount": 30,
+      "minSeq": 409,
+      "maxSeq": 438
+    },
+    {
+      "status": 200,
+      "postData": {
+        "channel_id": "cec409c5b5db4399a27358e76eb587b1",
+        "channel_type": 2,
+        "limit": 30,
+        "start_message_seq": 439,
+        "end_message_seq": 0,
+        "pull_mode": 1,
+        "device_uuid": "im-web-history"
+      },
+      "messageCount": 30,
+      "minSeq": 439,
+      "maxSeq": 468
+    },
+    {
+      "status": 200,
+      "postData": {
+        "channel_id": "cec409c5b5db4399a27358e76eb587b1",
+        "channel_type": 2,
+        "limit": 30,
+        "start_message_seq": 469,
+        "end_message_seq": 0,
+        "pull_mode": 1,
+        "device_uuid": "im-web-history"
+      },
+      "messageCount": 30,
+      "minSeq": 469,
+      "maxSeq": 498
+    },
+    {
+      "status": 200,
+      "postData": {
+        "channel_id": "cec409c5b5db4399a27358e76eb587b1",
+        "channel_type": 2,
+        "limit": 30,
+        "start_message_seq": 199,
+        "end_message_seq": 0,
+        "pull_mode": 0,
+        "device_uuid": "im-web-history"
+      },
+      "messageCount": 30,
+      "minSeq": 170,
+      "maxSeq": 199
+    },
+    {
+      "status": 200,
+      "postData": {
+        "channel_id": "cec409c5b5db4399a27358e76eb587b1",
+        "channel_type": 2,
+        "limit": 30,
+        "start_message_seq": 498,
+        "end_message_seq": 0,
+        "pull_mode": 1,
+        "device_uuid": "im-web-history"
+      },
+      "messageCount": 1,
+      "minSeq": 498,
+      "maxSeq": 498
+    },
+    {
+      "status": 200,
+      "postData": {
+        "channel_id": "cec409c5b5db4399a27358e76eb587b1",
+        "channel_type": 2,
+        "limit": 30,
+        "start_message_seq": 170,
+        "end_message_seq": 0,
+        "pull_mode": 0,
+        "device_uuid": "im-web-history"
+      },
+      "messageCount": 30,
+      "minSeq": 141,
+      "maxSeq": 170
+    },
+    {
+      "status": 200,
+      "postData": {
+        "channel_id": "cec409c5b5db4399a27358e76eb587b1",
+        "channel_type": 2,
+        "limit": 30,
+        "start_message_seq": 141,
+        "end_message_seq": 0,
+        "pull_mode": 0,
+        "device_uuid": "im-web-history"
+      },
+      "messageCount": 30,
+      "minSeq": 112,
+      "maxSeq": 141
+    },
+    {
+      "status": 200,
+      "postData": {
+        "channel_id": "cec409c5b5db4399a27358e76eb587b1",
+        "channel_type": 2,
+        "limit": 30,
+        "start_message_seq": 112,
+        "end_message_seq": 0,
+        "pull_mode": 0,
+        "device_uuid": "im-web-history"
+      },
+      "messageCount": 30,
+      "minSeq": 83,
+      "maxSeq": 112
+    },
+    {
+      "status": 200,
+      "postData": {
+        "channel_id": "cec409c5b5db4399a27358e76eb587b1",
+        "channel_type": 2,
+        "limit": 30,
+        "start_message_seq": 83,
+        "end_message_seq": 0,
+        "pull_mode": 0,
+        "device_uuid": "im-web-history"
+      },
+      "messageCount": 30,
+      "minSeq": 54,
+      "maxSeq": 83
+    },
+    {
+      "status": 200,
+      "postData": {
+        "channel_id": "cec409c5b5db4399a27358e76eb587b1",
+        "channel_type": 2,
+        "limit": 30,
+        "start_message_seq": 54,
+        "end_message_seq": 0,
+        "pull_mode": 0,
+        "device_uuid": "im-web-history"
+      },
+      "messageCount": 30,
+      "minSeq": 25,
+      "maxSeq": 54
+    },
+    {
+      "status": 200,
+      "postData": {
+        "channel_id": "cec409c5b5db4399a27358e76eb587b1",
+        "channel_type": 2,
+        "limit": 30,
+        "start_message_seq": 498,
+        "end_message_seq": 0,
+        "pull_mode": 1,
+        "device_uuid": "im-web-history"
+      },
+      "messageCount": 1,
+      "minSeq": 498,
+      "maxSeq": 498
+    },
+    {
+      "status": 200,
+      "postData": {
+        "channel_id": "cec409c5b5db4399a27358e76eb587b1",
+        "channel_type": 2,
+        "limit": 30,
+        "start_message_seq": 25,
+        "end_message_seq": 0,
+        "pull_mode": 0,
+        "device_uuid": "im-web-history"
+      },
+      "messageCount": 25,
+      "minSeq": 1,
+      "maxSeq": 25
+    }
+  ],
+  "olderPullCalls": [
+    {
+      "status": 200,
+      "postData": {
+        "channel_id": "cec409c5b5db4399a27358e76eb587b1",
+        "channel_type": 2,
+        "limit": 30,
+        "start_message_seq": 199,
+        "end_message_seq": 0,
+        "pull_mode": 0,
+        "device_uuid": "im-web-history"
+      },
+      "messageCount": 30,
+      "minSeq": 170,
+      "maxSeq": 199
+    },
+    {
+      "status": 200,
+      "postData": {
+        "channel_id": "cec409c5b5db4399a27358e76eb587b1",
+        "channel_type": 2,
+        "limit": 30,
+        "start_message_seq": 170,
+        "end_message_seq": 0,
+        "pull_mode": 0,
+        "device_uuid": "im-web-history"
+      },
+      "messageCount": 30,
+      "minSeq": 141,
+      "maxSeq": 170
+    },
+    {
+      "status": 200,
+      "postData": {
+        "channel_id": "cec409c5b5db4399a27358e76eb587b1",
+        "channel_type": 2,
+        "limit": 30,
+        "start_message_seq": 141,
+        "end_message_seq": 0,
+        "pull_mode": 0,
+        "device_uuid": "im-web-history"
+      },
+      "messageCount": 30,
+      "minSeq": 112,
+      "maxSeq": 141
+    },
+    {
+      "status": 200,
+      "postData": {
+        "channel_id": "cec409c5b5db4399a27358e76eb587b1",
+        "channel_type": 2,
+        "limit": 30,
+        "start_message_seq": 112,
+        "end_message_seq": 0,
+        "pull_mode": 0,
+        "device_uuid": "im-web-history"
+      },
+      "messageCount": 30,
+      "minSeq": 83,
+      "maxSeq": 112
+    },
+    {
+      "status": 200,
+      "postData": {
+        "channel_id": "cec409c5b5db4399a27358e76eb587b1",
+        "channel_type": 2,
+        "limit": 30,
+        "start_message_seq": 83,
+        "end_message_seq": 0,
+        "pull_mode": 0,
+        "device_uuid": "im-web-history"
+      },
+      "messageCount": 30,
+      "minSeq": 54,
+      "maxSeq": 83
+    },
+    {
+      "status": 200,
+      "postData": {
+        "channel_id": "cec409c5b5db4399a27358e76eb587b1",
+        "channel_type": 2,
+        "limit": 30,
+        "start_message_seq": 54,
+        "end_message_seq": 0,
+        "pull_mode": 0,
+        "device_uuid": "im-web-history"
+      },
+      "messageCount": 30,
+      "minSeq": 25,
+      "maxSeq": 54
+    },
+    {
+      "status": 200,
+      "postData": {
+        "channel_id": "cec409c5b5db4399a27358e76eb587b1",
+        "channel_type": 2,
+        "limit": 30,
+        "start_message_seq": 25,
+        "end_message_seq": 0,
+        "pull_mode": 0,
+        "device_uuid": "im-web-history"
+      },
+      "messageCount": 25,
+      "minSeq": 1,
+      "maxSeq": 25
+    }
+  ],
+  "consoleErrors": [
+    {
+      "type": "error",
+      "text": "Failed to load resource: the server responded with a status of 502 (Bad Gateway)"
+    },
+    {
+      "type": "warning",
+      "text": "Failed to load Clowder cat directory for clowder_cat:opus {error: AxiosError: Request failed with status code 502\n    at settle (http://localhost:3000/node_modules/.…, msg: 请求失败, status: 502}"
+    },
+    {
+      "type": "error",
+      "text": "Failed to load resource: the server responded with a status of 502 (Bad Gateway)"
+    },
+    {
+      "type": "warning",
+      "text": "Failed to load Clowder cat directory for clowder_cat:ragdoll-kn9a {error: AxiosError: Request failed with status code 502\n    at settle (http://localhost:3000/node_modules/.…, msg: 请求失败, status: 502}"
+    },
+    {
+      "type": "error",
+      "text": "Failed to load resource: the server responded with a status of 502 (Bad Gateway)"
+    },
+    {
+      "type": "warning",
+      "text": "Failed to load Clowder cat directory for clowder_cat:opus {error: AxiosError: Request failed with status code 502\n    at settle (http://localhost:3000/node_modules/.…, msg: 请求失败, status: 502}"
+    },
+    {
+      "type": "error",
+      "text": "Failed to load resource: the server responded with a status of 502 (Bad Gateway)"
+    },
+    {
+      "type": "warning",
+      "text": "Failed to load Clowder cat directory for clowder_cat:opus {error: AxiosError: Request failed with status code 502\n    at settle (http://localhost:3000/node_modules/.…, msg: 请求失败, status: 502}"
+    },
+    {
+      "type": "error",
+      "text": "Failed to load resource: the server responded with a status of 502 (Bad Gateway)"
+    },
+    {
+      "type": "warning",
+      "text": "Failed to load Clowder cat directory for clowder_cat:ragdoll-kn9a {error: AxiosError: Request failed with status code 502\n    at settle (http://localhost:3000/node_modules/.…, msg: 请求失败, status: 502}"
+    },
+    {
+      "type": "error",
+      "text": "Failed to load resource: the server responded with a status of 502 (Bad Gateway)"
+    },
+    {
+      "type": "warning",
+      "text": "Failed to load Clowder cat directory for clowder_cat:ragdoll-kn9a {error: AxiosError: Request failed with status code 502\n    at settle (http://localhost:3000/node_modules/.…, msg: 请求失败, status: 502}"
+    },
+    {
+      "type": "error",
+      "text": "Failed to load resource: the server responded with a status of 502 (Bad Gateway)"
+    },
+    {
+      "type": "error",
+      "text": "Failed to load resource: the server responded with a status of 502 (Bad Gateway)"
+    },
+    {
+      "type": "error",
+      "text": "Failed to load resource: the server responded with a status of 502 (Bad Gateway)"
+    },
+    {
+      "type": "error",
+      "text": "Failed to load resource: the server responded with a status of 502 (Bad Gateway)"
+    }
+  ],
+  "requestFailures": [
+    {
+      "url": "http://127.0.0.1:3003/uploads/ordering-demo.tar.gz",
+      "failure": "net::ERR_ABORTED"
+    },
+    {
+      "url": "http://127.0.0.1:3003/uploads/ordering-demo.tar.gz",
+      "failure": "net::ERR_ABORTED"
+    },
+    {
+      "url": "http://127.0.0.1:3003/uploads/ordering-demo.tar.gz",
+      "failure": "net::ERR_ABORTED"
+    },
+    {
+      "url": "http://127.0.0.1:3003/uploads/ordering-demo.tar.gz",
+      "failure": "net::ERR_ABORTED"
+    },
+    {
+      "url": "http://127.0.0.1:3003/uploads/ordering-demo.tar.gz",
+      "failure": "net::ERR_ABORTED"
+    },
+    {
+      "url": "http://127.0.0.1:3003/uploads/ordering-demo.tar.gz",
+      "failure": "net::ERR_ABORTED"
+    }
+  ]
+}

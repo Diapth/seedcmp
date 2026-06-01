@@ -44,7 +44,9 @@ const { remoteConfig } = useRemoteConfig();
 const scrollContainer = ref<HTMLDivElement | null>(null);
 const scrollTop = ref(0);
 const historyWindowSize = ref(300);
+const isLoadingEarlier = ref(false);
 const estimatedRowHeight = 72;
+const topHistoryLoadThreshold = 96;
 
 const showMenu = ref(false);
 const menuX = ref(0);
@@ -95,8 +97,41 @@ const visibleMessages = computed(() => {
 const topSpacerHeight = computed(() => visibleStart.value * estimatedRowHeight);
 const bottomSpacerHeight = computed(() => Math.max(0, renderableMessages.value.length - visibleEnd.value) * estimatedRowHeight);
 
+function isNearBottom() {
+  const container = scrollContainer.value;
+  if (!container) return true;
+  return container.scrollHeight - container.scrollTop - container.clientHeight < 120;
+}
+
+async function loadEarlierMessages() {
+  const container = scrollContainer.value;
+  if (!container || isLoadingEarlier.value || renderableMessages.value.length === 0) return;
+
+  const activeChannelKey = channelKey.value;
+  const previousScrollHeight = container.scrollHeight;
+  const previousScrollTop = container.scrollTop;
+
+  isLoadingEarlier.value = true;
+  try {
+    const loadedCount = await messageStore.loadEarlierMessages(props.channelId, props.channelType);
+    if (loadedCount <= 0 || channelKey.value !== activeChannelKey) return;
+
+    await nextTick();
+    if (!scrollContainer.value) return;
+    const nextScrollHeight = container.scrollHeight;
+    scrollContainer.value.scrollTop = nextScrollHeight - previousScrollHeight + previousScrollTop;
+    scrollTop.value = scrollContainer.value.scrollTop;
+  } finally {
+    isLoadingEarlier.value = false;
+  }
+}
+
 function handleScroll() {
-  scrollTop.value = scrollContainer.value?.scrollTop || 0;
+  const container = scrollContainer.value;
+  scrollTop.value = container?.scrollTop || 0;
+  if (container && container.scrollTop <= topHistoryLoadThreshold) {
+    void loadEarlierMessages();
+  }
 }
 
 function scrollToBottom(behavior: 'auto' | 'smooth' = 'auto') {
@@ -108,7 +143,9 @@ function scrollToBottom(behavior: 'auto' | 'smooth' = 'auto') {
   });
 }
 
-watch(() => messages.value.length, () => {
+watch(() => messages.value.length, (_newLength, oldLength) => {
+  if (isLoadingEarlier.value) return;
+  if (oldLength && !isNearBottom()) return;
   scrollToBottom('smooth');
 }, { immediate: true });
 

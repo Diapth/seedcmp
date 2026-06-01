@@ -224,6 +224,9 @@ export const useConversationStore = defineStore('conversation', () => {
     if (content && typeof content === 'object' && content.type === 1 && content.text === undefined && content.content !== undefined) {
       content = { ...content, text: content.content };
     }
+    if (content && typeof content === 'object' && content.catDisplayName === undefined && content.cat_display_name !== undefined) {
+      content = { ...content, catDisplayName: content.cat_display_name };
+    }
     return content;
   }
 

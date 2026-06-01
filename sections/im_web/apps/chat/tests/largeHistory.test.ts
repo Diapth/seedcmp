@@ -12,4 +12,15 @@ describe('large history rendering contracts', () => {
     expect(text).toContain('message-row-wrapper')
     expect(text).toContain('min-height')
   })
+
+  it('requests older history at the top without forcing the viewport back to the latest message', async () => {
+    const source = await import('../src/components/MessageList.vue?raw')
+    const text = source.default
+
+    expect(text).toContain('loadEarlierMessages')
+    expect(text).toContain('isLoadingEarlier')
+    expect(text).toContain('previousScrollHeight')
+    expect(text).toContain('scrollContainer.value.scrollTop = nextScrollHeight - previousScrollHeight + previousScrollTop')
+    expect(text).toContain('if (isLoadingEarlier.value) return')
+  })
 })
