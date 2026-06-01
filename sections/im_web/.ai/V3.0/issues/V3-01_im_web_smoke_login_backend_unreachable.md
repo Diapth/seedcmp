@@ -2,7 +2,7 @@
 
 ## Status
 
-Open
+Resolved on 2026-06-01
 
 ## Reported At
 
@@ -108,8 +108,66 @@ With proxy variables enabled, the same request returned `HTTP/1.1 502 Bad Gatewa
 
 ## Acceptance Criteria
 
-- [ ] `curl --noproxy '*' http://<tangseng-api>/v1/user/login` succeeds with smoke credentials.
-- [ ] IM Web login redirects to `/chat`.
-- [ ] `.conversation-list-container` renders.
-- [ ] V3 smoke tests progress beyond the shared `login()` helper.
+- [x] `curl --noproxy '*' http://<tangseng-api>/v1/user/login` succeeds with smoke credentials.
+- [x] IM Web login redirects to `/chat`.
+- [x] `.conversation-list-container` renders.
+- [x] V3 smoke tests progress beyond the shared `login()` helper.
 
+## 2026-06-01 Reverification
+
+The original backend-unreachable condition is no longer reproducible in the current local acceptance environment.
+
+API health:
+
+```bash
+curl --noproxy '*' -sS -i http://localhost:8090/v1/health
+```
+
+Result: `200 OK`, body includes `{"db":"up","redis":"up","status":"up"}`.
+
+IM Web dev server:
+
+```bash
+curl --noproxy '*' -sS -i http://localhost:3000/login
+```
+
+Result: `200 OK`, served the Vite login shell.
+
+Login API probe:
+
+```bash
+curl --noproxy '*' -sS -i --max-time 8 \
+  -X POST http://localhost:8090/v1/user/login \
+  -H 'content-type: application/json' \
+  --data '{"username":"008618337488675","password":"123456","flag":1,"device":{"device_id":"playwright-smoke-v3-01","device_name":"Playwright","device_model":"browser","platform":"web"}}'
+```
+
+Result: `200 OK`, response includes the smoke user and a `token`. The raw `18337488675` username still returns `用户不存在` when posted directly because the frontend login store normalizes 11-digit phone numbers to `0086...` before calling `user/login`.
+
+Browser smoke evidence:
+
+```bash
+cd sections/im_web/apps/chat
+RUN_V3_CLOWDER_SMOKE=1 TARGET_URL=http://localhost:3000 CLOWDER_URL=http://localhost:3003 TEST_USERNAME=18337488675 TEST_PASSWORD=123456 TEST_GROUP_CONVERSATION=集群 TEST_AGENT_A=codex TEST_AGENT_B=ragdoll CLOWDER_TEST_USER=default-user CLOWDER_CONNECTOR_SECRET=dev-im-web-secret pnpm exec playwright test tests-e2e/smoke-v3-clowder-multi-agent.spec.ts --config playwright.config.ts --reporter=line
+```
+
+Result: 1 passed.
+
+```bash
+cd sections/im_web/apps/chat
+RUN_V3_CLOWDER_SMOKE=1 TARGET_URL=http://localhost:3000 CLOWDER_URL=http://localhost:3003 TEST_USERNAME=18337488675 TEST_PASSWORD=123456 TEST_B_USERNAME=13733632709 TEST_B_PASSWORD=123456 TEST_GROUP_CONVERSATION=集群 TEST_AGENT_A=codex CLOWDER_TEST_USER=default-user CLOWDER_CONNECTOR_SECRET=dev-im-web-secret pnpm exec playwright test tests-e2e/smoke-v3-clowder-binding.spec.ts --config playwright.config.ts --reporter=line
+```
+
+Result: 1 passed.
+
+```bash
+cd sections/im_web/apps/chat
+RUN_V3_CLOWDER_SMOKE=1 TARGET_URL=http://localhost:3000 CLOWDER_URL=http://localhost:3003 TEST_USERNAME=18337488675 TEST_PASSWORD=123456 TEST_GROUP_CONVERSATION=集群 TEST_AGENT_A=codex TEST_AGENT_B=ragdoll CLOWDER_TEST_USER=default-user CLOWDER_CONNECTOR_SECRET=dev-im-web-secret pnpm exec playwright test tests-e2e/smoke-v3-clowder-v2-regression.spec.ts --config playwright.config.ts --reporter=line
+```
+
+Result: 1 passed.
+
+Close note:
+
+- Login now reaches TangSeng through `localhost:8090`, redirects to `/chat`, and V3 smoke specs progress beyond the shared `login()` helper.
+- No code change was needed for this issue during the 2026-06-01 pass; the remaining work was environment reverification and issue status normalization.
