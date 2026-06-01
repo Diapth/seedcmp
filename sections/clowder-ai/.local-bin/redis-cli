@@ -1,2 +1,2 @@
 #!/bin/bash
-exec docker exec -i redis redis-cli "$@"
+exec docker exec redis redis-cli "$@"
