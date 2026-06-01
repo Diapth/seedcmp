@@ -2,7 +2,7 @@
 
 ## Status
 
-Code resolved on 2026-06-01; live TangSeng bridge restart pending
+Resolved on 2026-06-01
 
 ## Severity
 
@@ -68,10 +68,10 @@ CLOWDER_DEFAULT_OWNER_USER_ID=<clowder-owner-user-id>
 ## Acceptance
 
 - [x] `GET /api/connectors/im-web/status` returns `enabled: true`, `configured: true`, `state: "ready"`.
-- [ ] Sending a first message in `clowder_ai` creates or resolves a binding for `externalChatId=1:clowder_ai`.
+- [x] Sending a first message in `clowder_ai` creates or resolves a binding for `externalChatId=1:clowder_ai`.
 - [x] `GET /api/connectors/im-web/agents?externalChatId=1:clowder_ai` returns agent data instead of `Binding not found` after the Clowder route fallback patch is deployed.
 - [x] TangSeng bridge queries Clowder agent directory with the connector owner identity, while keeping IM Web user-specific `externalChatId` calculation for direct virtual cat channels.
-- [ ] IM Web Clowder panel shows agent rows without an agent-directory unavailable state after the updated TangSeng bridge process is rebuilt/restarted.
+- [x] IM Web Clowder panel shows agent rows without an agent-directory unavailable state after the updated TangSeng bridge process is rebuilt/restarted.
 
 ## 2026-05-29 Reverification
 
@@ -156,6 +156,78 @@ curl --noproxy '*' -sS -i 'http://localhost:3003/api/connectors/im-web/agents?ex
 
 Result: `200 OK`, with `ragdoll-kn9a`, `codex`, and the remaining live cat directory rows.
 
-Deployment note:
+## 2026-06-01 Live Restart Completion
 
-- The currently running TangSeng bridge on `localhost:8090` still needs to be rebuilt/restarted before the browser path stops depending on the V3-24 frontend fallback for this live group directory call.
+Root cause of the remaining live failure:
+
+- `localhost:8090` was still served by a TangSeng bridge process started on 2026-05-31, before the owner-header fix was deployed.
+- That process also had `CLOWDER_DEFAULT_OWNER_USER_ID=6db8b65b3ae94092badfeb82e47c06f7`, while the live Clowder connector bindings are owned by `default-user`.
+- Direct Clowder verification showed `x-cat-cafe-user: default-user` returned `200 OK` for `externalChatId=2:cec409c5b5db4399a27358e76eb587b1`, while the old owner returned `403 Forbidden`.
+
+Runtime fix:
+
+- Restarted the `tangseng-v3-seedcmp` tmux process from the current `sections/im/TangSengDaoDaoServer` checkout.
+- Started it with `CLOWDER_DEFAULT_OWNER_USER_ID=default-user` and the existing local connector settings:
+
+```bash
+IM_WEB_CLOWDER_ENABLED=true
+CLOWDER_API_BASE_URL=http://127.0.0.1:3004
+CLOWDER_CONNECTOR_ID=im-web
+CLOWDER_CONNECTOR_SECRET=dev-im-web-secret
+CLOWDER_DEFAULT_OWNER_USER_ID=default-user
+go run . api -config configs/tsdd.yaml
+```
+
+Post-restart verification:
+
+```bash
+curl --noproxy '*' -sS -i http://localhost:8090/v1/health
+```
+
+Result: `200 OK`, `{"db":"up","redis":"up","status":"up"}`.
+
+```bash
+curl --noproxy '*' -sS -i http://localhost:3003/api/connectors/im-web/status
+```
+
+Result: `200 OK`, `state:"ready"`, `enabled:true`, `configured:true`, `reachable:true`.
+
+```bash
+GET /v1/clowder/conversation/agents?channelId=cec409c5b5db4399a27358e76eb587b1&channelType=2
+```
+
+Result after login: `200 OK`, thread `thread_mpu1mp2tfhrabwfx`, 6 live agents including `ragdoll-kn9a` and `codex`.
+
+```bash
+GET /v1/clowder/conversation?channelId=cec409c5b5db4399a27358e76eb587b1&channelType=2
+```
+
+Result after login: `200 OK`, binding owner `default-user`, `externalChatId:"2:cec409c5b5db4399a27358e76eb587b1"`, 6 live agents.
+
+```bash
+GET /v1/clowder/conversation?channelId=clowder_ai&channelType=1
+GET /v1/clowder/conversation/agents?channelId=clowder_ai&channelType=1
+```
+
+Result after login: both returned `200 OK` with the live agent directory.
+
+```bash
+cd sections/im/TangSengDaoDaoServer
+go test ./modules/clowder -run 'TestFetchAgentDirectory|TestFetchCatDirectory' -count=1
+```
+
+Result: passed.
+
+```bash
+cd sections/im_web/apps/chat
+RUN_V3_CLOWDER_SMOKE=1 TARGET_URL=http://localhost:3000 CLOWDER_URL=http://localhost:3003 TEST_USERNAME=18337488675 TEST_PASSWORD=123456 TEST_GROUP_CONVERSATION=集群 TEST_AGENT_A=codex TEST_AGENT_B=ragdoll CLOWDER_TEST_USER=default-user CLOWDER_CONNECTOR_SECRET=dev-im-web-secret pnpm exec playwright test tests-e2e/smoke-v3-clowder-panel.spec.ts --config playwright.config.ts --reporter=line
+```
+
+Result: 1 passed.
+
+```bash
+cd sections/im_web/apps/chat
+RUN_V3_CLOWDER_SMOKE=1 TARGET_URL=http://localhost:3000 CLOWDER_URL=http://localhost:3003 TEST_USERNAME=18337488675 TEST_PASSWORD=123456 TEST_GROUP_CONVERSATION=集群 TEST_AGENT_A=codex CLOWDER_TEST_USER=default-user CLOWDER_CONNECTOR_SECRET=dev-im-web-secret pnpm exec playwright test tests-e2e/smoke-v3-clowder-binding.spec.ts --config playwright.config.ts --reporter=line
+```
+
+Result: 1 passed.
