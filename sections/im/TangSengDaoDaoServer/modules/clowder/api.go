@@ -122,6 +122,9 @@ type createCatRequest struct {
 	Alias        string   `json:"alias,omitempty"`
 	ClientID     string   `json:"clientId,omitempty"`
 	Platform     string   `json:"platform,omitempty"`
+	AuthType     string   `json:"authType,omitempty"`
+	AccountRef   string   `json:"accountRef,omitempty"`
+	DefaultModel string   `json:"defaultModel,omitempty"`
 	Personality  string   `json:"personality,omitempty"`
 	Capabilities []string `json:"capabilities,omitempty"`
 }
@@ -141,6 +144,7 @@ type groupCatSyncRequest struct {
 	Cats             []ClowderAgent `json:"cats,omitempty"`
 	Prompt           string         `json:"prompt"`
 	ProactiveReplies bool           `json:"proactiveReplies,omitempty"`
+	AutoReplyMode    string         `json:"autoReplyMode,omitempty"`
 }
 
 type groupCatSyncResponse struct {
@@ -150,6 +154,7 @@ type groupCatSyncResponse struct {
 	Cats             []ClowderAgent `json:"cats"`
 	Prompt           string         `json:"prompt"`
 	ProactiveReplies bool           `json:"proactiveReplies,omitempty"`
+	AutoReplyMode    string         `json:"autoReplyMode,omitempty"`
 }
 
 func (c *Clowder) conversation(ctx *wkhttp.Context) {
@@ -293,13 +298,15 @@ func (c *Clowder) groupCats(ctx *wkhttp.Context) {
 
 func (c *Clowder) storeGroupCats(req groupCatSyncRequest) groupCatSyncResponse {
 	groupID := strings.TrimSpace(req.GroupID)
+	autoReplyMode := normalizeGroupAutoReplyMode(req.AutoReplyMode, req.ProactiveReplies)
 	response := groupCatSyncResponse{
 		GroupID:          groupID,
 		GroupName:        strings.TrimSpace(req.GroupName),
 		CatIDs:           cleanStringList(req.CatIDs),
 		Cats:             decorateGroupCats(req.Cats),
 		Prompt:           strings.TrimSpace(req.Prompt),
-		ProactiveReplies: req.ProactiveReplies,
+		ProactiveReplies: autoReplyMode == "soft_mentions",
+		AutoReplyMode:    autoReplyMode,
 	}
 	c.groupCatsMu.Lock()
 	if c.groupCatState == nil {
@@ -308,6 +315,18 @@ func (c *Clowder) storeGroupCats(req groupCatSyncRequest) groupCatSyncResponse {
 	c.groupCatState[groupID] = response
 	c.groupCatsMu.Unlock()
 	return response
+}
+
+func normalizeGroupAutoReplyMode(mode string, proactiveReplies bool) string {
+	switch strings.TrimSpace(mode) {
+	case "off", "mentions_only", "soft_mentions":
+		return strings.TrimSpace(mode)
+	default:
+		if proactiveReplies {
+			return "soft_mentions"
+		}
+		return "mentions_only"
+	}
 }
 
 func (c *Clowder) loadGroupCats(groupID string) (groupCatSyncResponse, bool) {
@@ -711,8 +730,28 @@ func buildCreateCatCommand(req createCatRequest) (string, bool) {
 	if platform == "" {
 		return "", false
 	}
+	authType := normalizeCatAuthType(req.AuthType)
+	accountRef := strings.TrimSpace(req.AccountRef)
+	if authType == "" || accountRef == "" {
+		return "", false
+	}
 	alias := normalizeCatAlias(req.Alias, name)
-	return "/cats new " + name + " " + alias + " --platform " + platform, true
+	command := "/cats new " + name + " " + alias + " --platform " + platform + " --auth " + authType + " --account " + accountRef
+	if model := strings.TrimSpace(req.DefaultModel); model != "" {
+		command += " --model " + model
+	}
+	return command, true
+}
+
+func normalizeCatAuthType(value string) string {
+	switch strings.ToLower(strings.TrimSpace(value)) {
+	case "oauth", "subscription":
+		return "oauth"
+	case "api_key", "api-key", "apikey":
+		return "api-key"
+	default:
+		return ""
+	}
 }
 
 func fallbackCatID(name string, alias string) string {

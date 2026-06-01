@@ -10,6 +10,7 @@ export type ClowderDeliveryState = 'queued' | 'dispatched' | 'streaming' | 'deli
 export type ClowderRoutingMode = 'mention' | 'ask' | 'focus' | 'preferred' | 'last-active' | 'default';
 export type ClowderStreamState = 'placeholder' | 'chunk' | 'final' | 'cleanup';
 export type ClowderCatSource = 'existing' | 'runtime-created' | 'disconnected' | 'stale';
+export type ClowderGroupAutoReplyMode = 'off' | 'mentions_only' | 'soft_mentions';
 
 export interface ClowderConversationRef {
   channelId: string;
@@ -119,6 +120,9 @@ export interface ClowderCreateCatRequest {
   name: string;
   alias?: string;
   clientId: 'openai' | 'anthropic';
+  authType: 'api_key' | 'oauth';
+  accountRef: string;
+  defaultModel?: string;
   personality?: string;
   capabilities?: string[];
 }
@@ -138,6 +142,7 @@ export interface ClowderGroupCatSyncRequest {
   cats?: ClowderAgent[];
   prompt: string;
   proactiveReplies?: boolean;
+  autoReplyMode?: ClowderGroupAutoReplyMode;
 }
 
 export interface ClowderGroupCatStateResponse {
@@ -147,6 +152,7 @@ export interface ClowderGroupCatStateResponse {
   cats?: ClowderAgent[];
   prompt?: string;
   proactiveReplies?: boolean;
+  autoReplyMode?: ClowderGroupAutoReplyMode;
 }
 
 export const clowderApi = {

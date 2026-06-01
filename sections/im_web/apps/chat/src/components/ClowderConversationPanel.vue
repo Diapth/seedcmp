@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { computed, onMounted, watch } from 'vue';
 import { useClowderStore } from '@tsdaodao/datasource-vue';
-import type { ClowderChannelType } from '@tsdaodao/datasource-vue';
+import type { ClowderChannelType, ClowderGroupAutoReplyMode } from '@tsdaodao/datasource-vue';
 
 defineOptions({ name: 'ClowderConversationPanel' });
 
@@ -25,6 +25,11 @@ const conversationRef = computed(() => ({
 const conversation = computed(() => clowderStore.getConversation(props.channelId, props.channelType));
 const directory = computed(() => clowderStore.agentDirectories[`${props.channelId}-${props.channelType}`]);
 const groupAgents = computed(() => props.channelType === 2 ? clowderStore.groupCatMemberships[props.channelId] || [] : []);
+const autoReplyModes: Array<{ value: ClowderGroupAutoReplyMode; label: string }> = [
+  { value: 'mentions_only', label: '仅 @ 时回复' },
+  { value: 'soft_mentions', label: '提到猫猫时自动回复' },
+  { value: 'off', label: '关闭' }
+];
 const status = computed(() => {
   if (clowderStore.status.state === 'error' || clowderStore.status.reachable === false) {
     return clowderStore.status;
@@ -40,6 +45,10 @@ const statusReason = computed(() => {
 });
 const agents = computed(() => directory.value?.agents || conversation.value?.agents || groupAgents.value);
 const currentFocus = computed(() => conversation.value?.focusCatId);
+const groupAutoReplyMode = computed<ClowderGroupAutoReplyMode>(() => {
+  if (props.channelType !== 2) return 'mentions_only';
+  return clowderStore.groupAutoReplyModes[props.channelId] || 'mentions_only';
+});
 
 async function refresh() {
   if (!props.visible || !props.channelId) return;
@@ -58,6 +67,11 @@ async function handleFocus(catId: string) {
 
 async function handleClearFocus() {
   await clowderStore.clearFocus(conversationRef.value);
+}
+
+async function handleAutoReplyMode(mode: ClowderGroupAutoReplyMode) {
+  if (props.channelType !== 2 || mode === groupAutoReplyMode.value) return;
+  await clowderStore.setGroupAutoReplyMode(props.channelId, mode, props.channelId);
 }
 
 onMounted(refresh);
@@ -88,6 +102,23 @@ watch(() => [props.visible, props.channelId, props.channelType], refresh);
         <div class="focus-row">
           <span>{{ currentFocus || 'Default routing' }}</span>
           <button type="button" :disabled="!currentFocus || clowderStore.loading" @click="handleClearFocus">Clear</button>
+        </div>
+      </section>
+
+      <section v-if="channelType === 2" class="panel-section">
+        <div class="section-label">Auto Reply</div>
+        <div class="mode-row" role="group" aria-label="群聊自动回复模式">
+          <button
+            v-for="mode in autoReplyModes"
+            :key="mode.value"
+            type="button"
+            class="mode-btn"
+            :class="{ active: groupAutoReplyMode === mode.value }"
+            :disabled="clowderStore.loading"
+            @click="handleAutoReplyMode(mode.value)"
+          >
+            {{ mode.label }}
+          </button>
         </div>
       </section>
 
@@ -186,6 +217,35 @@ watch(() => [props.visible, props.channelId, props.channelType], refresh);
   align-items: center;
   justify-content: space-between;
   gap: 8px;
+}
+
+.mode-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.mode-btn {
+  min-height: 30px;
+  padding: 0 10px;
+  border: var(--border-hairline);
+  border-radius: var(--radius-sm);
+  background: var(--bg-secondary);
+  color: var(--text-primary);
+  cursor: pointer;
+  font-size: 12px;
+}
+
+.mode-btn.active {
+  border-color: var(--primary-color, #165dff);
+  background: rgba(59, 130, 246, 0.12);
+  color: var(--primary-color, #165dff);
+  font-weight: 600;
+}
+
+.mode-btn:disabled {
+  cursor: not-allowed;
+  opacity: 0.58;
 }
 
 .agent-row {

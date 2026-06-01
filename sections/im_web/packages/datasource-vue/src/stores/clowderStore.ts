@@ -16,6 +16,7 @@ import {
   type ClowderConversationRef,
   type ClowderConversationStateResponse,
   type ClowderConnectionStatus,
+  type ClowderGroupAutoReplyMode,
   type ClowderGroupCatStateResponse,
   type IMConnectorPermission
 } from '../api/clowder';
@@ -163,6 +164,11 @@ function mergeClowderCatContacts(existing: ClowderCatContact[], additions: Clowd
   return next;
 }
 
+function normalizeGroupAutoReplyMode(mode?: string, proactiveReplies?: boolean): ClowderGroupAutoReplyMode {
+  if (mode === 'off' || mode === 'mentions_only' || mode === 'soft_mentions') return mode;
+  return proactiveReplies === true ? 'soft_mentions' : 'mentions_only';
+}
+
 export const useClowderStore = defineStore('clowder', () => {
   const status = ref<ClowderConnectionStatus>(defaultStatus());
   const conversations = ref<Record<string, ClowderConversationStateResponse>>({});
@@ -171,6 +177,7 @@ export const useClowderStore = defineStore('clowder', () => {
   const connectedCatContacts = ref<ClowderCatContact[]>([]);
   const groupCatMemberships = ref<Record<string, ClowderCatContact[]>>({});
   const groupPrompts = ref<Record<string, string>>({});
+  const groupAutoReplyModes = ref<Record<string, ClowderGroupAutoReplyMode>>({});
   const loading = ref(false);
   const error = ref<string | undefined>();
 
@@ -352,6 +359,8 @@ export const useClowderStore = defineStore('clowder', () => {
 
   async function syncMixedGroupCats(input: ClowderGroupPromptInput) {
     const prompt = buildClowderGroupPrompt(input);
+    const autoReplyMode = normalizeGroupAutoReplyMode(undefined, input.rules?.proactiveReplies === true);
+    groupAutoReplyModes.value[input.groupId] = autoReplyMode;
     const catMembers = input.catMembers.map(cat => 'id' in cat
       ? cat as ClowderCatContact
       : toClowderCatContact(cat));
@@ -375,6 +384,7 @@ export const useClowderStore = defineStore('clowder', () => {
         connected: true
       })),
       proactiveReplies: input.rules?.proactiveReplies === true,
+      autoReplyMode,
       prompt
     });
     return prompt;
@@ -396,14 +406,19 @@ export const useClowderStore = defineStore('clowder', () => {
     }));
   }
 
-  function buildCurrentGroupPrompt(groupId: string, groupName: string, cats: ClowderCatContact[]) {
+  function buildCurrentGroupPrompt(
+    groupId: string,
+    groupName: string,
+    cats: ClowderCatContact[],
+    autoReplyMode: ClowderGroupAutoReplyMode = 'mentions_only'
+  ) {
     const prompt = buildClowderGroupPrompt({
       groupId,
       groupName,
       humanMembers: [],
       catMembers: cats,
       rules: {
-        proactiveReplies: false,
+        proactiveReplies: autoReplyMode === 'soft_mentions',
         privacy: 'Cats can see display names, roles, and mention handles only.'
       }
     });
@@ -467,7 +482,8 @@ export const useClowderStore = defineStore('clowder', () => {
 
   async function persistRecoveredGroupCats(groupId: string, groupName: string, cats: ClowderCatContact[]) {
     if (cats.length === 0) return;
-    const prompt = buildCurrentGroupPrompt(groupId, groupName || groupId, cats);
+    const prompt = buildCurrentGroupPrompt(groupId, groupName || groupId, cats, 'mentions_only');
+    groupAutoReplyModes.value[groupId] = 'mentions_only';
     try {
       await clowderApi.syncGroupCats({
         groupId,
@@ -475,6 +491,7 @@ export const useClowderStore = defineStore('clowder', () => {
         catIds: cats.map(cat => cat.catId),
         cats: serializeGroupCatsForSync(cats),
         proactiveReplies: false,
+        autoReplyMode: 'mentions_only',
         prompt
       });
     } catch (e) {
@@ -484,6 +501,8 @@ export const useClowderStore = defineStore('clowder', () => {
 
   async function loadGroupCats(groupId: string) {
     const response = await clowderApi.getGroupCats({ groupId }) as unknown as ClowderGroupCatStateResponse;
+    const autoReplyMode = normalizeGroupAutoReplyMode(response.autoReplyMode, response.proactiveReplies);
+    groupAutoReplyModes.value[groupId] = autoReplyMode;
     let cats = (response.cats || []).map(agent => toClowderCatContact(agent, {
       connected: true
     }));
@@ -518,7 +537,7 @@ export const useClowderStore = defineStore('clowder', () => {
     }
     groupCatMemberships.value[groupId] = cats;
     if (cats.length > 0) {
-      buildCurrentGroupPrompt(groupId, response.groupName || groupId, cats);
+      buildCurrentGroupPrompt(groupId, response.groupName || groupId, cats, autoReplyMode);
     } else if (response.prompt) {
       groupPrompts.value[groupId] = response.prompt;
     }
@@ -535,13 +554,15 @@ export const useClowderStore = defineStore('clowder', () => {
       ? current
       : [...current, contact];
     groupCatMemberships.value[groupId] = nextCats;
-    const nextPrompt = buildCurrentGroupPrompt(groupId, groupName || groupId, nextCats);
+    const nextPrompt = buildCurrentGroupPrompt(groupId, groupName || groupId, nextCats, 'mentions_only');
+    groupAutoReplyModes.value[groupId] = 'mentions_only';
     await clowderApi.syncGroupCats({
       groupId,
       groupName: groupName || groupId,
       catIds: nextCats.map(cat => cat.catId),
       cats: serializeGroupCatsForSync(nextCats),
       proactiveReplies: false,
+      autoReplyMode: 'mentions_only',
       prompt: nextPrompt
     });
     return nextCats;
@@ -550,16 +571,59 @@ export const useClowderStore = defineStore('clowder', () => {
   async function removeGroupCat(groupId: string, catId: string, groupName?: string) {
     const nextCats = (groupCatMemberships.value[groupId] || []).filter(cat => cat.catId !== catId);
     groupCatMemberships.value[groupId] = nextCats;
-    const nextPrompt = buildCurrentGroupPrompt(groupId, groupName || groupId, nextCats);
+    const nextPrompt = buildCurrentGroupPrompt(groupId, groupName || groupId, nextCats, 'mentions_only');
+    groupAutoReplyModes.value[groupId] = 'mentions_only';
     await clowderApi.syncGroupCats({
       groupId,
       groupName: groupName || groupId,
       catIds: nextCats.map(cat => cat.catId),
       cats: serializeGroupCatsForSync(nextCats),
       proactiveReplies: false,
+      autoReplyMode: 'mentions_only',
       prompt: nextPrompt
     });
     return nextCats;
+  }
+
+  async function setGroupAutoReplyMode(groupId: string, mode: ClowderGroupAutoReplyMode, groupName?: string) {
+    const nextMode = normalizeGroupAutoReplyMode(mode);
+    const hadPreviousMode = Object.prototype.hasOwnProperty.call(groupAutoReplyModes.value, groupId);
+    const previousMode = groupAutoReplyModes.value[groupId] || 'mentions_only';
+    const hadPreviousPrompt = Object.prototype.hasOwnProperty.call(groupPrompts.value, groupId);
+    const previousPrompt = groupPrompts.value[groupId];
+    const cats = groupCatMemberships.value[groupId] || [];
+    const resolvedGroupName = groupName || groupId;
+    loading.value = true;
+    error.value = undefined;
+    try {
+      groupAutoReplyModes.value[groupId] = nextMode;
+      const nextPrompt = buildCurrentGroupPrompt(groupId, resolvedGroupName, cats, nextMode);
+      await clowderApi.syncGroupCats({
+        groupId,
+        groupName: resolvedGroupName,
+        catIds: cats.map(cat => cat.catId),
+        cats: serializeGroupCatsForSync(cats),
+        proactiveReplies: nextMode === 'soft_mentions',
+        autoReplyMode: nextMode,
+        prompt: nextPrompt
+      });
+      return nextMode;
+    } catch (err) {
+      if (hadPreviousMode) {
+        groupAutoReplyModes.value[groupId] = previousMode;
+      } else {
+        delete groupAutoReplyModes.value[groupId];
+      }
+      if (hadPreviousPrompt) {
+        groupPrompts.value[groupId] = previousPrompt;
+      } else {
+        delete groupPrompts.value[groupId];
+      }
+      error.value = err instanceof Error ? err.message : 'Clowder auto reply mode update failed';
+      throw err;
+    } finally {
+      loading.value = false;
+    }
   }
 
   function applyConversationState(refInput: ClowderConversationRef, state: ClowderConversationStateResponse) {
@@ -665,6 +729,7 @@ export const useClowderStore = defineStore('clowder', () => {
     connectedCatContacts.value = [];
     groupCatMemberships.value = {};
     groupPrompts.value = {};
+    groupAutoReplyModes.value = {};
     loading.value = false;
     error.value = undefined;
   }
@@ -686,6 +751,7 @@ export const useClowderStore = defineStore('clowder', () => {
     connectedCatContacts,
     groupCatMemberships,
     groupPrompts,
+    groupAutoReplyModes,
     getCatContactById,
     connectExistingCat,
     createCatAndConnect,
@@ -693,6 +759,7 @@ export const useClowderStore = defineStore('clowder', () => {
     loadGroupCats,
     addGroupCat,
     removeGroupCat,
+    setGroupAutoReplyMode,
     allowGroup,
     denyGroup,
     setFocus,

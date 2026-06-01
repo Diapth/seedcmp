@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, onBeforeUnmount, onMounted, watch } from 'vue';
+import { computed, ref, onBeforeUnmount, onMounted, watch } from 'vue';
 import { useRouter, useRoute } from 'vue-router';
 import { useConversationStore } from '@tsdaodao/datasource-vue';
 import { useUserStore } from '@tsdaodao/datasource-vue';
@@ -164,37 +164,61 @@ async function handleDeleteConversation() {
   selectedConversation.value = null;
 }
 
-const contextMenuItems = [
+async function handleHideConversation() {
+  if (!selectedConversation.value) return;
+  await conversationStore.hideConversation(selectedConversation.value.channel_id, selectedConversation.value.channel_type);
+  if (
+    route.params.channelId === selectedConversation.value.channel_id &&
+    Number(route.params.channelType) === Number(selectedConversation.value.channel_type)
+  ) {
+    router.push('/chat');
+  }
+  selectedConversation.value = null;
+}
+
+const isSelectedConversationPinned = computed(() => {
+  return Number(selectedConversation.value?.top || 0) === 1;
+});
+
+const isSelectedConversationMuted = computed(() => {
+  return Number(selectedConversation.value?.mute || 0) === 1;
+});
+
+const contextMenuItems = computed(() => [
   {
-    label: '置顶 / 取消置顶',
+    label: isSelectedConversationPinned.value ? '取消置顶' : '置顶',
     action: () => {
       if (!selectedConversation.value) return;
       void conversationStore.togglePin(
         selectedConversation.value.channel_id,
         selectedConversation.value.channel_type,
-        Number(selectedConversation.value.top || 0) !== 1
+        !isSelectedConversationPinned.value
       );
       selectedConversation.value = null;
     }
   },
   {
-    label: '免打扰 / 取消免打扰',
+    label: isSelectedConversationMuted.value ? '关闭免打扰' : '消息免打扰',
     action: () => {
       if (!selectedConversation.value) return;
       void conversationStore.toggleMute(
         selectedConversation.value.channel_id,
         selectedConversation.value.channel_type,
-        Number(selectedConversation.value.mute || 0) !== 1
+        !isSelectedConversationMuted.value
       );
       selectedConversation.value = null;
     }
+  },
+  {
+    label: '隐藏会话',
+    action: handleHideConversation
   },
   {
     label: '删除会话',
     danger: true,
     action: handleDeleteConversation
   }
-];
+]);
 
 function parseDigestContent(content: any): any {
   if (typeof content !== 'string') {

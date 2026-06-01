@@ -1109,6 +1109,8 @@ describe('message action state', () => {
     for (const label of ['编辑消息', '本地删除', '双向删除', '设为置顶', '查看回执', '提醒暂不可用', '重试发送']) {
       expect(list.default).toContain(label)
     }
+    expect(list.default).toContain("label: '引用回复'")
+    expect(list.default).toContain("label: '复制'")
     expect(list.default).toContain('messageStore.retryMessage')
     expect(list.default).toContain('messageStore.editMessage')
     expect(list.default).toContain('messageStore.deleteLocalMessage')
@@ -1119,5 +1121,21 @@ describe('message action state', () => {
     expect(menu.default).toContain('disabled?: boolean')
     expect(menu.default).toContain('disabled: item.disabled')
     expect(menu.default).toContain('.context-menu-item.disabled')
+  })
+
+  it('exposes group avatar context menu hooks for mention and profile actions', async () => {
+    const list = await import('../src/components/MessageList.vue?raw')
+    const chatView = await import('../src/views/ChatView.vue?raw')
+    const input = await import('../src/components/MessageInput.vue?raw')
+
+    expect(list.default).toContain('handleAvatarContextMenu')
+    expect(list.default).toContain("label: '@TA'")
+    expect(list.default).toContain("label: '查看资料'")
+    expect(list.default).toContain("emit('mention-user'")
+    expect(list.default).toContain("emit('view-user-profile'")
+    expect(chatView.default).toContain('@mention-user="handleMentionUser"')
+    expect(chatView.default).toContain('@view-user-profile="handleViewUserProfile"')
+    expect(input.default).toContain('mentionRequest')
+    expect(input.default).toContain('appendExternalMention')
   })
 })

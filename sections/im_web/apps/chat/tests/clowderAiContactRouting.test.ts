@@ -75,7 +75,16 @@ describe('Clowder AI contact routing', () => {
     expect(source.default).toContain('getCommandTargetCatIds')
     expect(source.default).toContain('/^\\/(ask|focus)\\s+')
     expect(source.default).toContain('matchesCatTargetToken')
-    expect(source.default).toContain('targetCatIds = Array.from(new Set')
+    expect(source.default).toContain('explicitTargetCatIds = Array.from(new Set')
+  })
+
+  it('uses the group auto-reply policy for non-at cat triggers', async () => {
+    const source = await import('../src/components/MessageInput.vue?raw')
+
+    expect(source.default).toContain('resolveGroupCatAutoReplyTrigger')
+    expect(source.default).toContain('autoReplyDecision')
+    expect(source.default).toContain('autoReplyDecision.reason')
+    expect(source.default).toContain('Trigger reason:')
   })
 
   it('loads group cat memberships from the chat input before showing mention targets', async () => {

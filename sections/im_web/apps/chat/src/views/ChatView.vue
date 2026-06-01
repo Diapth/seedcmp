@@ -19,7 +19,9 @@ const conversationStore = useConversationStore();
 
 const showGroupSettings = ref(false);
 const showUserProfile = ref(false);
+const activeUserProfileUid = ref('');
 const showClowderPanel = ref(false);
+const mentionRequest = ref<{ uid: string; name: string; requestId: number } | null>(null);
 const activeRightDockTab = ref<'preview' | 'clowder'>('preview');
 const rightDockWidth = ref(Number(window.localStorage.getItem('im-web-right-dock-width') || 420));
 const imageLightbox = ref({
@@ -122,6 +124,7 @@ watch(() => messageStore.messages[channelKey.value]?.length, () => {
 
 function handleHeaderClick() {
   if (channelType.value === 1) {
+    activeUserProfileUid.value = channelId.value;
     showUserProfile.value = true;
   }
 }
@@ -138,6 +141,18 @@ function handleClowderClick() {
 function handleMembersClick() {
   showGroupSettings.value = false;
   router.push(`/chat/group-members/${channelId.value}`);
+}
+
+function handleMentionUser(payload: { uid: string; name: string }) {
+  mentionRequest.value = {
+    ...payload,
+    requestId: Date.now()
+  };
+}
+
+function handleViewUserProfile(payload: { uid: string }) {
+  activeUserProfileUid.value = payload.uid;
+  showUserProfile.value = true;
 }
 
 function selectRightDockTab(tab: 'preview' | 'clowder') {
@@ -303,11 +318,14 @@ function startRightDockResize(event: MouseEvent) {
         :channel-id="channelId"
         :channel-type="channelType"
         @open-preview="handleOpenPreview"
+        @mention-user="handleMentionUser"
+        @view-user-profile="handleViewUserProfile"
       />
 
       <MessageInput
         :channel-id="channelId"
         :channel-type="channelType"
+        :mention-request="mentionRequest"
       />
     </div>
 
@@ -364,8 +382,8 @@ function startRightDockResize(event: MouseEvent) {
     />
 
     <UserProfileDrawer
-      v-if="channelType === 1"
-      :uid="channelId"
+      v-if="showUserProfile"
+      :uid="activeUserProfileUid || channelId"
       :visible="showUserProfile"
       @close="showUserProfile = false"
     />

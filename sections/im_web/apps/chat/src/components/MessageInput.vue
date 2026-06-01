@@ -14,10 +14,16 @@ import {
 } from '@tsdaodao/datasource-vue';
 import { useRobotConfigStore } from '@tsdaodao/contacts-vue';
 import WKSDK, { CMDContent } from 'wukongimjssdk';
+import { resolveGroupCatAutoReplyTrigger, type GroupCatAutoReplyReason } from '../utils/clowderGroupAutoReplyPolicy';
 
 const props = defineProps<{
   channelId: string;
   channelType: number;
+  mentionRequest?: {
+    uid: string;
+    name: string;
+    requestId: number;
+  } | null;
 }>();
 
 const messageStore = useMessageStore();
@@ -110,6 +116,13 @@ const catMentionMembers = computed(() => {
 
 const clowderPromptContext = computed(() => {
   return props.channelType === 2 ? clowderStore.groupPrompts[props.channelId] : undefined;
+});
+
+const clowderConversationKey = computed(() => `${props.channelId}-${Number(props.channelType)}`);
+
+const groupAutoReplyMode = computed(() => {
+  if (props.channelType !== 2) return 'mentions_only';
+  return clowderStore.groupAutoReplyModes[props.channelId] || 'mentions_only';
 });
 
 function getMemberUid(member: any): string {
@@ -244,6 +257,34 @@ function selectMember(member: any) {
   textareaRef.value?.focus();
 }
 
+async function appendExternalMention(request?: { uid: string; name: string } | null) {
+  if (!request?.uid || props.channelType !== 2) return;
+  const name = request.name || request.uid;
+  const mention = `@${name} `;
+  const current = inputText.value;
+  const start = textareaRef.value?.selectionStart ?? current.length;
+  const end = textareaRef.value?.selectionEnd ?? start;
+  const needsLeadingSpace = start > 0 && !/\s$/.test(current.slice(0, start));
+  const nextMention = `${needsLeadingSpace ? ' ' : ''}${mention}`;
+  inputText.value = `${current.slice(0, start)}${nextMention}${current.slice(end)}`;
+  if (!mentionedUids.value.includes(request.uid)) {
+    mentionedUids.value.push(request.uid);
+  }
+  await nextTick();
+  const nextCaret = start + nextMention.length;
+  textareaRef.value?.setSelectionRange(nextCaret, nextCaret);
+  textareaRef.value?.focus();
+}
+
+watch(
+  () => props.mentionRequest?.requestId,
+  () => {
+    if (props.mentionRequest) {
+      void appendExternalMention(props.mentionRequest);
+    }
+  }
+);
+
 function getMentionedTargetCatIds(text: string) {
   return catMentionMembers.value
     .filter(member => {
@@ -299,7 +340,7 @@ function getMessageSenderName(message: any) {
   return userStore.userCache[fromUID]?.name || fromUID || 'unknown';
 }
 
-function buildClowderPromptContext(text: string, targetCatIds: string[]) {
+function buildClowderPromptContext(text: string, targetCatIds: string[], triggerReason?: GroupCatAutoReplyReason) {
   if (props.channelType !== 2) return clowderPromptContext.value;
   const recentMessages = messageStore.getChannelMessages(props.channelId, props.channelType)
     .filter(message => getMessageVisibleText(message))
@@ -309,6 +350,7 @@ function buildClowderPromptContext(text: string, targetCatIds: string[]) {
   return [
     base,
     `Mention target cat ids: ${targetCatIds.length ? targetCatIds.join(', ') : 'none'}`,
+    `Trigger reason: ${triggerReason || 'manual'}`,
     `Current message: ${text}`,
     'Recent messages:',
     ...(recentMessages.length ? recentMessages : ['- No recent messages available.'])
@@ -356,13 +398,13 @@ function scheduleClowderConversationSync(channelId: string, channelType: number)
   );
 }
 
-async function sendClowderRouteMessage(text: string, targetCatIds: string[]) {
+async function sendClowderRouteMessage(text: string, targetCatIds: string[], triggerReason?: GroupCatAutoReplyReason) {
   await clowderStore.sendConversationMessage({
     channelId: props.channelId,
     channelType: props.channelType as 1 | 2,
     directCatId: getClowderCatIdFromContactId(props.channelId),
     targetCatIds,
-    promptContext: buildClowderPromptContext(text, targetCatIds)
+    promptContext: buildClowderPromptContext(text, targetCatIds, triggerReason)
   }, text);
   scheduleClowderConversationSync(props.channelId, props.channelType);
 }
@@ -709,9 +751,19 @@ async function handleSend() {
   if (props.channelType === 2) {
     await ensureGroupMentionMembersLoaded();
   }
-  const targetCatIds = Array.from(new Set(props.channelType === 2
+  const explicitTargetCatIds = Array.from(new Set(props.channelType === 2
     ? [...getMentionedTargetCatIds(text), ...getCommandTargetCatIds(text)]
     : []));
+  const autoReplyDecision = resolveGroupCatAutoReplyTrigger({
+    text,
+    mode: groupAutoReplyMode.value,
+    cats: props.channelType === 2 ? (clowderStore.groupCatMemberships[props.channelId] || []) : [],
+    explicitTargetCatIds,
+    focusedCatId: clowderStore.conversations[clowderConversationKey.value]?.focusCatId,
+    lastActiveCatId: clowderStore.agentDirectories[clowderConversationKey.value]?.lastActive?.catId,
+    replyTarget: messageStore.replyTarget
+  });
+  const targetCatIds = autoReplyDecision.targetCatIds;
 
   if (props.channelType === 2) {
     if (text.includes('@所有人') || text.includes('@all')) {
@@ -742,8 +794,8 @@ async function handleSend() {
 
   try {
     await messageStore.sendMessage(props.channelId, props.channelType, text, options);
-    if (isClowderAiConversation.value || isClowderCatConversation.value || targetCatIds.length > 0) {
-      await sendClowderRouteMessage(text, targetCatIds);
+    if (isClowderAiConversation.value || isClowderCatConversation.value || autoReplyDecision.shouldRoute) {
+      await sendClowderRouteMessage(text, targetCatIds, autoReplyDecision.reason);
     }
     messageStore.setReplyTarget(null);
     mentionedUids.value = [];

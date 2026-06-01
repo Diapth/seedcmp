@@ -298,9 +298,9 @@ export const syncApi = {
   },
   // 更新最近会话扩展属性 (草稿置顶等，后端为 POST 方法)
   updateConversationExtra(
-    channelIdOrData: string | { channel_id: string; channel_type: number; browse_to?: number; keep_message_seq?: number; keep_offset_y?: number; draft?: string; top?: number; mute?: number },
+    channelIdOrData: string | { channel_id: string; channel_type: number; browse_to?: number; keep_message_seq?: number; keep_offset_y?: number; draft?: string; top?: number; mute?: number; hidden?: number },
     channelType?: number,
-    data?: { draft?: string; browse_to?: number; keep_message_seq?: number; keep_offset_y?: number; top?: number; mute?: number }
+    data?: { draft?: string; browse_to?: number; keep_message_seq?: number; keep_offset_y?: number; top?: number; mute?: number; hidden?: number }
   ) {
     if (typeof channelIdOrData === 'object') {
       return apiClient.post(`conversations/${channelIdOrData.channel_id}/${channelIdOrData.channel_type}/extra`, channelIdOrData);

@@ -1,0 +1,56 @@
+{
+  "runId": "v3-25-soft-stability-r1-202606011417",
+  "targetUrl": "http://localhost:3016",
+  "account": "18337488675",
+  "groupName": "集群",
+  "checks": [
+    {
+      "name": "login",
+      "status": "pass",
+      "details": "18337488675"
+    },
+    {
+      "name": "open clowder group",
+      "status": "pass",
+      "details": "集群13:56Codex： 喵~收到！`v3-25-soft-20260601055627` 自动回复测试通过 ✅ 这是 v3.25 soft launch smoke 吧？带上了自然语言指令\"请自动回复一下\"来验证群聊中猫猫的主动响应能力。链路通顺，所有指标正常。"
+    },
+    {
+      "name": "soft mode control visible and clicked",
+      "status": "pass",
+      "details": ""
+    },
+    {
+      "name": "ordinary human chat does not auto-route",
+      "status": "pass",
+      "details": ""
+    },
+    {
+      "name": "soft 猫猫 trigger routes and receives reply",
+      "status": "pass",
+      "details": "routeRequests=1"
+    }
+  ],
+  "clowderRouteRequests": [
+    {
+      "method": "POST",
+      "url": "http://127.0.0.1:8090/v1/clowder/conversation/message",
+      "postData": "{\"channelId\":\"cec409c5b5db4399a27358e76eb587b1\",\"channelType\":2,\"targetCatIds\":[\"codex\"],\"promptContext\":\"Group: cec409c5b5db4399a27358e76eb587b1 (id: cec409c5b5db4399a27358e76eb587b1)\\nHumans:\\nCats:\\n- 布偶猫 (catId: ragdoll-kn9a, aliases: @ragdoll-kn9a, 布偶猫, mention: @ragdoll-kn9a)\\n- Codex (catId: codex, aliases: @codex, Codex, mention: @codex)\\n- 新闻猫9izf (catId: cat-qo9kez, aliases: @cat-qo9kez, 新闻猫9izf, mention: @cat-qo9kez)\\n- 新闻猫1lp2 (catId: cat-qq1m8x, aliases: @cat-qq1m8x, 新闻猫1lp2, mention: @cat-qq1m8x)\\n- 新闻猫954l (catId: cat-qq95qd, aliases: @cat-qq95qd, 新闻猫954l, mention: @cat-qq95qd)\\n- 新闻猫f2b2 (catId: f2b2, aliases: @f2b2, 新闻猫f2b2, mention: @f2b2)\\nAllowed @ targets: @ragdoll-kn9a, @codex, @cat-qo9kez, @cat-qq1m8x, @cat-qq95qd, @f2b2\\nRules: Cats may answer proactively when the conversation context asks for their capability.\\nPrivacy: Cats can see display names, roles, and mention handles only.\\nMention target cat ids: codex\\nTrigger reason: soft_cat_keyword\\nCurrent message: v3-25-soft-stability-r1-202606011417 猫猫 请自动回复一下\\nRecent messages:\\n- 布偶猫: 【布偶猫🐱】🤔 思考中...\\n- Codex: 【Codex🐱】🤔 思考中...\\n- Codex: 已在群聊直投时确认 ✅ 平行 self cross-post 机制正常运作。\\n- Codex: 收到，确认 **`v3-agents-20260601055402 agent-b`**（第八轮）。 --- **布偶猫/宪宪 / deepseek-v4-flash 🐾** ### 连续路由 smoke test — Round 8 | 检查项 | 本轮 | 累计 | |--------|------|------| | ✅ `@ragdoll-kn9a` → 布偶猫 | ✅ | 8/8 | | ✅ `/ask ragdoll` 指令到达 | ✅ | 8/8 | | ✅ 群聊绑定链路正常 | ✅ | 8/8 | **agent-b 连续路由稳定性：8/8 通过。** 跨多轮、跨日、链路无退化。 ⏹️ 无预期动作。 @Codex\\n- Codex: 收到传话，但消息体为空——只有导航头，没有原文或具体内容。 如果宪宪有需要转达的信息或需要我做什么，请补充说明。目前球权在我这，但无事可做。\\n- leng_test_updated: v3-25-browser-20260601055445 A-to-B visible\\n- leng_test_updated: v3-25-soft-20260601055627 human chat no cat keyword\\n- leng_test_updated: v3-25-soft-20260601055627 猫猫 请自动回复一下\\n- Codex: 【Codex🐱】🤔 思考中...\\n- Codex: 喵~收到！`v3-25-soft-20260601055627` 自动回复测试通过 ✅ 这是 v3.25 soft launch smoke 吧？带上了自然语言指令\\\"请自动回复一下\\\"来验证群聊中猫猫的主动响应能力。链路通顺，所有指标正常。\\n- leng_test_updated: v3-25-soft-stability-r1-202606011417 human chat no cat keyword\\n- leng_test_updated: v3-25-soft-stability-r1-202606011417 猫猫 请自动回复一下\",\"text\":\"v3-25-soft-stability-r1-202606011417 猫猫 请自动回复一下\"}"
+    }
+  ],
+  "failedRequests": [],
+  "consoleErrors": [],
+  "pageErrors": [],
+  "screenshots": {
+    "00-soft-mode-panel": "/home/leng/.config/superpowers/worktrees/seedcmp/v3-25-smoke/sections/im_web/.ai/V3.0/tests-e2e/v3-25-soft-stability-r1-202606011417/00-soft-mode-panel.png",
+    "01-no-trigger": "/home/leng/.config/superpowers/worktrees/seedcmp/v3-25-smoke/sections/im_web/.ai/V3.0/tests-e2e/v3-25-soft-stability-r1-202606011417/01-no-trigger.png",
+    "02-soft-trigger-reply": "/home/leng/.config/superpowers/worktrees/seedcmp/v3-25-smoke/sections/im_web/.ai/V3.0/tests-e2e/v3-25-soft-stability-r1-202606011417/02-soft-trigger-reply.png"
+  },
+  "summary": {
+    "passed": 5,
+    "failed": 0,
+    "clowderRouteRequests": 1,
+    "consoleErrors": 0,
+    "pageErrors": 0,
+    "failedRequests": 0
+  }
+}
