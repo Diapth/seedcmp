@@ -13,7 +13,9 @@ const SYSTEM_ROBOT_ID = 'u_10000';
 const DEEPSEEK_AI_ROBOT_ID = 'deepseek_ai_robot';
 const CLOWDER_AI_ROBOT_ID = 'clowder_ai';
 
-const clowderCatContacts = computed(() => clowderStore.catContactDirectory);
+const clowderCatContacts = computed(() => clowderStore.catContactDirectory.filter(cat =>
+  cat.source !== 'disconnected'
+));
 const connectedCatContacts = computed(() => clowderStore.connectedCatContacts);
 
 onMounted(() => {

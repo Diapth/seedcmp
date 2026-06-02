@@ -3,7 +3,7 @@
  * Shared types, interfaces, and helper functions for route-serial and route-parallel.
  */
 
-import type { CatId, MessageContent, RichBlock, RichBlockBase } from '@cat-cafe/shared';
+import type { CatId, CoordinationContext, MessageContent, RichBlock, RichBlockBase } from '@cat-cafe/shared';
 import { getCatContextBudget } from '../../../../../config/cat-budgets.js';
 import { DEFAULT_HIERARCHICAL_CONTEXT } from '../../../../../config/hierarchical-context-config.js';
 import { createModuleLogger } from '../../../../../infrastructure/logger.js';
@@ -144,6 +144,8 @@ export interface RouteOptions {
   completeA2ASlots?: ((threadId: string, catIds: readonly CatId[], controller: AbortController) => void) | undefined;
   /** F153 Phase E: Root route span — invocation spans become children of this. */
   routeSpan?: import('@opentelemetry/api').Span | undefined;
+  /** Visible-PM context for coordinator-led dispatches. */
+  coordination?: CoordinationContext | undefined;
 }
 
 export interface IncrementalContextResult {

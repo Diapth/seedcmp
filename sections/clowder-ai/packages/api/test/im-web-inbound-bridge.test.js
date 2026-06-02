@@ -127,6 +127,26 @@ describe('im-web inbound bridge', () => {
     });
   });
 
+  it('forwards explicit IM Web routing targets to the connector router', async () => {
+    const { handler, messages, triggerCalls } = createHarness();
+    const req = signedRequest(
+      createImWebInboundPayload({
+        text: '普通群消息',
+        directCatId: 'coordinator',
+        targetCatIds: ['coordinator'],
+        promptContext: 'Group context',
+      }),
+    );
+
+    const result = await handler.handleWebhook(req.body, req.headers, req.rawBody);
+
+    assert.equal(result.kind, 'routed');
+    assert.equal(triggerCalls.length, 1);
+    assert.equal(triggerCalls[0][1], 'coordinator');
+    assert.deepEqual(messages[0].mentions, ['coordinator']);
+    assert.equal(messages[0].extra.imWebRouting.promptContext, 'Group context');
+  });
+
   it('skips duplicate IM Web retries by message id', async () => {
     const { handler, messages, triggerCalls } = createHarness();
     const payload = createImWebInboundPayload({ messageId: 'retry-1', clientMsgNo: 'client-retry-1' });

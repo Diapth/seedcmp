@@ -81,6 +81,52 @@ describe('Tasks Routes', () => {
     assert.equal(events[0].data.title, 'Test task');
   });
 
+  test('POST/PATCH preserves coordination metadata and artifact refs', async () => {
+    const app = await createApp();
+    const createRes = await app.inject({
+      method: 'POST',
+      url: '/api/tasks',
+      payload: {
+        threadId: 'thread-1',
+        title: 'PM plan',
+        why: 'Coordinate parallel work',
+        createdBy: 'coordinator',
+        ownerCatId: 'codex',
+        coordinationId: 'coord-123',
+        dependsOn: ['task-root'],
+        artifactRefs: ['workspace:/apps/demo'],
+      },
+    });
+
+    assert.equal(createRes.statusCode, 201);
+    const created = createRes.json();
+    assert.equal(created.coordinationId, 'coord-123');
+    assert.deepEqual(created.dependsOn, ['task-root']);
+    assert.deepEqual(created.artifactRefs, ['workspace:/apps/demo']);
+
+    const updateRes = await app.inject({
+      method: 'PATCH',
+      url: `/api/tasks/${created.id}`,
+      payload: {
+        dependsOn: ['task-root', 'task-api'],
+        artifactRefs: ['workspace:/apps/demo', 'preview:http://127.0.0.1:3000'],
+      },
+    });
+
+    assert.equal(updateRes.statusCode, 200);
+    assert.deepEqual(updateRes.json().dependsOn, ['task-root', 'task-api']);
+    assert.deepEqual(updateRes.json().artifactRefs, ['workspace:/apps/demo', 'preview:http://127.0.0.1:3000']);
+
+    const listRes = await app.inject({
+      method: 'GET',
+      url: '/api/tasks?threadId=thread-1',
+    });
+    const listed = listRes.json().tasks[0];
+    assert.equal(listed.coordinationId, 'coord-123');
+    assert.deepEqual(listed.dependsOn, ['task-root', 'task-api']);
+    assert.deepEqual(listed.artifactRefs, ['workspace:/apps/demo', 'preview:http://127.0.0.1:3000']);
+  });
+
   test('POST rejects missing required fields', async () => {
     const app = await createApp();
     const response = await app.inject({

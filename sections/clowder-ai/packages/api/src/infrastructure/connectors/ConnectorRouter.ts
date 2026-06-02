@@ -16,7 +16,7 @@
  */
 
 import type { CatId, ConnectorSource, MessageContent } from '@cat-cafe/shared';
-import { catRegistry, getConnectorDefinition } from '@cat-cafe/shared';
+import { catRegistry, createCatId, getConnectorDefinition } from '@cat-cafe/shared';
 import type { FastifyBaseLogger } from 'fastify';
 import { findMonorepoRoot } from '../../utils/monorepo-root.js';
 import type { ConnectorCommandLayer } from './ConnectorCommandLayer.js';
@@ -26,6 +26,8 @@ import type { IConnectorThreadBindingStore } from './ConnectorThreadBindingStore
 import type { InboundMessageDedup } from './InboundMessageDedup.js';
 import { parseMentions } from './mention-parser.js';
 import type { IOutboundAdapter } from './OutboundDeliveryHook.js';
+
+const COORDINATOR_CAT_ID = createCatId('coordinator');
 
 /** Emit a connector_message socket event using the canonical protocol.
  *  All emit sites MUST use this to avoid protocol drift (旧/新 payload 不一致). */
@@ -63,6 +65,8 @@ export interface ConnectorRouterOptions {
       source: ConnectorSource;
       mentions: CatId[];
       timestamp: number;
+      extra?: { imWebRouting?: { promptContext?: string; targetCatIds?: string[] } };
+      contentBlocks?: readonly MessageContent[];
     }): Promise<{ id: string }>;
   };
   readonly threadStore: {
@@ -177,6 +181,11 @@ export class ConnectorRouter {
     sender?: { id: string; name?: string },
     chatType?: 'p2p' | 'group',
     chatName?: string,
+    routing?: {
+      directCatId?: string;
+      targetCatIds?: string[];
+      promptContext?: string;
+    },
   ): Promise<RouteResult> {
     const { bindingStore, dedup, messageStore, threadStore, invokeTrigger, socketManager, log } = this.opts;
 
@@ -438,8 +447,14 @@ export class ConnectorRouter {
     // Parse @-mentions to determine target cat
     const mentionPatterns = this.getMentionPatterns();
     const mentionResult = parseMentions(resolvedText, mentionPatterns, this.opts.defaultCatId);
-    let targetCatId = mentionResult.targetCatId;
-    if (!mentionResult.matched && this.opts.threadStore.getParticipantsWithActivity) {
+    const explicitTargetCatIds = this.normalizeExplicitTargetCatIds(routing);
+    let targetCatId = this.resolveConnectorTargetCatId(connectorId, mentionResult, explicitTargetCatIds);
+    if (
+      !mentionResult.matched &&
+      explicitTargetCatIds.length === 0 &&
+      targetCatId !== COORDINATOR_CAT_ID &&
+      this.opts.threadStore.getParticipantsWithActivity
+    ) {
       const participants = await this.opts.threadStore.getParticipantsWithActivity(binding.threadId);
       const lastActive = participants
         .filter((p) => p.messageCount > 0)
@@ -459,6 +474,16 @@ export class ConnectorRouter {
       mentions: [targetCatId],
       timestamp: storedTimestamp,
       ...(contentBlocks ? { contentBlocks } : {}),
+      ...(routing?.promptContext || explicitTargetCatIds.length > 1
+        ? {
+            extra: {
+              imWebRouting: {
+                ...(routing?.promptContext ? { promptContext: routing.promptContext } : {}),
+                ...(explicitTargetCatIds.length > 1 ? { targetCatIds: explicitTargetCatIds } : {}),
+              },
+            },
+          }
+        : {}),
     });
 
     // 4. Broadcast to WebSocket
@@ -496,6 +521,36 @@ export class ConnectorRouter {
       threadId: binding.threadId,
       messageId: stored.id,
     };
+  }
+
+  private normalizeExplicitTargetCatIds(routing?: {
+    directCatId?: string;
+    targetCatIds?: string[];
+  }): CatId[] {
+    const values = [
+      ...(routing?.directCatId ? [routing.directCatId] : []),
+      ...(routing?.targetCatIds ?? []),
+    ];
+    const out: CatId[] = [];
+    const seen = new Set<string>();
+    for (const raw of values) {
+      const trimmed = String(raw || '').replace(/^@/, '').trim();
+      if (!trimmed || seen.has(trimmed) || !catRegistry.has(trimmed)) continue;
+      seen.add(trimmed);
+      out.push(createCatId(trimmed));
+    }
+    return out;
+  }
+
+  private resolveConnectorTargetCatId(
+    connectorId: string,
+    mentionResult: { targetCatId: CatId; matched: boolean },
+    explicitTargetCatIds: readonly CatId[],
+  ): CatId {
+    if (explicitTargetCatIds.length > 0) return explicitTargetCatIds[0]!;
+    if (mentionResult.matched) return mentionResult.targetCatId;
+    if (connectorId === 'im-web' && catRegistry.has(COORDINATOR_CAT_ID)) return COORDINATOR_CAT_ID;
+    return mentionResult.targetCatId;
   }
 
   private async processAttachments(

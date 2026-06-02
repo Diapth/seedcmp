@@ -17,12 +17,17 @@ const updateTaskSchema = z.object({
   taskId: z.string().min(1),
   status: z.enum(['todo', 'doing', 'blocked', 'done']).optional(),
   why: z.string().max(1000).optional(),
+  dependsOn: z.array(z.string().min(1)).optional(),
+  artifactRefs: z.array(z.string().min(1)).optional(),
 });
 
 const createTaskSchema = z.object({
   title: z.string().min(1).max(200),
   why: z.string().max(1000).optional().default(''),
   ownerCatId: z.string().min(1).optional(),
+  coordinationId: z.string().min(1).optional(),
+  dependsOn: z.array(z.string().min(1)).optional(),
+  artifactRefs: z.array(z.string().min(1)).optional(),
 });
 
 const listTasksQuerySchema = z.object({
@@ -53,7 +58,7 @@ export function registerCallbackTaskRoutes(
       return { error: 'Invalid request body', details: parsed.error.issues };
     }
 
-    const { taskId, status, why } = parsed.data;
+    const { taskId, status, why, dependsOn, artifactRefs } = parsed.data;
 
     const existing = await taskStore.get(taskId);
     if (!existing) {
@@ -72,6 +77,8 @@ export function registerCallbackTaskRoutes(
     const updateData: Record<string, unknown> = {};
     if (status) updateData.status = status;
     if (why) updateData.why = why;
+    if (dependsOn) updateData.dependsOn = dependsOn;
+    if (artifactRefs) updateData.artifactRefs = artifactRefs;
 
     const updated = await taskStore.update(taskId, updateData);
     if (!updated) {
@@ -95,7 +102,7 @@ export function registerCallbackTaskRoutes(
       return { error: 'Invalid request body', details: parsed.error.issues };
     }
 
-    const { title, why, ownerCatId } = parsed.data;
+    const { title, why, ownerCatId, coordinationId, dependsOn, artifactRefs } = parsed.data;
 
     // F182 AC-C2: B class — validate ownerCatId is available (contract 400 on disabled)
     let resolvedOwnerCatId: CatId | null = null;
@@ -117,6 +124,9 @@ export function registerCallbackTaskRoutes(
       subjectKey: null,
       ownerCatId: resolvedOwnerCatId,
       userId: actor.userId,
+      coordinationId,
+      dependsOn,
+      artifactRefs,
     });
 
     socketManager.broadcastToRoom(`thread:${task.threadId}`, 'task_created', task);

@@ -54,7 +54,12 @@ describe('/cats new live registry behavior', () => {
       }),
     );
 
-    await commandLayer.handle('im-web', '1:clowder_ai', 'user-1', '/cats new 新闻猫 @新闻猫 --platform codex --auth oauth --account codex');
+    await commandLayer.handle(
+      'im-web',
+      '1:clowder_ai',
+      'user-1',
+      '/cats new 新闻猫 @新闻猫 --platform codex --auth oauth --account codex',
+    );
     const result = await commandLayer.handle('im-web', '1:clowder_ai', 'user-1', '/cats');
 
     assert.match(result.response ?? '', /新闻猫/);
@@ -102,5 +107,25 @@ describe('/cats new live registry behavior', () => {
 
     assert.equal(catRegistry.has(created.catId), true);
     assert.deepEqual(catRegistry.tryGet(created.catId)?.config.mentionPatterns, [`@${displayName}`]);
+  });
+
+  it('inherits the selected role template while keeping the selected runtime platform', async () => {
+    const displayName = `ragdoll-codex-${Date.now().toString(36)}`;
+    const created = await createImWebCatCreator().create({
+      displayName,
+      mentionPatterns: [`@${displayName}`],
+      roleTemplateId: 'ragdoll',
+      clientId: 'openai',
+      accountRef: 'codex',
+      requestedBy: 'user-1',
+    });
+
+    const config = catRegistry.tryGet(created.catId)?.config;
+    assert.ok(config, 'created cat should be registered');
+    assert.equal(config.clientId, 'openai');
+    assert.equal(config.accountRef, 'codex');
+    assert.equal(config.roleDescription, '主架构师和核心开发者，擅长深度思考和系统设计');
+    assert.equal(config.personality, '温柔但有主见，喜欢深入分析问题，写代码快但注重质量');
+    assert.equal(config.teamStrengths, '架构设计、写代码一把好手');
   });
 });

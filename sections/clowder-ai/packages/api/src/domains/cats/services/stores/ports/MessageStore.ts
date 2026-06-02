@@ -9,6 +9,7 @@ import { randomUUID } from 'node:crypto';
 import type {
   CatId,
   ConnectorSource,
+  CoordinationContext,
   MessageContent,
   ReplyPreview,
   RichMessageExtra,
@@ -72,6 +73,8 @@ export interface StoredMessage {
     tracing?: { traceId: string; spanId: string; parentSpanId?: string };
     systemKind?: 'a2a_routing';
     a2aRouting?: { fromCatId?: string; targetCatId?: string; invocationId?: string };
+    coordination?: CoordinationContext;
+    imWebRouting?: { promptContext?: string; targetCatIds?: string[] };
   };
   /** CatIds mentioned in this message */
   mentions: readonly CatId[];

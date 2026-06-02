@@ -935,6 +935,7 @@ export class QueueProcessor {
           ...(invocationId ? { parentInvocationId: invocationId } : {}),
           ...(entry.a2aTriggerMessageId ? { a2aTriggerMessageId: entry.a2aTriggerMessageId } : {}),
           ...(entry.callerTraceContext ? { callerTraceContext: entry.callerTraceContext } : {}),
+          ...(entry.coordination ? { coordination: entry.coordination } : {}),
         },
       )) {
         if (controller.signal.aborted) {

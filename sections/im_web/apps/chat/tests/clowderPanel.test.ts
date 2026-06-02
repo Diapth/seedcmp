@@ -26,7 +26,7 @@ describe('clowder conversation panel component', () => {
 
     expect(source.default).toContain('setGroupAutoReplyMode')
     expect(source.default).toContain('仅 @ 时回复')
-    expect(source.default).toContain('提到猫猫时自动回复')
+    expect(source.default).toContain('默认协调者')
     expect(source.default).toContain('关闭')
   })
 })

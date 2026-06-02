@@ -59,6 +59,7 @@ let clowderSyncTimers: number[] = [];
 const SYSTEM_ROBOT_ID = 'u_10000';
 const DEEPSEEK_AI_ROBOT_ID = 'deepseek_ai_robot';
 const CLOWDER_AI_ROBOT_ID = 'clowder_ai';
+const CLOWDER_COORDINATOR_CAT_ID = 'coordinator';
 
 // Mention state
 const showMentionPopup = ref(false);
@@ -127,7 +128,7 @@ const clowderConversationKey = computed(() => `${props.channelId}-${Number(props
 
 const groupAutoReplyMode = computed(() => {
   if (props.channelType !== 2) return 'mentions_only';
-  return clowderStore.groupAutoReplyModes[props.channelId] || 'mentions_only';
+  return clowderStore.groupAutoReplyModes[props.channelId] || 'soft_mentions';
 });
 
 function getMemberUid(member: any): string {
@@ -892,6 +893,7 @@ async function handleSend() {
     mode: groupAutoReplyMode.value,
     cats: props.channelType === 2 ? (clowderStore.groupCatMemberships[props.channelId] || []) : [],
     explicitTargetCatIds,
+    defaultTargetCatId: props.channelType === 2 ? CLOWDER_COORDINATOR_CAT_ID : undefined,
     focusedCatId: clowderStore.conversations[clowderConversationKey.value]?.focusCatId,
     lastActiveCatId: clowderStore.agentDirectories[clowderConversationKey.value]?.lastActive?.catId,
     replyTarget: messageStore.replyTarget,

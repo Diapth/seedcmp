@@ -12,6 +12,7 @@ const feedback = ref('');
 const form = reactive({
   name: '',
   alias: '',
+  roleTemplateId: '',
   clientId: '' as '' | 'openai' | 'anthropic',
   authType: '' as '' | 'api_key' | 'oauth',
   accountRef: '',
@@ -24,6 +25,14 @@ const canCreate = computed(() => form.name.trim().length > 0 &&
   form.clientId !== '' &&
   form.authType !== '' &&
   form.accountRef.trim().length > 0);
+
+const roleTemplateOptions = computed(() => clowderStore.catContactDirectory.filter(cat =>
+  cat.source === 'disconnected'
+));
+
+const selectedRoleTemplate = computed(() =>
+  roleTemplateOptions.value.find(cat => cat.catId === form.roleTemplateId)
+);
 
 const availableCats = computed(() => {
   const query = searchQuery.value.trim().toLowerCase();
@@ -55,6 +64,7 @@ async function loadDirectory() {
 function resetForm() {
   form.name = '';
   form.alias = '';
+  form.roleTemplateId = '';
   form.clientId = '';
   form.authType = '';
   form.accountRef = '';
@@ -62,6 +72,13 @@ function resetForm() {
   form.personality = '';
   form.capabilitiesText = '';
   feedback.value = '';
+}
+
+function applyRoleTemplate() {
+  const template = selectedRoleTemplate.value;
+  if (!template) return;
+  if (!form.personality.trim()) form.personality = template.personalitySummary;
+  if (!form.capabilitiesText.trim()) form.capabilitiesText = template.capabilitySummary;
 }
 
 function openCat(cat: ClowderCatContact) {
@@ -90,6 +107,7 @@ async function createCatAndConnect() {
   const cat = await clowderStore.createCatAndConnect({
     name: form.name.trim(),
     alias: form.alias.trim() || undefined,
+    roleTemplateId: form.roleTemplateId || undefined,
     clientId,
     authType,
     accountRef: form.accountRef.trim(),
@@ -130,6 +148,20 @@ function back() {
     <div class="console-layout">
       <section class="console-section">
         <div class="section-title">猫猫设置</div>
+        <label class="field">
+          <span>角色模板</span>
+          <select v-model="form.roleTemplateId" @change="applyRoleTemplate">
+            <option value="">选择 roleTemplates 角色模板</option>
+            <option v-for="template in roleTemplateOptions" :key="template.catId" :value="template.catId">
+              {{ template.displayName }} · {{ template.capabilitySummary || template.catId }}
+            </option>
+          </select>
+        </label>
+        <div v-if="selectedRoleTemplate" class="template-preview">
+          <span class="template-name">{{ selectedRoleTemplate.displayName }}</span>
+          <span>{{ selectedRoleTemplate.personalitySummary || '未声明性格设定' }}</span>
+          <span class="muted">{{ selectedRoleTemplate.capabilitySummary || '未声明能力标签' }}</span>
+        </div>
         <label class="field">
           <span>名称</span>
           <input v-model="form.name" placeholder="例如：代码助手" />
@@ -333,6 +365,29 @@ function back() {
   margin-top: 4px;
   color: var(--text-secondary);
   font-size: 12px;
+}
+
+.template-preview {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  margin: -4px 0 12px;
+  padding: 10px;
+  border: var(--border-hairline);
+  border-radius: var(--radius-sm);
+  background-color: var(--bg-secondary);
+  color: var(--text-secondary);
+  font-size: 12px;
+  line-height: 1.45;
+}
+
+.template-name {
+  color: var(--text-primary);
+  font-weight: 600;
+}
+
+.muted {
+  color: var(--text-tertiary, var(--text-secondary));
 }
 
 .form-actions {

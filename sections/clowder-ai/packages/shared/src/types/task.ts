@@ -78,6 +78,12 @@ export interface TaskItem {
   readonly sourceMessageId?: string;
   /** Source summary ID for traceability (4-A feature) */
   readonly sourceSummaryId?: string;
+  /** Coordination chain ID when this task belongs to a PM/coordinator workflow. */
+  readonly coordinationId?: string;
+  /** Task dependencies within the same or related coordination chain. */
+  readonly dependsOn?: readonly string[];
+  /** Workspace/document/preview artifacts produced for this task. */
+  readonly artifactRefs?: readonly string[];
 }
 
 export type CreateTaskInput = Pick<TaskItem, 'threadId' | 'title' | 'why' | 'createdBy'> & {
@@ -88,6 +94,9 @@ export type CreateTaskInput = Pick<TaskItem, 'threadId' | 'title' | 'why' | 'cre
   userId?: string;
   sourceMessageId?: string;
   sourceSummaryId?: string;
+  coordinationId?: string;
+  dependsOn?: readonly string[];
+  artifactRefs?: readonly string[];
 };
 
 /** Mutable partial for updates — strips readonly from TaskItem fields */
@@ -97,4 +106,6 @@ export type UpdateTaskInput = {
   status?: TaskStatus;
   why?: string;
   automationState?: AutomationState;
+  dependsOn?: readonly string[];
+  artifactRefs?: readonly string[];
 };

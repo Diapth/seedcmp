@@ -382,12 +382,27 @@ export const createTaskInputSchema = {
       'Cat ID to assign the task to (optional, defaults to unassigned). ' +
         'F182: if disabled, returns 400 {kind:"cat_disabled", alternatives[]}. Assign to an available cat from alternatives[].',
     ),
+  coordinationId: z
+    .string()
+    .min(1)
+    .optional()
+    .describe('PM/coordinator chain ID. Use the coordinationId from your current coordinator context.'),
+  dependsOn: z
+    .array(z.string().min(1))
+    .optional()
+    .describe('Task IDs this task depends on, usually within the same coordination chain.'),
+  artifactRefs: z
+    .array(z.string().min(1))
+    .optional()
+    .describe('Workspace paths, document IDs, preview URLs, or other artifact references produced by the task.'),
 };
 
 export const updateTaskInputSchema = {
   taskId: z.string().min(1).describe('The ID of the task to update'),
   status: z.enum(['todo', 'doing', 'blocked', 'done']).optional().describe('New task status'),
   why: z.string().max(1000).optional().describe('Optional note explaining the status change'),
+  dependsOn: z.array(z.string().min(1)).optional().describe('Replace dependency task IDs for this task.'),
+  artifactRefs: z.array(z.string().min(1)).optional().describe('Replace artifact references for this task.'),
 };
 
 export const crossPostMessageInputSchema = {
@@ -647,6 +662,8 @@ export async function handleUpdateTask(input: {
   taskId: string;
   status?: string | undefined;
   why?: string | undefined;
+  dependsOn?: string[] | undefined;
+  artifactRefs?: string[] | undefined;
 }): Promise<ToolResult> {
   // F174 Phase E (AC-E2/E5): explicit kind:'none'. Task state lives in Redis;
   // local fallback would diverge from server truth. Surface `[degrade]` hint.
@@ -657,6 +674,8 @@ export async function handleUpdateTask(input: {
         taskId: input.taskId,
         ...(input.status ? { status: input.status } : {}),
         ...(input.why ? { why: input.why } : {}),
+        ...(input.dependsOn ? { dependsOn: input.dependsOn } : {}),
+        ...(input.artifactRefs ? { artifactRefs: input.artifactRefs } : {}),
       }),
     policy: { kind: 'none' },
   });
@@ -666,11 +685,17 @@ export async function handleCreateTask(input: {
   title: string;
   why?: string | undefined;
   ownerCatId?: string | undefined;
+  coordinationId?: string | undefined;
+  dependsOn?: string[] | undefined;
+  artifactRefs?: string[] | undefined;
 }): Promise<ToolResult> {
   return callbackPost('/api/callbacks/create-task', {
     title: input.title,
     ...(input.why ? { why: input.why } : {}),
     ...(input.ownerCatId ? { ownerCatId: input.ownerCatId } : {}),
+    ...(input.coordinationId ? { coordinationId: input.coordinationId } : {}),
+    ...(input.dependsOn ? { dependsOn: input.dependsOn } : {}),
+    ...(input.artifactRefs ? { artifactRefs: input.artifactRefs } : {}),
   });
 }
 
@@ -1386,6 +1411,7 @@ export const callbackTools = [
       'e.g. "fix login timeout", "update API docs", "review F160 spec". ' +
       'NOT for: temporary execution steps (use PlanBoard/TodoWrite), NOT for inline checklists in a message (use create_rich_block with kind:"checklist"). ' +
       'Output: task appears in the thread 🧶 毛线球 panel, persists across sessions, visible to all cats and 铲屎官. ' +
+      'Coordinator tip: when acting as PM, include coordinationId and use dependsOn/artifactRefs so the task panel groups the plan, subtasks, and produced artifacts. ' +
       'GOTCHA: 毛线球 ≠ checklist rich block. 毛线球 lives in the task panel and survives session boundaries; checklist is ephemeral inline content in one message. ' +
       'TIP: Include a "why" to give context to whoever picks up the task.',
     inputSchema: createTaskInputSchema,

@@ -76,6 +76,9 @@ export class RedisTaskStore implements ITaskStore {
       updatedAt: now,
       automationState: input.automationState,
       userId: input.userId,
+      coordinationId: input.coordinationId,
+      dependsOn: input.dependsOn,
+      artifactRefs: input.artifactRefs,
     };
 
     await this.writeTask(task);
@@ -131,6 +134,9 @@ export class RedisTaskStore implements ITaskStore {
         updatedAt: now,
         automationState: input.automationState,
         userId: input.userId,
+        coordinationId: input.coordinationId,
+        dependsOn: input.dependsOn,
+        artifactRefs: input.artifactRefs,
       };
       const written = await this.writeTask(task, { syncSubject: false, requireSubjectOwner: true });
       if (!written) {
@@ -184,6 +190,9 @@ export class RedisTaskStore implements ITaskStore {
         updatedAt: now,
         automationState: input.automationState,
         userId: input.userId,
+        coordinationId: input.coordinationId,
+        dependsOn: input.dependsOn,
+        artifactRefs: input.artifactRefs,
       };
       const written = await this.writeTask(task, { syncSubject: false, requireSubjectOwner: true });
       if (!written) {
@@ -205,6 +214,9 @@ export class RedisTaskStore implements ITaskStore {
       why: input.why,
       userId: input.userId ?? existing.userId,
       automationState: input.automationState ?? existing.automationState,
+      coordinationId: input.coordinationId ?? existing.coordinationId,
+      dependsOn: input.dependsOn ?? existing.dependsOn,
+      artifactRefs: input.artifactRefs ?? existing.artifactRefs,
       updatedAt: now,
     };
 
@@ -263,6 +275,8 @@ export class RedisTaskStore implements ITaskStore {
       ...(input.status !== undefined ? { status: input.status } : {}),
       ...(input.why !== undefined ? { why: input.why } : {}),
       ...(input.automationState !== undefined ? { automationState: input.automationState } : {}),
+      ...(input.dependsOn !== undefined ? { dependsOn: input.dependsOn } : {}),
+      ...(input.artifactRefs !== undefined ? { artifactRefs: input.artifactRefs } : {}),
       updatedAt: Date.now(),
     };
 
@@ -480,6 +494,15 @@ export class RedisTaskStore implements ITaskStore {
     if (task.automationState) {
       out.automationState = JSON.stringify(task.automationState);
     }
+    if (task.coordinationId) {
+      out.coordinationId = task.coordinationId;
+    }
+    if (task.dependsOn) {
+      out.dependsOn = JSON.stringify(task.dependsOn);
+    }
+    if (task.artifactRefs) {
+      out.artifactRefs = JSON.stringify(task.artifactRefs);
+    }
     return out;
   }
 
@@ -497,14 +520,32 @@ export class RedisTaskStore implements ITaskStore {
       createdAt: parseInt(data.createdAt ?? '0', 10),
       updatedAt: parseInt(data.updatedAt ?? '0', 10),
       userId: data.userId || undefined,
+      coordinationId: data.coordinationId || undefined,
     };
+    let task = base;
     if (data.automationState) {
       try {
-        return { ...base, automationState: JSON.parse(data.automationState) };
+        task = { ...task, automationState: JSON.parse(data.automationState) };
       } catch {
-        return base;
+        /* ignore corrupt optional state */
       }
     }
-    return base;
+    if (data.dependsOn) {
+      try {
+        const dependsOn = JSON.parse(data.dependsOn);
+        if (Array.isArray(dependsOn)) task = { ...task, dependsOn: dependsOn.map(String) };
+      } catch {
+        /* ignore corrupt optional state */
+      }
+    }
+    if (data.artifactRefs) {
+      try {
+        const artifactRefs = JSON.parse(data.artifactRefs);
+        if (Array.isArray(artifactRefs)) task = { ...task, artifactRefs: artifactRefs.map(String) };
+      } catch {
+        /* ignore corrupt optional state */
+      }
+    }
+    return task;
   }
 }

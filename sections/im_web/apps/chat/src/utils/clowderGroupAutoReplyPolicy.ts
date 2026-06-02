@@ -2,6 +2,7 @@ export type GroupCatAutoReplyMode = 'off' | 'mentions_only' | 'soft_mentions';
 
 export type GroupCatAutoReplyReason =
   | 'explicit_mention'
+  | 'default_coordinator'
   | 'soft_cat_keyword'
   | 'soft_cat_name'
   | 'reply_to_cat'
@@ -37,6 +38,7 @@ export interface ResolveGroupCatAutoReplyInput {
   mode: GroupCatAutoReplyMode;
   cats: GroupCatAutoReplyCat[];
   explicitTargetCatIds?: string[];
+  defaultTargetCatId?: string;
   focusedCatId?: string;
   lastActiveCatId?: string;
   replyTarget?: any;
@@ -166,6 +168,11 @@ export function resolveGroupCatAutoReplyTrigger(input: ResolveGroupCatAutoReplyI
   const explicitTargetCatIds = unique(input.explicitTargetCatIds || []);
   if (explicitTargetCatIds.length > 0) {
     return decision('explicit_mention', explicitTargetCatIds);
+  }
+
+  const defaultTargetCatId = String(input.defaultTargetCatId || '').trim();
+  if (input.mode === 'soft_mentions' && defaultTargetCatId) {
+    return decision('default_coordinator', [defaultTargetCatId]);
   }
 
   if (input.mode !== 'soft_mentions') {

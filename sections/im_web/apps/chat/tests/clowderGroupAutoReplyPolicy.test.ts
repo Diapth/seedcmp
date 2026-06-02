@@ -18,6 +18,22 @@ const codex = {
 }
 
 describe('Clowder group auto reply policy', () => {
+  it('routes no-mention group messages to the default coordinator when enabled', () => {
+    const decision = resolveGroupCatAutoReplyTrigger({
+      text: '帮我拆一下这个比赛 demo 的任务',
+      mode: 'soft_mentions',
+      cats: [codex, ragdoll],
+      explicitTargetCatIds: [],
+      defaultTargetCatId: 'coordinator'
+    })
+
+    expect(decision).toEqual({
+      shouldRoute: true,
+      targetCatIds: ['coordinator'],
+      reason: 'default_coordinator'
+    })
+  })
+
   it('routes explicit cat mentions regardless of soft auto reply mode', () => {
     const decision = resolveGroupCatAutoReplyTrigger({
       text: '@Codex 帮我看一下这段逻辑',
@@ -74,7 +90,7 @@ describe('Clowder group auto reply policy', () => {
     })
   })
 
-  it('does not interrupt ordinary human chat when no cat trigger is present', () => {
+  it('does not interrupt ordinary human chat when no cat trigger is present and no default is configured', () => {
     const decision = resolveGroupCatAutoReplyTrigger({
       text: '我们先把明天的会议时间定下来',
       mode: 'soft_mentions',

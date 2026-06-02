@@ -27,7 +27,7 @@ const directory = computed(() => clowderStore.agentDirectories[`${props.channelI
 const groupAgents = computed(() => props.channelType === 2 ? clowderStore.groupCatMemberships[props.channelId] || [] : []);
 const autoReplyModes: Array<{ value: ClowderGroupAutoReplyMode; label: string }> = [
   { value: 'mentions_only', label: '仅 @ 时回复' },
-  { value: 'soft_mentions', label: '提到猫猫时自动回复' },
+  { value: 'soft_mentions', label: '默认协调者' },
   { value: 'off', label: '关闭' }
 ];
 const status = computed(() => {
@@ -47,7 +47,7 @@ const agents = computed(() => directory.value?.agents || conversation.value?.age
 const currentFocus = computed(() => conversation.value?.focusCatId);
 const groupAutoReplyMode = computed<ClowderGroupAutoReplyMode>(() => {
   if (props.channelType !== 2) return 'mentions_only';
-  return clowderStore.groupAutoReplyModes[props.channelId] || 'mentions_only';
+  return clowderStore.groupAutoReplyModes[props.channelId] || 'soft_mentions';
 });
 
 async function refresh() {

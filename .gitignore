@@ -9,6 +9,7 @@ __pycache__/
 .vscode/
 .agents/
 .specify/
+.seedcmp-run/
 
 # IM backend sources are tracked for V2/V3 integration.
 sections/im/*

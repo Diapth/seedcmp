@@ -151,6 +151,75 @@ func TestFetchCatDirectoryUsesDirectHubAndKeepsExistingRagdoll(t *testing.T) {
 	assert.Equal(t, "owner-1", gotUser)
 }
 
+func TestFetchCatDirectoryFallsBackToTemplateCandidatesWhenAgentDirectoryFails(t *testing.T) {
+	gotPaths := []string{}
+	gotUsers := []string{}
+	upstream := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		gotPaths = append(gotPaths, r.URL.RequestURI())
+		gotUsers = append(gotUsers, r.Header.Get("x-cat-cafe-user"))
+		require.Equal(t, http.MethodGet, r.Method)
+		switch r.URL.Path {
+		case "/api/connectors/im-web/agents":
+			http.Error(w, "agents unavailable", http.StatusBadGateway)
+		case "/api/cat-templates":
+			_ = json.NewEncoder(w).Encode(map[string]interface{}{
+				"templates": []map[string]interface{}{
+					{
+						"id":              "ragdoll",
+						"name":            "布偶猫",
+						"nickname":        "宪宪",
+						"avatar":          "/avatars/opus.png",
+						"roleDescription": "主架构师和核心开发者，擅长深度思考和系统设计",
+						"personality":     "温柔但有主见",
+						"teamStrengths":   "架构设计、写代码一把好手",
+					},
+					{
+						"id":              "maine-coon",
+						"name":            "Codex",
+						"nickname":        "Codex",
+						"avatar":          "/avatars/codex.png",
+						"roleDescription": "代码审查专家",
+						"personality":     "严谨认真",
+						"teamStrengths":   "Review、找 bug、coding 落地",
+					},
+				},
+			})
+		default:
+			http.NotFound(w, r)
+		}
+	}))
+	defer upstream.Close()
+
+	c := New(nil)
+	c.SetConfig(commonmodule.ClowderBridgeConfig{
+		Enabled:            true,
+		APIBaseURL:         upstream.URL,
+		ConnectorID:        "im-web",
+		ConnectorSecret:    "secret",
+		DefaultOwnerUserID: "owner-1",
+		RequestTimeout:     time.Second,
+		SignatureTolerance: time.Minute,
+	})
+
+	directory, err := c.fetchCatDirectory("leng_test_updated")
+
+	require.NoError(t, err)
+	require.Len(t, directory.Agents, 2)
+	assert.Equal(t, "ragdoll", directory.Agents[0].CatID)
+	assert.Equal(t, "布偶猫", directory.Agents[0].DisplayName)
+	assert.Equal(t, []string{"@ragdoll", "@布偶猫", "@宪宪"}, directory.Agents[0].MentionPatterns)
+	assert.Equal(t, "架构设计、写代码一把好手", directory.Agents[0].CapabilitySummary)
+	assert.True(t, directory.Agents[0].Available)
+	assert.False(t, directory.Agents[0].Connected)
+	assert.Equal(t, "disconnected", directory.Agents[0].Source)
+	assert.Equal(t, "available", directory.Agents[0].AvailabilityState)
+	require.Len(t, gotPaths, 2)
+	assert.Contains(t, gotPaths[0], "/api/connectors/im-web/agents?externalChatId=1%3A")
+	assert.Contains(t, gotPaths[0], "leng_test_updated")
+	assert.Equal(t, "/api/cat-templates", gotPaths[1])
+	assert.Equal(t, []string{"owner-1", "owner-1"}, gotUsers)
+}
+
 func TestCatContactResponseFindsExistingCatByDisplayNameOrMention(t *testing.T) {
 	directory := AgentDirectoryResponse{
 		Agents: []ClowderAgent{
@@ -175,6 +244,35 @@ func TestCatContactResponseFindsExistingCatByDisplayNameOrMention(t *testing.T) 
 	assert.Equal(t, "opus", byMention.Agent.CatID)
 }
 
+func TestDecorateCatContactKeepsDisconnectedTemplateCandidateUnconnected(t *testing.T) {
+	agent := decorateCatContact(ClowderAgent{
+		CatID:           "opus",
+		DisplayName:     "布偶猫",
+		MentionPatterns: []string{"@opus", "@布偶猫"},
+		Available:       false,
+		Source:          "disconnected",
+	}, "existing")
+
+	assert.False(t, agent.Connected)
+	assert.Equal(t, "unavailable", agent.AvailabilityState)
+	assert.Equal(t, "disconnected", agent.Source)
+}
+
+func TestDecorateCatDirectoryContactAllowsDisconnectedTemplateCandidateToBeAdded(t *testing.T) {
+	agent := decorateCatDirectoryContact(ClowderAgent{
+		CatID:           "opus",
+		DisplayName:     "布偶猫",
+		MentionPatterns: []string{"@opus", "@布偶猫"},
+		Available:       false,
+		Source:          "disconnected",
+	})
+
+	assert.True(t, agent.Available)
+	assert.False(t, agent.Connected)
+	assert.Equal(t, "available", agent.AvailabilityState)
+	assert.Equal(t, "disconnected", agent.Source)
+}
+
 func TestRouteTextForDirectCatUsesPlainMentionToAutoCreateThread(t *testing.T) {
 	text := routeTextForCatRequest(conversationRefRequest{
 		Text:        "你好，今天状态如何？",
@@ -192,6 +290,37 @@ func TestRouteTextForSingleGroupTargetUsesPlainMentionToAutoCreateThread(t *test
 
 	assert.True(t, strings.HasPrefix(text, "@opus "))
 	assert.Contains(t, text, "@布偶猫 帮我总结")
+}
+
+func TestSendInboundTextWithRoutingForwardsExplicitTargets(t *testing.T) {
+	var got InboundMessage
+	upstream := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		require.Equal(t, http.MethodPost, r.Method)
+		require.Equal(t, "/api/connectors/im-web/inbound", r.URL.Path)
+		require.NoError(t, json.NewDecoder(r.Body).Decode(&got))
+		_ = json.NewEncoder(w).Encode(RouteResponse{Kind: "routed", ThreadID: "thread-1", MessageID: "msg-1"})
+	}))
+	defer upstream.Close()
+
+	c := New(nil)
+	c.SetConfig(commonmodule.ClowderBridgeConfig{
+		Enabled:            true,
+		APIBaseURL:         upstream.URL,
+		ConnectorID:        "im-web",
+		ConnectorSecret:    "secret",
+		DefaultOwnerUserID: "owner-1",
+		RequestTimeout:     time.Second,
+		SignatureTolerance: time.Minute,
+	})
+
+	response, err := c.sendInboundTextWithRouting("group-1", 2, "user-1", "帮我拆任务", "coordinator", []string{"coordinator"}, "Group context")
+
+	require.NoError(t, err)
+	assert.Equal(t, "thread-1", response.ThreadID)
+	assert.Equal(t, "2:group-1", got.ExternalChatID)
+	assert.Equal(t, "coordinator", got.DirectCatID)
+	assert.Equal(t, []string{"coordinator"}, got.TargetCatIDs)
+	assert.Equal(t, "Group context", got.PromptContext)
 }
 
 func TestGroupCatMembershipStoreRoundTripsPromptAndCats(t *testing.T) {
@@ -223,10 +352,10 @@ func TestGroupCatMembershipStoreRoundTripsPromptAndCats(t *testing.T) {
 
 func TestBuildCreateCatCommandRequiresAndNormalizesClientPlatform(t *testing.T) {
 	command, ok := buildCreateCatCommand(createCatRequest{
-		Name:     "测试猫",
-		Alias:    "@testcat",
-		ClientID: "openai",
-		AuthType: "oauth",
+		Name:       "测试猫",
+		Alias:      "@testcat",
+		ClientID:   "openai",
+		AuthType:   "oauth",
 		AccountRef: "codex",
 	})
 
@@ -234,15 +363,16 @@ func TestBuildCreateCatCommandRequiresAndNormalizesClientPlatform(t *testing.T) 
 	assert.Equal(t, "/cats new 测试猫 @testcat --platform codex --auth oauth --account codex", command)
 
 	command, ok = buildCreateCatCommand(createCatRequest{
-		Name:     "Claude猫",
-		Alias:    "@claude-cat",
-		ClientID: "anthropic",
-		AuthType: "api_key",
-		AccountRef: "anthropic-prod",
+		Name:           "Claude猫",
+		Alias:          "@claude-cat",
+		RoleTemplateID: "ragdoll",
+		ClientID:       "anthropic",
+		AuthType:       "api_key",
+		AccountRef:     "anthropic-prod",
 	})
 
 	require.True(t, ok)
-	assert.Equal(t, "/cats new Claude猫 @claude-cat --platform claude-code --auth api-key --account anthropic-prod", command)
+	assert.Equal(t, "/cats new Claude猫 @claude-cat --platform claude-code --auth api-key --account anthropic-prod --role-template ragdoll", command)
 
 	_, ok = buildCreateCatCommand(createCatRequest{Name: "无平台猫"})
 	assert.False(t, ok)

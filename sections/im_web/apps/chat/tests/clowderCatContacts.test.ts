@@ -114,4 +114,63 @@ describe('Clowder cats as contact identities', () => {
     })
     expect(getChannelInfo).not.toHaveBeenCalled()
   })
+
+  it('keeps locally connected cats when a refreshed directory only returns template candidates', async () => {
+    const { useClowderStore } = await import('../../../packages/datasource-vue/src/stores/clowderStore.ts')
+    const store = useClowderStore()
+
+    post.mockResolvedValueOnce({
+      agent: {
+        catId: 'runtime-helper',
+        displayName: '代码助手',
+        aliases: ['@helper'],
+        mentionPatterns: ['@helper'],
+        personalitySummary: '稳健地写代码',
+        capabilitySummary: '代码审查、测试',
+        available: true,
+        source: 'runtime-created'
+      },
+      contact: {
+        connected: true,
+        source: 'runtime-created'
+      }
+    })
+
+    await store.createCatAndConnect({
+      name: '代码助手',
+      alias: '@helper',
+      clientId: 'openai',
+      authType: 'api_key',
+      accountRef: 'openai-prod'
+    })
+
+    expect(store.connectedCatContacts.map(cat => cat.catId)).toEqual(['runtime-helper'])
+    expect(store.catContactDirectory.map(cat => cat.catId)).toContain('runtime-helper')
+
+    get.mockResolvedValueOnce({
+      agents: [
+        {
+          catId: 'ragdoll',
+          displayName: '布偶猫',
+          aliases: ['@ragdoll', '@布偶猫'],
+          mentionPatterns: ['@ragdoll', '@布偶猫'],
+          personalitySummary: '温柔但有主见',
+          capabilitySummary: '架构设计',
+          available: true,
+          connected: false,
+          source: 'disconnected'
+        }
+      ]
+    })
+
+    const refreshed = await store.loadCatContactDirectory({ includeUnavailable: true })
+
+    expect(get).toHaveBeenCalledWith('clowder/cats', { params: { includeUnavailable: true } })
+    expect(refreshed.map(cat => cat.catId)).toEqual(['ragdoll', 'runtime-helper'])
+    expect(store.connectedCatContacts.map(cat => cat.catId)).toEqual(['runtime-helper'])
+    expect(store.catContactDirectory.find(cat => cat.catId === 'runtime-helper')).toMatchObject({
+      displayName: '代码助手',
+      connected: true
+    })
+  })
 })

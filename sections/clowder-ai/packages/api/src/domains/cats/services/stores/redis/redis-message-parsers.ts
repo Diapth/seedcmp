@@ -60,6 +60,7 @@ export function safeParseExtra(raw: string | undefined):
       targetCats?: string[];
       tracing?: { traceId: string; spanId: string; parentSpanId?: string };
       systemKind?: 'a2a_routing';
+      imWebRouting?: { promptContext?: string; targetCatIds?: string[] };
     }
   | undefined {
   if (!raw) return undefined;
@@ -85,6 +86,7 @@ export function safeParseExtra(raw: string | undefined):
       tracing?: { traceId: string; spanId: string; parentSpanId?: string };
       systemKind?: 'a2a_routing';
       a2aRouting?: { fromCatId?: string; targetCatId?: string; invocationId?: string };
+      imWebRouting?: { promptContext?: string; targetCatIds?: string[] };
     } = {};
     let hasField = false;
 
@@ -139,6 +141,22 @@ export function safeParseExtra(raw: string | undefined):
     if (Array.isArray(parsed.targetCats)) {
       result.targetCats = parsed.targetCats;
       hasField = true;
+    }
+
+    if (parsed.imWebRouting && typeof parsed.imWebRouting === 'object') {
+      const imWebRouting: NonNullable<typeof result.imWebRouting> = {};
+      if (typeof parsed.imWebRouting.promptContext === 'string') {
+        imWebRouting.promptContext = parsed.imWebRouting.promptContext;
+      }
+      if (Array.isArray(parsed.imWebRouting.targetCatIds)) {
+        imWebRouting.targetCatIds = parsed.imWebRouting.targetCatIds.filter(
+          (value: unknown): value is string => typeof value === 'string' && value.trim().length > 0,
+        );
+      }
+      if (imWebRouting.promptContext || imWebRouting.targetCatIds?.length) {
+        result.imWebRouting = imWebRouting;
+        hasField = true;
+      }
     }
 
     if (parsed.systemKind === 'a2a_routing') {

@@ -12,7 +12,7 @@
 
 import { existsSync } from 'node:fs';
 import { resolve } from 'node:path';
-import { type CatId, type ConnectorSource, catRegistry } from '@cat-cafe/shared';
+import { type CatId, type ConnectorSource, type MessageContent, catRegistry } from '@cat-cafe/shared';
 import type { RedisClient } from '@cat-cafe/shared/utils';
 import * as lark from '@larksuiteoapi/node-sdk';
 import type { FastifyBaseLogger } from 'fastify';
@@ -95,6 +95,8 @@ export interface ConnectorGatewayDeps {
       source: ConnectorSource;
       mentions: CatId[];
       timestamp: number;
+      extra?: { imWebRouting?: { promptContext?: string; targetCatIds?: string[] } };
+      contentBlocks?: readonly MessageContent[];
     }): Promise<{ id: string }>;
     getById?(id: string): Promise<{ source?: ConnectorSource } | null>;
     getByThreadBefore?(

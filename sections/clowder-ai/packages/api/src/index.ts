@@ -21,11 +21,13 @@ import {
   getAllCatIdsFromConfig,
   getConfigSessionStrategy,
   getDefaultCatId,
+  loadCatConfig,
   isCatAvailable,
   toAllCatConfigs,
 } from './config/cat-config-loader.js';
 import { configEventBus } from './config/config-event-bus.js';
 import { resolveFrontendBaseUrl, resolveFrontendCorsOrigins } from './config/frontend-origin.js';
+import { resolveProjectTemplatePath } from './config/project-template-path.js';
 import { initRuntimeOverrides } from './config/session-strategy-overrides.js';
 import { assertStorageReady } from './config/storage-guard.js';
 import { createTaskProgressStore } from './domains/cats/services/agents/invocation/createTaskProgressStore.js';
@@ -223,6 +225,8 @@ import {
 import { knowledgeFeedRoutes } from './routes/knowledge-feed.js';
 import { marketplaceRoutes } from './routes/marketplace.js';
 import { previewRoutes } from './routes/preview.js';
+import type { ThreadCatDirectoryAgent } from './routes/thread-cats.js';
+import { resolveActiveProjectRoot } from './utils/active-project-root.js';
 import { terminalRoutes } from './routes/terminal.js';
 import { threadExportRoutes } from './routes/thread-export.js';
 import { ApiInstanceLease, type ApiInstanceLeaseInvalidation } from './services/ApiInstanceLease.js';
@@ -254,6 +258,44 @@ function hasRuntimeSessionDrain(service: AgentService): service is AgentService 
   drainRuntimeSession(runtimeSessionId: string): Promise<RuntimeSessionSealReaperDrainResult>;
 } {
   return typeof (service as { drainRuntimeSession?: unknown }).drainRuntimeSession === 'function';
+}
+
+function catConfigToDirectoryAgent(config: CatConfig, source: ThreadCatDirectoryAgent['source']): ThreadCatDirectoryAgent {
+  return {
+    catId: String(config.id),
+    displayName: config.displayName,
+    aliases: [...config.mentionPatterns],
+    mentionPatterns: [...config.mentionPatterns],
+    avatar: config.avatar,
+    personalitySummary: config.personality,
+    capabilitySummary: config.teamStrengths ?? config.roleDescription,
+    source,
+  };
+}
+
+function getTemplateDirectoryAgents(): ThreadCatDirectoryAgent[] {
+  try {
+    const projectRoot = resolveActiveProjectRoot();
+    const templatePath = resolveProjectTemplatePath(projectRoot);
+    const templateConfig = loadCatConfig(templatePath);
+    return Object.values(toAllCatConfigs(templateConfig))
+      .filter((config) => config.isDefaultVariant !== false)
+      .map((config) => catConfigToDirectoryAgent(config, 'disconnected'));
+  } catch {
+    return [];
+  }
+}
+
+function getImWebDirectoryAgents(): ThreadCatDirectoryAgent[] {
+  const byCatId = new Map<string, ThreadCatDirectoryAgent>();
+  for (const config of Object.values(catRegistry.getAllConfigs())) {
+    const agent = catConfigToDirectoryAgent(config, 'existing');
+    byCatId.set(agent.catId, agent);
+  }
+  for (const agent of getTemplateDirectoryAgents()) {
+    if (!byCatId.has(agent.catId)) byCatId.set(agent.catId, agent);
+  }
+  return [...byCatId.values()];
 }
 
 async function main(): Promise<void> {
@@ -1695,14 +1737,14 @@ async function main(): Promise<void> {
     ? new RedisConnectorThreadBindingStore(redisClient)
     : new MemoryConnectorThreadBindingStore();
   {
-    const allCatConfigs = catRegistry.getAllConfigs();
     await app.register(threadCatsRoutes, {
       threadStore,
       agentRegistry,
       bindingStore: connectorBindingStore,
-      getCatDisplayName: (catId: string) => allCatConfigs[catId]?.displayName ?? catId,
-      getAllCatIds: () => Object.keys(allCatConfigs),
+      getCatDisplayName: (catId: string) => catRegistry.getAllConfigs()[catId]?.displayName ?? catId,
+      getAllCatIds: () => Object.keys(catRegistry.getAllConfigs()),
       isCatAvailable: (catId: string) => isCatAvailable(catId),
+      getDirectoryAgents: getImWebDirectoryAgents,
     });
   }
   await app.register(tasksRoutes, { taskStore, socketManager });

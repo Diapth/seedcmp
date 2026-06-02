@@ -103,6 +103,10 @@ export function resolveGroupCatAutoReplyTrigger(input) {
     if (explicitTargetCatIds.length > 0) {
         return decision('explicit_mention', explicitTargetCatIds);
     }
+    const defaultTargetCatId = String(input.defaultTargetCatId || '').trim();
+    if (input.mode === 'soft_mentions' && defaultTargetCatId) {
+        return decision('default_coordinator', [defaultTargetCatId]);
+    }
     if (input.mode !== 'soft_mentions') {
         return decision('auto_reply_disabled');
     }

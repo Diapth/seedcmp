@@ -226,6 +226,14 @@ export {
   DEFAULT_INTAKE_CHECKLIST,
   validateIntakeChecklist,
 } from './community-issue.js';
+// Coordination / lead-agent routing types
+export type {
+  CoordinationContext,
+  CoordinationPhase,
+  LeadSelection,
+  LeadSelectionMode,
+  LeadSelectionReason,
+} from './coordination.js';
 // Connector types (F97 外部信息源抽象)
 export type {
   ConnectorDefinition,

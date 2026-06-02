@@ -51,7 +51,7 @@ packages/web/public/vendor/
 # Runtime state (bootstrapped per-machine from cat-template.json)
 cat-config.json
 .cat-cafe/
-
+.pnpm-home/
 # Claude Code skills — cat-cafe symlinks are tracked; plugin-generated ones are not
 .claude/skills/pencil-renderer
 .claude/skills/pencil-to-code

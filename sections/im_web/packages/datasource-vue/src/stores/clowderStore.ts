@@ -166,7 +166,7 @@ function mergeClowderCatContacts(existing: ClowderCatContact[], additions: Clowd
 
 function normalizeGroupAutoReplyMode(mode?: string, proactiveReplies?: boolean): ClowderGroupAutoReplyMode {
   if (mode === 'off' || mode === 'mentions_only' || mode === 'soft_mentions') return mode;
-  return proactiveReplies === true ? 'soft_mentions' : 'mentions_only';
+  return proactiveReplies === false ? 'mentions_only' : 'soft_mentions';
 }
 
 export const useClowderStore = defineStore('clowder', () => {
@@ -280,6 +280,18 @@ export const useClowderStore = defineStore('clowder', () => {
     }));
   }
 
+  function applyCatDirectoryRefresh(directory: ClowderCatContact[]) {
+    const directoryIds = new Set(directory.map(cat => cat.catId));
+    const retainedConnectedContacts = connectedCatContacts.value.filter(cat =>
+      directoryIds.has(cat.catId) || cat.source !== 'existing'
+    );
+    const connectedFromDirectory = directory.filter(cat => cat.connected);
+    const nextConnected = mergeClowderCatContacts(retainedConnectedContacts, connectedFromDirectory);
+    connectedCatContacts.value = nextConnected;
+    catContactDirectory.value = mergeClowderCatContacts(directory, nextConnected);
+    return catContactDirectory.value;
+  }
+
   function upsertConnectedCatContact(contact: ClowderCatContact) {
     const idx = connectedCatContacts.value.findIndex(item => item.catId === contact.catId);
     const next = {
@@ -294,6 +306,8 @@ export const useClowderStore = defineStore('clowder', () => {
     const directoryIdx = catContactDirectory.value.findIndex(item => item.catId === contact.catId);
     if (directoryIdx >= 0) {
       catContactDirectory.value[directoryIdx] = next;
+    } else {
+      catContactDirectory.value = mergeClowderCatContacts(catContactDirectory.value, [next]);
     }
     return next;
   }
@@ -311,9 +325,7 @@ export const useClowderStore = defineStore('clowder', () => {
     error.value = undefined;
     try {
       const directory = normalizeCatDirectory(await clowderApi.getCatDirectory(params) as unknown as ClowderCatDirectoryResponse);
-      catContactDirectory.value = directory;
-      connectedCatContacts.value = directory.filter(cat => cat.connected);
-      return directory;
+      return applyCatDirectoryRefresh(directory);
     } catch (err) {
       error.value = err instanceof Error ? err.message : 'Clowder cat directory unavailable';
       throw err;
@@ -410,7 +422,7 @@ export const useClowderStore = defineStore('clowder', () => {
     groupId: string,
     groupName: string,
     cats: ClowderCatContact[],
-    autoReplyMode: ClowderGroupAutoReplyMode = 'mentions_only'
+    autoReplyMode: ClowderGroupAutoReplyMode = 'soft_mentions'
   ) {
     const prompt = buildClowderGroupPrompt({
       groupId,
@@ -482,16 +494,16 @@ export const useClowderStore = defineStore('clowder', () => {
 
   async function persistRecoveredGroupCats(groupId: string, groupName: string, cats: ClowderCatContact[]) {
     if (cats.length === 0) return;
-    const prompt = buildCurrentGroupPrompt(groupId, groupName || groupId, cats, 'mentions_only');
-    groupAutoReplyModes.value[groupId] = 'mentions_only';
+    const prompt = buildCurrentGroupPrompt(groupId, groupName || groupId, cats, 'soft_mentions');
+    groupAutoReplyModes.value[groupId] = 'soft_mentions';
     try {
       await clowderApi.syncGroupCats({
         groupId,
         groupName: groupName || groupId,
         catIds: cats.map(cat => cat.catId),
         cats: serializeGroupCatsForSync(cats),
-        proactiveReplies: false,
-        autoReplyMode: 'mentions_only',
+        proactiveReplies: true,
+        autoReplyMode: 'soft_mentions',
         prompt
       });
     } catch (e) {
@@ -521,9 +533,9 @@ export const useClowderStore = defineStore('clowder', () => {
     if (conversationDirectoryCats.length === 0) {
       try {
         const directory = await clowderApi.getCatDirectory({ includeUnavailable: true }) as unknown as ClowderCatDirectoryResponse | undefined;
-        catContactDirectory.value = (directory?.agents || []).map(agent => toClowderCatContact(agent, {
+        applyCatDirectoryRefresh((directory?.agents || []).map(agent => toClowderCatContact(agent, {
           connected: agent.connected === true
-        }));
+        })));
       } catch (_err) {
         // The history recovery path can still fall back to its own directory lookup.
       }
@@ -554,15 +566,15 @@ export const useClowderStore = defineStore('clowder', () => {
       ? current
       : [...current, contact];
     groupCatMemberships.value[groupId] = nextCats;
-    const nextPrompt = buildCurrentGroupPrompt(groupId, groupName || groupId, nextCats, 'mentions_only');
-    groupAutoReplyModes.value[groupId] = 'mentions_only';
+    const nextPrompt = buildCurrentGroupPrompt(groupId, groupName || groupId, nextCats, 'soft_mentions');
+    groupAutoReplyModes.value[groupId] = 'soft_mentions';
     await clowderApi.syncGroupCats({
       groupId,
       groupName: groupName || groupId,
       catIds: nextCats.map(cat => cat.catId),
       cats: serializeGroupCatsForSync(nextCats),
-      proactiveReplies: false,
-      autoReplyMode: 'mentions_only',
+      proactiveReplies: true,
+      autoReplyMode: 'soft_mentions',
       prompt: nextPrompt
     });
     return nextCats;
@@ -571,15 +583,15 @@ export const useClowderStore = defineStore('clowder', () => {
   async function removeGroupCat(groupId: string, catId: string, groupName?: string) {
     const nextCats = (groupCatMemberships.value[groupId] || []).filter(cat => cat.catId !== catId);
     groupCatMemberships.value[groupId] = nextCats;
-    const nextPrompt = buildCurrentGroupPrompt(groupId, groupName || groupId, nextCats, 'mentions_only');
-    groupAutoReplyModes.value[groupId] = 'mentions_only';
+    const nextPrompt = buildCurrentGroupPrompt(groupId, groupName || groupId, nextCats, 'soft_mentions');
+    groupAutoReplyModes.value[groupId] = 'soft_mentions';
     await clowderApi.syncGroupCats({
       groupId,
       groupName: groupName || groupId,
       catIds: nextCats.map(cat => cat.catId),
       cats: serializeGroupCatsForSync(nextCats),
-      proactiveReplies: false,
-      autoReplyMode: 'mentions_only',
+      proactiveReplies: true,
+      autoReplyMode: 'soft_mentions',
       prompt: nextPrompt
     });
     return nextCats;

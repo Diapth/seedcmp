@@ -119,6 +119,7 @@ export interface ClowderMessageRequest extends ClowderConversationRef {
 export interface ClowderCreateCatRequest {
   name: string;
   alias?: string;
+  roleTemplateId?: string;
   clientId: 'openai' | 'anthropic';
   authType: 'api_key' | 'oauth';
   accountRef: string;

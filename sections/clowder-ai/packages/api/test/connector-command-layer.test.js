@@ -955,11 +955,20 @@ describe('ConnectorCommandLayer', () => {
           },
         },
       });
-      const result = await layer.handle('im-web', '2:group1', 'user1', '/cats new 悟净 @悟净 --platform codex', 'owner1');
+      const result = await layer.handle(
+        'im-web',
+        '2:group1',
+        'user1',
+        '/cats new 悟净 @悟净 --platform codex --auth oauth --account codex --role-template ragdoll',
+        'owner1',
+      );
       assert.equal(result.kind, 'cats');
       assert.equal(created.length, 1);
       assert.equal(created[0].requestedBy, 'owner1');
       assert.equal(created[0].clientId, 'openai');
+      assert.equal(created[0].authType, 'oauth');
+      assert.equal(created[0].accountRef, 'codex');
+      assert.equal(created[0].roleTemplateId, 'ragdoll');
       assert.equal(created[0].displayName, '悟净');
       assert.deepEqual(created[0].mentionPatterns, ['@悟净']);
       assert.ok(result.response.includes('悟净'));

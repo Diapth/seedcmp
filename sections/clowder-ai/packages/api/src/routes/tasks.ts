@@ -31,6 +31,9 @@ const createSchema = z.object({
   why: z.string().max(1000).default(''),
   createdBy: createdBySchema,
   ownerCatId: catIdSchema().nullable().optional(),
+  coordinationId: z.string().min(1).optional(),
+  dependsOn: z.array(z.string().min(1)).optional(),
+  artifactRefs: z.array(z.string().min(1)).optional(),
 });
 
 const updateSchema = z
@@ -39,6 +42,8 @@ const updateSchema = z
     ownerCatId: catIdSchema().nullable().optional(),
     status: z.enum(VALID_STATUSES).optional(),
     why: z.string().max(1000).optional(),
+    dependsOn: z.array(z.string().min(1)).optional(),
+    artifactRefs: z.array(z.string().min(1)).optional(),
   })
   .refine((data) => Object.keys(data).length > 0, {
     message: 'At least one field must be provided',
@@ -52,9 +57,10 @@ function toCreateInput(data: z.infer<typeof createSchema>): CreateTaskInput {
     why: data.why,
     createdBy: data.createdBy as CatId | 'user',
   };
-  if (data.ownerCatId != null) {
-    return { ...input, ownerCatId: data.ownerCatId as CatId };
-  }
+  if (data.ownerCatId != null) input.ownerCatId = data.ownerCatId as CatId;
+  if (data.coordinationId) input.coordinationId = data.coordinationId;
+  if (data.dependsOn) input.dependsOn = data.dependsOn;
+  if (data.artifactRefs) input.artifactRefs = data.artifactRefs;
   return input;
 }
 
@@ -65,6 +71,8 @@ function toUpdateInput(data: z.infer<typeof updateSchema>): UpdateTaskInput {
   if (data.status !== undefined) input.status = data.status;
   if (data.why !== undefined) input.why = data.why;
   if (data.ownerCatId !== undefined) input.ownerCatId = data.ownerCatId as CatId | null;
+  if (data.dependsOn !== undefined) input.dependsOn = data.dependsOn;
+  if (data.artifactRefs !== undefined) input.artifactRefs = data.artifactRefs;
   return input;
 }
 

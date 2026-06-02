@@ -88,7 +88,10 @@ function parseFlagValue(parts: string[], names: string[]): string | undefined {
 }
 
 function normalizeImWebCatAuthType(value: string | undefined): 'oauth' | 'api_key' | undefined {
-  const normalized = String(value || '').trim().toLowerCase().replace(/-/g, '_');
+  const normalized = String(value || '')
+    .trim()
+    .toLowerCase()
+    .replace(/-/g, '_');
   if (normalized === 'oauth' || normalized === 'subscription') return 'oauth';
   if (normalized === 'api_key' || normalized === 'apikey') return 'api_key';
   return undefined;
@@ -135,6 +138,7 @@ export interface ConnectorCommandLayerDeps {
     create(input: {
       displayName: string;
       mentionPatterns: string[];
+      roleTemplateId?: string;
       clientId: ClientId;
       authType?: 'oauth' | 'api_key';
       accountRef?: string;
@@ -378,7 +382,8 @@ export class ConnectorCommandLayer {
     if (!args) {
       return {
         kind: 'cats',
-        response: '❌ 用法: /cats new <猫名> [@别名] --platform codex|claude-code\n例如: /cats new 悟净 @悟净 --platform codex',
+        response:
+          '❌ 用法: /cats new <猫名> [@别名] --platform codex|claude-code\n例如: /cats new 悟净 @悟净 --platform codex',
         contextThreadId: threadId,
       };
     }
@@ -391,7 +396,8 @@ export class ConnectorCommandLayer {
     if (!displayName) {
       return {
         kind: 'cats',
-        response: '❌ 用法: /cats new <猫名> [@别名] --platform codex|claude-code\n例如: /cats new 悟净 @悟净 --platform codex',
+        response:
+          '❌ 用法: /cats new <猫名> [@别名] --platform codex|claude-code\n例如: /cats new 悟净 @悟净 --platform codex',
         contextThreadId: threadId,
       };
     }
@@ -399,17 +405,20 @@ export class ConnectorCommandLayer {
     if (!clientId) {
       return {
         kind: 'cats',
-        response: '❌ 用法: /cats new <猫名> [@别名] --platform codex|claude-code\n请选择运行平台：codex 或 claude-code。',
+        response:
+          '❌ 用法: /cats new <猫名> [@别名] --platform codex|claude-code\n请选择运行平台：codex 或 claude-code。',
         contextThreadId: threadId,
       };
     }
     const authType = normalizeImWebCatAuthType(parseFlagValue(parts, ['--auth', '--auth-type']));
     const accountRef = parseFlagValue(parts, ['--account', '--account-ref'])?.trim();
     const defaultModel = parseFlagValue(parts, ['--model'])?.trim();
+    const roleTemplateId = parseFlagValue(parts, ['--role-template', '--role-template-id', '--template'])?.trim();
     if (!authType || !accountRef) {
       return {
         kind: 'cats',
-        response: '❌ 用法: /cats new <猫名> [@别名] --platform codex|claude-code --auth oauth|api-key --account <账号引用>',
+        response:
+          '❌ 用法: /cats new <猫名> [@别名] --platform codex|claude-code --auth oauth|api-key --account <账号引用>',
         contextThreadId: threadId,
       };
     }
@@ -424,6 +433,7 @@ export class ConnectorCommandLayer {
         authType,
         accountRef,
         ...(defaultModel ? { defaultModel } : {}),
+        ...(roleTemplateId ? { roleTemplateId } : {}),
         requestedBy,
       });
       if (this.deps.catRoster) {

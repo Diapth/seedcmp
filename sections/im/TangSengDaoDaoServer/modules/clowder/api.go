@@ -101,6 +101,20 @@ type ClowderAgent struct {
 	Preferred          bool     `json:"preferred,omitempty"`
 }
 
+type catTemplatesResponse struct {
+	Templates []catTemplate `json:"templates"`
+}
+
+type catTemplate struct {
+	ID              string `json:"id"`
+	Name            string `json:"name"`
+	Nickname        string `json:"nickname,omitempty"`
+	Avatar          string `json:"avatar,omitempty"`
+	RoleDescription string `json:"roleDescription,omitempty"`
+	Personality     string `json:"personality,omitempty"`
+	TeamStrengths   string `json:"teamStrengths,omitempty"`
+}
+
 type conversationRefRequest struct {
 	ChannelID     string   `json:"channelId"`
 	ChannelType   uint8    `json:"channelType"`
@@ -118,15 +132,16 @@ type catContactRequest struct {
 }
 
 type createCatRequest struct {
-	Name         string   `json:"name"`
-	Alias        string   `json:"alias,omitempty"`
-	ClientID     string   `json:"clientId,omitempty"`
-	Platform     string   `json:"platform,omitempty"`
-	AuthType     string   `json:"authType,omitempty"`
-	AccountRef   string   `json:"accountRef,omitempty"`
-	DefaultModel string   `json:"defaultModel,omitempty"`
-	Personality  string   `json:"personality,omitempty"`
-	Capabilities []string `json:"capabilities,omitempty"`
+	Name           string   `json:"name"`
+	Alias          string   `json:"alias,omitempty"`
+	RoleTemplateID string   `json:"roleTemplateId,omitempty"`
+	ClientID       string   `json:"clientId,omitempty"`
+	Platform       string   `json:"platform,omitempty"`
+	AuthType       string   `json:"authType,omitempty"`
+	AccountRef     string   `json:"accountRef,omitempty"`
+	DefaultModel   string   `json:"defaultModel,omitempty"`
+	Personality    string   `json:"personality,omitempty"`
+	Capabilities   []string `json:"capabilities,omitempty"`
 }
 
 type catContactEnvelope struct {
@@ -244,22 +259,6 @@ func (c *Clowder) createCatAndConnect(ctx *wkhttp.Context) {
 		if response, ok := catContactResponse(alias, directory, "runtime-created"); ok {
 			ctx.JSON(http.StatusOK, response)
 			return
-		}
-	}
-	if _, err := c.sendCommand(clowderAIDirectChannelID, 1, ctx.GetLoginUID(), "/new IM Web 猫猫联系人"); err == nil {
-		if _, err := c.sendCommand(clowderAIDirectChannelID, 1, ctx.GetLoginUID(), createCommand); err != nil {
-			ctx.JSON(http.StatusBadGateway, map[string]string{"error": "cat_create_failed", "message": err.Error()})
-			return
-		}
-		if directory, err := c.fetchCatDirectory(ctx.GetLoginUID()); err == nil {
-			if response, ok := catContactResponse(name, directory, "runtime-created"); ok {
-				ctx.JSON(http.StatusOK, response)
-				return
-			}
-			if response, ok := catContactResponse(alias, directory, "runtime-created"); ok {
-				ctx.JSON(http.StatusOK, response)
-				return
-			}
 		}
 	}
 	ctx.JSON(http.StatusOK, fallbackCreatedCatResponse(req, alias))
@@ -534,13 +533,57 @@ func (c *Clowder) fetchAgentDirectory(channelID string, channelType uint8, userI
 	if err != nil {
 		return AgentDirectoryResponse{}, err
 	}
-	directoryUserID := strings.TrimSpace(c.config.DefaultOwnerUserID)
-	if directoryUserID == "" {
-		directoryUserID = strings.TrimSpace(userID)
+	c.applyDirectoryUserHeader(req, userID)
+
+	res, err := c.httpClient().Do(req)
+	if err != nil {
+		return c.fallbackAgentDirectory(userID, err)
 	}
-	if directoryUserID != "" {
-		req.Header.Set("x-cat-cafe-user", directoryUserID)
+	defer res.Body.Close()
+	if res.StatusCode < 200 || res.StatusCode >= 300 {
+		return c.fallbackAgentDirectory(userID, fmt.Errorf("clowder agents failed: %s", res.Status))
 	}
+
+	var directory AgentDirectoryResponse
+	if err := json.NewDecoder(res.Body).Decode(&directory); err != nil {
+		return c.fallbackAgentDirectory(userID, err)
+	}
+	if directory.Agents == nil {
+		directory.Agents = []ClowderAgent{}
+	}
+	if len(directory.Agents) == 0 {
+		if fallback, fallbackErr := c.fetchTemplateCandidateDirectory(userID); fallbackErr == nil && len(fallback.Agents) > 0 {
+			return fallback, nil
+		}
+	}
+	return directory, nil
+}
+
+func (c *Clowder) fallbackAgentDirectory(userID string, cause error) (AgentDirectoryResponse, error) {
+	fallback, fallbackErr := c.fetchTemplateCandidateDirectory(userID)
+	if fallbackErr == nil && len(fallback.Agents) > 0 {
+		return fallback, nil
+	}
+	if cause != nil {
+		return AgentDirectoryResponse{}, cause
+	}
+	return fallback, fallbackErr
+}
+
+func (c *Clowder) fetchTemplateCandidateDirectory(userID string) (AgentDirectoryResponse, error) {
+	if !c.config.IsConfigured() {
+		return AgentDirectoryResponse{}, fmt.Errorf("clowder bridge is not configured")
+	}
+	endpoint, err := url.Parse(strings.TrimRight(c.config.APIBaseURL, "/") + "/api/cat-templates")
+	if err != nil {
+		return AgentDirectoryResponse{}, err
+	}
+
+	req, err := http.NewRequest(http.MethodGet, endpoint.String(), nil)
+	if err != nil {
+		return AgentDirectoryResponse{}, err
+	}
+	c.applyDirectoryUserHeader(req, userID)
 
 	res, err := c.httpClient().Do(req)
 	if err != nil {
@@ -548,17 +591,79 @@ func (c *Clowder) fetchAgentDirectory(channelID string, channelType uint8, userI
 	}
 	defer res.Body.Close()
 	if res.StatusCode < 200 || res.StatusCode >= 300 {
-		return AgentDirectoryResponse{}, fmt.Errorf("clowder agents failed: %s", res.Status)
+		return AgentDirectoryResponse{}, fmt.Errorf("clowder cat templates failed: %s", res.Status)
 	}
 
-	var directory AgentDirectoryResponse
-	if err := json.NewDecoder(res.Body).Decode(&directory); err != nil {
+	var response catTemplatesResponse
+	if err := json.NewDecoder(res.Body).Decode(&response); err != nil {
 		return AgentDirectoryResponse{}, err
 	}
-	if directory.Agents == nil {
-		directory.Agents = []ClowderAgent{}
+
+	agents := make([]ClowderAgent, 0, len(response.Templates))
+	for _, template := range response.Templates {
+		if agent, ok := catTemplateCandidateAgent(template); ok {
+			agents = append(agents, agent)
+		}
 	}
-	return directory, nil
+	return AgentDirectoryResponse{Agents: agents}, nil
+}
+
+func (c *Clowder) applyDirectoryUserHeader(req *http.Request, userID string) {
+	directoryUserID := strings.TrimSpace(c.config.DefaultOwnerUserID)
+	if directoryUserID == "" {
+		directoryUserID = strings.TrimSpace(userID)
+	}
+	if directoryUserID != "" {
+		req.Header.Set("x-cat-cafe-user", directoryUserID)
+	}
+}
+
+func catTemplateCandidateAgent(template catTemplate) (ClowderAgent, bool) {
+	catID := strings.TrimSpace(template.ID)
+	if catID == "" {
+		return ClowderAgent{}, false
+	}
+	displayName := strings.TrimSpace(template.Name)
+	if displayName == "" {
+		displayName = catID
+	}
+	mentionPatterns := templateCandidateMentions(catID, displayName, template.Nickname)
+	capabilitySummary := strings.TrimSpace(template.TeamStrengths)
+	if capabilitySummary == "" {
+		capabilitySummary = strings.TrimSpace(template.RoleDescription)
+	}
+	return ClowderAgent{
+		CatID:              catID,
+		DisplayName:        displayName,
+		Aliases:            mentionPatterns,
+		MentionPatterns:    mentionPatterns,
+		Avatar:             strings.TrimSpace(template.Avatar),
+		PersonalitySummary: strings.TrimSpace(template.Personality),
+		CapabilitySummary:  capabilitySummary,
+		Available:          false,
+		AvailabilityState:  "unavailable",
+		Source:             "disconnected",
+		Connected:          false,
+	}, true
+}
+
+func templateCandidateMentions(values ...string) []string {
+	mentions := make([]string, 0, len(values))
+	seen := map[string]bool{}
+	for _, value := range values {
+		trimmed := strings.TrimPrefix(strings.TrimSpace(value), "@")
+		if trimmed == "" {
+			continue
+		}
+		mention := "@" + trimmed
+		key := strings.ToLower(mention)
+		if seen[key] {
+			continue
+		}
+		seen[key] = true
+		mentions = append(mentions, mention)
+	}
+	return mentions
 }
 
 func (c *Clowder) fetchCatDirectory(userID string) (AgentDirectoryResponse, error) {
@@ -567,7 +672,7 @@ func (c *Clowder) fetchCatDirectory(userID string) (AgentDirectoryResponse, erro
 		return AgentDirectoryResponse{}, err
 	}
 	for idx := range directory.Agents {
-		directory.Agents[idx] = decorateCatContact(directory.Agents[idx], "existing")
+		directory.Agents[idx] = decorateCatDirectoryContact(directory.Agents[idx])
 	}
 	return directory, nil
 }
@@ -641,7 +746,19 @@ func decorateCatContact(agent ClowderAgent, source string) ClowderAgent {
 	if agent.Source == "" {
 		agent.Source = source
 	}
-	agent.Connected = true
+	if !agent.Connected {
+		agent.Connected = agent.Available && agent.Source != "disconnected" && agent.Source != "stale"
+	}
+	return agent
+}
+
+func decorateCatDirectoryContact(agent ClowderAgent) ClowderAgent {
+	agent = decorateCatContact(agent, "existing")
+	if agent.Source == "disconnected" {
+		agent.Available = true
+		agent.AvailabilityState = "available"
+		agent.Connected = false
+	}
 	return agent
 }
 
@@ -739,6 +856,9 @@ func buildCreateCatCommand(req createCatRequest) (string, bool) {
 	command := "/cats new " + name + " " + alias + " --platform " + platform + " --auth " + authType + " --account " + accountRef
 	if model := strings.TrimSpace(req.DefaultModel); model != "" {
 		command += " --model " + model
+	}
+	if roleTemplateID := strings.TrimSpace(req.RoleTemplateID); roleTemplateID != "" {
+		command += " --role-template " + roleTemplateID
 	}
 	return command, true
 }

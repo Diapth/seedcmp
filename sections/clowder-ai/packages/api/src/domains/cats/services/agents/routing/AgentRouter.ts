@@ -18,7 +18,7 @@
  * 虽然参数可选（兼容测试），但生产代码必须显式传入。
  */
 
-import type { CatId, CatRoutingError, MessageContent } from '@cat-cafe/shared';
+import type { CatId, CatRoutingError, CoordinationContext, LeadSelection, MessageContent } from '@cat-cafe/shared';
 import { catRegistry, escapeRegExp } from '@cat-cafe/shared';
 import type { SessionStore } from '@cat-cafe/shared/utils';
 import { context as ctxApi, SpanStatusCode, trace } from '@opentelemetry/api';
@@ -54,6 +54,12 @@ import type { PersistenceContext, RouteOptions, RouteStrategyDeps } from '../rou
 import { routeParallel } from '../routing/route-parallel.js';
 import { routeSerial } from '../routing/route-serial.js';
 import { resolveCatTarget } from './cat-target-resolver.js';
+import {
+  buildCoordinatorDispatchMessage,
+  COORDINATOR_CAT_ID,
+  selectLeadAgent,
+  targetCatsForLeadSelection,
+} from './lead-agent-selector.js';
 
 const log = createModuleLogger('agent-router');
 const routeTracer = trace.getTracer('cat-cafe-api', '0.1.0');
@@ -906,15 +912,25 @@ export class AgentRouter {
   async resolveTargetsAndIntent(
     message: string,
     threadId?: string,
-    options?: { persist?: boolean },
-  ): Promise<{ targetCats: CatId[]; intent: IntentResult; hasMentions: boolean }> {
+    options?: { persist?: boolean; disableCoordinator?: boolean },
+  ): Promise<{ targetCats: CatId[]; intent: IntentResult; hasMentions: boolean; leadSelection: LeadSelection }> {
     const resolvedThreadId = threadId ?? DEFAULT_THREAD_ID;
-    const hasMentions = (await this.parseAllMentions(message, resolvedThreadId)).mentions.length > 0;
-    const targetCats = options?.persist
+    const { mentions: explicitMentionCatIds } = await this.parseAllMentions(message, resolvedThreadId);
+    const hasMentions = explicitMentionCatIds.length > 0;
+    const resolvedTargetCats = options?.persist
       ? await this.resolveTargets(message, resolvedThreadId)
       : await this.peekTargets(message, resolvedThreadId);
+    const leadSelection = selectLeadAgent({
+      resolvedCatIds: resolvedTargetCats,
+      explicitMentionCatIds,
+      coordinatorAvailable: !options?.disableCoordinator && this.isRoutableCat(COORDINATOR_CAT_ID),
+    });
+    const targetCats = targetCatsForLeadSelection(leadSelection, resolvedTargetCats);
+    if (options?.persist && leadSelection.mode === 'coordinator' && this.threadStore) {
+      await this.threadStore.addParticipants(resolvedThreadId, [leadSelection.leadCatId]);
+    }
     const intent = parseIntent(message, targetCats.length);
-    return { targetCats, intent, hasMentions };
+    return { targetCats, intent, hasMentions, leadSelection };
   }
 
   /**
@@ -931,10 +947,22 @@ export class AgentRouter {
     signal?: AbortSignal,
   ): AsyncIterable<AgentMessage> {
     const resolvedThreadId = threadId ?? DEFAULT_THREAD_ID;
-    const targetCats = await this.resolveTargets(message, resolvedThreadId);
-    const intent = parseIntent(message, targetCats.length);
+    const { targetCats, intent, leadSelection } = await this.resolveTargetsAndIntent(message, resolvedThreadId, {
+      persist: true,
+    });
     const strategy = intent.intent === 'ideate' && targetCats.length > 1 ? 'parallel' : 'serial';
-    const cleanMessage = stripIntentTags(message);
+    const legacyCoordination: CoordinationContext | undefined =
+      leadSelection.mode === 'coordinator'
+        ? {
+            id: `coord-legacy-${Date.now()}`,
+            leadCatId: leadSelection.leadCatId,
+            participantCatIds: leadSelection.participantCatIds,
+            phase: 'intake',
+            artifactRefs: [],
+          }
+        : undefined;
+    const routedMessage = legacyCoordination ? buildCoordinatorDispatchMessage(message, legacyCoordination) : message;
+    const cleanMessage = stripIntentTags(routedMessage);
 
     const routeSpan = routeTracer.startSpan('cat_cafe.route', {
       attributes: {
@@ -963,6 +991,7 @@ export class AgentRouter {
       timestamp: Date.now(),
       threadId: resolvedThreadId,
       ...(contentBlocks ? { contentBlocks } : {}),
+      ...(legacyCoordination ? { extra: { coordination: legacyCoordination } } : {}),
     });
 
     const strategyDeps = this.getStrategyDeps();
@@ -1027,9 +1056,14 @@ export class AgentRouter {
       callerTraceContext?: CallerTraceContext;
       /** Explicit A2A trigger message ID for queue-dispatched stream reply threading */
       a2aTriggerMessageId?: string;
+      /** Visible-PM context for coordinator-led dispatches. */
+      coordination?: CoordinationContext;
     },
   ): AsyncIterable<AgentMessage> {
-    const cleanMessage = stripIntentTags(message);
+    const routedMessage = options?.coordination
+      ? buildCoordinatorDispatchMessage(message, options.coordination)
+      : message;
+    const cleanMessage = stripIntentTags(routedMessage);
     const strategy = intent.intent === 'ideate' && targetCats.length > 1 ? 'parallel' : 'serial';
 
     // F153: Reconstruct remote parent context for cross-route A2A trace propagation
