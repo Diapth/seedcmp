@@ -1138,4 +1138,14 @@ describe('message action state', () => {
     expect(input.default).toContain('mentionRequest')
     expect(input.default).toContain('appendExternalMention')
   })
+
+  it('opens custom context menus only from contextmenu events so the native menu cannot close them immediately', async () => {
+    const list = await import('../src/components/MessageList.vue?raw')
+    const menu = await import('../../../packages/base-vue/src/components/ContextMenu.vue?raw')
+
+    expect(list.default).not.toContain('@mousedown.right.prevent="handleRightClick')
+    expect(list.default).not.toContain('@mousedown.right.stop.prevent="handleAvatarContextMenu')
+    expect(menu.default).toContain('function handleGlobalContextMenu')
+    expect(menu.default).toContain('event.preventDefault()')
+  })
 })

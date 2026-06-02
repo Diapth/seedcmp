@@ -24,6 +24,14 @@ export interface GroupCatAutoReplyDecision {
   reason: GroupCatAutoReplyReason;
 }
 
+export interface GroupCatRecentMessage {
+  text?: string;
+  content?: any;
+  payload?: any;
+  fromCat?: boolean;
+  catId?: string;
+}
+
 export interface ResolveGroupCatAutoReplyInput {
   text: string;
   mode: GroupCatAutoReplyMode;
@@ -32,6 +40,7 @@ export interface ResolveGroupCatAutoReplyInput {
   focusedCatId?: string;
   lastActiveCatId?: string;
   replyTarget?: any;
+  recentMessages?: GroupCatRecentMessage[];
 }
 
 const GENERIC_CAT_TRIGGERS = ['猫猫'];
@@ -85,6 +94,74 @@ function decision(reason: GroupCatAutoReplyReason, targetCatIds: string[] = []):
   };
 }
 
+function resolveSoftTextTrigger(
+  text: string,
+  cats: GroupCatAutoReplyCat[],
+  focusedCatId?: string,
+  lastActiveCatId?: string
+) {
+  const namedCats = cats.filter(cat => catMentionedByName(text, cat));
+  if (namedCats.length === 1) {
+    return decision('soft_cat_name', [namedCats[0].catId]);
+  }
+  if (namedCats.length > 1) {
+    return decision('ambiguous_cat_keyword');
+  }
+
+  const hasGenericCatTrigger = GENERIC_CAT_TRIGGERS.some(trigger => text.includes(trigger));
+  if (!hasGenericCatTrigger) {
+    return decision('no_trigger');
+  }
+
+  const focusedCat = findAvailableCat(cats, focusedCatId);
+  if (focusedCat) {
+    return decision('soft_cat_keyword', [focusedCat.catId]);
+  }
+
+  const lastActiveCat = findAvailableCat(cats, lastActiveCatId);
+  if (lastActiveCat) {
+    return decision('soft_cat_keyword', [lastActiveCat.catId]);
+  }
+
+  if (cats.length === 1) {
+    return decision('soft_cat_keyword', [cats[0].catId]);
+  }
+
+  return decision('ambiguous_cat_keyword');
+}
+
+function recentMessageText(message: GroupCatRecentMessage) {
+  const content = message?.content || message?.payload || {};
+  return String(message?.text || content.text || content.content || '').trim();
+}
+
+function isRecentCatMessage(message: GroupCatRecentMessage) {
+  const content = message?.content || message?.payload || {};
+  return message?.fromCat === true ||
+    Boolean(message?.catId || content.catId || content.cat_id || content.catDisplayName || content.cat_display_name) ||
+    String(content.connectorId || content.connector_id || '') === 'im-web';
+}
+
+function resolveRecentContextTrigger(input: ResolveGroupCatAutoReplyInput, cats: GroupCatAutoReplyCat[]) {
+  const recent = input.recentMessages || [];
+  let sawCatReplyAfterCandidate = false;
+  for (let index = recent.length - 1; index >= 0; index--) {
+    const message = recent[index];
+    if (isRecentCatMessage(message)) {
+      sawCatReplyAfterCandidate = true;
+      continue;
+    }
+    if (sawCatReplyAfterCandidate) continue;
+    const text = recentMessageText(message);
+    if (!text) continue;
+    const contextDecision = resolveSoftTextTrigger(text, cats, input.focusedCatId, input.lastActiveCatId);
+    if (contextDecision.shouldRoute || contextDecision.reason === 'ambiguous_cat_keyword') {
+      return contextDecision;
+    }
+  }
+  return undefined;
+}
+
 export function resolveGroupCatAutoReplyTrigger(input: ResolveGroupCatAutoReplyInput): GroupCatAutoReplyDecision {
   const explicitTargetCatIds = unique(input.explicitTargetCatIds || []);
   if (explicitTargetCatIds.length > 0) {
@@ -106,32 +183,10 @@ export function resolveGroupCatAutoReplyTrigger(input: ResolveGroupCatAutoReplyI
   }
 
   const text = String(input.text || '').trim();
-  const namedCats = cats.filter(cat => catMentionedByName(text, cat));
-  if (namedCats.length === 1) {
-    return decision('soft_cat_name', [namedCats[0].catId]);
-  }
-  if (namedCats.length > 1) {
-    return decision('ambiguous_cat_keyword');
+  const currentDecision = resolveSoftTextTrigger(text, cats, input.focusedCatId, input.lastActiveCatId);
+  if (currentDecision.reason !== 'no_trigger') {
+    return currentDecision;
   }
 
-  const hasGenericCatTrigger = GENERIC_CAT_TRIGGERS.some(trigger => text.includes(trigger));
-  if (!hasGenericCatTrigger) {
-    return decision('no_trigger');
-  }
-
-  const focusedCat = findAvailableCat(cats, input.focusedCatId);
-  if (focusedCat) {
-    return decision('soft_cat_keyword', [focusedCat.catId]);
-  }
-
-  const lastActiveCat = findAvailableCat(cats, input.lastActiveCatId);
-  if (lastActiveCat) {
-    return decision('soft_cat_keyword', [lastActiveCat.catId]);
-  }
-
-  if (cats.length === 1) {
-    return decision('soft_cat_keyword', [cats[0].catId]);
-  }
-
-  return decision('ambiguous_cat_keyword');
+  return resolveRecentContextTrigger(input, cats) || currentDecision;
 }

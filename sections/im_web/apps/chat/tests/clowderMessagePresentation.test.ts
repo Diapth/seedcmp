@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
-import { render, screen } from '@testing-library/vue'
+import { fireEvent, render, screen } from '@testing-library/vue'
 import { createPinia, setActivePinia } from 'pinia'
 import TextCell from '../../../packages/base-vue/src/components/messages/TextCell.vue'
 
@@ -28,7 +28,20 @@ vi.mock('@tsdaodao/base-vue', () => ({
   LocationCell: { template: '<div />' },
   CardCell: { template: '<div />' },
   MergeCell: { template: '<div />' },
-  ContextMenu: { template: '<div />' },
+  ContextMenu: {
+    props: ['items'],
+    template: `
+      <div class="context-menu">
+        <button
+          v-for="item in items"
+          :key="item.label"
+          class="context-menu-item"
+          :class="{ disabled: item.disabled }"
+          @click="item.disabled ? undefined : item.action()"
+        >{{ item.label }}</button>
+      </div>
+    `
+  },
   AppDialog: { template: '<div />' },
   StorageService: {
     get: vi.fn(),
@@ -257,6 +270,54 @@ describe('clowder message presentation', () => {
 
     expect(document.querySelector('.msg-row')?.classList.contains('is-me')).toBe(false)
     expect(document.querySelector('.msg-avatar.channel-avatar')).toHaveAttribute('data-name', '布偶猫')
+  })
+
+  it('allows avatar context menu mentions for Clowder cats using the cat contact id', async () => {
+    const { default: MessageList } = await import('../src/components/MessageList.vue')
+    const { useMessageStore } = await import('../../../packages/datasource-vue/src/stores/messageStore.ts')
+    const { useUserStore } = await import('../../../packages/datasource-vue/src/stores/userStore.ts')
+    const messageStore = useMessageStore()
+    const userStore = useUserStore()
+    userStore.currentUser = { uid: 'viewer', name: 'Viewer' }
+    userStore.userCache.creator = { uid: 'creator', name: 'Creator', avatar: '' }
+    const mentionUser = vi.fn()
+
+    messageStore.addMessage('group-cat-cafe', 2, {
+      messageID: 'm-cat-group-mention',
+      messageSeq: 25,
+      clientMsgNo: 'clowder-group-ragdoll-mention',
+      fromUID: 'creator',
+      timestamp: 100,
+      content: {
+        type: 1,
+        text: '【布偶猫🐱】可以 @ 我继续聊。',
+        connectorId: 'im-web',
+        catId: 'ragdoll-kn9a',
+        catDisplayName: '布偶猫',
+        markdown: true
+      },
+      isRevoked: false,
+      status: 'success'
+    }, { countUnread: false })
+
+    render(MessageList, {
+      props: {
+        channelId: 'group-cat-cafe',
+        channelType: 2
+      },
+      attrs: {
+        onMentionUser: mentionUser
+      }
+    })
+
+    await fireEvent.contextMenu(document.querySelector('.msg-avatar.channel-avatar')!)
+    const atButton = screen.getByText('@TA')
+    expect(atButton).not.toHaveClass('disabled')
+    await fireEvent.click(atButton)
+    expect(mentionUser).toHaveBeenCalledWith({
+      uid: 'clowder_cat:ragdoll-kn9a',
+      name: '布偶猫'
+    })
   })
 
   it('does not fall back to the transport user avatar for group Clowder cat replies', async () => {
@@ -559,6 +620,20 @@ describe('clowder message presentation', () => {
 
     expect(content.catDisplayName).toBe('codex')
     expect(content.cat_display_name).toBe('codex')
+  })
+
+  it('prefers an explicit final reply signature over a stale explicit cat display name', async () => {
+    const { getClowderCatDisplayNameFromPayload } = await import('../../../packages/base-vue/src/utils/clowderMessageIdentity.ts')
+
+    const displayName = getClowderCatDisplayNameFromPayload({
+      type: 1,
+      text: '到啦～ 布偶猫/宪宪 在此。',
+      connectorId: 'im-web',
+      catDisplayName: 'Codex',
+      markdown: true
+    })
+
+    expect(displayName).toBe('布偶猫')
   })
 
   it('renders all visible Clowder thought and transcript blocks from array aliases', () => {

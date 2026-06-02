@@ -37,6 +37,9 @@ export function extractClowderCatDisplayNameFromText(text: string) {
   const suffixMatch = value.match(/[［\[]([^\]/\]］\n]{1,40})\/[^\]］\n]{1,120}[］\]]\s*$/);
   if (suffixMatch) return stripClowderCatDecorations(suffixMatch[1]);
 
+  const selfIntroSlashMatch = value.match(/(?:^|[\s，。！？～~])([^\s/@/［\[\]］，。:：！？?（）()]{1,40})\/[^\s/［\[\]］，。:：！？?（）()]{1,40}(?=\s*(?:在此|已|收到|来|可以|能|为|帮|接|回复|上线|准备))/u);
+  if (selfIntroSlashMatch) return stripClowderCatDecorations(selfIntroSlashMatch[1]);
+
   return '';
 }
 
@@ -63,6 +66,8 @@ export function getClowderRichBlocksFromPayload(payload: any): any[] {
 
 export function getClowderCatDisplayNameFromPayload(payload: any) {
   const content = getClowderPayload(payload);
+  const textName = extractClowderCatDisplayNameFromText(String(content.text || content.content || ''));
+  if (textName) return textName;
   const explicit = String(
     content.catDisplayName ||
     content.cat_display_name ||
@@ -71,7 +76,7 @@ export function getClowderCatDisplayNameFromPayload(payload: any) {
     ''
   ).trim();
   if (explicit) return stripClowderCatDecorations(explicit);
-  return extractClowderCatDisplayNameFromText(String(content.text || content.content || ''));
+  return '';
 }
 
 export function isClowderPayload(payload: any) {

@@ -200,4 +200,61 @@ describe('clowder streaming merge contracts', () => {
     expect(messages[0].messageSeq).toBe(4)
     expect(messages[0].content.text).toContain('猫群自动测试通过')
   })
+
+  it('preserves the local cat identity when a human interrupts before the final streamed group reply', async () => {
+    const { useMessageStore } = await import('../../../packages/datasource-vue/src/stores/messageStore.ts')
+    const messageStore = useMessageStore()
+
+    messageStore.addMessage('group-cat-cafe', 2, {
+      messageID: 'placeholder',
+      messageSeq: 1,
+      clientMsgNo: 'server-random-placeholder',
+      fromUID: 'creator',
+      timestamp: 100,
+      content: {
+        type: 1,
+        text: '【布偶猫🐱】🤔 思考中...',
+        connectorId: 'im-web',
+        catId: 'ragdoll-kn9a',
+        catDisplayName: '布偶猫',
+        markdown: true,
+        invocationId: 'invoke-identity',
+        streaming: true,
+        stream: { state: 'placeholder' }
+      },
+      isRevoked: false,
+      status: 'success'
+    }, { countUnread: false })
+    messageStore.addMessage('group-cat-cafe', 2, {
+      messageID: 'human-interrupt',
+      messageSeq: 3,
+      clientMsgNo: 'human-interrupt-client',
+      fromUID: 'member-b',
+      timestamp: 102,
+      content: { type: 1, text: '我插一句' },
+      isRevoked: false,
+      status: 'success'
+    }, { countUnread: false })
+    messageStore.addMessage('group-cat-cafe', 2, {
+      messageID: 'final',
+      messageSeq: 4,
+      clientMsgNo: '',
+      fromUID: 'creator',
+      timestamp: 108,
+      content: {
+        type: 1,
+        text: '我是群里的布偶猫，可以帮大家整理上下文。',
+        connectorId: 'im-web',
+        invocationId: 'invoke-identity'
+      },
+      isRevoked: false,
+      status: 'success'
+    }, { countUnread: false })
+
+    const messages = messageStore.getChannelMessages('group-cat-cafe', 2)
+    const final = messages.find(item => item.messageID === 'final')
+    expect(final?.content.catDisplayName).toBe('布偶猫')
+    expect(final?.content.catId).toBe('ragdoll-kn9a')
+    expect(final?.content.markdown).toBe(true)
+  })
 })

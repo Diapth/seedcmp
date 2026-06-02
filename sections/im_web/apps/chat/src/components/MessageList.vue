@@ -1,6 +1,13 @@
 <script setup lang="ts">
 import { ref, onMounted, watch, nextTick, computed } from 'vue';
-import { useChannelStore, useMessageStore, useUserStore } from '@tsdaodao/datasource-vue';
+import {
+  buildClowderCatContactId,
+  getClowderCatIdFromContactId,
+  useChannelStore,
+  useClowderStore,
+  useMessageStore,
+  useUserStore
+} from '@tsdaodao/datasource-vue';
 import { useRemoteConfig } from '@tsdaodao/base-vue';
 import {
   getClowderCatDisplayNameFromPayload,
@@ -39,6 +46,7 @@ const emit = defineEmits<{
 const messageStore = useMessageStore();
 const userStore = useUserStore();
 const channelStore = useChannelStore();
+const clowderStore = useClowderStore();
 const { remoteConfig } = useRemoteConfig();
 
 const scrollContainer = ref<HTMLDivElement | null>(null);
@@ -59,6 +67,7 @@ const selectedAvatarMsg = ref<any>(null);
 const editDialogVisible = ref(false);
 const editDialogText = ref('');
 const channelKey = computed(() => `${props.channelId}-${props.channelType}`);
+const deploymentActionClientMsgNos = new Set<string>();
 
 const messages = computed(() => {
   return messageStore.messages[channelKey.value] || [];
@@ -231,6 +240,54 @@ function getNearbyClowderSenderName(msg: any): string {
 
 function getClowderSenderName(msg: any): string {
   return getClowderSenderNameFromMessage(msg) || getNearbyClowderSenderName(msg);
+}
+
+function normalizeCatLookupToken(value: string) {
+  return String(value || '').replace(/^@/, '').replace(/[🐱🐈🐾\s]+$/g, '').trim().toLowerCase();
+}
+
+function findCatContactByDisplayName(displayName: string) {
+  const lookup = normalizeCatLookupToken(displayName);
+  if (!lookup) return undefined;
+  const groups = Object.values(clowderStore.groupCatMemberships || {}).flat();
+  const directory = [
+    ...groups,
+    ...(clowderStore.connectedCatContacts || []),
+    ...(clowderStore.catContactDirectory || [])
+  ];
+  return directory.find(cat => [
+    cat.catId,
+    cat.displayName,
+    cat.name,
+    ...(cat.aliases || []),
+    ...(cat.mentionNames || [])
+  ].some(token => normalizeCatLookupToken(String(token || '')) === lookup));
+}
+
+function getClowderSenderCatId(msg: any): string {
+  const content = msg?.content || msg?.payload || {};
+  const directCatId = getClowderCatIdFromContactId(String(props.channelId || ''));
+  const explicitCatId = String(content.catId || content.cat_id || directCatId || '').trim();
+  if (explicitCatId) return explicitCatId;
+  const displayName = getClowderSenderName(msg);
+  return findCatContactByDisplayName(displayName)?.catId || normalizeCatLookupToken(displayName);
+}
+
+function getMentionTargetForMessage(msg: any) {
+  if (isClowderConnectorMessage(msg)) {
+    const catId = getClowderSenderCatId(msg);
+    if (!catId) return undefined;
+    return {
+      uid: buildClowderCatContactId(catId),
+      name: getClowderSenderName(msg) || catId
+    };
+  }
+  const uid = String(msg?.fromUID || '');
+  if (!uid) return undefined;
+  return {
+    uid,
+    name: getMessageSenderName(msg)
+  };
 }
 
 function getClowderSenderAvatar(msg: any): string {
@@ -521,17 +578,18 @@ const menuItems = computed(() => {
 const avatarMenuItems = computed(() => {
   if (!selectedAvatarMsg.value) return [];
   const msg = selectedAvatarMsg.value;
-  const uid = String(msg.fromUID || '');
-  const name = getMessageSenderName(msg);
+  const mentionTarget = getMentionTargetForMessage(msg);
   const items: Array<{ label: string; action: () => void; disabled?: boolean }> = [{
     label: '@TA',
-    disabled: !uid || isClowderConnectorMessage(msg),
+    disabled: !mentionTarget?.uid,
     action: () => {
-      emit('mention-user', { uid, name });
+      if (!mentionTarget) return;
+      emit('mention-user', mentionTarget);
       showAvatarMenu.value = false;
     }
   }];
   if (!isClowderConnectorMessage(msg)) {
+    const uid = String(msg?.fromUID || '');
     items.push({
       label: '查看资料',
       disabled: !uid,
@@ -581,6 +639,55 @@ function handleCodePreview(payload: any) {
     ...payload
   });
 }
+
+function updateDeploymentCardStatus(msg: any, status: string) {
+  messageStore.updateMessageStatus(msg.clientMsgNo, {
+    content: {
+      ...(msg.content || {}),
+      status
+    }
+  });
+}
+
+async function handleDeploymentCardAction(payload: { action: 'confirm' | 'cancel'; message: any }) {
+  const msg = payload.message;
+  const clientMsgNo = String(msg?.clientMsgNo || '');
+  if (!clientMsgNo || deploymentActionClientMsgNos.has(clientMsgNo)) return;
+
+  const content = msg?.content || {};
+  const currentStatus = String(content.status || 'pending_confirmation');
+  if (['confirmed', 'running', 'cancelled', 'canceled'].includes(currentStatus)) return;
+
+  if (payload.action === 'cancel') {
+    updateDeploymentCardStatus(msg, 'cancelled');
+    Message.info('已取消部署');
+    return;
+  }
+
+  deploymentActionClientMsgNos.add(clientMsgNo);
+  updateDeploymentCardStatus(msg, 'confirmed');
+  try {
+    const request = content.deploymentRequest || {};
+    const text = `用户已确认部署：${String(request.text || content.target || '部署请求')}`;
+    const targetCatIds = Array.isArray(request.targetCatIds) ? request.targetCatIds : [];
+    await clowderStore.sendConversationMessage({
+      channelId: props.channelId,
+      channelType: props.channelType as 1 | 2,
+      directCatId: getClowderCatIdFromContactId(props.channelId),
+      targetCatIds,
+      promptContext: [
+        request.promptContext || '',
+        'Deployment confirmation: user explicitly confirmed from the IM Web deployment card.'
+      ].filter(Boolean).join('\n')
+    }, text);
+    Message.success('已确认部署');
+  } catch (err: any) {
+    updateDeploymentCardStatus(msg, 'failed');
+    Message.error(err?.message || err?.msg || '部署确认失败');
+  } finally {
+    deploymentActionClientMsgNos.delete(clientMsgNo);
+  }
+}
 </script>
 
 <template>
@@ -604,7 +711,6 @@ function handleCodePreview(payload: any) {
         :data-message-status="item.msg.status"
         :data-message-seq="item.msg.messageSeq"
         @contextmenu="handleRightClick($event, item.msg)"
-        @mousedown.right.prevent="handleRightClick($event, item.msg)"
       >
         <ChannelAvatar
           v-if="!isMe(item.msg)"
@@ -613,7 +719,6 @@ function handleCodePreview(payload: any) {
           :size="36"
           class="msg-avatar"
           @contextmenu.stop.prevent="handleAvatarContextMenu($event, item.msg)"
-          @mousedown.right.stop.prevent="handleAvatarContextMenu($event, item.msg)"
         />
 
         <div class="msg-bubble-container">
@@ -666,6 +771,7 @@ function handleCodePreview(payload: any) {
             v-else-if="item.msg.content?.type === 7"
             :message="item.msg"
             :is-me="isMe(item.msg)"
+            @action="handleDeploymentCardAction"
           />
           <FileCell
             v-else-if="item.msg.content?.type === 8"

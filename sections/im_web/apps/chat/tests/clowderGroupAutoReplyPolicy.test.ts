@@ -138,4 +138,23 @@ describe('Clowder group auto reply policy', () => {
       reason: 'reply_to_cat'
     })
   })
+
+  it('uses recent unresolved group context when the current message continues a cat request', () => {
+    const decision = resolveGroupCatAutoReplyTrigger({
+      text: '请介绍自己',
+      mode: 'soft_mentions',
+      cats: [ragdoll],
+      explicitTargetCatIds: [],
+      recentMessages: [
+        { text: '大家先等一下', fromCat: false },
+        { text: '猫猫，请介绍自己', fromCat: false }
+      ]
+    })
+
+    expect(decision).toEqual({
+      shouldRoute: true,
+      targetCatIds: ['ragdoll'],
+      reason: 'soft_cat_keyword'
+    })
+  })
 })

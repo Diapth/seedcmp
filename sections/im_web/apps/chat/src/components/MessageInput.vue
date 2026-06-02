@@ -2,6 +2,7 @@
 import { ref, computed, watch, onBeforeUnmount, nextTick } from 'vue';
 import { Message as ArcoMessage } from '@arco-design/web-vue';
 import {
+  buildClowderCatContactId,
   commonApi,
   getClowderCatIdFromContactId,
   isClowderAiContactId,
@@ -14,7 +15,9 @@ import {
 } from '@tsdaodao/datasource-vue';
 import { useRobotConfigStore } from '@tsdaodao/contacts-vue';
 import WKSDK, { CMDContent } from 'wukongimjssdk';
+import { getClowderCatDisplayNameFromPayload } from '@tsdaodao/base-vue/utils/clowderMessageIdentity';
 import { resolveGroupCatAutoReplyTrigger, type GroupCatAutoReplyReason } from '../utils/clowderGroupAutoReplyPolicy';
+import { detectDeploymentIntent, type DeploymentIntent } from '../utils/deploymentIntent';
 
 const props = defineProps<{
   channelId: string;
@@ -104,7 +107,9 @@ const currentGroupMembers = computed(() => {
 });
 
 const catMentionMembers = computed(() => {
-  return (clowderStore.groupCatMemberships[props.channelId] || []).map(cat => ({
+  const cats = clowderStore.groupCatMemberships[props.channelId] || [];
+  const sourceCats = cats.length ? cats : inferCatMentionMembersFromRecentMessages();
+  return sourceCats.map(cat => ({
     uid: cat.id,
     member_uid: cat.id,
     name: cat.displayName,
@@ -131,6 +136,61 @@ function getMemberUid(member: any): string {
 
 function getMemberDisplayName(member: any): string {
   return String(member?.catContact?.displayName || member?.display_name || member?.member_name || member?.name || getMemberUid(member));
+}
+
+function normalizeCatLookupToken(value: string) {
+  return String(value || '').replace(/^@/, '').replace(/[🐱🐈🐾\s]+$/g, '').trim().toLowerCase();
+}
+
+function findCatContactByDisplayName(displayName: string) {
+  const lookup = normalizeCatLookupToken(displayName);
+  if (!lookup) return undefined;
+  const directory = [
+    ...(clowderStore.groupCatMemberships[props.channelId] || []),
+    ...(clowderStore.connectedCatContacts || []),
+    ...(clowderStore.catContactDirectory || [])
+  ];
+  return directory.find(cat => [
+    cat.catId,
+    cat.displayName,
+    cat.name,
+    ...(cat.aliases || []),
+    ...(cat.mentionNames || [])
+  ].some(token => normalizeCatLookupToken(String(token || '')) === lookup));
+}
+
+function inferCatMentionMembersFromRecentMessages() {
+  if (props.channelType !== 2) return [];
+  const seen = new Set<string>();
+  return messageStore.getChannelMessages(props.channelId, props.channelType)
+    .slice(-30)
+    .reverse()
+    .map(message => {
+      const content = message?.content || (message as any)?.payload || {};
+      const displayName = getClowderCatDisplayNameFromPayload(content);
+      const matched = findCatContactByDisplayName(displayName);
+      const catId = String(content.catId || content.cat_id || matched?.catId || normalizeCatLookupToken(displayName)).trim();
+      if (!catId || !displayName || seen.has(catId)) return undefined;
+      seen.add(catId);
+      if (matched) return matched;
+      return {
+        id: buildClowderCatContactId(catId),
+        uid: buildClowderCatContactId(catId),
+        catId,
+        displayName,
+        name: displayName,
+        avatar: String(content.avatar || content.catAvatar || content.cat_avatar || ''),
+        aliases: [displayName],
+        mentionNames: [`@${displayName}`, displayName],
+        personalitySummary: '',
+        capabilitySummary: '',
+        available: true,
+        availabilityState: 'available' as const,
+        source: 'existing' as const,
+        connected: true
+      };
+    })
+    .filter(Boolean) as any[];
 }
 
 const filteredMentionTargets = computed(() => {
@@ -187,7 +247,10 @@ watch(inputText, (newVal) => {
     return;
   }
 
-  const caretPos = textareaRef.value?.selectionStart || 0;
+  const selectionStart = textareaRef.value?.selectionStart;
+  const caretPos = typeof selectionStart === 'number'
+    ? (selectionStart > 0 ? selectionStart : newVal.length)
+    : newVal.length;
   const mentionToken = findActiveMentionToken(newVal, caretPos);
 
   if (mentionToken) {
@@ -340,6 +403,28 @@ function getMessageSenderName(message: any) {
   return userStore.userCache[fromUID]?.name || fromUID || 'unknown';
 }
 
+function isGroupCatMessage(message: any) {
+  const content = message?.content || message?.payload || {};
+  return String(content.connectorId || content.connector_id || '') === 'im-web' ||
+    Boolean(content.catId || content.cat_id || content.catDisplayName || content.cat_display_name);
+}
+
+function buildRecentAutoReplyMessages() {
+  if (props.channelType !== 2) return [];
+  return messageStore.getChannelMessages(props.channelId, props.channelType)
+    .filter(message => getMessageVisibleText(message))
+    .slice(-12)
+    .map(message => {
+      const content = message?.content || (message as any)?.payload || {};
+      return {
+        text: getMessageVisibleText(message),
+        content,
+        fromCat: isGroupCatMessage(message),
+        catId: String(content.catId || content.cat_id || '')
+      };
+    });
+}
+
 function buildClowderPromptContext(text: string, targetCatIds: string[], triggerReason?: GroupCatAutoReplyReason) {
   if (props.channelType !== 2) return clowderPromptContext.value;
   const recentMessages = messageStore.getChannelMessages(props.channelId, props.channelType)
@@ -355,6 +440,54 @@ function buildClowderPromptContext(text: string, targetCatIds: string[], trigger
     'Recent messages:',
     ...(recentMessages.length ? recentMessages : ['- No recent messages available.'])
   ].join('\n');
+}
+
+function getCatDisplayName(catId: string) {
+  if (!catId) return '';
+  const groupCat = (clowderStore.groupCatMemberships[props.channelId] || [])
+    .find(cat => cat.catId === catId || cat.id === catId);
+  if (groupCat?.displayName) return groupCat.displayName;
+  const direct = clowderStore.getCatContactById(props.channelId);
+  return direct?.displayName || catId;
+}
+
+function addDeploymentConfirmationCard(
+  intent: DeploymentIntent,
+  text: string,
+  targetCatIds: string[],
+  triggerReason?: GroupCatAutoReplyReason
+) {
+  const directCatId = getClowderCatIdFromContactId(props.channelId);
+  const effectiveTargetCatIds = targetCatIds.length ? targetCatIds : (directCatId ? [directCatId] : []);
+  const firstCatId = effectiveTargetCatIds[0] || '';
+  const catDisplayName = getCatDisplayName(firstCatId) || 'Clowder';
+  const clientMsgNo = `deployment-card-${Date.now()}-${Math.random().toString(16).slice(2)}`;
+  messageStore.addMessage(props.channelId, props.channelType, {
+    messageID: clientMsgNo,
+    messageSeq: 0,
+    clientMsgNo,
+    fromUID: props.channelType === 2 ? (userStore.currentUser?.uid || CLOWDER_AI_ROBOT_ID) : CLOWDER_AI_ROBOT_ID,
+    timestamp: Math.floor(Date.now() / 1000),
+    content: {
+      type: 7,
+      cardType: 'deployment',
+      title: '确认部署',
+      target: intent.target,
+      environment: intent.environment,
+      status: 'pending_confirmation',
+      connectorId: 'im-web',
+      catId: firstCatId,
+      catDisplayName,
+      deploymentRequest: {
+        text,
+        targetCatIds: effectiveTargetCatIds,
+        triggerReason,
+        promptContext: buildClowderPromptContext(text, effectiveTargetCatIds, triggerReason)
+      }
+    },
+    isRevoked: false,
+    status: 'success'
+  }, { countUnread: false });
 }
 
 function openImagePicker() {
@@ -761,9 +894,13 @@ async function handleSend() {
     explicitTargetCatIds,
     focusedCatId: clowderStore.conversations[clowderConversationKey.value]?.focusCatId,
     lastActiveCatId: clowderStore.agentDirectories[clowderConversationKey.value]?.lastActive?.catId,
-    replyTarget: messageStore.replyTarget
+    replyTarget: messageStore.replyTarget,
+    recentMessages: buildRecentAutoReplyMessages()
   });
   const targetCatIds = autoReplyDecision.targetCatIds;
+  const deploymentIntent = detectDeploymentIntent(text);
+  const needsDeploymentConfirmation = deploymentIntent.shouldConfirm &&
+    (isClowderAiConversation.value || isClowderCatConversation.value || autoReplyDecision.shouldRoute);
 
   if (props.channelType === 2) {
     if (text.includes('@所有人') || text.includes('@all')) {
@@ -794,7 +931,9 @@ async function handleSend() {
 
   try {
     await messageStore.sendMessage(props.channelId, props.channelType, text, options);
-    if (isClowderAiConversation.value || isClowderCatConversation.value || autoReplyDecision.shouldRoute) {
+    if (needsDeploymentConfirmation) {
+      addDeploymentConfirmationCard(deploymentIntent, text, targetCatIds, autoReplyDecision.reason);
+    } else if (isClowderAiConversation.value || isClowderCatConversation.value || autoReplyDecision.shouldRoute) {
       await sendClowderRouteMessage(text, targetCatIds, autoReplyDecision.reason);
     }
     messageStore.setReplyTarget(null);

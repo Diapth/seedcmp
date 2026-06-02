@@ -138,6 +138,90 @@ describe('Clowder AI contact routing', () => {
     await waitFor(() => expect(screen.getByText('布偶猫')).toBeInTheDocument())
   })
 
+  it('shows loaded Clowder cats in the mention popup even when human group members are empty', async () => {
+    const { default: MessageInput } = await import('../src/components/MessageInput.vue')
+    const { useGroupStore } = await import('../../../packages/datasource-vue/src/stores/groupStore.ts')
+    const { useClowderStore } = await import('../../../packages/datasource-vue/src/stores/clowderStore.ts')
+    const groupStore = useGroupStore()
+    const clowderStore = useClowderStore()
+    groupStore.groupMembers['group-live-cluster'] = []
+    vi.spyOn(clowderStore, 'loadGroupCats').mockImplementation(async (groupId: string) => {
+      clowderStore.groupCatMemberships[groupId] = [{
+        id: 'clowder_cat:ragdoll-kn9a',
+        catId: 'ragdoll-kn9a',
+        displayName: '布偶猫',
+        aliases: ['@布偶猫'],
+        mentionNames: ['@布偶猫'],
+        avatar: '',
+        personalitySummary: '',
+        capabilitySummary: '',
+        available: true,
+        availabilityState: 'available',
+        source: 'existing',
+        connected: true
+      }]
+      return clowderStore.groupCatMemberships[groupId]
+    })
+
+    render(MessageInput, {
+      props: {
+        channelId: 'group-live-cluster',
+        channelType: 2
+      }
+    })
+
+    const textarea = screen.getByPlaceholderText('输入消息，Enter 发送，Ctrl+Enter 换行') as HTMLTextAreaElement
+    await fireEvent.update(textarea, '@')
+
+    await waitFor(() => expect(screen.getByText('布偶猫')).toBeInTheDocument())
+  })
+
+  it('keeps the mention popup active for a single @ even if the browser reports caret position as zero during input', async () => {
+    const source = await import('../src/components/MessageInput.vue?raw')
+
+    expect(source.default).toContain('selectionStart > 0 ? selectionStart : newVal.length')
+  })
+
+  it('recovers a Clowder cat mention target from recent live messages when group cat sync is empty', async () => {
+    const { default: MessageInput } = await import('../src/components/MessageInput.vue')
+    const { useGroupStore } = await import('../../../packages/datasource-vue/src/stores/groupStore.ts')
+    const { useClowderStore } = await import('../../../packages/datasource-vue/src/stores/clowderStore.ts')
+    const { useMessageStore } = await import('../../../packages/datasource-vue/src/stores/messageStore.ts')
+    const groupStore = useGroupStore()
+    const clowderStore = useClowderStore()
+    const messageStore = useMessageStore()
+    groupStore.groupMembers['group-live-cluster'] = []
+    vi.spyOn(clowderStore, 'loadGroupCats').mockResolvedValue([])
+    messageStore.addMessage('group-live-cluster', 2, {
+      messageID: 'm-live-ragdoll',
+      messageSeq: 526,
+      clientMsgNo: 'live-ragdoll',
+      fromUID: 'creator',
+      timestamp: 100,
+      content: {
+        type: 1,
+        text: '到啦～ 布偶猫/宪宪 在此。',
+        connectorId: 'im-web',
+        catDisplayName: 'Codex',
+        markdown: true
+      },
+      isRevoked: false,
+      status: 'success'
+    }, { countUnread: false })
+
+    render(MessageInput, {
+      props: {
+        channelId: 'group-live-cluster',
+        channelType: 2
+      }
+    })
+
+    const textarea = screen.getByPlaceholderText('输入消息，Enter 发送，Ctrl+Enter 换行') as HTMLTextAreaElement
+    await fireEvent.update(textarea, '@')
+
+    await waitFor(() => expect(screen.getByText('布偶猫')).toBeInTheDocument())
+  })
+
   it('closes the mention popup after inserting a selected target', async () => {
     const { default: MessageInput } = await import('../src/components/MessageInput.vue')
     const { useGroupStore } = await import('../../../packages/datasource-vue/src/stores/groupStore.ts')

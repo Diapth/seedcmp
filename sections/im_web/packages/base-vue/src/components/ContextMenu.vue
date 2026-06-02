@@ -27,14 +27,19 @@ function handleGlobalClick() {
   emit('close');
 }
 
+function handleGlobalContextMenu(event: MouseEvent) {
+  event.preventDefault();
+  emit('close');
+}
+
 onMounted(() => {
   document.addEventListener('click', handleGlobalClick);
-  document.addEventListener('contextmenu', handleGlobalClick);
+  document.addEventListener('contextmenu', handleGlobalContextMenu);
 });
 
 onBeforeUnmount(() => {
   document.removeEventListener('click', handleGlobalClick);
-  document.removeEventListener('contextmenu', handleGlobalClick);
+  document.removeEventListener('contextmenu', handleGlobalContextMenu);
 });
 </script>
 
@@ -43,6 +48,7 @@ onBeforeUnmount(() => {
     class="context-menu" 
     :style="{ top: y + 'px', left: x + 'px' }"
     @click.stop
+    @contextmenu.prevent.stop
   >
     <!-- Reactions Bar at the top of context menu -->
     <div v-if="reactions && reactions.length > 0" class="reactions-menu-bar">

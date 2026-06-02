@@ -348,12 +348,81 @@ export const useMessageStore = defineStore('message', () => {
     })[0];
   }
 
+  function firstNonEmpty(...values: any[]) {
+    return values
+      .map(value => String(value || '').trim())
+      .find(Boolean) || '';
+  }
+
+  function mergeClowderStreamContent(localContent: any, incomingContent: any, fromUID: string) {
+    const incoming = normalizeAiRobotMessageContent(fromUID, incomingContent, false);
+    const local = normalizeMessageContent(localContent || {});
+    if (!isClowderPayload(local) && !isClowderPayload(incoming)) {
+      return incoming;
+    }
+
+    const catId = firstNonEmpty(incoming.catId, incoming.cat_id, local.catId, local.cat_id);
+    const catDisplayName = firstNonEmpty(
+      incoming.catDisplayName,
+      incoming.cat_display_name,
+      getClowderCatDisplayNameFromPayload(incoming),
+      local.catDisplayName,
+      local.cat_display_name,
+      getClowderCatDisplayNameFromPayload(local)
+    );
+    const catAvatar = firstNonEmpty(
+      incoming.catAvatar,
+      incoming.cat_avatar,
+      incoming.avatar,
+      incoming.metadata?.catAvatar,
+      incoming.metadata?.cat_avatar,
+      incoming.metadata?.avatar,
+      local.catAvatar,
+      local.cat_avatar,
+      local.avatar,
+      local.metadata?.catAvatar,
+      local.metadata?.cat_avatar,
+      local.metadata?.avatar
+    );
+
+    const next = normalizeMessageContent({
+      ...incoming,
+      connectorId: incoming.connectorId || incoming.connector_id || local.connectorId || local.connector_id || CLOWDER_CONNECTOR_ID,
+      connector_id: incoming.connector_id || incoming.connectorId || local.connector_id || local.connectorId || CLOWDER_CONNECTOR_ID,
+      catId: incoming.catId || incoming.cat_id || local.catId || local.cat_id,
+      cat_id: incoming.cat_id || incoming.catId || local.cat_id || local.catId,
+      catDisplayName: incoming.catDisplayName || incoming.cat_display_name || local.catDisplayName || local.cat_display_name,
+      cat_display_name: incoming.cat_display_name || incoming.catDisplayName || local.cat_display_name || local.catDisplayName,
+      catAvatar: incoming.catAvatar || incoming.cat_avatar || local.catAvatar || local.cat_avatar,
+      cat_avatar: incoming.cat_avatar || incoming.catAvatar || local.cat_avatar || local.catAvatar,
+      avatar: incoming.avatar || local.avatar,
+      format: incoming.format || local.format || 'markdown',
+      markdown: incoming.markdown ?? local.markdown ?? true,
+      ai: incoming.ai ?? local.ai ?? true
+    });
+
+    if (catId) {
+      next.catId = next.catId || catId;
+      next.cat_id = next.cat_id || catId;
+    }
+    if (catDisplayName) {
+      next.catDisplayName = next.catDisplayName || catDisplayName;
+      next.cat_display_name = next.cat_display_name || catDisplayName;
+    }
+    if (catAvatar) {
+      next.catAvatar = next.catAvatar || catAvatar;
+      next.cat_avatar = next.cat_avatar || catAvatar;
+      next.avatar = next.avatar || catAvatar;
+    }
+    return next;
+  }
+
   function mergePersistedAiIntoLocal(local: Message, incoming: Message): Message {
     return {
       ...local,
       ...incoming,
       clientMsgNo: local.clientMsgNo,
-      content: normalizeAiRobotMessageContent(incoming.fromUID, incoming.content, false),
+      content: mergeClowderStreamContent(local.content, incoming.content, incoming.fromUID),
       status: 'success'
     };
   }
