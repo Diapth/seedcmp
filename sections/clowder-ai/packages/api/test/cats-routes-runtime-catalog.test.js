@@ -6,6 +6,7 @@ import { after, afterEach, beforeEach, describe, it } from 'node:test';
 import { fileURLToPath } from 'node:url';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
+const RUNTIME_CATALOG_FIXTURE_PATH = join(__dirname, 'fixtures', 'runtime-cat-catalog.json');
 
 const tempDirs = [];
 let savedTemplatePath;
@@ -111,6 +112,10 @@ const BUILTIN_ACCOUNT_IDS = {
 
 function seedCatalogFromTemplate(projectRoot, templateObj) {
   const template = templateObj || JSON.parse(readFileSync(join(projectRoot, 'cat-template.json'), 'utf-8'));
+  const seedSource =
+    Array.isArray(template.breeds) && template.breeds.length > 0
+      ? template
+      : JSON.parse(readFileSync(RUNTIME_CATALOG_FIXTURE_PATH, 'utf-8'));
   const catalogPath = join(projectRoot, '.cat-cafe', 'cat-catalog.json');
   let catalog;
   try {
@@ -119,8 +124,8 @@ function seedCatalogFromTemplate(projectRoot, templateObj) {
     catalog = {};
   }
   // Use version from template or existing catalog; ensure required v2 fields are present.
-  const version = template.version ?? catalog.version ?? 1;
-  const breeds = structuredClone(template.breeds || []);
+  const version = seedSource.version ?? catalog.version ?? 1;
+  const breeds = structuredClone(seedSource.breeds || []);
   for (const breed of breeds) {
     for (const variant of breed.variants || []) {
       if (!variant.accountRef && variant.clientId && BUILTIN_ACCOUNT_IDS[variant.clientId]) {
@@ -128,8 +133,8 @@ function seedCatalogFromTemplate(projectRoot, templateObj) {
       }
     }
   }
-  const roster = template.roster ?? catalog.roster ?? {};
-  const reviewPolicy = template.reviewPolicy ??
+  const roster = seedSource.roster ?? catalog.roster ?? {};
+  const reviewPolicy = seedSource.reviewPolicy ??
     catalog.reviewPolicy ?? {
       requireDifferentFamily: true,
       preferActiveInThread: true,
@@ -138,7 +143,7 @@ function seedCatalogFromTemplate(projectRoot, templateObj) {
     };
   const seeded =
     version >= 2
-      ? { version, breeds, roster, reviewPolicy, ...(template.coCreator ? { coCreator: template.coCreator } : {}) }
+      ? { version, breeds, roster, reviewPolicy, ...(seedSource.coCreator ? { coCreator: seedSource.coCreator } : {}) }
       : { version, breeds };
   mkdirSync(join(projectRoot, '.cat-cafe'), { recursive: true });
   writeFileSync(catalogPath, `${JSON.stringify(seeded, null, 2)}\n`, 'utf-8');

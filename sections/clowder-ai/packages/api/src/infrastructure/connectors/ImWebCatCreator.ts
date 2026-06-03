@@ -1,15 +1,16 @@
 import {
   type CatConfig,
+  type CatRoleTemplate,
   type CliConfig,
   catRegistry,
   getDefaultCliEffortForProvider,
   type ClientId,
 } from '@cat-cafe/shared';
 import { configEventBus, createChangeSetId } from '../../config/config-event-bus.js';
-import { resolveActiveProjectRoot } from '../../utils/active-project-root.js';
+import { loadCatTemplateConfig, toAllCatConfigs } from '../../config/cat-config-loader.js';
 import { createRuntimeCat } from '../../config/runtime-cat-catalog.js';
-import { loadCatConfig, toAllCatConfigs } from '../../config/cat-config-loader.js';
 import { resolveProjectTemplatePath } from '../../config/project-template-path.js';
+import { resolveActiveProjectRoot } from '../../utils/active-project-root.js';
 
 export interface ImWebCreateCatInput {
   readonly displayName: string;
@@ -72,69 +73,52 @@ function defaultCliForClient(client: ClientId): CliConfig {
   }
 }
 
-function uniqueConfigs(configs: readonly CatConfig[]): CatConfig[] {
-  const byId = new Map<string, CatConfig>();
-  for (const config of configs) {
-    const key = String(config.id);
-    if (!byId.has(key)) byId.set(key, config);
-  }
-  return [...byId.values()];
-}
-
-function loadTemplateConfigs(projectRoot: string): CatConfig[] {
-  return Object.values(toAllCatConfigs(loadCatConfig(resolveProjectTemplatePath(projectRoot))));
+function loadRoleTemplates(projectRoot: string): CatRoleTemplate[] {
+  return [...(loadCatTemplateConfig(resolveProjectTemplatePath(projectRoot)).roleTemplates ?? [])];
 }
 
 function normalizeTemplateLookup(value: string): string {
   return value.trim().toLowerCase().replace(/^@/, '');
 }
 
-function roleTemplateKeys(config: CatConfig): string[] {
+function roleTemplateKeys(template: CatRoleTemplate): string[] {
   return [
-    String(config.id),
-    config.breedId,
-    config.breedDisplayName,
-    config.displayName,
-    config.name,
-    ...config.mentionPatterns,
+    template.id,
+    template.name,
+    template.nickname,
   ]
     .filter((value): value is string => typeof value === 'string' && value.trim().length > 0)
     .map(normalizeTemplateLookup);
 }
 
-function findRoleTemplateCat(configs: readonly CatConfig[], roleTemplateId?: string): CatConfig | undefined {
+function findRoleTemplate(configs: readonly CatRoleTemplate[], roleTemplateId?: string): CatRoleTemplate | undefined {
   const needle = normalizeTemplateLookup(roleTemplateId || '');
   if (!needle) return undefined;
   return configs.find((config) => roleTemplateKeys(config).includes(needle));
 }
 
-function pickRuntimeTemplateCat(clientId: ClientId, configs: readonly CatConfig[]): CatConfig {
-  const projectRoot = resolveActiveProjectRoot();
-  const allConfigs = configs.length > 0 ? configs : loadTemplateConfigs(projectRoot);
-  const preferred =
-    allConfigs.find((cat) => cat.clientId === clientId && cat.accountRef) ??
-    allConfigs.find((cat) => cat.clientId === clientId);
-  if (!preferred) {
-    throw new Error(`没有可继承的 ${clientId} Clowder cat 配置`);
-  }
-  return preferred;
+function pickRuntimeTemplateCat(clientId: ClientId, configs: readonly CatConfig[]): CatConfig | null {
+  return (
+    configs.find((cat) => cat.clientId === clientId && cat.accountRef) ??
+    configs.find((cat) => cat.clientId === clientId) ??
+    null
+  );
 }
 
-function resolveCreateTemplates(input: ImWebCreateCatInput): { roleTemplate: CatConfig; runtimeTemplate: CatConfig } {
+function resolveCreateTemplates(input: ImWebCreateCatInput): {
+  roleTemplate: CatRoleTemplate | null;
+  runtimeTemplate: CatConfig | null;
+} {
   const projectRoot = resolveActiveProjectRoot();
-  const templateConfigs = loadTemplateConfigs(projectRoot);
+  const templateConfigs = loadRoleTemplates(projectRoot);
   const runtimeConfigs = Object.values(catRegistry.getAllConfigs());
-  const allConfigs = uniqueConfigs([...templateConfigs, ...runtimeConfigs]);
-  const roleTemplate = findRoleTemplateCat(allConfigs, input.roleTemplateId);
+  const roleTemplate = findRoleTemplate(templateConfigs, input.roleTemplateId);
   if (input.roleTemplateId && !roleTemplate) {
     throw new Error(`没有找到角色模板：${input.roleTemplateId}`);
   }
-  const runtimeTemplate = pickRuntimeTemplateCat(
-    input.clientId,
-    uniqueConfigs([...runtimeConfigs, ...templateConfigs]),
-  );
+  const runtimeTemplate = pickRuntimeTemplateCat(input.clientId, runtimeConfigs);
   return {
-    roleTemplate: roleTemplate ?? runtimeTemplate,
+    roleTemplate: roleTemplate ?? null,
     runtimeTemplate,
   };
 }
@@ -159,12 +143,12 @@ export function createImWebCatCreator() {
       const mentionPatterns = normalizeAliases(displayName, input.mentionPatterns);
       const clientId = input.clientId;
       const { roleTemplate, runtimeTemplate } = resolveCreateTemplates(input);
-      const defaultCli = defaultCliForClient(clientId);
       const defaultEffort = getDefaultCliEffortForProvider(clientId);
-      const cli = runtimeTemplate.cli ?? {
-        ...defaultCli,
+      const defaultCli = {
+        ...defaultCliForClient(clientId),
         ...(defaultEffort ? { effort: defaultEffort } : {}),
       };
+      const cli = runtimeTemplate?.cli ?? defaultCli;
       const catId = uniqueCatId(displayName);
       const projectRoot = resolveActiveProjectRoot();
 
@@ -172,29 +156,38 @@ export function createImWebCatCreator() {
         catId,
         name: displayName,
         displayName,
-        avatar: roleTemplate.avatar ?? '/avatars/default.png',
-        color: roleTemplate.color ?? { primary: '#3B82F6', secondary: '#DBEAFE' },
+        avatar: roleTemplate?.avatar ?? runtimeTemplate?.avatar ?? '/avatars/default.png',
+        color: roleTemplate?.color ?? runtimeTemplate?.color ?? { primary: '#3B82F6', secondary: '#DBEAFE' },
         mentionPatterns,
         ...(input.accountRef
           ? { accountRef: input.accountRef }
-          : runtimeTemplate.accountRef
+          : runtimeTemplate?.accountRef
             ? { accountRef: runtimeTemplate.accountRef }
             : {}),
-        roleDescription: roleTemplate.roleDescription || `${displayName}，由 TangSeng IM 通过 Clowder 新增。`,
-        personality: roleTemplate.personality,
-        teamStrengths: roleTemplate.teamStrengths,
-        caution: roleTemplate.caution,
-        ...(roleTemplate.strengths ? { strengths: [...roleTemplate.strengths] } : {}),
-        sessionChain: roleTemplate.sessionChain ?? runtimeTemplate.sessionChain,
+        roleDescription: roleTemplate?.roleDescription ?? runtimeTemplate?.roleDescription ?? `${displayName}，由 TangSeng IM 通过 Clowder 新增。`,
+        ...(roleTemplate?.personality ? { personality: roleTemplate.personality } : runtimeTemplate?.personality ? { personality: runtimeTemplate.personality } : {}),
+        ...(roleTemplate?.teamStrengths
+          ? { teamStrengths: roleTemplate.teamStrengths }
+          : runtimeTemplate?.teamStrengths
+            ? { teamStrengths: runtimeTemplate.teamStrengths }
+            : {}),
+        ...(runtimeTemplate?.caution !== undefined ? { caution: runtimeTemplate.caution } : {}),
+        ...(roleTemplate?.restrictions && roleTemplate.restrictions.length > 0
+          ? { restrictions: [...roleTemplate.restrictions] }
+          : runtimeTemplate?.restrictions && runtimeTemplate.restrictions.length > 0
+            ? { restrictions: [...runtimeTemplate.restrictions] }
+            : {}),
+        ...(runtimeTemplate?.strengths ? { strengths: [...runtimeTemplate.strengths] } : {}),
+        ...(runtimeTemplate?.sessionChain !== undefined ? { sessionChain: runtimeTemplate.sessionChain } : {}),
         clientId,
-        defaultModel: input.defaultModel ?? runtimeTemplate.defaultModel ?? '',
-        mcpSupport: runtimeTemplate.mcpSupport ?? true,
+        defaultModel: input.defaultModel ?? runtimeTemplate?.defaultModel ?? '',
+        mcpSupport: runtimeTemplate?.mcpSupport ?? true,
         cli,
-        ...(runtimeTemplate.commandArgs ? { commandArgs: [...runtimeTemplate.commandArgs] } : {}),
-        ...(runtimeTemplate.cliConfigArgs ? { cliConfigArgs: [...runtimeTemplate.cliConfigArgs] } : {}),
-        ...(runtimeTemplate.provider ? { provider: runtimeTemplate.provider } : {}),
-        ...(runtimeTemplate.contextBudget ? { contextBudget: runtimeTemplate.contextBudget } : {}),
-        ...(roleTemplate.voiceConfig ? { voiceConfig: roleTemplate.voiceConfig } : {}),
+        ...(runtimeTemplate?.commandArgs ? { commandArgs: [...runtimeTemplate.commandArgs] } : {}),
+        ...(runtimeTemplate?.cliConfigArgs ? { cliConfigArgs: [...runtimeTemplate.cliConfigArgs] } : {}),
+        ...(runtimeTemplate?.provider ? { provider: runtimeTemplate.provider } : {}),
+        ...(runtimeTemplate?.contextBudget ? { contextBudget: runtimeTemplate.contextBudget } : {}),
+        ...(runtimeTemplate?.voiceConfig ? { voiceConfig: runtimeTemplate.voiceConfig } : {}),
       });
       const config = toAllCatConfigs(catalog)[catId];
       if (!config) throw new Error(`新猫猫配置未写入运行时目录：${catId}`);

@@ -58,6 +58,34 @@ export interface ClowderAgent {
   preferred?: boolean;
 }
 
+export interface ClowderCatRoleTemplate {
+  roleTemplateId: string;
+  catId: string;
+  logicalKey?: string;
+  displayName: string;
+  aliases?: string[];
+  mentionPatterns?: string[];
+  avatar?: string;
+  personalitySummary?: string;
+  capabilitySummary?: string;
+  cloneable: boolean;
+  unavailableReason?: string;
+  source?: 'role-template' | ClowderCatSource;
+}
+
+export interface ClowderClientDefaultModels {
+  defaultModel?: string;
+  models?: string[];
+}
+
+export interface ClowderPlatformModelOption {
+  id: string;
+  label: string;
+  default?: boolean;
+  disabled?: boolean;
+  disabledReason?: string;
+}
+
 export interface IMConnectorPermission {
   connectorId: ClowderConnectorId;
   externalChatId: string;
@@ -98,6 +126,8 @@ export interface ClowderAgentDirectoryResponse {
 
 export interface ClowderCatDirectoryResponse {
   agents: ClowderAgent[];
+  templates?: ClowderCatRoleTemplate[];
+  clientDefaults?: Record<string, ClowderClientDefaultModels>;
 }
 
 export interface ClowderBindRequest extends ClowderConversationRef {

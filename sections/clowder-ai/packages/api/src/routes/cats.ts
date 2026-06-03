@@ -28,7 +28,7 @@ import {
 } from '../config/account-resolver.js';
 import { resolveBoundAccountRefForCat } from '../config/cat-account-binding.js';
 import { bootstrapCatCatalog, resolveCatCatalogPath } from '../config/cat-catalog-store.js';
-import { getAcpConfig, getRoster, loadCatConfig, toAllCatConfigs } from '../config/cat-config-loader.js';
+import { getAcpConfig, getRoster, loadCatConfig, loadCatTemplateConfig, toAllCatConfigs } from '../config/cat-config-loader.js';
 import { configEventBus, createChangeSetId } from '../config/config-event-bus.js';
 import { resolveProjectTemplatePath } from '../config/project-template-path.js';
 import { getResolvedCats } from '../config/resolved-cats.js';
@@ -92,6 +92,7 @@ const baseCatSchema = z.object({
   personality: z.string().optional(),
   teamStrengths: z.string().optional(),
   caution: z.string().nullable().optional(),
+  restrictions: z.array(z.string().min(1)).optional(),
   strengths: z.array(z.string().min(1)).optional(),
   sessionChain: z.boolean().optional(),
   voiceConfig: voiceConfigSchema.optional(),
@@ -135,6 +136,7 @@ const updateCatSchema = z.object({
   personality: z.string().optional(),
   teamStrengths: z.string().optional(),
   caution: z.string().nullable().optional(),
+  restrictions: z.array(z.string().min(1)).optional(),
   strengths: z.array(z.string().min(1)).optional(),
   sessionChain: z.boolean().optional(),
   available: z.boolean().optional(),
@@ -352,6 +354,7 @@ async function toCatResponse(
     personality: cat.personality,
     teamStrengths: cat.teamStrengths,
     caution: cat.caution,
+    restrictions: cat.restrictions,
     strengths: cat.strengths,
     sessionChain: cat.sessionChain,
     voiceConfig: cat.voiceConfig,
@@ -406,39 +409,8 @@ export const catsRoutes: FastifyPluginAsync<CatsRoutesOptions> = async (app, opt
     try {
       const projectRoot = resolveProjectRoot();
       const templatePath = resolveProjectTemplatePath(projectRoot);
-      const raw = JSON.parse(await import('node:fs').then((fs) => fs.promises.readFile(templatePath, 'utf-8'))) as {
-        roleTemplates?: {
-          id: string;
-          name: string;
-          nickname?: string;
-          avatar: string;
-          color: { primary: string; secondary: string };
-          roleDescription: string;
-          personality: string;
-          teamStrengths?: string;
-        }[];
-        clientDefaults?: Record<string, { defaultModel: string; models: string[] }>;
-      };
-      if (raw.roleTemplates && raw.roleTemplates.length > 0) {
-        return { templates: raw.roleTemplates, clientDefaults: raw.clientDefaults ?? {} };
-      }
-      // Fallback: extract from breeds (legacy)
-      const templateConfig = loadCatConfig(templatePath);
-      const allCats = Object.values(toAllCatConfigs(templateConfig));
-      const templateCats = allCats.filter((c) => c.isDefaultVariant);
-      return {
-        templates: templateCats.map((cat) => ({
-          id: cat.breedId ?? cat.id,
-          name: cat.breedDisplayName ?? cat.displayName ?? cat.name,
-          nickname: cat.nickname,
-          avatar: cat.avatar,
-          color: cat.color,
-          roleDescription: cat.roleDescription,
-          personality: cat.personality,
-          teamStrengths: cat.teamStrengths,
-        })),
-        clientDefaults: {},
-      };
+      const template = loadCatTemplateConfig(templatePath);
+      return { templates: template.roleTemplates ?? [], clientDefaults: template.clientDefaults ?? {} };
     } catch (err) {
       app.log.warn({ err }, 'Failed to load cat templates');
       return { templates: [], clientDefaults: {} };
@@ -517,6 +489,7 @@ export const catsRoutes: FastifyPluginAsync<CatsRoutesOptions> = async (app, opt
           personality: body.personality,
           teamStrengths: body.teamStrengths,
           caution: body.caution,
+          restrictions: body.restrictions,
           strengths: body.strengths,
           sessionChain: body.sessionChain,
           clientId: 'antigravity',
@@ -546,6 +519,7 @@ export const catsRoutes: FastifyPluginAsync<CatsRoutesOptions> = async (app, opt
           personality: body.personality,
           teamStrengths: body.teamStrengths,
           caution: body.caution,
+          restrictions: body.restrictions,
           strengths: body.strengths,
           sessionChain: body.sessionChain,
           clientId: body.clientId,
@@ -705,6 +679,7 @@ export const catsRoutes: FastifyPluginAsync<CatsRoutesOptions> = async (app, opt
         ...(body.personality !== undefined ? { personality: body.personality } : {}),
         ...(body.teamStrengths !== undefined ? { teamStrengths: body.teamStrengths } : {}),
         ...(body.caution !== undefined ? { caution: body.caution } : {}),
+        ...(body.restrictions !== undefined ? { restrictions: body.restrictions } : {}),
         ...(body.strengths !== undefined ? { strengths: body.strengths } : {}),
         ...(body.sessionChain !== undefined ? { sessionChain: body.sessionChain } : {}),
         ...(body.clientId !== undefined ? { clientId: body.clientId } : {}),

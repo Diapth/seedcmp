@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, onMounted, reactive, ref } from 'vue';
+import { computed, onMounted, reactive, ref, watch } from 'vue';
 import { useRouter } from 'vue-router';
 import { ChannelAvatar } from '@tsdaodao/base-vue';
 import { useClowderStore, type ClowderCatContact } from '@tsdaodao/datasource-vue';
@@ -26,13 +26,20 @@ const canCreate = computed(() => form.name.trim().length > 0 &&
   form.authType !== '' &&
   form.accountRef.trim().length > 0);
 
-const roleTemplateOptions = computed(() => clowderStore.catContactDirectory.filter(cat =>
-  cat.source === 'disconnected'
-));
+const roleTemplateOptions = computed(() => clowderStore.catRoleTemplates);
 
 const selectedRoleTemplate = computed(() =>
-  roleTemplateOptions.value.find(cat => cat.catId === form.roleTemplateId)
+  roleTemplateOptions.value.find(template => template.roleTemplateId === form.roleTemplateId)
 );
+
+const modelOptions = computed(() => form.clientId
+  ? clowderStore.platformModelOptions[form.clientId] || []
+  : []);
+
+const recommendedModel = computed(() =>
+  modelOptions.value.find(model => model.default && !model.disabled)?.id ||
+  modelOptions.value.find(model => !model.disabled)?.id ||
+  '');
 
 const availableCats = computed(() => {
   const query = searchQuery.value.trim().toLowerCase();
@@ -49,6 +56,14 @@ const availableCats = computed(() => {
 
 onMounted(() => {
   loadDirectory();
+});
+
+watch(() => form.clientId, () => {
+  applyRecommendedModel();
+});
+
+watch(modelOptions, () => {
+  applyRecommendedModel();
 });
 
 async function loadDirectory() {
@@ -74,11 +89,22 @@ function resetForm() {
   feedback.value = '';
 }
 
+function applyRecommendedModel() {
+  if (!form.clientId) {
+    form.defaultModel = '';
+    return;
+  }
+  const current = modelOptions.value.find(model => model.id === form.defaultModel);
+  if (!current || current.disabled) {
+    form.defaultModel = recommendedModel.value;
+  }
+}
+
 function applyRoleTemplate() {
   const template = selectedRoleTemplate.value;
   if (!template) return;
-  if (!form.personality.trim()) form.personality = template.personalitySummary;
-  if (!form.capabilitiesText.trim()) form.capabilitiesText = template.capabilitySummary;
+  if (!form.personality.trim()) form.personality = template.personalitySummary || '';
+  if (!form.capabilitiesText.trim()) form.capabilitiesText = template.capabilitySummary || '';
 }
 
 function openCat(cat: ClowderCatContact) {
@@ -152,7 +178,12 @@ function back() {
           <span>角色模板</span>
           <select v-model="form.roleTemplateId" @change="applyRoleTemplate">
             <option value="">选择 roleTemplates 角色模板</option>
-            <option v-for="template in roleTemplateOptions" :key="template.catId" :value="template.catId">
+            <option
+              v-for="template in roleTemplateOptions"
+              :key="template.roleTemplateId"
+              :value="template.roleTemplateId"
+              :disabled="template.cloneable === false"
+            >
               {{ template.displayName }} · {{ template.capabilitySummary || template.catId }}
             </option>
           </select>
@@ -193,9 +224,22 @@ function back() {
             :placeholder="form.authType === 'oauth' ? '例如：codex / claude' : '例如：openai-prod / anthropic-prod'"
           />
         </label>
-        <label v-if="form.authType === 'api_key'" class="field">
+        <label v-if="form.clientId && modelOptions.length > 0" class="field">
           <span>默认模型</span>
-          <input v-model="form.defaultModel" placeholder="API Key 账号需要时填写，例如 gpt-4.1 或 claude-sonnet-4" />
+          <select v-model="form.defaultModel">
+            <option
+              v-for="model in modelOptions"
+              :key="model.id"
+              :value="model.id"
+              :disabled="model.disabled"
+            >
+              {{ model.label }}{{ model.default ? ' · 推荐' : '' }}{{ model.disabledReason ? ` · ${model.disabledReason}` : '' }}
+            </option>
+          </select>
+        </label>
+        <label v-else-if="form.clientId" class="field">
+          <span>默认模型</span>
+          <input v-model="form.defaultModel" placeholder="例如：gpt-5.4 或 claude-sonnet-4-6" />
         </label>
         <label class="field">
           <span>性格设定</span>

@@ -173,4 +173,74 @@ describe('Clowder cats as contact identities', () => {
       connected: true
     })
   })
+
+  it('loads cloneable role templates separately from connected cat contacts', async () => {
+    const { useClowderStore } = await import('../../../packages/datasource-vue/src/stores/clowderStore.ts')
+    const store = useClowderStore()
+
+    get.mockResolvedValueOnce({
+      agents: [
+        {
+          catId: 'codex',
+          displayName: 'Codex',
+          aliases: ['@codex'],
+          mentionPatterns: ['@codex'],
+          personalitySummary: 'Careful coding partner',
+          capabilitySummary: 'code, tests',
+          available: true,
+          connected: true,
+          source: 'existing'
+        },
+        {
+          catId: 'runtime-helper',
+          displayName: '代码助手',
+          aliases: ['@helper'],
+          mentionPatterns: ['@helper'],
+          personalitySummary: '稳健地写代码',
+          capabilitySummary: '代码审查、测试',
+          available: true,
+          connected: true,
+          source: 'runtime-created'
+        }
+      ],
+      templates: [
+        {
+          roleTemplateId: 'ragdoll',
+          catId: 'ragdoll',
+          displayName: '布偶猫',
+          personalitySummary: '温柔但有主见',
+          capabilitySummary: '架构设计',
+          cloneable: true,
+          source: 'role-template'
+        },
+        {
+          roleTemplateId: 'maine-coon',
+          catId: 'maine-coon',
+          displayName: 'Codex',
+          personalitySummary: '严谨认真',
+          capabilitySummary: 'Review、找 bug、coding 落地',
+          cloneable: true,
+          source: 'role-template'
+        },
+        {
+          roleTemplateId: 'coordinator',
+          catId: 'coordinator',
+          displayName: '协调者',
+          personalitySummary: '清晰、稳健',
+          capabilitySummary: '需求澄清、任务拆分',
+          cloneable: true,
+          source: 'role-template'
+        }
+      ]
+    })
+
+    await store.loadCatContactDirectory({ includeUnavailable: true })
+
+    expect(store.catContactDirectory.map(cat => cat.catId)).toEqual(['codex', 'runtime-helper'])
+    expect(store.catRoleTemplates.map(template => template.roleTemplateId)).toEqual(['ragdoll', 'maine-coon', 'coordinator'])
+    expect(store.catRoleTemplates.find(template => template.roleTemplateId === 'coordinator')).toMatchObject({
+      displayName: '协调者',
+      cloneable: true
+    })
+  })
 })

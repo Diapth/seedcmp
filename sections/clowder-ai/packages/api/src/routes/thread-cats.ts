@@ -80,6 +80,7 @@ export const threadCatsRoutes: FastifyPluginAsync<ThreadCatsRoutesOptions> = asy
         ...(candidate?.avatar ? { avatar: candidate.avatar } : {}),
         ...(candidate?.personalitySummary ? { personalitySummary: candidate.personalitySummary } : {}),
         ...(candidate?.capabilitySummary ? { capabilitySummary: candidate.capabilitySummary } : {}),
+        ...(candidate?.restrictions && candidate.restrictions.length > 0 ? { restrictions: candidate.restrictions } : {}),
         available,
         availabilityState: available ? 'available' : 'unavailable',
         source: candidate?.source ?? (hasService ? 'existing' : 'disconnected'),
@@ -194,5 +195,6 @@ export interface ThreadCatDirectoryAgent {
   avatar?: string;
   personalitySummary?: string;
   capabilitySummary?: string;
+  restrictions?: string[];
   source?: 'existing' | 'runtime-created' | 'disconnected' | 'stale';
 }

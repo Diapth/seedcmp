@@ -250,6 +250,8 @@ export interface CatCafeConfigV1 {
 export interface CoCreatorConfig {
   /** Primary display name (e.g. "You") */
   readonly name: string;
+  /** Informal display nickname shown in template-driven setup surfaces. */
+  readonly nickname?: string;
   /** Alternative names cats may use (e.g. ["L.S.", "Lysander"]) */
   readonly aliases: readonly string[];
   /** Line-start mention patterns for routing detection (e.g. ["@co-creator", "@co-creator"]) */
@@ -275,6 +277,36 @@ export interface CatCafeConfigV2 {
    * New code must use catalog-accounts.ts which reads the global file.
    */
   readonly accounts?: Readonly<Record<string, AccountConfig>>;
+}
+
+/**
+ * Role template metadata distributed in repo-root cat-template.json.
+ * Runtime member instances live in .cat-cafe/cat-catalog.json instead.
+ */
+export interface CatRoleTemplate {
+  readonly id: string;
+  readonly name: string;
+  readonly nickname?: string;
+  readonly avatar: string;
+  readonly color: CatColor;
+  readonly roleDescription: string;
+  readonly personality: string;
+  readonly teamStrengths?: string;
+  /** Hard role constraints inherited by runtime cats cloned from this template. */
+  readonly restrictions?: readonly string[];
+}
+
+export interface CatClientDefaults {
+  readonly defaultModel: string;
+  readonly models: readonly string[];
+}
+
+export interface CatTemplateConfig {
+  readonly version: 2;
+  readonly roleTemplates?: readonly CatRoleTemplate[];
+  readonly clientDefaults?: Readonly<Record<string, CatClientDefaults>>;
+  readonly reviewPolicy?: ReviewPolicy;
+  readonly coCreator?: CoCreatorConfig;
 }
 
 /**

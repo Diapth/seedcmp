@@ -33,6 +33,7 @@ export interface RuntimeCatInput {
   personality?: string;
   teamStrengths?: string;
   caution?: string | null;
+  restrictions?: string[];
   strengths?: string[];
   sessionChain?: boolean;
   clientId: ClientId;
@@ -60,6 +61,7 @@ export interface RuntimeCatUpdate {
   personality?: string;
   teamStrengths?: string;
   caution?: string | null;
+  restrictions?: string[];
   strengths?: string[];
   sessionChain?: boolean;
   clientId?: ClientId;
@@ -233,6 +235,7 @@ function createBreedFromInput(input: RuntimeCatInput): CatBreed {
         ...(input.caution !== undefined
           ? { caution: input.caution && input.caution.trim().length > 0 ? input.caution.trim() : null }
           : {}),
+        ...(input.restrictions && input.restrictions.length > 0 ? { restrictions: input.restrictions } : {}),
         ...(input.strengths ? { strengths: input.strengths } : {}),
       },
     ],
@@ -377,6 +380,13 @@ export function updateRuntimeCat(projectRoot: string, catId: string, patch: Runt
   }
   if (patch.caution !== undefined) {
     variant.caution = patch.caution && patch.caution.trim().length > 0 ? patch.caution.trim() : null;
+  }
+  if (patch.restrictions !== undefined) {
+    if (patch.restrictions.length > 0) {
+      variant.restrictions = patch.restrictions;
+    } else {
+      delete variant.restrictions;
+    }
   }
   if (patch.strengths !== undefined) {
     if (patch.strengths.length > 0) {

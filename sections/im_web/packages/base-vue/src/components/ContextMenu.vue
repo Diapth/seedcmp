@@ -18,6 +18,8 @@ const props = defineProps<{
 
 const emit = defineEmits(['close']);
 
+let globalListenerTimer: ReturnType<typeof setTimeout> | null = null;
+
 function handleItemClick(action: () => void) {
   action();
   emit('close');
@@ -32,12 +34,20 @@ function handleGlobalContextMenu(event: MouseEvent) {
   emit('close');
 }
 
-onMounted(() => {
+function addGlobalListeners() {
   document.addEventListener('click', handleGlobalClick);
   document.addEventListener('contextmenu', handleGlobalContextMenu);
+}
+
+onMounted(() => {
+  globalListenerTimer = setTimeout(addGlobalListeners, 0);
 });
 
 onBeforeUnmount(() => {
+  if (globalListenerTimer) {
+    clearTimeout(globalListenerTimer);
+    globalListenerTimer = null;
+  }
   document.removeEventListener('click', handleGlobalClick);
   document.removeEventListener('contextmenu', handleGlobalContextMenu);
 });

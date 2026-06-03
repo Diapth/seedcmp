@@ -106,22 +106,40 @@ func TestFetchAgentDirectoryUsesBridgeOwnerForClowderThreadAuth(t *testing.T) {
 }
 
 func TestFetchCatDirectoryUsesDirectHubAndKeepsExistingRagdoll(t *testing.T) {
-	var gotPath string
-	var gotUser string
+	gotPaths := []string{}
+	gotUsers := []string{}
 	upstream := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		gotPath = r.URL.RequestURI()
-		gotUser = r.Header.Get("x-cat-cafe-user")
+		gotPaths = append(gotPaths, r.URL.RequestURI())
+		gotUsers = append(gotUsers, r.Header.Get("x-cat-cafe-user"))
 		require.Equal(t, http.MethodGet, r.Method)
-		_ = json.NewEncoder(w).Encode(map[string]interface{}{
-			"agents": []map[string]interface{}{
-				{
-					"catId":           "opus",
-					"displayName":     "布偶猫",
-					"mentionPatterns": []string{"@opus", "@布偶猫"},
-					"available":       true,
+		switch r.URL.Path {
+		case "/api/connectors/im-web/agents":
+			_ = json.NewEncoder(w).Encode(map[string]interface{}{
+				"agents": []map[string]interface{}{
+					{
+						"catId":           "opus",
+						"displayName":     "布偶猫",
+						"mentionPatterns": []string{"@opus", "@布偶猫"},
+						"available":       true,
+					},
 				},
-			},
-		})
+			})
+		case "/api/cat-templates":
+			_ = json.NewEncoder(w).Encode(map[string]interface{}{
+				"templates": []map[string]interface{}{
+					{
+						"id":            "coordinator",
+						"name":          "协调者",
+						"nickname":      "PM",
+						"avatar":        "/avatars/keeper.png",
+						"personality":   "清晰、稳健",
+						"teamStrengths": "需求澄清、任务拆分",
+					},
+				},
+			})
+		default:
+			http.NotFound(w, r)
+		}
 	}))
 	defer upstream.Close()
 
@@ -140,15 +158,20 @@ func TestFetchCatDirectoryUsesDirectHubAndKeepsExistingRagdoll(t *testing.T) {
 
 	require.NoError(t, err)
 	require.Len(t, directory.Agents, 1)
+	require.Len(t, directory.Templates, 1)
 	assert.Equal(t, "opus", directory.Agents[0].CatID)
+	assert.Equal(t, "coordinator", directory.Templates[0].RoleTemplateID)
+	assert.Equal(t, "协调者", directory.Templates[0].DisplayName)
 	assert.Equal(t, "布偶猫", directory.Agents[0].DisplayName)
 	assert.Equal(t, []string{"@opus", "@布偶猫"}, directory.Agents[0].MentionPatterns)
 	assert.True(t, directory.Agents[0].Connected)
 	assert.Equal(t, "existing", directory.Agents[0].Source)
-	assert.Contains(t, gotPath, "/api/connectors/im-web/agents?externalChatId=1%3A")
-	assert.Contains(t, gotPath, "leng_test_updated")
-	assert.NotContains(t, gotPath, "externalChatId=1%3Aclowder_ai&")
-	assert.Equal(t, "owner-1", gotUser)
+	require.Len(t, gotPaths, 2)
+	assert.Contains(t, gotPaths[0], "/api/connectors/im-web/agents?externalChatId=1%3A")
+	assert.Contains(t, gotPaths[0], "leng_test_updated")
+	assert.NotContains(t, gotPaths[0], "externalChatId=1%3Aclowder_ai&")
+	assert.Equal(t, "/api/cat-templates", gotPaths[1])
+	assert.Equal(t, []string{"owner-1", "owner-1"}, gotUsers)
 }
 
 func TestFetchCatDirectoryFallsBackToTemplateCandidatesWhenAgentDirectoryFails(t *testing.T) {
@@ -205,7 +228,12 @@ func TestFetchCatDirectoryFallsBackToTemplateCandidatesWhenAgentDirectoryFails(t
 
 	require.NoError(t, err)
 	require.Len(t, directory.Agents, 2)
+	require.Len(t, directory.Templates, 2)
 	assert.Equal(t, "ragdoll", directory.Agents[0].CatID)
+	assert.Equal(t, "ragdoll", directory.Templates[0].RoleTemplateID)
+	assert.Equal(t, "布偶猫", directory.Templates[0].DisplayName)
+	assert.True(t, directory.Templates[0].Cloneable)
+	assert.Equal(t, "role-template", directory.Templates[0].Source)
 	assert.Equal(t, "布偶猫", directory.Agents[0].DisplayName)
 	assert.Equal(t, []string{"@ragdoll", "@布偶猫", "@宪宪"}, directory.Agents[0].MentionPatterns)
 	assert.Equal(t, "架构设计、写代码一把好手", directory.Agents[0].CapabilitySummary)
@@ -232,14 +260,14 @@ func TestCatContactResponseFindsExistingCatByDisplayNameOrMention(t *testing.T) 
 		},
 	}
 
-	byDisplay, ok := catContactResponse("布偶猫", directory, "existing")
+	byDisplay, ok := catContactResponse("布偶猫", directory.Agents, "existing")
 	require.True(t, ok)
 	assert.Equal(t, "opus", byDisplay.Agent.CatID)
 	assert.Equal(t, "布偶猫", byDisplay.Agent.DisplayName)
 	assert.True(t, byDisplay.Agent.Connected)
 	assert.True(t, byDisplay.Contact.Connected)
 
-	byMention, ok := catContactResponse("@布偶猫", directory, "existing")
+	byMention, ok := catContactResponse("@布偶猫", directory.Agents, "existing")
 	require.True(t, ok)
 	assert.Equal(t, "opus", byMention.Agent.CatID)
 }
@@ -369,10 +397,11 @@ func TestBuildCreateCatCommandRequiresAndNormalizesClientPlatform(t *testing.T) 
 		ClientID:       "anthropic",
 		AuthType:       "api_key",
 		AccountRef:     "anthropic-prod",
+		DefaultModel:   "claude-sonnet-4-6",
 	})
 
 	require.True(t, ok)
-	assert.Equal(t, "/cats new Claude猫 @claude-cat --platform claude-code --auth api-key --account anthropic-prod --role-template ragdoll", command)
+	assert.Equal(t, "/cats new Claude猫 @claude-cat --platform claude-code --auth api-key --account anthropic-prod --model claude-sonnet-4-6 --role-template ragdoll", command)
 
 	_, ok = buildCreateCatCommand(createCatRequest{Name: "无平台猫"})
 	assert.False(t, ok)

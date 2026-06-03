@@ -1,10 +1,34 @@
 import { existsSync, mkdirSync, readFileSync, renameSync, unlinkSync, writeFileSync } from 'node:fs';
 import { dirname, relative, resolve, sep } from 'node:path';
-import type { CatCafeConfig, ClientId, RosterEntry } from '@cat-cafe/shared';
-import { builtinAccountIdForClient, resolveBuiltinClientForProvider } from './account-resolver.js';
+import type {
+  CatCafeConfig,
+  CatCafeConfigV2,
+  CatTemplateConfig,
+  ClientId,
+  CoCreatorConfig,
+  ReviewPolicy,
+  RosterEntry,
+} from '@cat-cafe/shared';
+import { resolveBuiltinClientForProvider } from './account-resolver.js';
 
 const CONFIG_SUBDIR = '.cat-cafe';
 const CAT_CATALOG_FILENAME = 'cat-catalog.json';
+
+type BootstrapSourceConfig = Partial<CatTemplateConfig> &
+  Partial<Pick<CatCafeConfigV2, 'breeds' | 'roster' | 'reviewPolicy' | 'coCreator'>>;
+
+const DEFAULT_REVIEW_POLICY: ReviewPolicy = {
+  requireDifferentFamily: true,
+  preferActiveInThread: true,
+  preferLead: true,
+  excludeUnavailable: true,
+};
+
+function getBreedRecords(value: unknown): Record<string, unknown>[] {
+  if (!value || typeof value !== 'object') return [];
+  const breeds = (value as { breeds?: unknown }).breeds;
+  return Array.isArray(breeds) ? (breeds as Record<string, unknown>[]) : [];
+}
 
 function safePath(projectRoot: string, ...segments: string[]): string {
   const root = resolve(projectRoot);
@@ -55,15 +79,16 @@ function migrateCatalogVariants(
 ): { catalog: CatCafeConfig; dirty: boolean } {
   let dirty = false;
   const next = structuredClone(catalog) as CatCafeConfig;
+  const breeds = getBreedRecords(next);
 
   // Step 4 prep: union the catalog's own breed ids with any external ones (template)
   // so legacy variants are dropped even when the catalog itself hasn't grown the new breed yet.
   const standaloneBreedIds = new Set<string>(externalStandaloneBreedIds ?? []);
-  for (const breed of next.breeds as unknown as Record<string, unknown>[]) {
+  for (const breed of breeds) {
     if (typeof breed.id === 'string') standaloneBreedIds.add(breed.id);
   }
 
-  for (const breed of next.breeds as unknown as Record<string, unknown>[]) {
+  for (const breed of breeds) {
     const variants = Array.isArray(breed.variants) ? (breed.variants as Record<string, unknown>[]) : [];
     for (const variant of variants) {
       // P5 step 1: old `provider` holding a ClientId value → `clientId`
@@ -118,7 +143,7 @@ function migrateCatalogVariants(
   // Triggered when a cat (e.g. opus-47) was previously a sub-variant of another breed
   // (ragdoll) and later got promoted to its own breed. Without this normalization,
   // toAllCatConfigs() throws Duplicate catId at startup once both forms coexist.
-  for (const breed of next.breeds as unknown as Record<string, unknown>[]) {
+  for (const breed of breeds) {
     const breedId = typeof breed.id === 'string' ? breed.id : undefined;
     const breedDefaultCatId = typeof breed.catId === 'string' ? breed.catId : undefined;
     const variants = Array.isArray(breed.variants) ? (breed.variants as Record<string, unknown>[]) : [];
@@ -152,7 +177,8 @@ function stripLegacySourceField(catalogPath: string): void {
   const catalog = JSON.parse(raw) as CatCafeConfig;
   const next = structuredClone(catalog) as CatCafeConfig;
   let dirty = false;
-  for (const breed of next.breeds as unknown as Record<string, unknown>[]) {
+  const breeds = getBreedRecords(next);
+  for (const breed of breeds) {
     const variants = Array.isArray(breed.variants) ? (breed.variants as Record<string, unknown>[]) : [];
     for (const variant of variants) {
       if ('source' in variant) {
@@ -177,18 +203,28 @@ function buildOwnerRosterEntry(): RosterEntry {
   };
 }
 
-function createEmptyRuntimeCatalog(template: CatCafeConfig): CatCafeConfig {
-  const ownerEntry = buildOwnerRosterEntry();
-  if ('roster' in template) {
-    return {
-      ...template,
-      breeds: [],
-      roster: { [OWNER_ROSTER_KEY]: ownerEntry },
-    };
-  }
+function pickCoCreator(raw: unknown): CoCreatorConfig | undefined {
+  if (!raw || typeof raw !== 'object') return undefined;
+  const value = (raw as { coCreator?: unknown; owner?: unknown }).coCreator ?? (raw as { owner?: unknown }).owner;
+  if (!value || typeof value !== 'object') return undefined;
+  return value as CoCreatorConfig;
+}
+
+function pickReviewPolicy(raw: unknown): ReviewPolicy {
+  if (!raw || typeof raw !== 'object') return DEFAULT_REVIEW_POLICY;
+  const value = (raw as { reviewPolicy?: unknown }).reviewPolicy;
+  if (!value || typeof value !== 'object') return DEFAULT_REVIEW_POLICY;
+  return value as ReviewPolicy;
+}
+
+function createEmptyRuntimeCatalog(template: BootstrapSourceConfig): CatCafeConfigV2 {
+  const coCreator = pickCoCreator(template);
   return {
-    ...template,
+    version: 2,
     breeds: [],
+    roster: { [OWNER_ROSTER_KEY]: buildOwnerRosterEntry() },
+    reviewPolicy: pickReviewPolicy(template),
+    ...(coCreator ? { coCreator } : {}),
   };
 }
 
@@ -264,10 +300,9 @@ export function readCatCatalog(projectRoot: string): CatCafeConfig | null {
   return JSON.parse(raw) as CatCafeConfig;
 }
 
-function readBootstrapSourceConfig(templatePath: string): { catalog: CatCafeConfig; sourcePath: string } {
+function readBootstrapSourceConfig(templatePath: string): BootstrapSourceConfig {
   return {
-    catalog: JSON.parse(readFileSync(templatePath, 'utf-8')) as CatCafeConfig,
-    sourcePath: templatePath,
+    ...(JSON.parse(readFileSync(templatePath, 'utf-8')) as BootstrapSourceConfig),
   };
 }
 
@@ -282,12 +317,11 @@ export function bootstrapCatCatalog(projectRoot: string, templatePath: string): 
     return catalogPath;
   }
 
-  const { catalog: template } = readBootstrapSourceConfig(templatePath);
-  const { catalog: migratedCatalog } = migrateCatalogVariants(template);
+  const template = readBootstrapSourceConfig(templatePath);
 
   // Always start empty — first-run wizard guides users to add their first cat.
-  // Template breeds are used as a menu when adding members, not seeded on startup.
-  const runtimeCatalog = createEmptyRuntimeCatalog(migratedCatalog);
+  // Role templates are menu data; runtime members are only persisted in catalog.
+  const runtimeCatalog = createEmptyRuntimeCatalog(template);
 
   mkdirSync(dirname(catalogPath), { recursive: true });
   writeFileAtomic(catalogPath, `${JSON.stringify(runtimeCatalog, null, 2)}\n`);

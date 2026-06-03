@@ -43,4 +43,24 @@ describe('Clowder cat console', () => {
     expect(page.default).toContain('console-layout')
     expect(page.default).toContain('cat-row')
   })
+
+  it('uses the full role template catalog for the create-cat dropdown', async () => {
+    const page = await import('../../../packages/contacts-vue/src/views/ClowderCatConsolePage.vue?raw')
+
+    expect(page.default).toContain('clowderStore.catRoleTemplates')
+    expect(page.default).toContain('template.roleTemplateId')
+    expect(page.default).toContain(':disabled="template.cloneable === false"')
+    expect(page.default).not.toContain("cat.source === 'disconnected'")
+  })
+
+  it('shows platform model options and sends the selected model with create-cat requests', async () => {
+    const page = await import('../../../packages/contacts-vue/src/views/ClowderCatConsolePage.vue?raw')
+
+    expect(page.default).toContain('clowderStore.platformModelOptions')
+    expect(page.default).toContain('recommendedModel')
+    expect(page.default).toContain('applyRecommendedModel')
+    expect(page.default).toContain('v-for="model in modelOptions"')
+    expect(page.default).toContain('model.default ?')
+    expect(page.default).toContain('defaultModel: form.defaultModel.trim() || undefined')
+  })
 })

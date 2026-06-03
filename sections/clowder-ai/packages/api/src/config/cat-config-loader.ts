@@ -5,7 +5,7 @@
  */
 
 import { readFileSync } from 'node:fs';
-import { dirname, resolve } from 'node:path';
+import { basename, dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import type {
   CatBreed,
@@ -13,6 +13,7 @@ import type {
   CatConfig,
   CatFeatures,
   CatId,
+  CatTemplateConfig,
   CatVariant,
   CoCreatorConfig,
   ContextBudget,
@@ -190,6 +191,7 @@ const reviewPolicySchema = z.object({
 /** F067: Owner config schema */
 const coCreatorConfigSchema = z.object({
   name: z.string().min(1),
+  nickname: z.string().min(1).optional(),
   aliases: z.array(z.string().min(1)),
   mentionPatterns: z.array(mentionPatternSchema).min(1),
   avatar: z.string().min(1).optional(),
@@ -225,6 +227,33 @@ const catCafeConfigSchemaV2 = z
 /** Union of all versions — loader handles migration */
 const catCafeConfigSchema = z.union([catCafeConfigSchemaV1, catCafeConfigSchemaV2]);
 
+const roleTemplateSchema = z.object({
+  id: z.string().min(1),
+  name: z.string().min(1),
+  nickname: z.string().min(1).optional(),
+  avatar: z.string().min(1),
+  color: colorSchema,
+  roleDescription: z.string().min(1),
+  personality: z.string().min(1),
+  teamStrengths: z.string().optional(),
+  restrictions: z.array(z.string().min(1)).optional(),
+});
+
+const clientDefaultsSchema = z.object({
+  defaultModel: z.string(),
+  models: z.array(z.string()),
+});
+
+const catTemplateConfigSchema = z.object({
+  version: z.literal(2),
+  roleTemplates: z.array(roleTemplateSchema).optional(),
+  clientDefaults: z.record(z.string(), clientDefaultsSchema).optional(),
+  reviewPolicy: reviewPolicySchema.optional(),
+  coCreator: coCreatorConfigSchema.optional(),
+  breeds: z.never().optional(),
+  roster: z.never().optional(),
+});
+
 /** clowder-ai#340: Read cat-template.json directly — cat-config.json is no longer a runtime source. */
 function readTemplate(templatePath: string): string {
   try {
@@ -233,6 +262,48 @@ function readTemplate(templatePath: string): string {
     const code = (err as NodeJS.ErrnoException).code;
     throw new Error(`Failed to read cat-template.json at ${templatePath}: ${code ?? 'unknown error'}`);
   }
+}
+
+export function loadCatTemplateConfig(templatePath?: string): CatTemplateConfig {
+  const resolvedTemplatePath = templatePath ?? process.env.CAT_TEMPLATE_PATH ?? DEFAULT_CAT_TEMPLATE_PATH;
+  const raw = readTemplate(resolvedTemplatePath);
+  const json: unknown = JSON.parse(raw);
+  const rawObject = json && typeof json === 'object' && !Array.isArray(json) ? (json as Record<string, unknown>) : null;
+  const hasLegacyBreeds = Array.isArray(rawObject?.breeds);
+  const shouldUseLegacyFallback = hasLegacyBreeds;
+
+  const result = catTemplateConfigSchema.safeParse(json);
+  if (result.success && !shouldUseLegacyFallback) return result.data;
+
+  const legacyConfig = catCafeConfigSchema.safeParse(json);
+  if (!legacyConfig.success) {
+    const issues = result.success
+      ? legacyConfig.error.issues.map((i) => `  ${i.path.join('.')}: ${i.message}`)
+      : result.error.issues.map((i) => `  ${i.path.join('.')}: ${i.message}`);
+    throw new Error(`Invalid cat-template.json:\n${issues.join('\n')}`);
+  }
+
+  const templates = legacyConfig.data.breeds.map((breed) => {
+    const defaultVariant = breed.variants.find((variant) => variant.id === breed.defaultVariantId);
+    const restrictions = defaultVariant?.restrictions ?? breed.restrictions;
+    return {
+      id: breed.id,
+      name: breed.displayName ?? breed.name,
+      ...(breed.nickname ? { nickname: breed.nickname } : {}),
+      avatar: breed.avatar,
+      color: breed.color,
+      roleDescription: breed.roleDescription,
+      personality: defaultVariant?.personality ?? '',
+      ...(breed.teamStrengths ? { teamStrengths: breed.teamStrengths } : {}),
+      ...(restrictions && restrictions.length > 0 ? { restrictions: [...restrictions] } : {}),
+    };
+  });
+  return {
+    version: 2,
+    roleTemplates: templates,
+    ...(legacyConfig.data.version === 2 ? { reviewPolicy: legacyConfig.data.reviewPolicy } : {}),
+    ...(legacyConfig.data.version === 2 && legacyConfig.data.coCreator ? { coCreator: legacyConfig.data.coCreator } : {}),
+  };
 }
 
 /**
@@ -381,14 +452,31 @@ export function loadCatConfig(filePath?: string): CatCafeConfig {
       raw = merged;
       resolvedPath = resolveCatCatalogPath(dirname(templatePath));
     } else {
-      raw = readTemplate(templatePath);
-      resolvedPath = templatePath;
+      const templateRaw = readTemplate(templatePath);
+      // Compatibility for legacy tests/projects that still point CAT_TEMPLATE_PATH
+      // at a full runtime config. Clean templates have no breeds and still
+      // bootstrap/read the sibling runtime catalog.
+      const templateConfig = catCafeConfigSchema.safeParse(JSON.parse(templateRaw));
+      if (templateConfig.success) {
+        raw = templateRaw;
+        resolvedPath = templatePath;
+      } else {
+        const projectRoot = dirname(templatePath);
+        const catalogPath = bootstrapCatCatalog(projectRoot, templatePath);
+        raw = readFileSync(catalogPath, 'utf-8');
+        resolvedPath = catalogPath;
+      }
     }
   }
 
   const json: unknown = JSON.parse(raw);
   const result = catCafeConfigSchema.safeParse(json);
   if (!result.success) {
+    if (filePath && basename(filePath) === 'cat-template.json' && catTemplateConfigSchema.safeParse(json).success) {
+      const projectRoot = dirname(filePath);
+      const catalogPath = bootstrapCatCatalog(projectRoot, filePath);
+      return loadCatConfig(catalogPath);
+    }
     const issues = result.error.issues.map((i) => `  ${i.path.join('.')}: ${i.message}`);
     throw new Error(`Invalid cat config:\n${issues.join('\n')}`);
   }

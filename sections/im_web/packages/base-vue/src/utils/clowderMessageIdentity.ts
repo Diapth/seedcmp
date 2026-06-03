@@ -26,6 +26,23 @@ export function stripClowderCatDecorations(value: string) {
   return String(value || '').replace(/[🐱🐈🐾\s]+$/g, '').trim();
 }
 
+export function normalizeClowderCanonicalDisplayName(displayName: string, catId = '') {
+  const name = stripClowderCatDecorations(displayName);
+  const normalizedName = name.replace(/^@/, '').trim().toLocaleLowerCase();
+  const normalizedCatId = stripClowderCatDecorations(catId).replace(/^@/, '').trim().toLocaleLowerCase();
+  const coordinatorTokens = new Set([
+    'coordinator',
+    'pm',
+    '协调者',
+    '主agent',
+    '主代理'
+  ]);
+  if (coordinatorTokens.has(normalizedCatId) || coordinatorTokens.has(normalizedName)) {
+    return '协调者';
+  }
+  return name;
+}
+
 export function extractClowderCatDisplayNameFromText(text: string) {
   const value = String(text || '').trim();
   const prefixMatch = value.match(/^【([^】]{1,40}?)】/);
@@ -66,16 +83,39 @@ export function getClowderRichBlocksFromPayload(payload: any): any[] {
 
 export function getClowderCatDisplayNameFromPayload(payload: any) {
   const content = getClowderPayload(payload);
+  const metadata = asRecord(content.metadata) || {};
+  const catId = String(
+    content.catId ||
+    content.cat_id ||
+    content.agentId ||
+    content.agent_id ||
+    metadata.catId ||
+    metadata.cat_id ||
+    metadata.agentId ||
+    metadata.agent_id ||
+    ''
+  ).trim();
   const textName = extractClowderCatDisplayNameFromText(String(content.text || content.content || ''));
-  if (textName) return textName;
+  if (!catId && textName) return normalizeClowderCanonicalDisplayName(textName, catId);
+
   const explicit = String(
     content.catDisplayName ||
     content.cat_display_name ||
     content.catName ||
     content.cat_name ||
+    metadata.catDisplayName ||
+    metadata.cat_display_name ||
+    metadata.catName ||
+    metadata.cat_name ||
     ''
   ).trim();
-  if (explicit) return stripClowderCatDecorations(explicit);
+  if (explicit) return normalizeClowderCanonicalDisplayName(explicit, catId);
+
+  if (catId && normalizeClowderCanonicalDisplayName(catId, catId) === '协调者') {
+    return '协调者';
+  }
+
+  if (textName) return normalizeClowderCanonicalDisplayName(textName, catId);
   return '';
 }
 
@@ -95,9 +135,9 @@ export function withClowderCatDisplayName(payload: any, fallbackDisplayName = ''
   if (!isClowderPayload(payload)) return payload;
 
   const catId = stripClowderCatDecorations(String(payload.catId || payload.cat_id || ''));
-  const displayName = getClowderCatDisplayNameFromPayload(payload) ||
+  const displayName = normalizeClowderCanonicalDisplayName(getClowderCatDisplayNameFromPayload(payload) ||
     catId ||
-    stripClowderCatDecorations(String(fallbackDisplayName || ''));
+    stripClowderCatDecorations(String(fallbackDisplayName || '')), catId);
   const next = { ...payload };
   if (next.connectorId === undefined && next.connector_id !== undefined) next.connectorId = next.connector_id;
   if (next.connector_id === undefined && next.connectorId !== undefined) next.connector_id = next.connectorId;
@@ -105,8 +145,8 @@ export function withClowderCatDisplayName(payload: any, fallbackDisplayName = ''
   if (next.cat_id === undefined && next.catId !== undefined) next.cat_id = next.catId;
   if (next.richBlocks === undefined) next.richBlocks = next.rich_blocks || next.rich?.blocks || next.metadata?.richBlocks || next.metadata?.rich_blocks;
   if (displayName) {
-    next.catDisplayName = next.catDisplayName || displayName;
-    next.cat_display_name = next.cat_display_name || displayName;
+    next.catDisplayName = displayName;
+    next.cat_display_name = displayName;
   }
   return next;
 }

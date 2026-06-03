@@ -71,7 +71,7 @@ let suppressMentionPopupOnce = false;
 const replyUser = computed(() => {
   const target = messageStore.replyTarget;
   if (!target) return '';
-  return userStore.userCache[target.fromUID]?.name || target.fromUID;
+  return getMessageSenderName(target);
 });
 
 const replyDigest = computed(() => {
@@ -394,14 +394,88 @@ function getMessageVisibleText(message: any) {
 
 function getMessageSenderName(message: any) {
   const content = message?.content || message?.payload || {};
-  if (content.catDisplayName || content.cat_display_name) {
-    return String(content.catDisplayName || content.cat_display_name);
-  }
+  const clowderName = getClowderCatDisplayNameFromPayload(content);
+  if (clowderName) return clowderName;
   const fromUID = String(message?.fromUID || '');
   if (fromUID === userStore.currentUser?.uid) {
     return userStore.currentUser?.name || fromUID;
   }
   return userStore.userCache[fromUID]?.name || fromUID || 'unknown';
+}
+
+function getReplyTargetCatId(message: any) {
+  const content = message?.content || message?.payload || {};
+  const metadata = content.metadata || {};
+  const explicit = String(
+    content.catId ||
+    content.cat_id ||
+    content.agentId ||
+    content.agent_id ||
+    metadata.catId ||
+    metadata.cat_id ||
+    metadata.agentId ||
+    metadata.agent_id ||
+    ''
+  ).trim();
+  if (explicit) return explicit;
+
+  const fromUID = String(message?.fromUID || message?.from_uid || message?.from || '').trim();
+  if (fromUID.startsWith('clowder_cat:')) return fromUID.slice('clowder_cat:'.length);
+  if (fromUID.startsWith('clowder_cat_')) return fromUID.slice('clowder_cat_'.length);
+  if (fromUID.startsWith('clowder:')) return fromUID.slice('clowder:'.length);
+
+  const displayName = getClowderCatDisplayNameFromPayload(content);
+  return findCatContactByDisplayName(displayName)?.catId || '';
+}
+
+function getReplyTargetType(message: any, targetCatId: string) {
+  const content = message?.content || message?.payload || {};
+  const displayName = getClowderCatDisplayNameFromPayload(content);
+  const normalizedCatId = targetCatId.trim().toLowerCase();
+  const normalizedName = displayName.trim().toLowerCase();
+  if (normalizedCatId === CLOWDER_COORDINATOR_CAT_ID || normalizedName === '协调者' || normalizedName === 'pm') {
+    return 'coordinator';
+  }
+  return targetCatId || isGroupCatMessage(message) ? 'cat' : '';
+}
+
+function buildReplyPayload(target: any) {
+  const targetCatId = getReplyTargetCatId(target);
+  const targetType = getReplyTargetType(target, targetCatId);
+  return {
+    messageID: target.messageID,
+    messageSeq: target.messageSeq,
+    conversationId: props.channelId,
+    conversationType: props.channelType,
+    fromUID: target.fromUID,
+    fromName: getMessageSenderName(target),
+    content: target.content,
+    text: getMessageVisibleText(target),
+    targetCatId: targetCatId || undefined,
+    targetAgentId: targetCatId || undefined,
+    targetType: targetType || undefined
+  };
+}
+
+function buildReplyPromptLines(replyTarget?: any) {
+  if (!replyTarget) return [];
+  const reply = buildReplyPayload(replyTarget);
+  return [
+    'Reply reference:',
+    `- quotedMessageId: ${reply.messageID || 'unknown'}`,
+    `- quotedMessageSeq: ${reply.messageSeq || 0}`,
+    `- quotedAuthor: ${reply.fromName || reply.fromUID || 'unknown'} (${reply.fromUID || 'unknown'})`,
+    `- quotedText: ${reply.text || '[消息]'}`,
+    `- quotedTargetType: ${reply.targetType || 'human'}`,
+    `- quotedTargetCatId: ${reply.targetCatId || 'none'}`
+  ];
+}
+
+function isSameReplyTarget(a: any, b: any) {
+  if (!a || !b) return false;
+  const aKey = String(a.clientMsgNo || a.messageID || `${a.messageSeq || ''}:${a.fromUID || ''}`);
+  const bKey = String(b.clientMsgNo || b.messageID || `${b.messageSeq || ''}:${b.fromUID || ''}`);
+  return aKey === bKey;
 }
 
 function isGroupCatMessage(message: any) {
@@ -426,18 +500,20 @@ function buildRecentAutoReplyMessages() {
     });
 }
 
-function buildClowderPromptContext(text: string, targetCatIds: string[], triggerReason?: GroupCatAutoReplyReason) {
+function buildClowderPromptContext(text: string, targetCatIds: string[], triggerReason?: GroupCatAutoReplyReason, replyTarget?: any) {
   if (props.channelType !== 2) return clowderPromptContext.value;
   const recentMessages = messageStore.getChannelMessages(props.channelId, props.channelType)
     .filter(message => getMessageVisibleText(message))
     .slice(-12)
     .map(message => `- ${getMessageSenderName(message)}: ${getMessageVisibleText(message)}`);
+  const replyLines = buildReplyPromptLines(replyTarget);
   const base = clowderPromptContext.value || `Group: ${props.channelId} (id: ${props.channelId})`;
   return [
     base,
     `Mention target cat ids: ${targetCatIds.length ? targetCatIds.join(', ') : 'none'}`,
     `Trigger reason: ${triggerReason || 'manual'}`,
     `Current message: ${text}`,
+    ...(replyLines.length ? replyLines : []),
     'Recent messages:',
     ...(recentMessages.length ? recentMessages : ['- No recent messages available.'])
   ].join('\n');
@@ -456,7 +532,8 @@ function addDeploymentConfirmationCard(
   intent: DeploymentIntent,
   text: string,
   targetCatIds: string[],
-  triggerReason?: GroupCatAutoReplyReason
+  triggerReason?: GroupCatAutoReplyReason,
+  replyTarget?: any
 ) {
   const directCatId = getClowderCatIdFromContactId(props.channelId);
   const effectiveTargetCatIds = targetCatIds.length ? targetCatIds : (directCatId ? [directCatId] : []);
@@ -483,7 +560,7 @@ function addDeploymentConfirmationCard(
         text,
         targetCatIds: effectiveTargetCatIds,
         triggerReason,
-        promptContext: buildClowderPromptContext(text, effectiveTargetCatIds, triggerReason)
+        promptContext: buildClowderPromptContext(text, effectiveTargetCatIds, triggerReason, replyTarget)
       }
     },
     isRevoked: false,
@@ -532,13 +609,13 @@ function scheduleClowderConversationSync(channelId: string, channelType: number)
   );
 }
 
-async function sendClowderRouteMessage(text: string, targetCatIds: string[], triggerReason?: GroupCatAutoReplyReason) {
+async function sendClowderRouteMessage(text: string, targetCatIds: string[], triggerReason?: GroupCatAutoReplyReason, replyTarget?: any) {
   await clowderStore.sendConversationMessage({
     channelId: props.channelId,
     channelType: props.channelType as 1 | 2,
     directCatId: getClowderCatIdFromContactId(props.channelId),
     targetCatIds,
-    promptContext: buildClowderPromptContext(text, targetCatIds, triggerReason)
+    promptContext: buildClowderPromptContext(text, targetCatIds, triggerReason, replyTarget)
   }, text);
   scheduleClowderConversationSync(props.channelId, props.channelType);
 }
@@ -880,6 +957,7 @@ async function handleSend() {
   conversationStore.updateDraft(props.channelId, props.channelType, '');
 
   const options: any = {};
+  const replyTargetSnapshot = messageStore.replyTarget;
   
   // Build Mention
   if (props.channelType === 2) {
@@ -896,7 +974,7 @@ async function handleSend() {
     defaultTargetCatId: props.channelType === 2 ? CLOWDER_COORDINATOR_CAT_ID : undefined,
     focusedCatId: clowderStore.conversations[clowderConversationKey.value]?.focusCatId,
     lastActiveCatId: clowderStore.agentDirectories[clowderConversationKey.value]?.lastActive?.catId,
-    replyTarget: messageStore.replyTarget,
+    replyTarget: replyTargetSnapshot,
     recentMessages: buildRecentAutoReplyMessages()
   });
   const targetCatIds = autoReplyDecision.targetCatIds;
@@ -920,26 +998,21 @@ async function handleSend() {
   }
 
   // Build Reply / Quote
-  if (messageStore.replyTarget) {
-    const target = messageStore.replyTarget;
-    options.reply = {
-      messageID: target.messageID,
-      messageSeq: target.messageSeq,
-      fromUID: target.fromUID,
-      fromName: userStore.userCache[target.fromUID]?.name || target.fromUID,
-      content: target.content
-    };
+  if (replyTargetSnapshot) {
+    options.reply = buildReplyPayload(replyTargetSnapshot);
   }
 
   try {
     await messageStore.sendMessage(props.channelId, props.channelType, text, options);
-    if (needsDeploymentConfirmation) {
-      addDeploymentConfirmationCard(deploymentIntent, text, targetCatIds, autoReplyDecision.reason);
-    } else if (isClowderAiConversation.value || isClowderCatConversation.value || autoReplyDecision.shouldRoute) {
-      await sendClowderRouteMessage(text, targetCatIds, autoReplyDecision.reason);
+    if (replyTargetSnapshot && isSameReplyTarget(messageStore.replyTarget, replyTargetSnapshot)) {
+      messageStore.setReplyTarget(null);
     }
-    messageStore.setReplyTarget(null);
     mentionedUids.value = [];
+    if (needsDeploymentConfirmation) {
+      addDeploymentConfirmationCard(deploymentIntent, text, targetCatIds, autoReplyDecision.reason, replyTargetSnapshot);
+    } else if (isClowderAiConversation.value || isClowderCatConversation.value || autoReplyDecision.shouldRoute) {
+      await sendClowderRouteMessage(text, targetCatIds, autoReplyDecision.reason, replyTargetSnapshot);
+    }
   } catch (err) {
     console.error('Failed to send message', err);
   } finally {

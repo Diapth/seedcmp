@@ -8,6 +8,7 @@ import { fileURLToPath } from 'node:url';
 
 const {
   loadCatConfig,
+  loadCatTemplateConfig,
   getDefaultVariant,
   toFlatConfigs,
   toAllCatConfigs,
@@ -1052,6 +1053,36 @@ describe('GPT-5.2 variant mention aliases in project config', () => {
  * (via buildStaticIdentity). No harness-side matching.
  */
 describe('F167 Phase E: cat-config restrictions', () => {
+  it('role template restrictions are preserved in CatTemplateConfig', () => {
+    const loaded = loadCatTemplateConfig(
+      writeTempConfig({
+        version: 2,
+        roleTemplates: [
+          {
+            id: 'frontend',
+            name: '波斯猫（前端工程师）',
+            avatar: '/avatars/persian.png',
+            color: { primary: '#EC4899', secondary: '#FCE7F3' },
+            roleDescription: '前端工程师',
+            personality: '优雅挑剔',
+            teamStrengths: 'UI 还原',
+            restrictions: ['禁止跳过响应式检查'],
+          },
+        ],
+      }),
+    );
+
+    assert.deepEqual(loaded.roleTemplates?.[0]?.restrictions, ['禁止跳过响应式检查']);
+  });
+
+  it('legacy breed restrictions project to role templates', () => {
+    const cfg = validConfig();
+    cfg.breeds[0].restrictions = ['禁止生成图片'];
+    const loaded = loadCatTemplateConfig(writeTempConfig(cfg));
+
+    assert.deepEqual(loaded.roleTemplates?.[0]?.restrictions, ['禁止生成图片']);
+  });
+
   it('variant-level restrictions are preserved in CatConfig', () => {
     const cfg = validConfig();
     cfg.breeds[0].variants[0].restrictions = ['禁止写代码'];
