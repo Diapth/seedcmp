@@ -18,6 +18,10 @@ const props = defineProps<{
       status?: string;
       confirmText?: string;
       cancelText?: string;
+      deploymentRequestId?: string;
+      missingFields?: string[];
+      disabledReason?: string;
+      error?: string;
     };
     [key: string]: any;
   };
@@ -41,18 +45,32 @@ const deploymentTarget = computed(() => content.value.target || content.value.pr
 const deploymentEnvironment = computed(() => content.value.environment || content.value.destination || '未指定环境');
 const deploymentStatus = computed(() => {
   const status = String(content.value.status || 'pending_confirmation');
+  if (status === 'needs_fields') return '需要补充信息';
+  if (status === 'submitting') return '提交中';
   if (status === 'confirmed' || status === 'running') return '已确认，等待执行';
   if (status === 'cancelled' || status === 'canceled') return '已取消';
   if (status === 'failed') return '确认失败，可重试';
   return '待确认';
 });
+const deploymentMissingFields = computed(() => Array.isArray(content.value.missingFields) ? content.value.missingFields : []);
 const deploymentActionDisabled = computed(() => {
   const status = String(content.value.status || 'pending_confirmation');
-  return ['confirmed', 'running', 'cancelled', 'canceled'].includes(status);
+  return ['confirmed', 'running', 'cancelled', 'canceled', 'submitting'].includes(status);
+});
+const deploymentConfirmDisabled = computed(() => {
+  return deploymentActionDisabled.value || deploymentMissingFields.value.length > 0 || String(content.value.status || '') === 'needs_fields';
+});
+const deploymentDisabledReason = computed(() => {
+  if (content.value.disabledReason) return String(content.value.disabledReason);
+  if (deploymentMissingFields.value.length > 0) {
+    return `请先补充${deploymentMissingFields.value.map((field: string) => field === 'target' ? '部署目标' : '部署环境').join('、')}`;
+  }
+  return '';
 });
 
 function handleDeploymentAction(action: 'confirm' | 'cancel') {
-  if (deploymentActionDisabled.value) return;
+  if (action === 'confirm' && deploymentConfirmDisabled.value) return;
+  if (action === 'cancel' && deploymentActionDisabled.value) return;
   emit('action', { action, message: props.message });
 }
 </script>
@@ -75,12 +93,17 @@ function handleDeploymentAction(action: 'confirm' | 'cancel') {
           <dd>{{ deploymentEnvironment }}</dd>
         </div>
       </dl>
+      <p v-if="deploymentDisabledReason || content.error" class="deployment-hint">
+        {{ content.error || deploymentDisabledReason }}
+      </p>
       <div class="deployment-actions">
         <button
           type="button"
           class="deployment-btn primary"
-          :disabled="deploymentActionDisabled"
-          aria-label="确认部署"
+          :disabled="deploymentConfirmDisabled"
+          :aria-disabled="deploymentConfirmDisabled"
+          :aria-label="deploymentConfirmDisabled && deploymentDisabledReason ? `确认部署：${deploymentDisabledReason}` : '确认部署'"
+          :title="deploymentDisabledReason"
           @click="handleDeploymentAction('confirm')"
         >
           {{ content.confirmText || '确认' }}
@@ -243,6 +266,13 @@ function handleDeploymentAction(action: 'confirm' | 'cancel') {
   justify-content: flex-end;
   gap: 8px;
   padding-top: 2px;
+}
+
+.deployment-hint {
+  margin: 0;
+  color: #b45309;
+  font-size: 12px;
+  line-height: 18px;
 }
 
 .deployment-btn {

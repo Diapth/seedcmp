@@ -67,7 +67,7 @@ const selectedAvatarMsg = ref<any>(null);
 const editDialogVisible = ref(false);
 const editDialogText = ref('');
 const channelKey = computed(() => `${props.channelId}-${props.channelType}`);
-const deploymentActionClientMsgNos = new Set<string>();
+const deploymentActionKeys = new Set<string>();
 
 const messages = computed(() => {
   return messageStore.messages[channelKey.value] || [];
@@ -640,11 +640,12 @@ function handleCodePreview(payload: any) {
   });
 }
 
-function updateDeploymentCardStatus(msg: any, status: string) {
+function updateDeploymentCardStatus(msg: any, status: string, extra: Record<string, unknown> = {}) {
   messageStore.updateMessageStatus(msg.clientMsgNo, {
     content: {
       ...(msg.content || {}),
-      status
+      status,
+      ...extra
     }
   });
 }
@@ -652,40 +653,59 @@ function updateDeploymentCardStatus(msg: any, status: string) {
 async function handleDeploymentCardAction(payload: { action: 'confirm' | 'cancel'; message: any }) {
   const msg = payload.message;
   const clientMsgNo = String(msg?.clientMsgNo || '');
-  if (!clientMsgNo || deploymentActionClientMsgNos.has(clientMsgNo)) return;
-
   const content = msg?.content || {};
-  const currentStatus = String(content.status || 'pending_confirmation');
-  if (['confirmed', 'running', 'cancelled', 'canceled'].includes(currentStatus)) return;
+  const request = content.deploymentRequest || {};
+  const deploymentRequestId = String(content.deploymentRequestId || request.deploymentRequestId || clientMsgNo || '').trim();
+  const actionKey = `${deploymentRequestId}:${payload.action}`;
+  if (!clientMsgNo || !deploymentRequestId || deploymentActionKeys.has(actionKey)) return;
 
-  if (payload.action === 'cancel') {
-    updateDeploymentCardStatus(msg, 'cancelled');
-    Message.info('已取消部署');
+  const currentStatus = String(content.status || 'pending_confirmation');
+  if (['confirmed', 'running', 'cancelled', 'canceled', 'submitting'].includes(currentStatus)) return;
+  const missingFields = Array.isArray(content.missingFields) ? content.missingFields : [];
+  if (payload.action === 'confirm' && (currentStatus === 'needs_fields' || missingFields.length > 0)) {
+    Message.warning(String(content.disabledReason || '请先补充部署目标和环境'));
     return;
   }
 
-  deploymentActionClientMsgNos.add(clientMsgNo);
-  updateDeploymentCardStatus(msg, 'confirmed');
+  const previousStatus = currentStatus;
+  const actionId = `${deploymentRequestId}:${payload.action}:${Date.now()}`;
+  deploymentActionKeys.add(actionKey);
+  updateDeploymentCardStatus(msg, 'submitting', { error: '' });
   try {
-    const request = content.deploymentRequest || {};
-    const text = `用户已确认部署：${String(request.text || content.target || '部署请求')}`;
     const targetCatIds = Array.isArray(request.targetCatIds) ? request.targetCatIds : [];
-    await clowderStore.sendConversationMessage({
+    const response = await clowderStore.sendDeploymentAction({
       channelId: props.channelId,
       channelType: props.channelType as 1 | 2,
+      deploymentRequestId,
+      action: payload.action,
+      actionId,
+      cardMessageId: clientMsgNo,
+      sourceMessageId: String(request.sourceMessageId || clientMsgNo),
+      target: String(content.target || ''),
+      environment: String(content.environment || ''),
+      missingFields,
       directCatId: getClowderCatIdFromContactId(props.channelId),
       targetCatIds,
+      originalText: String(request.text || ''),
       promptContext: [
         request.promptContext || '',
-        'Deployment confirmation: user explicitly confirmed from the IM Web deployment card.'
+        `Deployment action: user selected ${payload.action} from the IM Web deployment card.`
       ].filter(Boolean).join('\n')
-    }, text);
-    Message.success('已确认部署');
+    });
+    const nextStatus = response.status || (payload.action === 'cancel' ? 'cancelled' : 'confirmed');
+    updateDeploymentCardStatus(msg, nextStatus, {
+      actionId,
+      missingFields: response.missingFields || missingFields,
+      error: ''
+    });
+    Message.success(payload.action === 'cancel' ? '已取消部署' : '已确认部署');
   } catch (err: any) {
-    updateDeploymentCardStatus(msg, 'failed');
-    Message.error(err?.message || err?.msg || '部署确认失败');
+    updateDeploymentCardStatus(msg, previousStatus === 'needs_fields' ? 'needs_fields' : 'failed', {
+      error: err?.message || err?.msg || '部署操作失败，可重试'
+    });
+    Message.error(err?.message || err?.msg || '部署操作失败');
   } finally {
-    deploymentActionClientMsgNos.delete(clientMsgNo);
+    deploymentActionKeys.delete(actionKey);
   }
 }
 </script>

@@ -26,4 +26,23 @@ describe('clowder slash command contracts', () => {
     expect(source).toContain('connectorCommand')
     expect(source).toContain('clowder:command')
   })
+
+  it('routes deployment confirmation cards through structured connector actions', async () => {
+    const fs = await import('node:fs/promises')
+    const path = await import('node:path')
+    const [api, store, bridge, backend] = await Promise.all([
+      fs.readFile(path.resolve(process.cwd(), '../../packages/datasource-vue/src/api/clowder.ts'), 'utf8'),
+      fs.readFile(path.resolve(process.cwd(), '../../packages/datasource-vue/src/stores/clowderStore.ts'), 'utf8'),
+      fs.readFile(path.resolve(process.cwd(), '../../../im/TangSengDaoDaoServer/modules/clowder/api.go'), 'utf8'),
+      fs.readFile(path.resolve(process.cwd(), '../../../clowder-ai/packages/api/src/routes/connector-deployment-action.ts'), 'utf8')
+    ])
+
+    expect(api).toContain('sendDeploymentAction')
+    expect(api).toContain('deploymentRequestId')
+    expect(store).toContain('sendDeploymentAction')
+    expect(bridge).toContain('/conversation/deployment-action')
+    expect(bridge).toContain('/api/connectors/im-web/deployment-action')
+    expect(backend).toContain("status === 'needs_fields'")
+    expect(backend).toContain('actionId')
+  })
 })

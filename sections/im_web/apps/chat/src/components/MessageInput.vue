@@ -540,6 +540,8 @@ function addDeploymentConfirmationCard(
   const firstCatId = effectiveTargetCatIds[0] || '';
   const catDisplayName = getCatDisplayName(firstCatId) || 'Clowder';
   const clientMsgNo = `deployment-card-${Date.now()}-${Math.random().toString(16).slice(2)}`;
+  const deploymentRequestId = `deploy-${props.channelType}-${props.channelId}-${Date.now()}-${Math.random().toString(16).slice(2)}`;
+  const missingFields = intent.missingFields || [];
   messageStore.addMessage(props.channelId, props.channelType, {
     messageID: clientMsgNo,
     messageSeq: 0,
@@ -552,12 +554,19 @@ function addDeploymentConfirmationCard(
       title: '确认部署',
       target: intent.target,
       environment: intent.environment,
-      status: 'pending_confirmation',
+      status: missingFields.length ? 'needs_fields' : 'pending_confirmation',
+      deploymentRequestId,
+      missingFields,
+      disabledReason: missingFields.length
+        ? `请先补充${missingFields.map(field => field === 'target' ? '部署目标' : '部署环境').join('、')}`
+        : '',
       connectorId: 'im-web',
       catId: firstCatId,
       catDisplayName,
       deploymentRequest: {
+        deploymentRequestId,
         text,
+        sourceMessageId: clientMsgNo,
         targetCatIds: effectiveTargetCatIds,
         triggerReason,
         promptContext: buildClowderPromptContext(text, effectiveTargetCatIds, triggerReason, replyTarget)

@@ -21,6 +21,8 @@ import {
   type ClowderConversationRef,
   type ClowderConversationStateResponse,
   type ClowderConnectionStatus,
+  type ClowderDeploymentActionRequest,
+  type ClowderDeploymentActionResponse,
   type ClowderGroupAutoReplyMode,
   type ClowderGroupCatStateResponse,
   type IMConnectorPermission
@@ -942,6 +944,11 @@ export const useClowderStore = defineStore('clowder', () => {
     return clowderApi.sendConversationMessage({ ...refInput, text });
   }
 
+  async function sendDeploymentAction(input: ClowderDeploymentActionRequest): Promise<ClowderDeploymentActionResponse> {
+    const response = await clowderApi.sendDeploymentAction(input);
+    return response as unknown as ClowderDeploymentActionResponse;
+  }
+
   // Phase 2.2: kickoff actions. kickoffs come from the Clowder API either
   // pushed over WebSocket (`coordinator_kickoff`) or pulled on demand
   // (`GET /v1/clowder/coordinator/kickoff/:id` — proxied through WuKongIM
@@ -1088,6 +1095,7 @@ export const useClowderStore = defineStore('clowder', () => {
     setFocus,
     clearFocus,
     sendConversationMessage,
+    sendDeploymentAction,
     kickoffs,
     setKickoff,
     removeKickoff,

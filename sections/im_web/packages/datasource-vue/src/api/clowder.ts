@@ -146,6 +146,31 @@ export interface ClowderMessageRequest extends ClowderConversationRef {
   promptContext?: string;
 }
 
+export interface ClowderDeploymentActionRequest extends ClowderConversationRef {
+  deploymentRequestId: string;
+  action: 'confirm' | 'cancel';
+  actionId: string;
+  cardMessageId?: string;
+  sourceMessageId?: string;
+  target?: string;
+  environment?: string;
+  missingFields?: string[];
+  directCatId?: string;
+  targetCatIds?: string[];
+  promptContext?: string;
+  originalText?: string;
+}
+
+export interface ClowderDeploymentActionResponse {
+  ok: boolean;
+  deploymentRequestId: string;
+  action: 'confirm' | 'cancel';
+  status: 'confirmed' | 'cancelled' | 'needs_fields' | 'failed';
+  missingFields?: string[];
+  message?: string;
+  actionId?: string;
+}
+
 export interface ClowderCreateCatRequest {
   name: string;
   alias?: string;
@@ -225,6 +250,9 @@ export const clowderApi = {
   },
   sendConversationMessage(data: ClowderMessageRequest) {
     return apiClient.post<Record<string, unknown>>('clowder/conversation/message', data);
+  },
+  sendDeploymentAction(data: ClowderDeploymentActionRequest) {
+    return apiClient.post<ClowderDeploymentActionResponse>('clowder/conversation/deployment-action', data);
   },
   syncGroupCats(data: ClowderGroupCatSyncRequest) {
     return apiClient.post<Record<string, unknown>>('clowder/group/cats/sync', data);

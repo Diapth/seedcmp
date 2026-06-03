@@ -60,6 +60,7 @@ func (c *Clowder) Route(r *wkhttp.WKHttp) {
 		auth.POST("/conversation/focus", c.setFocus)
 		auth.POST("/conversation/focus/clear", c.clearFocus)
 		auth.POST("/conversation/message", c.conversationMessage)
+		auth.POST("/conversation/deployment-action", c.conversationDeploymentAction)
 		// Phase 2: Coordinator kickoff — proxy GET/dismiss to Clowder 3004.
 		// See sections/clowder-ai/packages/api/src/routes/coordinator-kickoff.ts.
 		auth.GET("/coordinator/kickoff/:coordinationId", c.getCoordinatorKickoff)
@@ -841,6 +842,39 @@ func (c *Clowder) conversationMessage(ctx *wkhttp.Context) {
 		return
 	}
 	ctx.JSON(http.StatusOK, response)
+}
+
+// conversationDeploymentAction proxies structured deployment approvals from
+// IM Web to Clowder. Deployment card clicks must not be downgraded to natural
+// language chat messages because approvals need idempotency and audit fields.
+func (c *Clowder) conversationDeploymentAction(ctx *wkhttp.Context) {
+	if !c.config.IsConfigured() {
+		ctx.JSON(http.StatusBadGateway, map[string]string{"error": "clowder_bridge_not_configured"})
+		return
+	}
+	body, err := io.ReadAll(ctx.Request.Body)
+	if err != nil {
+		ctx.JSON(http.StatusBadRequest, map[string]string{"error": "invalid_body", "message": err.Error()})
+		return
+	}
+	endpoint := strings.TrimRight(c.config.APIBaseURL, "/") + "/api/connectors/im-web/deployment-action"
+	req, err := http.NewRequest(http.MethodPost, endpoint, bytes.NewReader(body))
+	if err != nil {
+		ctx.JSON(http.StatusInternalServerError, map[string]string{"error": "build_request_failed", "message": err.Error()})
+		return
+	}
+	req.Header.Set("Content-Type", "application/json")
+	c.applyDirectoryUserHeader(req, ctx.GetLoginUID())
+
+	res, err := c.httpClient().Do(req)
+	if err != nil {
+		ctx.JSON(http.StatusBadGateway, map[string]string{"error": "deployment_action_unavailable", "message": err.Error()})
+		return
+	}
+	defer res.Body.Close()
+
+	respBody, _ := io.ReadAll(res.Body)
+	ctx.Data(res.StatusCode, "application/json; charset=utf-8", respBody)
 }
 
 func (c *Clowder) outbound(ctx *wkhttp.Context) {

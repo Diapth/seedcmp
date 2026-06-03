@@ -2269,6 +2269,10 @@ async function main(): Promise<void> {
     log: app.log,
   });
 
+  // V3-29: IM Web deployment confirmation cards send structured actions.
+  const { connectorDeploymentActionRoutes } = await import('./routes/connector-deployment-action.js');
+  await app.register(connectorDeploymentActionRoutes);
+
   // F088: Register connector webhook routes BEFORE listen (Fastify requires it)
   const connectorWebhookHandlers = new Map<string, import('./routes/connector-webhooks.js').ConnectorWebhookHandler>();
   await app.register(connectorWebhookRoutes, { handlers: connectorWebhookHandlers });

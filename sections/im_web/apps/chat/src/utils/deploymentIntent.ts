@@ -2,6 +2,7 @@ export interface DeploymentIntent {
   shouldConfirm: boolean;
   target: string;
   environment: string;
+  missingFields: Array<'target' | 'environment'>;
   reason: 'deployment_request' | 'negated_or_discussion' | 'no_deployment_intent';
 }
 
@@ -40,6 +41,7 @@ export function detectDeploymentIntent(input: string): DeploymentIntent {
       shouldConfirm: false,
       target: '',
       environment: '',
+      missingFields: [],
       reason: 'no_deployment_intent'
     };
   }
@@ -49,14 +51,22 @@ export function detectDeploymentIntent(input: string): DeploymentIntent {
       shouldConfirm: false,
       target: '',
       environment: '',
+      missingFields: [],
       reason: 'negated_or_discussion'
     };
   }
 
+  const target = detectTarget(text);
+  const environment = detectEnvironment(text);
+  const missingFields: Array<'target' | 'environment'> = [];
+  if (target === '待确认目标') missingFields.push('target');
+  if (environment === '待确认环境') missingFields.push('environment');
+
   return {
     shouldConfirm: true,
-    target: detectTarget(text),
-    environment: detectEnvironment(text),
+    target,
+    environment,
+    missingFields,
     reason: 'deployment_request'
   };
 }

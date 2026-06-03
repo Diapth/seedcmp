@@ -35,6 +35,7 @@ export function detectDeploymentIntent(input) {
             shouldConfirm: false,
             target: '',
             environment: '',
+            missingFields: [],
             reason: 'no_deployment_intent'
         };
     }
@@ -43,13 +44,22 @@ export function detectDeploymentIntent(input) {
             shouldConfirm: false,
             target: '',
             environment: '',
+            missingFields: [],
             reason: 'negated_or_discussion'
         };
     }
+    const target = detectTarget(text);
+    const environment = detectEnvironment(text);
+    const missingFields = [];
+    if (target === '待确认目标')
+        missingFields.push('target');
+    if (environment === '待确认环境')
+        missingFields.push('environment');
     return {
         shouldConfirm: true,
-        target: detectTarget(text),
-        environment: detectEnvironment(text),
+        target,
+        environment,
+        missingFields,
         reason: 'deployment_request'
     };
 }
