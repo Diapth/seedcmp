@@ -9,7 +9,8 @@ __pycache__/
 .vscode/
 .agents/
 .specify/
-
+.seedcmp-run/
+.pnpm-home/
 # IM backend sources are tracked for V2/V3 integration.
 sections/im/*
 !sections/im/TangSengDaoDaoServer/
