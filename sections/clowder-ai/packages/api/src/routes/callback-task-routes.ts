@@ -12,6 +12,7 @@ import type { IThreadStore } from '../domains/cats/services/stores/ports/ThreadS
 import type { SocketManager } from '../infrastructure/websocket/index.js';
 import { requireCallbackAuth } from './callback-auth-prehandler.js';
 import { deriveCallbackActor, resolveScopedThreadId } from './callback-scope-helpers.js';
+import { appendArtifactRef, findOrCreateArtifactTask, isSupportedArtifactKind, type ArtifactKind } from './thread-tasks.js';
 
 const updateTaskSchema = z.object({
   taskId: z.string().min(1),
@@ -28,6 +29,14 @@ const createTaskSchema = z.object({
   coordinationId: z.string().min(1).optional(),
   dependsOn: z.array(z.string().min(1)).optional(),
   artifactRefs: z.array(z.string().min(1)).optional(),
+});
+
+const declareArtifactSchema = z.object({
+  path: z.string().min(1),
+  kind: z.enum(['code', 'doc', 'image', 'preview', 'file', 'patch', 'workspace', 'other']).optional().default('other'),
+  description: z.string().max(1000).optional(),
+  taskId: z.string().min(1).optional(),
+  coordinationId: z.string().min(1).optional(),
 });
 
 const listTasksQuerySchema = z.object({
@@ -132,6 +141,70 @@ export function registerCallbackTaskRoutes(
     socketManager.broadcastToRoom(`thread:${task.threadId}`, 'task_created', task);
     reply.status(201);
     return { status: 'ok', task };
+  });
+
+  app.post('/api/callbacks/declare-artifact', async (request, reply) => {
+    const record = requireCallbackAuth(request, reply);
+    if (!record) return;
+    const actor = deriveCallbackActor(record);
+
+    const parsed = declareArtifactSchema.safeParse(request.body);
+    if (!parsed.success) {
+      reply.status(400);
+      return { error: 'Invalid request body', details: parsed.error.issues };
+    }
+
+    const { path, description, taskId, coordinationId } = parsed.data;
+    const kind = parsed.data.kind as ArtifactKind;
+    if (!isSupportedArtifactKind(kind)) {
+      reply.status(400);
+      return { error: 'Unsupported artifact kind' };
+    }
+
+    let task;
+    if (taskId) {
+      const existing = await taskStore.get(taskId);
+      if (!existing) {
+        reply.status(404);
+        return { error: 'Task not found' };
+      }
+      if (existing.threadId !== actor.threadId) {
+        reply.status(403);
+        return { error: 'Task belongs to a different thread' };
+      }
+      if (existing.ownerCatId && existing.ownerCatId !== actor.catId) {
+        reply.status(403);
+        return { error: 'Task is owned by another cat' };
+      }
+      const refs = appendArtifactRef(existing.artifactRefs, path, kind, description);
+      task = await taskStore.update(existing.id, { artifactRefs: refs, ...(description ? { why: description } : {}) });
+    } else {
+      task = await findOrCreateArtifactTask(
+        taskStore,
+        actor.threadId,
+        actor.userId,
+        coordinationId,
+        actor.catId,
+        path,
+        kind,
+        description,
+      );
+    }
+    if (!task) {
+      reply.status(500);
+      return { error: 'Failed to declare artifact' };
+    }
+
+    socketManager.broadcastToRoom(`thread:${task.threadId}`, 'artifact_declared', {
+      threadId: task.threadId,
+      taskId: task.id,
+      ownerCatId: actor.catId,
+      path,
+      kind,
+      description,
+    });
+    socketManager.broadcastToRoom(`thread:${task.threadId}`, 'task_updated', task);
+    return { status: 'ok', task, artifact: { path, kind, description, ownerCatId: actor.catId, taskId: task.id } };
   });
 
   app.get('/api/callbacks/list-tasks', async (request, reply) => {

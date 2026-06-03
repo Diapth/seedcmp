@@ -13,7 +13,8 @@
  *   GET  /api/threads/:threadId/artifacts
  *     — List all artifacts produced in this thread, grouped by ownerCatId.
  *       Used by ProjectArtifactsPanel (Phase 4.6) to render the artifacts
- *       tab. Files that no longer exist on disk are silently filtered out.
+ *       tab. Files that no longer exist on disk are returned with diagnostic
+ *       status instead of being silently filtered out.
  */
 
 import { existsSync } from 'node:fs';
@@ -33,16 +34,29 @@ export interface ThreadTasksRoutesOptions {
   };
 }
 
-export type ArtifactKind = 'code' | 'doc' | 'image' | 'preview' | 'other';
+export type ArtifactKind = 'code' | 'doc' | 'image' | 'preview' | 'file' | 'patch' | 'workspace' | 'other';
+export type ThreadArtifactStatus = 'available' | 'missing' | 'outside_project' | 'forbidden';
+export type ThreadArtifactSource = 'declared' | 'task_ref';
+const ARTIFACT_REF_PREFIX = 'artifact:';
 
 export interface ThreadArtifact {
   path: string;                // relative to projectPath
-  absolutePath: string;        // absolute, exists on disk
+  absolutePath: string;        // absolute when known
   kind: ArtifactKind;
   description?: string;
   ownerCatId: string;
   taskId: string;
   createdAt: number;
+  source: ThreadArtifactSource;
+  status: ThreadArtifactStatus;
+  reason?: string;
+}
+
+interface ParsedArtifactRef {
+  path: string;
+  kind: ArtifactKind;
+  description?: string;
+  source: ThreadArtifactSource;
 }
 
 function threadIdFromParams(req: FastifyRequest): string {
@@ -56,7 +70,58 @@ function isPathInsideRoot(child: string, root: string): boolean {
   return childAbs.startsWith(root + sep) || childAbs.startsWith(root + '/');
 }
 
-function findOrCreateArtifactTask(
+export function isSupportedArtifactKind(kind: string): kind is ArtifactKind {
+  return ['code', 'doc', 'image', 'preview', 'file', 'patch', 'workspace', 'other'].includes(kind);
+}
+
+export function serializeArtifactRef(
+  path: string,
+  kind: ArtifactKind = 'other',
+  description?: string,
+): string {
+  if (kind === 'other' && !description) return path;
+  return `${ARTIFACT_REF_PREFIX}${JSON.stringify({
+    path,
+    kind,
+    ...(description ? { description } : {}),
+  })}`;
+}
+
+export function parseArtifactRef(ref: string): ParsedArtifactRef {
+  if (!ref.startsWith(ARTIFACT_REF_PREFIX)) {
+    return { path: ref, kind: 'other', source: 'task_ref' };
+  }
+  try {
+    const parsed = JSON.parse(ref.slice(ARTIFACT_REF_PREFIX.length)) as {
+      path?: unknown;
+      kind?: unknown;
+      description?: unknown;
+    };
+    const path = typeof parsed.path === 'string' && parsed.path.trim() ? parsed.path : ref;
+    const kind = typeof parsed.kind === 'string' && isSupportedArtifactKind(parsed.kind)
+      ? parsed.kind
+      : 'other';
+    const description = typeof parsed.description === 'string' ? parsed.description : undefined;
+    return { path, kind, description, source: 'declared' };
+  } catch {
+    return { path: ref, kind: 'other', source: 'task_ref' };
+  }
+}
+
+export function appendArtifactRef(
+  refs: readonly string[] | undefined,
+  path: string,
+  kind: ArtifactKind,
+  description?: string,
+): string[] {
+  const existing = refs ?? [];
+  if (existing.some((ref) => parseArtifactRef(ref).path === path)) {
+    return [...existing];
+  }
+  return [...existing, serializeArtifactRef(path, kind, description)];
+}
+
+export function findOrCreateArtifactTask(
   taskStore: ITaskStore,
   threadId: string,
   userId: string,
@@ -78,10 +143,9 @@ function findOrCreateArtifactTask(
         (coordinationId ? t.coordinationId === coordinationId : true),
     );
     if (existing) {
-      const refs = new Set(existing.artifactRefs ?? []);
-      if (!refs.has(path)) {
-        refs.add(path);
-        const updated = await Promise.resolve(taskStore.update(existing.id, { artifactRefs: [...refs] }));
+      const refs = appendArtifactRef(existing.artifactRefs, path, kind, description);
+      if (refs.length !== (existing.artifactRefs ?? []).length) {
+        const updated = await Promise.resolve(taskStore.update(existing.id, { artifactRefs: refs }));
         return updated ?? existing;
       }
       return existing;
@@ -97,7 +161,7 @@ function findOrCreateArtifactTask(
         kind: 'work',
         ownerCatId: createCatId(ownerCatId),
         ...(coordinationId ? { coordinationId } : {}),
-        artifactRefs: [path],
+        artifactRefs: [serializeArtifactRef(path, kind, description)],
       }),
     );
     // Touch updatedAt to surface the task in list queries.
@@ -106,27 +170,30 @@ function findOrCreateArtifactTask(
   })();
 }
 
-function buildThreadArtifact(
+export function buildThreadArtifact(
   task: TaskItem,
   projectPath: string,
   path: string,
   kind: ArtifactKind,
   description: string | undefined,
-): ThreadArtifact | null {
-  // Resolve to absolute and verify it actually exists on disk. Drop stale
-  // refs (cat removed the file) silently — the panel only shows living
-  // artifacts.
+  source: ThreadArtifactSource = 'task_ref',
+): ThreadArtifact {
   const absolutePath = isAbsolute(path) ? path : resolve(projectPath, path);
-  if (!existsSync(absolutePath)) return null;
-  if (projectPath && !isPathInsideRoot(absolutePath, projectPath)) return null;
+  const outsideProject = Boolean(projectPath && !isPathInsideRoot(absolutePath, projectPath));
+  const exists = existsSync(absolutePath);
+  const status: ThreadArtifactStatus = outsideProject ? 'outside_project' : exists ? 'available' : 'missing';
   return {
-    path: projectPath ? absolutePath.slice(projectPath.length).replace(/^[\\/]+/, '') : path,
+    path: projectPath && !outsideProject ? absolutePath.slice(projectPath.length).replace(/^[\\/]+/, '') : path,
     absolutePath,
     kind,
     description,
     ownerCatId: task.ownerCatId ?? 'unknown',
     taskId: task.id,
     createdAt: task.updatedAt ?? task.createdAt,
+    source,
+    status,
+    ...(status === 'outside_project' ? { reason: 'artifact path is outside thread projectPath' } : {}),
+    ...(status === 'missing' ? { reason: 'artifact path does not exist on disk' } : {}),
   };
 }
 
@@ -168,8 +235,8 @@ export const threadTasksRoutes: FastifyPluginAsync<ThreadTasksRoutesOptions> = a
     if (!userId) return reply.status(400).send({ error: 'userId is required' });
     if (!path) return reply.status(400).send({ error: 'path is required' });
     if (!ownerCatId) return reply.status(400).send({ error: 'ownerCatId is required' });
-    if (!['code', 'doc', 'image', 'preview', 'other'].includes(kind)) {
-      return reply.status(400).send({ error: 'kind must be one of code|doc|image|preview|other' });
+    if (!isSupportedArtifactKind(kind)) {
+      return reply.status(400).send({ error: 'kind must be one of code|doc|image|preview|file|patch|workspace|other' });
     }
 
     // ProjectPath is the absolute root this thread is bound to. The
@@ -244,28 +311,32 @@ export const threadTasksRoutes: FastifyPluginAsync<ThreadTasksRoutesOptions> = a
     for (const task of tasks) {
       const refs = task.artifactRefs ?? [];
       for (const ref of refs) {
+        const parsedRef = parseArtifactRef(ref);
         if (!projectPath) {
-          // No projectPath binding — surface refs as-is but skip
-          // existence checks (we can't be sure where they live).
           const owner = task.ownerCatId ?? 'unknown';
           artifacts.push({
-            path: ref,
-            absolutePath: ref,
-            kind: 'other',
+            path: parsedRef.path,
+            absolutePath: parsedRef.path,
+            kind: parsedRef.kind,
+            ...(parsedRef.description ? { description: parsedRef.description } : {}),
             ownerCatId: owner,
             taskId: task.id,
             createdAt: task.updatedAt ?? task.createdAt,
+            source: parsedRef.source,
+            status: isAbsolute(parsedRef.path) && !existsSync(parsedRef.path) ? 'missing' : 'available',
+            ...(isAbsolute(parsedRef.path) && !existsSync(parsedRef.path) ? { reason: 'artifact path does not exist on disk' } : {}),
           });
           continue;
         }
         const artifact = buildThreadArtifact(
           task,
           projectPath,
-          ref,
-          'other',
-          undefined,
+          parsedRef.path,
+          parsedRef.kind,
+          parsedRef.description,
+          parsedRef.source,
         );
-        if (artifact) artifacts.push(artifact);
+        artifacts.push(artifact);
       }
     }
 
@@ -274,6 +345,10 @@ export const threadTasksRoutes: FastifyPluginAsync<ThreadTasksRoutesOptions> = a
       if (a.ownerCatId !== b.ownerCatId) return a.ownerCatId.localeCompare(b.ownerCatId);
       return b.createdAt - a.createdAt;
     });
-    return reply.send({ artifacts });
+    const diagnostics = artifacts.reduce<Record<string, number>>((acc, artifact) => {
+      acc[artifact.status] = (acc[artifact.status] ?? 0) + 1;
+      return acc;
+    }, {});
+    return reply.send({ artifacts, diagnostics });
   });
 };

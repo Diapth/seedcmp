@@ -26,6 +26,7 @@ const EXPECTED_TOOLS = [
   'cat_cafe_update_task',
   // F160 Phase A: create-task
   'cat_cafe_create_task',
+  'cat_cafe_declare_artifact',
   'cat_cafe_create_rich_block',
   'cat_cafe_generate_document',
   'cat_cafe_get_rich_block_rules',
@@ -132,6 +133,7 @@ const EXPECTED_COLLAB_TOOLS = [
   'cat_cafe_list_tasks',
   'cat_cafe_update_task',
   'cat_cafe_create_task',
+  'cat_cafe_declare_artifact',
   'cat_cafe_create_rich_block',
   'cat_cafe_generate_document',
   'cat_cafe_get_rich_block_rules',
@@ -373,6 +375,7 @@ const KNOWN_WRITE_TOOLS = [
   'cat_cafe_multi_mention',
   'cat_cafe_update_task',
   'cat_cafe_create_task',
+  'cat_cafe_declare_artifact',
   'cat_cafe_create_rich_block',
   'cat_cafe_generate_document',
   'cat_cafe_request_permission',

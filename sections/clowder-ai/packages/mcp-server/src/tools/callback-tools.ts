@@ -397,6 +397,17 @@ export const createTaskInputSchema = {
     .describe('Workspace paths, document IDs, preview URLs, or other artifact references produced by the task.'),
 };
 
+export const declareArtifactInputSchema = {
+  path: z.string().min(1).describe('Artifact path or reference. Prefer a path relative to the bound project root.'),
+  kind: z
+    .enum(['code', 'doc', 'image', 'preview', 'file', 'patch', 'workspace', 'other'])
+    .optional()
+    .describe('Artifact kind. Use preview for routes/URLs, patch for patch files, workspace for registered workspace outputs.'),
+  description: z.string().max(1000).optional().describe('Short user-facing description of the artifact.'),
+  taskId: z.string().min(1).optional().describe('Optional existing task to attach the artifact to.'),
+  coordinationId: z.string().min(1).optional().describe('Optional coordinator chain id for auto-created artifact task.'),
+};
+
 export const updateTaskInputSchema = {
   taskId: z.string().min(1).describe('The ID of the task to update'),
   status: z.enum(['todo', 'doing', 'blocked', 'done']).optional().describe('New task status'),
@@ -696,6 +707,22 @@ export async function handleCreateTask(input: {
     ...(input.coordinationId ? { coordinationId: input.coordinationId } : {}),
     ...(input.dependsOn ? { dependsOn: input.dependsOn } : {}),
     ...(input.artifactRefs ? { artifactRefs: input.artifactRefs } : {}),
+  });
+}
+
+export async function handleDeclareArtifact(input: {
+  path: string;
+  kind?: 'code' | 'doc' | 'image' | 'preview' | 'file' | 'patch' | 'workspace' | 'other' | undefined;
+  description?: string | undefined;
+  taskId?: string | undefined;
+  coordinationId?: string | undefined;
+}): Promise<ToolResult> {
+  return callbackPost('/api/callbacks/declare-artifact', {
+    path: input.path,
+    ...(input.kind ? { kind: input.kind } : {}),
+    ...(input.description ? { description: input.description } : {}),
+    ...(input.taskId ? { taskId: input.taskId } : {}),
+    ...(input.coordinationId ? { coordinationId: input.coordinationId } : {}),
   });
 }
 
@@ -1416,6 +1443,16 @@ export const callbackTools = [
       'TIP: Include a "why" to give context to whoever picks up the task.',
     inputSchema: createTaskInputSchema,
     handler: handleCreateTask,
+  },
+  {
+    name: 'cat_cafe_declare_artifact',
+    description:
+      'Declare a produced artifact so it appears in the thread artifacts panel and links back to task progress. ' +
+      'Use after writing files, creating a preview route, producing a patch, or exporting a workspace result. ' +
+      'This is the structured ledger entry; sending a chat attachment alone is not enough for the artifacts panel. ' +
+      'If taskId is omitted, the server attaches it to your existing task or creates an owner-scoped artifact task.',
+    inputSchema: declareArtifactInputSchema,
+    handler: handleDeclareArtifact,
   },
   {
     name: 'cat_cafe_create_rich_block',

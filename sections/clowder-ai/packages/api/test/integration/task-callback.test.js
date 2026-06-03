@@ -6,14 +6,19 @@
  */
 
 import assert from 'node:assert/strict';
+import { mkdir, writeFile } from 'node:fs/promises';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
 import { before, beforeEach, describe, test } from 'node:test';
 import '../helpers/setup-cat-registry.js';
 import Fastify from 'fastify';
 
 const { InvocationRegistry } = await import('../../dist/domains/cats/services/agents/invocation/InvocationRegistry.js');
 const { TaskStore } = await import('../../dist/domains/cats/services/stores/ports/TaskStore.js');
+const { ThreadStore } = await import('../../dist/domains/cats/services/stores/ports/ThreadStore.js');
 const { MessageStore } = await import('../../dist/domains/cats/services/stores/ports/MessageStore.js');
 const { callbacksRoutes } = await import('../../dist/routes/callbacks.js');
+const { threadTasksRoutes } = await import('../../dist/routes/thread-tasks.js');
 
 function createMockSocketManager() {
   const events = [];
@@ -34,12 +39,14 @@ describe('Task Callback Integration', () => {
   let registry;
   let messageStore;
   let taskStore;
+  let threadStore;
   let socketManager;
 
   beforeEach(() => {
     registry = new InvocationRegistry();
     messageStore = new MessageStore();
     taskStore = new TaskStore();
+    threadStore = new ThreadStore();
     socketManager = createMockSocketManager();
   });
 
@@ -50,6 +57,12 @@ describe('Task Callback Integration', () => {
       messageStore,
       socketManager,
       taskStore,
+      threadStore,
+    });
+    await app.register(threadTasksRoutes, {
+      taskStore,
+      threadStore,
+      log: app.log,
     });
     return app;
   }
@@ -294,5 +307,72 @@ describe('Task Callback Integration', () => {
     });
 
     assert.equal(response.statusCode, 400);
+  });
+
+  test('MCP declare-artifact creates a task-scoped artifact ledger entry', async () => {
+    const app = await createApp();
+    const projectRoot = join(tmpdir(), `cat-cafe-artifact-${Date.now()}`);
+    await mkdir(projectRoot, { recursive: true });
+    await writeFile(join(projectRoot, 'result.md'), '# done\n');
+    const thread = threadStore.create('user-1', 'Artifacts', projectRoot);
+    const { invocationId, callbackToken } = await registry.create('user-1', 'opus', thread.id);
+
+    const response = await app.inject({
+      method: 'POST',
+      url: '/api/callbacks/declare-artifact',
+      headers: { 'x-invocation-id': invocationId, 'x-callback-token': callbackToken },
+      payload: {
+        path: 'result.md',
+        kind: 'doc',
+        description: 'Final markdown deliverable',
+      },
+    });
+
+    assert.equal(response.statusCode, 200);
+    const body = response.json();
+    assert.equal(body.status, 'ok');
+    assert.equal(body.artifact.path, 'result.md');
+    assert.equal(body.artifact.ownerCatId, 'opus');
+
+    const events = socketManager.getEvents();
+    assert.ok(events.some((e) => e.event === 'artifact_declared'), 'artifact_declared event should be broadcast');
+
+    const artifactsRes = await app.inject({
+      method: 'GET',
+      url: `/api/threads/${thread.id}/artifacts`,
+    });
+    assert.equal(artifactsRes.statusCode, 200);
+    const artifactsBody = artifactsRes.json();
+    assert.equal(artifactsBody.artifacts.length, 1);
+    assert.equal(artifactsBody.artifacts[0].status, 'available');
+    assert.equal(artifactsBody.artifacts[0].path, 'result.md');
+    assert.equal(artifactsBody.artifacts[0].kind, 'doc');
+    assert.equal(artifactsBody.artifacts[0].description, 'Final markdown deliverable');
+    assert.equal(artifactsBody.artifacts[0].source, 'declared');
+  });
+
+  test('thread artifacts route returns missing refs as diagnostics', async () => {
+    const app = await createApp();
+    const projectRoot = join(tmpdir(), `cat-cafe-artifact-missing-${Date.now()}`);
+    await mkdir(projectRoot, { recursive: true });
+    const thread = threadStore.create('user-1', 'Artifacts', projectRoot);
+    taskStore.create({
+      threadId: thread.id,
+      title: 'Missing output',
+      why: 'diagnostic',
+      createdBy: 'opus',
+      ownerCatId: 'opus',
+      artifactRefs: ['missing.txt'],
+    });
+
+    const res = await app.inject({
+      method: 'GET',
+      url: `/api/threads/${thread.id}/artifacts`,
+    });
+    assert.equal(res.statusCode, 200);
+    const body = res.json();
+    assert.equal(body.artifacts.length, 1);
+    assert.equal(body.artifacts[0].status, 'missing');
+    assert.equal(body.diagnostics.missing, 1);
   });
 });

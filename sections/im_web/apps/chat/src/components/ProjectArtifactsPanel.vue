@@ -13,7 +13,8 @@ interface Props {
 
 const props = defineProps<Props>();
 
-type ArtifactKind = 'code' | 'doc' | 'image' | 'preview' | 'other';
+type ArtifactKind = 'code' | 'doc' | 'image' | 'preview' | 'file' | 'patch' | 'workspace' | 'other';
+type ArtifactStatus = 'available' | 'missing' | 'outside_project' | 'forbidden' | 'undeclared';
 
 interface ThreadArtifact {
   path: string;
@@ -23,9 +24,13 @@ interface ThreadArtifact {
   ownerCatId: string;
   taskId: string;
   createdAt: number;
+  source?: 'declared' | 'task_ref' | 'chat_file' | 'workspace_scan' | 'patch_staging';
+  status?: ArtifactStatus;
+  reason?: string;
 }
 
 const artifacts = ref<ThreadArtifact[]>([]);
+const diagnostics = ref<Record<string, number>>({});
 const loading = ref(false);
 const error = ref<string | null>(null);
 let pollTimer: ReturnType<typeof setInterval> | null = null;
@@ -48,6 +53,7 @@ function lookupAgent(catId: string): ClowderAgent | undefined {
 }
 
 function openArtifact(artifact: ThreadArtifact) {
+  if ((artifact.status || 'available') !== 'available') return;
   // Code files go through vscode:// (fallback to file:// if VS Code is not
   // installed). Documents and images open with the OS default handler.
   const url =
@@ -61,16 +67,43 @@ function openArtifact(artifact: ThreadArtifact) {
   }
 }
 
+function artifactStatus(artifact: ThreadArtifact): ArtifactStatus {
+  return artifact.status || 'available';
+}
+
+function artifactStatusText(status: ArtifactStatus) {
+  if (status === 'available') return '可用';
+  if (status === 'missing') return '文件缺失';
+  if (status === 'outside_project') return '项目外';
+  if (status === 'forbidden') return '无权限';
+  if (status === 'undeclared') return '未登记';
+  return status;
+}
+
+function artifactStatusReason(artifact: ThreadArtifact) {
+  if (artifact.reason) return artifact.reason;
+  const status = artifactStatus(artifact);
+  if (status === 'missing') return '产物引用存在，但当前磁盘上找不到该文件。';
+  if (status === 'outside_project') return '产物位于绑定项目目录之外，需要登记为 workspace 产物或导出补丁。';
+  if (status === 'undeclared') return '聊天中可能有附件，但还没有结构化产物声明。';
+  return '';
+}
+
+function hasDiagnosticArtifacts() {
+  return artifacts.value.some((artifact) => artifactStatus(artifact) !== 'available');
+}
+
 async function refresh() {
   if (!props.threadId) return;
   loading.value = true;
   error.value = null;
   try {
-    const response = await apiClient.get<{ artifacts?: ThreadArtifact[] }>(
+    const response = await apiClient.get<{ artifacts?: ThreadArtifact[]; diagnostics?: Record<string, number> }>(
       `clowder/thread/${encodeURIComponent(props.threadId)}/artifacts`,
     );
     const list = response.data?.artifacts ?? [];
     artifacts.value = Array.isArray(list) ? list : [];
+    diagnostics.value = response.data?.diagnostics || {};
   } catch (err) {
     error.value = err instanceof Error ? err.message : '加载产物失败';
   } finally {
@@ -89,6 +122,7 @@ watch(
   () => props.threadId,
   () => {
     artifacts.value = [];
+    diagnostics.value = {};
     void refresh();
   },
 );
@@ -115,15 +149,21 @@ if (typeof window !== 'undefined') {
     </div>
 
     <p v-if="error" class="artifacts-panel__error">{{ error }}</p>
-    <p
-      v-else-if="!loading && artifacts.length === 0"
-      class="artifacts-panel__empty"
-    >
-      还没有产物。猫猫完成文件后,会通过
-      <code>cat_cafe_declare_artifact</code> 工具自动出现在这里。
-    </p>
+    <div v-else-if="!loading && artifacts.length === 0" class="artifacts-panel__empty">
+      <p>还没有已登记产物。</p>
+      <p>
+        猫猫需要调用 <code>cat_cafe_declare_artifact</code>；如果聊天里有附件但这里为空，
+        说明产物声明链路没有写入。
+      </p>
+    </div>
 
     <div v-else class="artifacts-panel__groups">
+      <div v-if="hasDiagnosticArtifacts()" class="artifacts-panel__diagnostic">
+        <span>诊断</span>
+        <span v-if="diagnostics.missing">缺失 {{ diagnostics.missing }}</span>
+        <span v-if="diagnostics.outside_project">项目外 {{ diagnostics.outside_project }}</span>
+        <span v-if="diagnostics.forbidden">无权限 {{ diagnostics.forbidden }}</span>
+      </div>
       <section
         v-for="group in artifactsByOwner"
         :key="group.ownerCatId"
@@ -150,16 +190,27 @@ if (typeof window !== 'undefined') {
             <button
               type="button"
               class="artifacts-panel__item-btn"
+              :class="{ 'is-unavailable': artifactStatus(artifact) !== 'available' }"
+              :disabled="artifactStatus(artifact) !== 'available'"
               @click="openArtifact(artifact)"
             >
               <span class="artifacts-panel__filename">{{ artifact.path.split('/').pop() }}</span>
-              <span class="artifacts-panel__kind artifacts-panel__kind--{{ artifact.kind }}">
+              <span class="artifacts-panel__kind">
                 {{ artifact.kind }}
+              </span>
+              <span
+                class="artifacts-panel__status"
+                :class="`artifacts-panel__status--${artifactStatus(artifact)}`"
+              >
+                {{ artifactStatusText(artifactStatus(artifact)) }}
               </span>
               <span v-if="artifact.description" class="artifacts-panel__desc">
                 {{ artifact.description }}
               </span>
             </button>
+            <div v-if="artifactStatusReason(artifact)" class="artifacts-panel__reason">
+              {{ artifactStatusReason(artifact) }}
+            </div>
           </li>
         </ul>
       </section>
@@ -211,6 +262,16 @@ if (typeof window !== 'undefined') {
   margin: 0;
 }
 
+.artifacts-panel__empty {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.artifacts-panel__empty p {
+  margin: 0;
+}
+
 .artifacts-panel__error {
   color: #c2410c;
 }
@@ -219,6 +280,18 @@ if (typeof window !== 'undefined') {
   display: flex;
   flex-direction: column;
   gap: 12px;
+}
+
+.artifacts-panel__diagnostic {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  padding: 8px;
+  border: 1px solid #f59e0b;
+  border-radius: 6px;
+  background: #fff7ed;
+  color: #92400e;
+  font-size: 12px;
 }
 
 .artifacts-panel__group {
@@ -266,6 +339,11 @@ if (typeof window !== 'undefined') {
   border-color: var(--color-primary, #6b8afd);
 }
 
+.artifacts-panel__item-btn.is-unavailable {
+  cursor: not-allowed;
+  opacity: 0.8;
+}
+
 .artifacts-panel__filename {
   flex: 1;
   font-size: 12px;
@@ -282,6 +360,30 @@ if (typeof window !== 'undefined') {
   border-radius: 999px;
   color: var(--color-text-2, #3a3a3a);
   text-transform: uppercase;
+}
+
+.artifacts-panel__status {
+  font-size: 10px;
+  padding: 2px 6px;
+  border-radius: 999px;
+  background: #dcfce7;
+  color: #166534;
+  white-space: nowrap;
+}
+
+.artifacts-panel__status--missing,
+.artifacts-panel__status--outside_project,
+.artifacts-panel__status--forbidden,
+.artifacts-panel__status--undeclared {
+  background: #fee2e2;
+  color: #991b1b;
+}
+
+.artifacts-panel__reason {
+  padding: 2px 8px 0;
+  color: #92400e;
+  font-size: 11px;
+  line-height: 16px;
 }
 
 .artifacts-panel__desc {
