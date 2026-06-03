@@ -10,6 +10,8 @@ __pycache__/
 .agents/
 .specify/
 .seedcmp-run/
+.clowder/
+**/.clowder/
 
 # IM backend sources are tracked for V2/V3 integration.
 sections/im/*

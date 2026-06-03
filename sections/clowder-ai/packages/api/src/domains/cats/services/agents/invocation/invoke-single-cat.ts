@@ -12,7 +12,7 @@
 import { execFileSync } from 'node:child_process';
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { rm } from 'node:fs/promises';
-import { dirname, resolve } from 'node:path';
+import { dirname, join, resolve } from 'node:path';
 import { type CatId, type ContextHealth, catRegistry, type MessageContent, type SessionRecord } from '@cat-cafe/shared';
 import { context, SpanStatusCode, trace } from '@opentelemetry/api';
 import {
@@ -61,6 +61,12 @@ import { DEFAULT_CLI_TIMEOUT_MS, resolveCliTimeoutMs } from '../../../../../util
 import { findMonorepoRoot, isSameProject } from '../../../../../utils/monorepo-root.js';
 import { isUnderAllowedRoot } from '../../../../../utils/project-path.js';
 import { tcpProbe } from '../../../../../utils/tcp-probe.js';
+import type { IRuntimeWorkspaceStore, RuntimeWorkspaceRecord } from '../../../../runtime-workspaces/RuntimeWorkspaceStore.js';
+import {
+  buildAllowedWorkspaceDirs,
+  type ProjectRuntimeRoot,
+  resolveProjectRuntimeRoot,
+} from '../../../../runtime-workspaces/project-runtime-root.js';
 import type { AgentPaneRegistry } from '../../../../terminal/agent-pane-registry.js';
 import type { TmuxGateway } from '../../../../terminal/tmux-gateway.js';
 import { resolveBootcampWorkspaceRoot } from '../../bootcamp/workspace-root.js';
@@ -335,6 +341,8 @@ export interface InvocationDeps {
   readonly sessionChainStore?: ISessionChainStore;
   /** F211 Phase A2: runtime sidecar for provider runtime session metadata. */
   readonly runtimeSessionStore?: IRuntimeSessionStore;
+  /** V3-32: project-scoped runtime/workspace metadata ledger. */
+  readonly runtimeWorkspaceStore?: IRuntimeWorkspaceStore;
   /** F24 Phase B: Session sealer for auto-seal when context threshold reached */
   readonly sessionSealer?: ISessionSealer;
   /** F24 Phase C: Transcript writer for event collection + flush on seal */
@@ -767,6 +775,43 @@ export async function* invokeSingleCat(deps: InvocationDeps, params: InvocationP
       throw bootcampWorkspaceError;
     }
     const workingProjectRoot = workingDirectory ? findMonorepoRoot(workingDirectory) : undefined;
+    let projectRuntimeRoot: ProjectRuntimeRoot | null = null;
+    let registeredRuntimeWorkspace: RuntimeWorkspaceRecord | null = null;
+    if (workingDirectory) {
+      try {
+        projectRuntimeRoot = await resolveProjectRuntimeRoot({ projectPath: workingDirectory });
+        if (projectRuntimeRoot) {
+          const workspacePath = join(
+            projectRuntimeRoot.runtimeRoot,
+            'workspaces',
+            threadId.replace(/[^a-zA-Z0-9_.-]+/g, '-'),
+            invocationId,
+          );
+          registeredRuntimeWorkspace = await deps.runtimeWorkspaceStore?.register({
+            type: 'agent_workspace',
+            projectRoot: projectRuntimeRoot.projectRoot,
+            runtimeRoot: projectRuntimeRoot.runtimeRoot,
+            path: workspacePath,
+            threadId,
+            invocationId,
+            ownerCatId: catId,
+            dirtyStatus: 'unknown',
+            cleanupPolicy: 'manual_required',
+          }) ?? null;
+          callbackEnv.CLOWDER_PROJECT_RUNTIME_ROOT = projectRuntimeRoot.runtimeRoot;
+          callbackEnv.CAT_CAFE_PROJECT_RUNTIME_ROOT = projectRuntimeRoot.runtimeRoot;
+          callbackEnv.CAT_CAFE_PROJECT_ROOT = projectRuntimeRoot.projectRoot;
+          callbackEnv.CLOWDER_WORKSPACE_ID = registeredRuntimeWorkspace?.id ?? `${threadId}:${invocationId}`;
+          callbackEnv.ALLOWED_WORKSPACE_DIRS = buildAllowedWorkspaceDirs(
+            projectRuntimeRoot.projectRoot,
+            projectRuntimeRoot.runtimeRoot,
+            process.env.ALLOWED_WORKSPACE_DIRS,
+          );
+        }
+      } catch (err) {
+        log.warn({ err, workingDirectory, threadId, invocationId }, 'failed to resolve/register project runtime workspace');
+      }
+    }
 
     // Shared-state preflight — covers ALL cats (Claude/Codex/Gemini), vendor-agnostic.
     // Three-layer defense model (shared-rules §14):
@@ -1232,7 +1277,18 @@ export async function* invokeSingleCat(deps: InvocationDeps, params: InvocationP
 
     // Prepend staticIdentity to prompt when injection is needed
     // F070-P2: missionPrefix (dispatch context) is prepended for external projects
-    const promptWithMission = missionPrefix ? `${missionPrefix}\n\n${prompt}` : prompt;
+    const runtimeWorkspaceHint = projectRuntimeRoot
+      ? [
+          '[Project runtime workspace policy]',
+          `Bound project root: ${projectRuntimeRoot.projectRoot}`,
+          `Project runtime root: ${projectRuntimeRoot.runtimeRoot}`,
+          registeredRuntimeWorkspace
+            ? `Registered agent workspace: ${registeredRuntimeWorkspace.path} (workspaceId=${registeredRuntimeWorkspace.id})`
+            : 'Registered agent workspace: unavailable; keep project runtime output under the project runtime root.',
+          'Use the bound project root for canonical edits. If you need an isolated checkout, QA copy, patch staging, cache, or generated workspace output, place it under CLOWDER_PROJECT_RUNTIME_ROOT and declare resulting artifacts instead of writing project-specific work under /tmp.',
+        ].join('\n')
+      : '';
+    const promptWithMission = [missionPrefix, runtimeWorkspaceHint, prompt].filter(Boolean).join('\n\n');
 
     let effectivePrompt =
       injectSystemPrompt && params.systemPrompt

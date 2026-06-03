@@ -172,6 +172,8 @@ export interface AgentRouterOptions {
   sessionChainStore?: ISessionChainStore;
   /** F211 Phase A2: runtime sidecar for provider runtime session metadata */
   runtimeSessionStore?: IRuntimeSessionStore;
+  /** V3-32: project-scoped runtime/workspace metadata ledger. */
+  runtimeWorkspaceStore?: import('../../../../runtime-workspaces/RuntimeWorkspaceStore.js').IRuntimeWorkspaceStore;
   /** F24 Phase C: Transcript writer for event recording */
   transcriptWriter?: TranscriptWriter;
   /** F24 Phase D: Transcript reader for bootstrap injection */
@@ -236,6 +238,9 @@ export class AgentRouter {
   private threadStore: IThreadStore | null;
   private sessionChainStore: ISessionChainStore | undefined;
   private runtimeSessionStore: IRuntimeSessionStore | undefined;
+  private runtimeWorkspaceStore:
+    | import('../../../../runtime-workspaces/RuntimeWorkspaceStore.js').IRuntimeWorkspaceStore
+    | undefined;
   private transcriptWriter: TranscriptWriter | undefined;
   private transcriptReader: TranscriptReader | undefined;
   private sessionSealer: ISessionSealer | undefined;
@@ -300,6 +305,7 @@ export class AgentRouter {
     this.threadStore = options.threadStore ?? null;
     this.sessionChainStore = options.sessionChainStore;
     this.runtimeSessionStore = options.runtimeSessionStore;
+    this.runtimeWorkspaceStore = options.runtimeWorkspaceStore;
     this.transcriptWriter = options.transcriptWriter;
     this.transcriptReader = options.transcriptReader;
     this.sessionSealer = options.sessionSealer;
@@ -878,6 +884,7 @@ export class AgentRouter {
         ...(this.taskProgressStore ? { taskProgressStore: this.taskProgressStore } : {}),
         ...(this.sessionChainStore ? { sessionChainStore: this.sessionChainStore } : {}),
         ...(this.runtimeSessionStore ? { runtimeSessionStore: this.runtimeSessionStore } : {}),
+        ...(this.runtimeWorkspaceStore ? { runtimeWorkspaceStore: this.runtimeWorkspaceStore } : {}),
         ...(this.transcriptWriter ? { transcriptWriter: this.transcriptWriter } : {}),
         ...(this.transcriptReader ? { transcriptReader: this.transcriptReader } : {}),
         ...(this.sessionSealer ? { sessionSealer: this.sessionSealer } : {}),

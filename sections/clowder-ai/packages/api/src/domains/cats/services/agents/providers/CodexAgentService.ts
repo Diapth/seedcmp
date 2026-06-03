@@ -198,9 +198,17 @@ const CAT_CAFE_MCP_CALLBACK_ENV_KEYS = [
   'CAT_CAFE_USER_ID',
   'CAT_CAFE_CAT_ID',
   'CAT_CAFE_SIGNAL_USER',
+  'CAT_CAFE_THREAD_ID',
+  'CAT_CAFE_PROJECT_ROOT',
+  'CLOWDER_PROJECT_RUNTIME_ROOT',
+  'CAT_CAFE_PROJECT_RUNTIME_ROOT',
+  'CLOWDER_WORKSPACE_ID',
+  'ALLOWED_WORKSPACE_DIRS',
 ] as const;
 
-function resolveAllowedWorkspaceDirsForMcp(workingDirectory?: string): string {
+function resolveAllowedWorkspaceDirsForMcp(workingDirectory?: string, callbackEnv?: Record<string, string>): string {
+  const invocationAllowed = callbackEnv?.ALLOWED_WORKSPACE_DIRS?.trim();
+  if (invocationAllowed) return invocationAllowed;
   const explicitAllowed = process.env.ALLOWED_WORKSPACE_DIRS?.trim();
   if (explicitAllowed) return explicitAllowed;
   const threadWorkspace = workingDirectory?.trim();
@@ -249,7 +257,7 @@ function buildCatCafeMcpConfigArgs(workingDirectory?: string, callbackEnv?: Reco
   if (!mcpDistDir) return [];
 
   const args: string[] = [];
-  const allowedWorkspaceDirs = resolveAllowedWorkspaceDirsForMcp(workingDirectory);
+  const allowedWorkspaceDirs = resolveAllowedWorkspaceDirsForMcp(workingDirectory, callbackEnv);
 
   // F213 (2026-05-26, post 砚砚 review P2 fix): L4 per-invocation dummy disabled
   // override for the legacy `cat-cafe` server. L5 startup cleanup

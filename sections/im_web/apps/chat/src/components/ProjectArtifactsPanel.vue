@@ -29,7 +29,24 @@ interface ThreadArtifact {
   reason?: string;
 }
 
+interface RuntimeWorkspaceRecord {
+  id: string;
+  type: string;
+  path: string;
+  runtimeRoot: string;
+  projectRoot: string;
+  ownerCatId?: string;
+  invocationId?: string;
+  dirtyStatus: 'clean' | 'dirty' | 'unknown';
+  changedFiles?: string[];
+  sizeBytes?: number;
+  cleanupPolicy: string;
+  exists?: boolean;
+  projectScoped?: boolean;
+}
+
 const artifacts = ref<ThreadArtifact[]>([]);
+const workspaces = ref<RuntimeWorkspaceRecord[]>([]);
 const diagnostics = ref<Record<string, number>>({});
 const loading = ref(false);
 const error = ref<string | null>(null);
@@ -93,16 +110,36 @@ function hasDiagnosticArtifacts() {
   return artifacts.value.some((artifact) => artifactStatus(artifact) !== 'available');
 }
 
+function formatWorkspaceType(type: string) {
+  if (type === 'agent_workspace') return 'Agent';
+  if (type === 'patch_staging') return 'Patch';
+  if (type === 'verification_checkout') return '验证';
+  if (type === 'qa_workspace') return 'QA';
+  if (type === 'cache') return '缓存';
+  return type;
+}
+
+function workspaceOwner(workspace: RuntimeWorkspaceRecord) {
+  return workspace.ownerCatId || 'unknown';
+}
+
 async function refresh() {
   if (!props.threadId) return;
   loading.value = true;
   error.value = null;
   try {
-    const response = await apiClient.get<{ artifacts?: ThreadArtifact[]; diagnostics?: Record<string, number> }>(
-      `clowder/thread/${encodeURIComponent(props.threadId)}/artifacts`,
-    );
+    const [response, workspaceResponse] = await Promise.all([
+      apiClient.get<{ artifacts?: ThreadArtifact[]; diagnostics?: Record<string, number> }>(
+        `clowder/thread/${encodeURIComponent(props.threadId)}/artifacts`,
+      ),
+      apiClient.get<{ workspaces?: RuntimeWorkspaceRecord[] }>(
+        `clowder/thread/${encodeURIComponent(props.threadId)}/workspaces`,
+      ).catch(() => ({ data: { workspaces: [] } })),
+    ]);
     const list = response.data?.artifacts ?? [];
     artifacts.value = Array.isArray(list) ? list : [];
+    const workspaceList = workspaceResponse.data?.workspaces ?? [];
+    workspaces.value = Array.isArray(workspaceList) ? workspaceList : [];
     diagnostics.value = response.data?.diagnostics || {};
   } catch (err) {
     error.value = err instanceof Error ? err.message : '加载产物失败';
@@ -122,6 +159,7 @@ watch(
   () => props.threadId,
   () => {
     artifacts.value = [];
+    workspaces.value = [];
     diagnostics.value = {};
     void refresh();
   },
@@ -149,7 +187,7 @@ if (typeof window !== 'undefined') {
     </div>
 
     <p v-if="error" class="artifacts-panel__error">{{ error }}</p>
-    <div v-else-if="!loading && artifacts.length === 0" class="artifacts-panel__empty">
+    <div v-else-if="!loading && artifacts.length === 0 && workspaces.length === 0" class="artifacts-panel__empty">
       <p>还没有已登记产物。</p>
       <p>
         猫猫需要调用 <code>cat_cafe_declare_artifact</code>；如果聊天里有附件但这里为空，
@@ -158,6 +196,38 @@ if (typeof window !== 'undefined') {
     </div>
 
     <div v-else class="artifacts-panel__groups">
+      <section v-if="workspaces.length > 0" class="artifacts-panel__workspace-section">
+        <header class="artifacts-panel__group-header">
+          <span class="artifacts-panel__owner-name">Runtime Workspaces</span>
+        </header>
+        <ul class="artifacts-panel__list">
+          <li
+            v-for="workspace in workspaces"
+            :key="workspace.id"
+            class="artifacts-panel__item"
+          >
+            <div class="artifacts-panel__workspace">
+              <div class="artifacts-panel__workspace-main">
+                <span class="artifacts-panel__filename">{{ workspace.path.split('/').pop() }}</span>
+                <span class="artifacts-panel__kind">{{ formatWorkspaceType(workspace.type) }}</span>
+                <span
+                  class="artifacts-panel__status"
+                  :class="workspace.projectScoped ? 'artifacts-panel__status--available' : 'artifacts-panel__status--outside_project'"
+                >
+                  {{ workspace.projectScoped ? '项目内' : '待检查' }}
+                </span>
+              </div>
+              <div class="artifacts-panel__desc">
+                @{{ workspaceOwner(workspace) }} · {{ workspace.dirtyStatus }} · {{ workspace.cleanupPolicy }}
+              </div>
+              <div class="artifacts-panel__reason">
+                {{ workspace.path }}
+              </div>
+            </div>
+          </li>
+        </ul>
+      </section>
+
       <div v-if="hasDiagnosticArtifacts()" class="artifacts-panel__diagnostic">
         <span>诊断</span>
         <span v-if="diagnostics.missing">缺失 {{ diagnostics.missing }}</span>
@@ -298,6 +368,29 @@ if (typeof window !== 'undefined') {
   display: flex;
   flex-direction: column;
   gap: 6px;
+}
+
+.artifacts-panel__workspace-section {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.artifacts-panel__workspace {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: 8px;
+  border: 1px solid var(--color-border-2, #e5e0d8);
+  border-radius: 6px;
+  background: var(--color-bg-2, #fff);
+}
+
+.artifacts-panel__workspace-main {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
 }
 
 .artifacts-panel__group-header {

@@ -75,6 +75,7 @@ func (c *Clowder) Route(r *wkhttp.WKHttp) {
 		auth.GET("/thread/:threadId/tasks", c.proxyThreadTasks)
 		auth.GET("/thread/:threadId/artifacts", c.proxyThreadArtifacts)
 		auth.POST("/thread/:threadId/artifacts", c.proxyPostThreadArtifact)
+		auth.GET("/thread/:threadId/workspaces", c.proxyThreadWorkspaces)
 		// im_web creates new project group threads via
 		// POST /v1/threads (handled by the bridge below).
 		auth.POST("/threads", c.proxyCreateThread)
@@ -492,6 +493,39 @@ func (c *Clowder) proxyPostThreadArtifact(ctx *wkhttp.Context) {
 
 	respBody, _ := io.ReadAll(res.Body)
 	ctx.Data(res.StatusCode, "application/json; charset=utf-8", respBody)
+}
+
+// proxyThreadWorkspaces proxies `GET /api/threads/:threadId/workspaces`
+// (V3-32 runtime workspace ledger) to Clowder 3004.
+func (c *Clowder) proxyThreadWorkspaces(ctx *wkhttp.Context) {
+	threadID := strings.TrimSpace(ctx.Param("threadId"))
+	if threadID == "" {
+		ctx.JSON(http.StatusBadRequest, map[string]string{"error": "thread_id_required"})
+		return
+	}
+	if !c.config.IsConfigured() {
+		ctx.JSON(http.StatusBadGateway, map[string]string{"error": "clowder_bridge_not_configured"})
+		return
+	}
+	endpoint := strings.TrimRight(c.config.APIBaseURL, "/") +
+		"/api/threads/" + url.PathEscape(threadID) + "/workspaces"
+
+	req, err := http.NewRequest(http.MethodGet, endpoint, nil)
+	if err != nil {
+		ctx.JSON(http.StatusInternalServerError, map[string]string{"error": "build_request_failed", "message": err.Error()})
+		return
+	}
+	c.applyDirectoryUserHeader(req, ctx.GetLoginUID())
+
+	res, err := c.httpClient().Do(req)
+	if err != nil {
+		ctx.JSON(http.StatusBadGateway, map[string]string{"error": "thread_workspaces_unavailable", "message": err.Error()})
+		return
+	}
+	defer res.Body.Close()
+
+	body, _ := io.ReadAll(res.Body)
+	ctx.Data(res.StatusCode, "application/json; charset=utf-8", body)
 }
 
 // proxyCreateThread proxies `POST /api/threads` to Clowder 3004. im_web's

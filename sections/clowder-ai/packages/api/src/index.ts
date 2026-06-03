@@ -533,6 +533,8 @@ async function main(): Promise<void> {
   const { InMemoryGuideDismissTracker } = await import('./domains/guides/GuideDismissTracker.js');
   const dismissTracker = new InMemoryGuideDismissTracker();
   const taskStore = createTaskStore(redis);
+  const { RuntimeWorkspaceStore } = await import('./domains/runtime-workspaces/RuntimeWorkspaceStore.js');
+  const runtimeWorkspaceStore = new RuntimeWorkspaceStore();
   const labelStore = createLabelStore(redis);
   const communityIssueStore = createCommunityIssueStore(redis);
   if (redis) {
@@ -1372,6 +1374,7 @@ async function main(): Promise<void> {
     ...(threadStore ? { threadStore } : {}),
     sessionChainStore,
     runtimeSessionStore,
+    runtimeWorkspaceStore,
     transcriptWriter,
     transcriptReader,
     sessionSealer,
@@ -2267,6 +2270,13 @@ async function main(): Promise<void> {
     taskStore,
     ...(threadStore ? { threadStore } : {}),
     log: app.log,
+  });
+
+  // V3-32: expose project-scoped runtime/agent workspaces for the bound thread.
+  const { threadWorkspacesRoutes } = await import('./routes/thread-workspaces.js');
+  await app.register(threadWorkspacesRoutes, {
+    threadStore,
+    runtimeWorkspaceStore,
   });
 
   // V3-29: IM Web deployment confirmation cards send structured actions.
