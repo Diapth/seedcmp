@@ -6,7 +6,7 @@ export interface WarnLoggerLike {
   warn: (...args: unknown[]) => void;
 }
 
-const DEFAULT_FRONTEND_BASE_URL = 'http://localhost:3003';
+const DEFAULT_FRONTEND_BASE_URL = 'http://localhost:3000';
 const DEFAULT_CORS_ORIGINS = ['http://localhost:3000', 'http://localhost:3003', 'https://cafe.clowder-ai.com'];
 
 /**
@@ -65,6 +65,10 @@ function parseFrontendPort(rawPort: string | undefined): number | null {
 }
 
 export function resolveFrontendBaseUrl(env: NodeJS.ProcessEnv, logger?: WarnLoggerLike): string {
+  // Precedence: env FRONTEND_URL → env FRONTEND_PORT → default.
+  // Default points at im_web (port 3000) because that's the user-facing
+  // surface; clowder-ai web (3003) is a developer / admin surface and
+  // can still be reached explicitly via FRONTEND_URL=http://localhost:3003.
   const rawFrontendUrl = env.FRONTEND_URL?.trim();
   if (rawFrontendUrl) {
     const normalizedUrl = normalizeConfiguredUrl(rawFrontendUrl);
@@ -86,11 +90,32 @@ export function resolveFrontendBaseUrl(env: NodeJS.ProcessEnv, logger?: WarnLogg
   if (rawFrontendPort?.trim()) {
     logger?.warn(
       { frontendPort: rawFrontendPort },
-      '[thread-export] Invalid FRONTEND_PORT, fallback to localhost:3003',
+      '[thread-export] Invalid FRONTEND_PORT, fallback to localhost:3000',
     );
   }
 
   return DEFAULT_FRONTEND_BASE_URL;
+}
+
+/**
+ * Per-request override for the frontend base URL. Connector bridges (the
+ * Go bridge in TangSengDaoDaoServer) forward the caller's `X-Frontend-Base-Url`
+ * header — set to the im_web origin — so Clowder emits deep links that
+ * point back at im_web (not at the clowder-ai web at 3003).
+ */
+const X_FRONTEND_BASE_URL_HEADER = 'x-frontend-base-url';
+
+export function extractPerRequestFrontendBaseUrl(
+  headers: Record<string, string | string[] | undefined> | undefined,
+  fallback: string,
+): string {
+  if (!headers) return fallback;
+  const raw = headers[X_FRONTEND_BASE_URL_HEADER];
+  const value = Array.isArray(raw) ? raw[0] : raw;
+  if (typeof value !== 'string') return fallback;
+  const normalized = normalizeConfiguredUrl(value);
+  if (!normalized) return fallback;
+  return normalized;
 }
 
 export function resolveFrontendCorsOrigins(env: NodeJS.ProcessEnv, logger?: WarnLoggerLike): (string | RegExp)[] {
