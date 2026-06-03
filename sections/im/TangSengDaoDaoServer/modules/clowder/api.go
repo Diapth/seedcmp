@@ -53,6 +53,7 @@ func (c *Clowder) Route(r *wkhttp.WKHttp) {
 		auth.GET("/cats", c.catDirectory)
 		auth.POST("/cats/connect", c.connectCatContact)
 		auth.POST("/cats", c.createCatAndConnect)
+		auth.DELETE("/cats/:catId", c.deleteCatContact)
 		auth.POST("/group/cats/sync", c.syncGroupCats)
 		auth.GET("/group/cats", c.groupCats)
 		auth.POST("/conversation/bind", c.bindConversation)
@@ -585,6 +586,23 @@ func (c *Clowder) createCatAndConnect(ctx *wkhttp.Context) {
 	ctx.JSON(http.StatusOK, fallbackCreatedCatResponse(req, alias))
 }
 
+func (c *Clowder) deleteCatContact(ctx *wkhttp.Context) {
+	catID := strings.TrimSpace(ctx.Param("catId"))
+	if catID == "" {
+		ctx.JSON(http.StatusBadRequest, map[string]string{"error": "cat_required"})
+		return
+	}
+	statusCode, body, err := c.deleteCatFromUpstream(catID, ctx.GetLoginUID())
+	if err != nil {
+		ctx.JSON(http.StatusBadGateway, map[string]string{"error": "cat_delete_unavailable", "message": err.Error()})
+		return
+	}
+	if statusCode >= 200 && statusCode < 300 {
+		c.pruneGroupCatState(catID)
+	}
+	ctx.Data(statusCode, "application/json; charset=utf-8", body)
+}
+
 func (c *Clowder) syncGroupCats(ctx *wkhttp.Context) {
 	var req groupCatSyncRequest
 	if err := ctx.BindJSON(&req); err != nil {
@@ -657,6 +675,72 @@ func (c *Clowder) loadGroupCats(groupID string) (groupCatSyncResponse, bool) {
 	}
 	response, ok := c.groupCatState[strings.TrimSpace(groupID)]
 	return response, ok
+}
+
+func (c *Clowder) deleteCatFromUpstream(catID string, userID string) (int, []byte, error) {
+	if !c.config.IsConfigured() {
+		return 0, nil, fmt.Errorf("clowder bridge is not configured")
+	}
+	trimmed := strings.TrimSpace(catID)
+	if trimmed == "" {
+		return 0, nil, fmt.Errorf("cat is required")
+	}
+	endpoint := strings.TrimRight(c.config.APIBaseURL, "/") + "/api/cats/" + url.PathEscape(trimmed)
+	req, err := http.NewRequest(http.MethodDelete, endpoint, nil)
+	if err != nil {
+		return 0, nil, err
+	}
+	c.applyDirectoryUserHeader(req, userID)
+
+	res, err := c.httpClient().Do(req)
+	if err != nil {
+		return 0, nil, err
+	}
+	defer res.Body.Close()
+	body, _ := io.ReadAll(res.Body)
+	return res.StatusCode, body, nil
+}
+
+func (c *Clowder) pruneGroupCatState(catID string) int {
+	needle := normalizeCatLookup(catID)
+	if needle == "" {
+		return 0
+	}
+	affected := 0
+	c.groupCatsMu.Lock()
+	defer c.groupCatsMu.Unlock()
+	for groupID, state := range c.groupCatState {
+		nextIDs := make([]string, 0, len(state.CatIDs))
+		removed := false
+		for _, id := range state.CatIDs {
+			if normalizeCatLookup(id) == needle {
+				removed = true
+				continue
+			}
+			nextIDs = append(nextIDs, id)
+		}
+
+		nextCats := make([]ClowderAgent, 0, len(state.Cats))
+		for _, cat := range state.Cats {
+			if normalizeCatLookup(cat.CatID) == needle {
+				removed = true
+				continue
+			}
+			nextCats = append(nextCats, cat)
+		}
+
+		if !removed {
+			continue
+		}
+		state.CatIDs = nextIDs
+		state.Cats = nextCats
+		if len(nextIDs) == 0 && len(nextCats) == 0 {
+			state.Prompt = ""
+		}
+		c.groupCatState[groupID] = state
+		affected++
+	}
+	return affected
 }
 
 func decorateGroupCats(cats []ClowderAgent) []ClowderAgent {

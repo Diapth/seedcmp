@@ -378,6 +378,110 @@ func TestGroupCatMembershipStoreRoundTripsPromptAndCats(t *testing.T) {
 	assert.Equal(t, stored.Prompt, loaded.Prompt)
 }
 
+func TestDeleteCatFromUpstreamProxiesOwnerAndStatus(t *testing.T) {
+	var gotPath string
+	var gotUser string
+	var gotMethod string
+	upstream := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		gotPath = r.URL.RequestURI()
+		gotUser = r.Header.Get("x-cat-cafe-user")
+		gotMethod = r.Method
+		w.WriteHeader(http.StatusAccepted)
+		_ = json.NewEncoder(w).Encode(map[string]interface{}{
+			"deleted": true,
+			"id":      "opus",
+		})
+	}))
+	defer upstream.Close()
+
+	c := New(nil)
+	c.SetConfig(commonmodule.ClowderBridgeConfig{
+		Enabled:            true,
+		APIBaseURL:         upstream.URL,
+		ConnectorID:        "im-web",
+		ConnectorSecret:    "secret",
+		DefaultOwnerUserID: "owner-1",
+		RequestTimeout:     time.Second,
+		SignatureTolerance: time.Minute,
+	})
+
+	statusCode, body, err := c.deleteCatFromUpstream("opus", "im-user")
+
+	require.NoError(t, err)
+	assert.Equal(t, http.StatusAccepted, statusCode)
+	assert.Equal(t, http.MethodDelete, gotMethod)
+	assert.Equal(t, "/api/cats/opus", gotPath)
+	assert.Equal(t, "owner-1", gotUser)
+	assert.Contains(t, string(body), `"deleted":true`)
+}
+
+func TestDeleteCatFromUpstreamReturnsUpstreamErrorStatus(t *testing.T) {
+	upstream := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		require.Equal(t, http.MethodDelete, r.Method)
+		w.WriteHeader(http.StatusNotFound)
+		_ = json.NewEncoder(w).Encode(map[string]interface{}{
+			"error": "Cat not found",
+		})
+	}))
+	defer upstream.Close()
+
+	c := New(nil)
+	c.SetConfig(commonmodule.ClowderBridgeConfig{
+		Enabled:            true,
+		APIBaseURL:         upstream.URL,
+		ConnectorID:        "im-web",
+		ConnectorSecret:    "secret",
+		DefaultOwnerUserID: "owner-1",
+		RequestTimeout:     time.Second,
+		SignatureTolerance: time.Minute,
+	})
+
+	statusCode, body, err := c.deleteCatFromUpstream("missing-cat", "im-user")
+
+	require.NoError(t, err)
+	assert.Equal(t, http.StatusNotFound, statusCode)
+	assert.Contains(t, string(body), "Cat not found")
+}
+
+func TestPruneGroupCatStateRemovesDeletedCatAndClearsEmptyPrompt(t *testing.T) {
+	c := New(nil)
+	c.storeGroupCats(groupCatSyncRequest{
+		GroupID:   "group-1",
+		GroupName: "猫家庭",
+		CatIDs:    []string{"opus", "codex"},
+		Cats: []ClowderAgent{
+			{CatID: "opus", DisplayName: "布偶猫", MentionPatterns: []string{"@布偶猫"}, Available: true},
+			{CatID: "codex", DisplayName: "猫猫", MentionPatterns: []string{"@codex"}, Available: true},
+		},
+		Prompt: "Group: 猫家庭\nCats:\n- 布偶猫\n- 猫猫",
+	})
+	c.storeGroupCats(groupCatSyncRequest{
+		GroupID:   "group-empty",
+		GroupName: "只有布偶猫",
+		CatIDs:    []string{"opus"},
+		Cats: []ClowderAgent{
+			{CatID: "opus", DisplayName: "布偶猫", MentionPatterns: []string{"@布偶猫"}, Available: true},
+		},
+		Prompt: "Group: 只有布偶猫\nCats:\n- 布偶猫",
+	})
+
+	affected := c.pruneGroupCatState("opus")
+
+	assert.Equal(t, 2, affected)
+	groupOne, ok := c.loadGroupCats("group-1")
+	require.True(t, ok)
+	assert.Equal(t, []string{"codex"}, groupOne.CatIDs)
+	require.Len(t, groupOne.Cats, 1)
+	assert.Equal(t, "codex", groupOne.Cats[0].CatID)
+	assert.NotEmpty(t, groupOne.Prompt)
+
+	emptyGroup, ok := c.loadGroupCats("group-empty")
+	require.True(t, ok)
+	assert.Empty(t, emptyGroup.CatIDs)
+	assert.Empty(t, emptyGroup.Cats)
+	assert.Empty(t, emptyGroup.Prompt)
+}
+
 func TestBuildCreateCatCommandRequiresAndNormalizesClientPlatform(t *testing.T) {
 	command, ok := buildCreateCatCommand(createCatRequest{
 		Name:       "测试猫",

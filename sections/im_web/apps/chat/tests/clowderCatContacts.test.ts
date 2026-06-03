@@ -3,12 +3,14 @@ import { createPinia, setActivePinia } from 'pinia'
 
 const get = vi.fn()
 const post = vi.fn()
+const del = vi.fn()
 const getChannelInfo = vi.fn()
 
 vi.mock('@tsdaodao/base-vue', () => ({
   apiClient: {
     get,
-    post
+    post,
+    delete: del
   }
 }))
 
@@ -242,5 +244,119 @@ describe('Clowder cats as contact identities', () => {
       displayName: '协调者',
       cloneable: true
     })
+  })
+
+  it('deletes a connected cat and prunes local contact, group, directory, and focus state', async () => {
+    const { useClowderStore } = await import('../../../packages/datasource-vue/src/stores/clowderStore.ts')
+    const store = useClowderStore()
+    const deletedCat: any = {
+      id: 'clowder_cat:codex',
+      uid: 'clowder_cat:codex',
+      catId: 'codex',
+      channelId: 'clowder_cat:codex',
+      channelType: 1,
+      directConversationId: 'clowder_cat:codex',
+      outboundSenderId: 'clowder_cat_codex',
+      historyGroupKey: 'clowder-cat:codex',
+      connectorId: 'im-web',
+      category: 'clowder-cat',
+      robot: 1,
+      name: 'Codex',
+      displayName: 'Codex',
+      avatar: '',
+      aliases: ['@codex'],
+      mentionNames: ['@codex'],
+      personalitySummary: 'Careful coding partner',
+      capabilitySummary: 'code, tests',
+      available: true,
+      availabilityState: 'available',
+      source: 'existing',
+      connected: true
+    }
+    const remainingCat: any = {
+      ...deletedCat,
+      id: 'clowder_cat:news',
+      uid: 'clowder_cat:news',
+      catId: 'news',
+      channelId: 'clowder_cat:news',
+      directConversationId: 'clowder_cat:news',
+      outboundSenderId: 'clowder_cat_news',
+      historyGroupKey: 'clowder-cat:news',
+      name: 'News Cat',
+      displayName: 'News Cat',
+      aliases: ['@news'],
+      mentionNames: ['@news'],
+      personalitySummary: 'Brief news watcher',
+      capabilitySummary: 'summaries'
+    }
+    store.connectedCatContacts = [deletedCat, remainingCat]
+    store.catContactDirectory = [deletedCat, remainingCat]
+    store.groupCatMemberships['group-1'] = [deletedCat, remainingCat]
+    store.groupPrompts['group-1'] = 'old prompt'
+    store.conversations['group-1-2'] = {
+      status: { enabled: true, configured: true, reachable: true, state: 'ready' },
+      agents: [
+        { catId: 'codex', displayName: 'Codex', mentionPatterns: ['@codex'], available: true, preferred: true },
+        { catId: 'news', displayName: 'News Cat', mentionPatterns: ['@news'], available: true }
+      ],
+      focusCatId: 'codex'
+    }
+    store.agentDirectories['group-1-2'] = {
+      agents: [
+        { catId: 'codex', displayName: 'Codex', mentionPatterns: ['@codex'], available: true, preferred: true },
+        { catId: 'news', displayName: 'News Cat', mentionPatterns: ['@news'], available: true }
+      ],
+      available: [],
+      unavailable: [],
+      preferred: [],
+      lastActive: undefined
+    }
+    del.mockResolvedValueOnce({ deleted: true, id: 'codex' })
+
+    await expect(store.deleteCatContact('codex')).resolves.toEqual({ deleted: true, id: 'codex' })
+
+    expect(del).toHaveBeenCalledWith('clowder/cats/codex')
+    expect(store.connectedCatContacts.map(cat => cat.catId)).toEqual(['news'])
+    expect(store.catContactDirectory.map(cat => cat.catId)).toEqual(['news'])
+    expect(store.groupCatMemberships['group-1'].map(cat => cat.catId)).toEqual(['news'])
+    expect(store.groupPrompts['group-1']).toContain('News Cat')
+    expect(store.getConversation('group-1', 2)?.agents.map(agent => agent.catId)).toEqual(['news'])
+    expect(store.getConversation('group-1', 2)?.focusCatId).toBeUndefined()
+    expect(store.agentDirectories['group-1-2'].agents.map(agent => agent.catId)).toEqual(['news'])
+  })
+
+  it('keeps local cat state when remote delete fails', async () => {
+    const { useClowderStore } = await import('../../../packages/datasource-vue/src/stores/clowderStore.ts')
+    const store = useClowderStore()
+    store.connectedCatContacts = [{
+      id: 'clowder_cat:codex',
+      uid: 'clowder_cat:codex',
+      catId: 'codex',
+      channelId: 'clowder_cat:codex',
+      channelType: 1,
+      directConversationId: 'clowder_cat:codex',
+      outboundSenderId: 'clowder_cat_codex',
+      historyGroupKey: 'clowder-cat:codex',
+      connectorId: 'im-web',
+      category: 'clowder-cat',
+      robot: 1,
+      name: 'Codex',
+      displayName: 'Codex',
+      avatar: '',
+      aliases: ['@codex'],
+      mentionNames: ['@codex'],
+      personalitySummary: 'Careful coding partner',
+      capabilitySummary: 'code, tests',
+      available: true,
+      availabilityState: 'available',
+      source: 'existing',
+      connected: true
+    }]
+    del.mockRejectedValueOnce(new Error('delete failed'))
+
+    await expect(store.deleteCatContact('codex')).rejects.toThrow('delete failed')
+
+    expect(store.connectedCatContacts.map(cat => cat.catId)).toEqual(['codex'])
+    expect(store.error).toBe('delete failed')
   })
 })

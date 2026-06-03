@@ -22,6 +22,7 @@ describe('Clowder cat console', () => {
     expect(page.default).toContain('Clowder 猫猫联系人')
     expect(page.default).toContain('createCatAndConnect')
     expect(page.default).toContain('connectExistingCat')
+    expect(page.default).toContain('deleteCatContact')
     expect(page.default).toContain('loadCatContactDirectory')
     expect(page.default).toContain('router.push(`/chat/conversation/${cat.directConversationId}/1`)')
     expect(page.default).toContain('form.alias')
@@ -42,6 +43,21 @@ describe('Clowder cat console', () => {
     expect(page.default).toContain('accountRef:')
     expect(page.default).toContain('console-layout')
     expect(page.default).toContain('cat-row')
+  })
+
+  it('uses an AppDialog typed confirmation for deleting connected cats', async () => {
+    const page = await import('../../../packages/contacts-vue/src/views/ClowderCatConsolePage.vue?raw')
+
+    expect(page.default).toContain('AppDialog')
+    expect(page.default).toContain('pendingDeleteCat')
+    expect(page.default).toContain('deleteConfirmInput')
+    expect(page.default).toContain('deleteConfirmMatches')
+    expect(page.default).toContain('requestDeleteCat(cat)')
+    expect(page.default).toContain('confirmDeleteCat')
+    expect(page.default).toContain('clowderStore.deleteCatContact(cat.catId)')
+    expect(page.default).toContain('confirm-text="删除"')
+    expect(page.default).toContain('输入 ${pendingDeleteCat.displayName} 或 ${pendingDeleteCat.catId}')
+    expect(page.default).not.toContain('window.confirm')
   })
 
   it('uses the full role template catalog for the create-cat dropdown', async () => {

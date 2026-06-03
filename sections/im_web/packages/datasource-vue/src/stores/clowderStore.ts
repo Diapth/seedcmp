@@ -16,6 +16,7 @@ import {
   type ClowderClientDefaultModels,
   type ClowderCatRoleTemplate,
   type ClowderCreateCatRequest,
+  type ClowderDeleteCatResponse,
   type ClowderPlatformModelOption,
   type ClowderConversationRef,
   type ClowderConversationStateResponse,
@@ -513,6 +514,64 @@ export const useClowderStore = defineStore('clowder', () => {
       return upsertConnectedCatContact(contact);
     } catch (err) {
       error.value = err instanceof Error ? err.message : 'Clowder cat creation failed';
+      throw err;
+    } finally {
+      loading.value = false;
+    }
+  }
+
+  function catIdMatches(value: string | undefined | null, catId: string) {
+    return normalizeLookupToken(String(value || '')) === normalizeLookupToken(catId);
+  }
+
+  function pruneDeletedCatFromLocalState(catId: string) {
+    connectedCatContacts.value = connectedCatContacts.value.filter(cat => !catIdMatches(cat.catId, catId));
+    catContactDirectory.value = catContactDirectory.value.filter(cat => !catIdMatches(cat.catId, catId));
+
+    for (const [groupId, cats] of Object.entries(groupCatMemberships.value)) {
+      const nextCats = cats.filter(cat => !catIdMatches(cat.catId, catId));
+      if (nextCats.length === cats.length) continue;
+      groupCatMemberships.value[groupId] = nextCats;
+      if (nextCats.length > 0) {
+        buildCurrentGroupPrompt(groupId, groupId, nextCats, groupAutoReplyModes.value[groupId] || 'soft_mentions');
+      } else {
+        delete groupPrompts.value[groupId];
+      }
+    }
+
+    for (const [key, state] of Object.entries(conversations.value)) {
+      const nextAgents = (state.agents || []).filter(agent => !catIdMatches(agent.catId, catId));
+      const focusCatId = state.focusCatId && catIdMatches(state.focusCatId, catId) ? undefined : state.focusCatId;
+      if (nextAgents.length === (state.agents || []).length && focusCatId === state.focusCatId) continue;
+      conversations.value[key] = normalizeConversationState({
+        ...state,
+        agents: nextAgents,
+        focusCatId
+      });
+    }
+
+    for (const [key, directory] of Object.entries(agentDirectories.value)) {
+      const nextAgents = directory.agents.filter(agent => !catIdMatches(agent.catId, catId));
+      if (nextAgents.length === directory.agents.length) continue;
+      agentDirectories.value[key] = normalizeAgentDirectory({
+        agents: nextAgents
+      });
+    }
+  }
+
+  async function deleteCatContact(catId: string) {
+    const trimmed = String(catId || '').trim();
+    if (!trimmed) {
+      throw new Error('Clowder cat id is required');
+    }
+    loading.value = true;
+    error.value = undefined;
+    try {
+      const response = await clowderApi.deleteCatContact(trimmed) as unknown as ClowderDeleteCatResponse;
+      pruneDeletedCatFromLocalState(trimmed);
+      return response;
+    } catch (err) {
+      error.value = err instanceof Error ? err.message : 'Clowder cat delete failed';
       throw err;
     } finally {
       loading.value = false;
@@ -1018,6 +1077,7 @@ export const useClowderStore = defineStore('clowder', () => {
     getCatContactById,
     connectExistingCat,
     createCatAndConnect,
+    deleteCatContact,
     syncMixedGroupCats,
     loadGroupCats,
     addGroupCat,

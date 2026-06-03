@@ -1,13 +1,16 @@
 <script setup lang="ts">
 import { computed, onMounted, reactive, ref, watch } from 'vue';
 import { useRouter } from 'vue-router';
-import { ChannelAvatar } from '@tsdaodao/base-vue';
+import { AppDialog, ChannelAvatar } from '@tsdaodao/base-vue';
 import { useClowderStore, type ClowderCatContact } from '@tsdaodao/datasource-vue';
 
 const router = useRouter();
 const clowderStore = useClowderStore();
 const searchQuery = ref('');
 const feedback = ref('');
+const pendingDeleteCat = ref<ClowderCatContact | null>(null);
+const deleteConfirmInput = ref('');
+const deleteLoading = ref(false);
 
 const form = reactive({
   name: '',
@@ -52,6 +55,13 @@ const availableCats = computed(() => {
     cat.personalitySummary,
     cat.capabilitySummary
   ].some(value => String(value || '').toLowerCase().includes(query)));
+});
+
+const deleteConfirmMatches = computed(() => {
+  const cat = pendingDeleteCat.value;
+  if (!cat) return false;
+  const input = deleteConfirmInput.value.trim().toLowerCase();
+  return input === cat.catId.toLowerCase() || input === cat.displayName.toLowerCase();
 });
 
 onMounted(() => {
@@ -118,6 +128,39 @@ async function connectCat(cat: ClowderCatContact) {
     return undefined;
   });
   if (connected) openCat(connected);
+}
+
+function requestDeleteCat(cat: ClowderCatContact) {
+  pendingDeleteCat.value = cat;
+  deleteConfirmInput.value = '';
+  feedback.value = '';
+}
+
+function closeDeleteDialog() {
+  if (deleteLoading.value) return;
+  pendingDeleteCat.value = null;
+  deleteConfirmInput.value = '';
+}
+
+async function confirmDeleteCat() {
+  const cat = pendingDeleteCat.value;
+  if (!cat) return;
+  if (!deleteConfirmMatches.value) {
+    feedback.value = `请输入 ${cat.displayName} 或 ${cat.catId} 确认删除`;
+    return;
+  }
+  deleteLoading.value = true;
+  feedback.value = '';
+  try {
+    await clowderStore.deleteCatContact(cat.catId);
+    feedback.value = `已删除 ${cat.displayName}`;
+    pendingDeleteCat.value = null;
+    deleteConfirmInput.value = '';
+  } catch (error) {
+    feedback.value = error instanceof Error ? error.message : '删除猫猫失败';
+  } finally {
+    deleteLoading.value = false;
+  }
 }
 
 async function createCatAndConnect() {
@@ -292,13 +335,22 @@ function back() {
               <span class="cat-summary">{{ cat.personalitySummary || 'Clowder 联系人' }}</span>
               <span class="cat-summary muted">{{ cat.capabilitySummary || '暂未声明能力' }}</span>
             </div>
-            <button
-              v-if="cat.connected"
-              class="secondary-btn compact"
-              @click="openCat(cat)"
-            >
-              打开会话
-            </button>
+            <div v-if="cat.connected" class="cat-actions">
+              <button
+                class="secondary-btn compact"
+                :disabled="deleteLoading || clowderStore.loading"
+                @click="openCat(cat)"
+              >
+                打开会话
+              </button>
+              <button
+                class="danger-btn compact"
+                :disabled="deleteLoading || clowderStore.loading"
+                @click="requestDeleteCat(cat)"
+              >
+                删除
+              </button>
+            </div>
             <button
               v-else
               class="primary-btn compact"
@@ -311,6 +363,20 @@ function back() {
         </div>
       </section>
     </div>
+
+    <AppDialog
+      :visible="!!pendingDeleteCat"
+      title="删除猫猫"
+      :message="pendingDeleteCat ? `确认彻底删除 ${pendingDeleteCat.displayName}？历史消息会保留，但这只猫猫将不再作为联系人、群成员或 @ 路由目标出现。` : ''"
+      mode="input"
+      v-model="deleteConfirmInput"
+      :placeholder="pendingDeleteCat ? `输入 ${pendingDeleteCat.displayName} 或 ${pendingDeleteCat.catId}` : ''"
+      confirm-text="删除"
+      danger
+      :loading="deleteLoading"
+      @confirm="confirmDeleteCat"
+      @close="closeDeleteDialog"
+    />
   </div>
 </template>
 
@@ -477,6 +543,26 @@ function back() {
   height: 28px;
   padding: 0 10px;
   white-space: nowrap;
+}
+
+.cat-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.danger-btn {
+  border: none;
+  border-radius: var(--radius-sm);
+  background-color: #cf1322;
+  color: #ffffff;
+  cursor: pointer;
+  font-size: 13px;
+}
+
+.danger-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
 }
 
 .icon-btn {

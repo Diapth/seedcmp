@@ -166,6 +166,12 @@ export interface ClowderCatContactResponse {
   };
 }
 
+export interface ClowderDeleteCatResponse {
+  deleted: boolean;
+  id: string;
+  updatedBy?: string;
+}
+
 export interface ClowderGroupCatSyncRequest {
   groupId: string;
   groupName: string;
@@ -204,6 +210,9 @@ export const clowderApi = {
   },
   createCatAndConnect(data: ClowderCreateCatRequest) {
     return apiClient.post<ClowderCatContactResponse>('clowder/cats', data);
+  },
+  deleteCatContact(catId: string) {
+    return apiClient.delete<ClowderDeleteCatResponse>(`clowder/cats/${encodeURIComponent(catId)}`);
   },
   bindConversation(data: ClowderBindRequest) {
     return apiClient.post<IMConnectorBinding>('clowder/conversation/bind', data);
