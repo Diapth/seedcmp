@@ -102,6 +102,23 @@ curl "$CAT_CAFE_API_URL/api/callbacks/list-tasks?invocationId=$CAT_CAFE_INVOCATI
 - `catId`：仅查看 owner 为该猫的任务
 - `status`：仅查看指定状态（`todo|doing|blocked|done`）
 
+### Local Preview Handoff
+
+本地预览必须区分“已启动可访问”和“尝试过但不可用”。如果启动 Next/Vite/其他 dev server 时出现 `listen EPERM`，最终交付消息不能把 `127.0.0.1:<port>` 写成可用预览 URL；应明确写成“已尝试，但当前环境禁止监听端口，预览不可用”。
+
+可将启动结果交给 API 分类：
+
+```bash
+curl -sS -X POST $CAT_CAFE_API_URL/api/preview/local-status \
+  -H 'Content-Type: application/json' \
+  -d '{"host":"127.0.0.1","port":4301,"route":"/showcase/wedding-invite","stderr":"Error: listen EPERM: operation not permitted 127.0.0.1:4301","exitCode":1}'
+```
+
+规则：
+- 只有服务仍在运行且 health check 成功，才说“本地预览已启动”并给可点击 URL。
+- `listen EPERM` 归类为 `port_binding_forbidden`，表达为环境端口监听限制，不要误写成下载权限、CORS、HTTP 403/404 或文件预览失败。
+- 失败收口仍需给出 route、源码路径、测试/lint 结果、git 状态边界。
+
 ### Register PR Tracking
 
 Call after `gh pr create` so PR review notifications route to the current thread.

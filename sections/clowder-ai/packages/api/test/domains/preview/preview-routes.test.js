@@ -62,6 +62,29 @@ describe('preview routes', () => {
     assert.equal(body.allowed, false);
   });
 
+  it('POST /api/preview/local-status reports listen EPERM as attempted but unavailable', async () => {
+    const res = await app.inject({
+      method: 'POST',
+      url: '/api/preview/local-status',
+      payload: {
+        host: '127.0.0.1',
+        port: 4301,
+        route: '/showcase/wedding-invite',
+        stderr: 'Error: listen EPERM: operation not permitted 127.0.0.1:4301',
+        exitCode: 1,
+        sourcePath: 'packages/web/src/app/showcase/wedding-invite/page.tsx',
+      },
+    });
+    assert.equal(res.statusCode, 200);
+    const body = JSON.parse(res.body);
+    assert.equal(body.previewStatus.status, 'failed');
+    assert.equal(body.previewStatus.reason, 'port_binding_forbidden');
+    assert.equal(body.previewStatus.attemptedUrl, 'http://127.0.0.1:4301/showcase/wedding-invite');
+    assert.equal(body.previewStatus.url, undefined);
+    assert.match(body.handoff, /本地预览不可用/);
+    assert.match(body.handoff, /listen EPERM/);
+  });
+
   it('GET /api/preview/discovered returns empty initially', async () => {
     const res = await app.inject({ method: 'GET', url: '/api/preview/discovered' });
     assert.equal(res.statusCode, 200);
