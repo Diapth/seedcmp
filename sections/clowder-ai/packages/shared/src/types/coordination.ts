@@ -27,3 +27,18 @@ export interface CoordinationContext {
   readonly phase: CoordinationPhase;
   readonly artifactRefs?: readonly string[];
 }
+
+/**
+ * When a coordinator finishes its first intake reply, it may emit a fenced
+ * `cat-recommendation` JSON block suggesting cats to invite into a new project
+ * group chat. This is the persisted, transport-friendly form of that
+ * recommendation — stored once per coordinationId, surfaced to im_web via
+ * WebSocket, and dismissed when the user accepts/declines the kickoff card.
+ */
+export interface CoordinatorKickoff {
+  readonly coordinationId: string;
+  readonly messageId: string;
+  readonly suggestedCats: readonly CatId[];
+  readonly reason?: string;
+  readonly createdAt: number;
+}

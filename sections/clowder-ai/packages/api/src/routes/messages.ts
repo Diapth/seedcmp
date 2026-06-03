@@ -43,6 +43,7 @@ import {
   coordinationAuditCatIds,
   createCoordinationContext,
 } from '../domains/cats/services/agents/routing/lead-agent-selector.js';
+import type { ICoordinatorKickoffStore } from '../domains/cats/services/stores/ports/CoordinatorKickoffStore.js';
 import {
   accumulateTextParts,
   flattenTextParts,
@@ -148,6 +149,8 @@ export interface MessagesRoutesOptions {
   streamingHook?: StreamingHookLike;
   /** F167 Phase J: deps for auto-cancelling pending hold-ball tasks on user message */
   holdBallCancelDeps?: HoldBallCancelDeps;
+  /** Phase 1.5: persisted CoordinatorKickoff state (one per coordinationId). */
+  coordinatorKickoffStore?: ICoordinatorKickoffStore;
 }
 
 const log = createModuleLogger('routes/messages');
@@ -1109,6 +1112,36 @@ export const messagesRoutes: FastifyPluginAsync<MessagesRoutesOptions> = async (
             finalStatus = 'succeeded';
             // F194 Phase Z3: chain succeeded — signal for finally fallback
             routeChainTracker.succeed(createResult.invocationId);
+
+            // Project group chat kickoff: if a coordinator just finished its first
+            // intake reply and emitted a `cat-recommendation` JSON block, surface
+            // a "create project group chat?" card to im_web. Phase 1.5 integration.
+            if (coordination && opts.coordinatorKickoffStore) {
+              const assistantText = flattenTurnTextParts(outboundTurns).trim();
+              const { maybeEmitCoordinatorKickoff } = await import(
+                '../domains/cats/services/agents/coordinator-kickoff-trigger.js'
+              );
+              const existingKickoff = await opts.coordinatorKickoffStore
+                .get(coordination.id)
+                .catch(() => null);
+              await maybeEmitCoordinatorKickoff(
+                {
+                  userId,
+                  coordinationId: coordination.id,
+                  replyText: assistantText,
+                  messageId: createResult.invocationId,
+                  phase: coordination.phase,
+                  ...(existingKickoff ? { existingKickoffCoordinationId: existingKickoff.coordinationId } : {}),
+                },
+                {
+                  kickoffStore: opts.coordinatorKickoffStore,
+                  emit: (uid, evt, data) => opts.socketManager.emitToUser(uid, evt, data),
+                  log,
+                },
+              ).catch((err) => {
+                log.warn({ err, coordinationId: coordination.id }, '[messages] coordinator kickoff trigger failed');
+              });
+            }
 
             for (const continuationCapsule of continuationCapsules.values()) {
               opts.queueProcessor?.enqueueContinuation({

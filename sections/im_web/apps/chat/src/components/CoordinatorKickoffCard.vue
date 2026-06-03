@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { computed, onMounted, ref, watch } from 'vue';
+import { apiClient } from '@tsdaodao/base-vue';
 import { useClowderStore, type ClowderAgent, type CoordinatorKickoff } from '@tsdaodao/datasource-vue';
 import CatWorkBadge from './CatWorkBadge.vue';
 
@@ -73,10 +74,21 @@ async function validatePath() {
   }
   pathValidating.value = true;
   try {
-    // Phase 4 will provide /v1/clowder/workspace/validate through the bridge.
-    // Until then, we just check the path is non-empty and let createThread
-    // surface a 400 from Clowder if the path is invalid.
-    pathHint.value = '路径会跟随项目群聊,猫猫在该目录下写文件';
+    const response = await apiClient.get<{
+      valid: boolean;
+      absolute?: string;
+      reason?: string;
+    }>('clowder/workspace/validate', { params: { path: trimmed } });
+    const data = response.data;
+    if (!data || typeof data !== 'object') {
+      pathError.value = '路径校验失败';
+      return;
+    }
+    if (data.valid) {
+      pathHint.value = `已锁定到 ${data.absolute}`;
+    } else {
+      pathError.value = data.reason || '路径无效';
+    }
   } catch (err) {
     pathError.value = err instanceof Error ? err.message : '路径校验失败';
   } finally {

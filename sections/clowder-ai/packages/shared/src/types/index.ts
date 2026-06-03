@@ -174,7 +174,10 @@ export type {
   CatCafeConfig,
   CatCafeConfigV1,
   CatCafeConfigV2,
+  CatClientDefaults,
   CatFeatures,
+  CatRoleTemplate,
+  CatTemplateConfig,
   CatVariant,
   CliConfig,
   // F067: Co-Creator config for @ mention routing
@@ -228,6 +231,7 @@ export {
 } from './community-issue.js';
 // Coordination / lead-agent routing types
 export type {
+  CoordinatorKickoff,
   CoordinationContext,
   CoordinationPhase,
   LeadSelection,

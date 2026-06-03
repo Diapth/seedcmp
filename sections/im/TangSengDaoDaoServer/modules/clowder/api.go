@@ -1,6 +1,7 @@
 package clowder
 
 import (
+	"bytes"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -58,6 +59,23 @@ func (c *Clowder) Route(r *wkhttp.WKHttp) {
 		auth.POST("/conversation/focus", c.setFocus)
 		auth.POST("/conversation/focus/clear", c.clearFocus)
 		auth.POST("/conversation/message", c.conversationMessage)
+		// Phase 2: Coordinator kickoff — proxy GET/dismiss to Clowder 3004.
+		// See sections/clowder-ai/packages/api/src/routes/coordinator-kickoff.ts.
+		auth.GET("/coordinator/kickoff/:coordinationId", c.getCoordinatorKickoff)
+		auth.GET("/coordinator/kickoffs", c.listCoordinatorKickoffs)
+		auth.POST("/coordinator/kickoff/:coordinationId/dismiss", c.dismissCoordinatorKickoff)
+		// Phase 4.2: Workspace path validation — read-only preview of the
+		// rules enforced by `POST /api/threads` in Clowder 3004.
+		auth.GET("/workspace/validate", c.validateWorkspacePath)
+		// Phase 4.5 + 5.2: thread tasks + artifacts REST.
+		// We don't know the threadId prefix here, so we proxy the
+		// `/v1/clowder/thread/...` shape to `/api/threads/...` upstream.
+		auth.GET("/thread/:threadId/tasks", c.proxyThreadTasks)
+		auth.GET("/thread/:threadId/artifacts", c.proxyThreadArtifacts)
+		auth.POST("/thread/:threadId/artifacts", c.proxyPostThreadArtifact)
+		// im_web creates new project group threads via
+		// POST /v1/threads (handled by the bridge below).
+		auth.POST("/threads", c.proxyCreateThread)
 	}
 
 	r.POST("/api/im-web/clowder/outbound", c.outbound)
@@ -99,6 +117,25 @@ type ClowderAgent struct {
 	LastActiveAt       int64    `json:"lastActiveAt,omitempty"`
 	MessageCount       int64    `json:"messageCount,omitempty"`
 	Preferred          bool     `json:"preferred,omitempty"`
+}
+
+type CatDirectoryResponse struct {
+	Agents    []ClowderAgent       `json:"agents"`
+	Templates []ClowderCatTemplate `json:"templates,omitempty"`
+}
+
+type ClowderCatTemplate struct {
+	RoleTemplateID     string   `json:"roleTemplateId"`
+	CatID              string   `json:"catId"`
+	DisplayName        string   `json:"displayName"`
+	Aliases            []string `json:"aliases,omitempty"`
+	MentionPatterns    []string `json:"mentionPatterns,omitempty"`
+	Avatar             string   `json:"avatar,omitempty"`
+	PersonalitySummary string   `json:"personalitySummary,omitempty"`
+	CapabilitySummary  string   `json:"capabilitySummary,omitempty"`
+	Cloneable          bool     `json:"cloneable"`
+	UnavailableReason  string   `json:"unavailableReason,omitempty"`
+	Source             string   `json:"source,omitempty"`
 }
 
 type catTemplatesResponse struct {
@@ -207,6 +244,290 @@ func (c *Clowder) catDirectory(ctx *wkhttp.Context) {
 	ctx.JSON(http.StatusOK, directory)
 }
 
+// getCoordinatorKickoff proxies `GET /api/coordinator/kickoff/:coordinationId`
+// from the Clowder 3004 backend. Used by im_web to pull the latest kickoff
+// emitted by the coordinator (the primary signal is the WebSocket event
+// `coordinator_kickoff`; this REST route is a fallback / refresh path).
+func (c *Clowder) getCoordinatorKickoff(ctx *wkhttp.Context) {
+	coordinationID := strings.TrimSpace(ctx.Param("coordinationId"))
+	if coordinationID == "" {
+		ctx.JSON(http.StatusBadRequest, map[string]string{"error": "coordination_id_required"})
+		return
+	}
+	if !c.config.IsConfigured() {
+		ctx.JSON(http.StatusBadGateway, map[string]string{"error": "clowder_bridge_not_configured"})
+		return
+	}
+	endpoint := strings.TrimRight(c.config.APIBaseURL, "/") +
+		"/api/coordinator/kickoff/" + url.PathEscape(coordinationID)
+
+	req, err := http.NewRequest(http.MethodGet, endpoint, nil)
+	if err != nil {
+		ctx.JSON(http.StatusInternalServerError, map[string]string{"error": "build_request_failed", "message": err.Error()})
+		return
+	}
+	c.applyDirectoryUserHeader(req, ctx.GetLoginUID())
+
+	res, err := c.httpClient().Do(req)
+	if err != nil {
+		ctx.JSON(http.StatusBadGateway, map[string]string{"error": "kickoff_unavailable", "message": err.Error()})
+		return
+	}
+	defer res.Body.Close()
+
+	body, _ := io.ReadAll(res.Body)
+	ctx.Data(res.StatusCode, "application/json; charset=utf-8", body)
+}
+
+// dismissCoordinatorKickoff proxies
+// `POST /api/coordinator/kickoff/:coordinationId/dismiss` to Clowder 3004.
+// Called when the user clicks "稍后再说" on the im_web kickoff card.
+func (c *Clowder) dismissCoordinatorKickoff(ctx *wkhttp.Context) {
+	coordinationID := strings.TrimSpace(ctx.Param("coordinationId"))
+	if coordinationID == "" {
+		ctx.JSON(http.StatusBadRequest, map[string]string{"error": "coordination_id_required"})
+		return
+	}
+	if !c.config.IsConfigured() {
+		ctx.JSON(http.StatusBadGateway, map[string]string{"error": "clowder_bridge_not_configured"})
+		return
+	}
+	endpoint := strings.TrimRight(c.config.APIBaseURL, "/") +
+		"/api/coordinator/kickoff/" + url.PathEscape(coordinationID) + "/dismiss"
+
+	req, err := http.NewRequest(http.MethodPost, endpoint, nil)
+	if err != nil {
+		ctx.JSON(http.StatusInternalServerError, map[string]string{"error": "build_request_failed", "message": err.Error()})
+		return
+	}
+	c.applyDirectoryUserHeader(req, ctx.GetLoginUID())
+
+	res, err := c.httpClient().Do(req)
+	if err != nil {
+		ctx.JSON(http.StatusBadGateway, map[string]string{"error": "kickoff_dismiss_unavailable", "message": err.Error()})
+		return
+	}
+	defer res.Body.Close()
+
+	body, _ := io.ReadAll(res.Body)
+	ctx.Data(res.StatusCode, "application/json; charset=utf-8", body)
+}
+
+// listCoordinatorKickoffs proxies
+// `GET /api/coordinator/kickoffs?userId=...&maxAgeMs=...` to Clowder 3004.
+// im_web polls this on panel mount to surface recent kickoffs without
+// requiring WS plumbing across the two sub-projects.
+func (c *Clowder) listCoordinatorKickoffs(ctx *wkhttp.Context) {
+	if !c.config.IsConfigured() {
+		ctx.JSON(http.StatusBadGateway, map[string]string{"error": "clowder_bridge_not_configured"})
+		return
+	}
+	endpoint := strings.TrimRight(c.config.APIBaseURL, "/") + "/api/coordinator/kickoffs"
+
+	req, err := http.NewRequest(http.MethodGet, endpoint, nil)
+	if err != nil {
+		ctx.JSON(http.StatusInternalServerError, map[string]string{"error": "build_request_failed", "message": err.Error()})
+		return
+	}
+	// Forward caller identity so the upstream can scope the listing.
+	c.applyDirectoryUserHeader(req, ctx.GetLoginUID())
+	if userID := strings.TrimSpace(ctx.Query("userId")); userID != "" {
+		q := req.URL.Query()
+		q.Set("userId", userID)
+		if maxAge := strings.TrimSpace(ctx.Query("maxAgeMs")); maxAge != "" {
+			q.Set("maxAgeMs", maxAge)
+		}
+		req.URL.RawQuery = q.Encode()
+	}
+
+	res, err := c.httpClient().Do(req)
+	if err != nil {
+		ctx.JSON(http.StatusBadGateway, map[string]string{"error": "kickoff_list_unavailable", "message": err.Error()})
+		return
+	}
+	defer res.Body.Close()
+
+	body, _ := io.ReadAll(res.Body)
+	ctx.Data(res.StatusCode, "application/json; charset=utf-8", body)
+}
+
+// validateWorkspacePath proxies `GET /api/workspace/validate?path=...` to
+// Clowder 3004. The upstream already validates the same way it does for
+// `POST /api/threads`; this is a read-only preview so the im_web
+// CoordinatorKickoffCard can show a friendly error before the user submits.
+func (c *Clowder) validateWorkspacePath(ctx *wkhttp.Context) {
+	if !c.config.IsConfigured() {
+		ctx.JSON(http.StatusBadGateway, map[string]string{"error": "clowder_bridge_not_configured"})
+		return
+	}
+	endpoint := strings.TrimRight(c.config.APIBaseURL, "/") + "/api/workspace/validate"
+
+	req, err := http.NewRequest(http.MethodGet, endpoint, nil)
+	if err != nil {
+		ctx.JSON(http.StatusInternalServerError, map[string]string{"error": "build_request_failed", "message": err.Error()})
+		return
+	}
+	c.applyDirectoryUserHeader(req, ctx.GetLoginUID())
+	if rawPath := strings.TrimSpace(ctx.Query("path")); rawPath != "" {
+		q := req.URL.Query()
+		q.Set("path", rawPath)
+		req.URL.RawQuery = q.Encode()
+	}
+
+	res, err := c.httpClient().Do(req)
+	if err != nil {
+		ctx.JSON(http.StatusBadGateway, map[string]string{"error": "workspace_validate_unavailable", "message": err.Error()})
+		return
+	}
+	defer res.Body.Close()
+
+	body, _ := io.ReadAll(res.Body)
+	ctx.Data(res.StatusCode, "application/json; charset=utf-8", body)
+}
+
+// proxyThreadTasks proxies `GET /api/threads/:threadId/tasks` (Phase 5) to
+// Clowder 3004. Used by the im_web ProjectKanbanPanel.
+func (c *Clowder) proxyThreadTasks(ctx *wkhttp.Context) {
+	threadID := strings.TrimSpace(ctx.Param("threadId"))
+	if threadID == "" {
+		ctx.JSON(http.StatusBadRequest, map[string]string{"error": "thread_id_required"})
+		return
+	}
+	if !c.config.IsConfigured() {
+		ctx.JSON(http.StatusBadGateway, map[string]string{"error": "clowder_bridge_not_configured"})
+		return
+	}
+	endpoint := strings.TrimRight(c.config.APIBaseURL, "/") +
+		"/api/threads/" + url.PathEscape(threadID) + "/tasks"
+
+	req, err := http.NewRequest(http.MethodGet, endpoint, nil)
+	if err != nil {
+		ctx.JSON(http.StatusInternalServerError, map[string]string{"error": "build_request_failed", "message": err.Error()})
+		return
+	}
+	c.applyDirectoryUserHeader(req, ctx.GetLoginUID())
+
+	res, err := c.httpClient().Do(req)
+	if err != nil {
+		ctx.JSON(http.StatusBadGateway, map[string]string{"error": "thread_tasks_unavailable", "message": err.Error()})
+		return
+	}
+	defer res.Body.Close()
+
+	body, _ := io.ReadAll(res.Body)
+	ctx.Data(res.StatusCode, "application/json; charset=utf-8", body)
+}
+
+// proxyThreadArtifacts proxies `GET /api/threads/:threadId/artifacts`
+// (Phase 4.6) to Clowder 3004.
+func (c *Clowder) proxyThreadArtifacts(ctx *wkhttp.Context) {
+	threadID := strings.TrimSpace(ctx.Param("threadId"))
+	if threadID == "" {
+		ctx.JSON(http.StatusBadRequest, map[string]string{"error": "thread_id_required"})
+		return
+	}
+	if !c.config.IsConfigured() {
+		ctx.JSON(http.StatusBadGateway, map[string]string{"error": "clowder_bridge_not_configured"})
+		return
+	}
+	endpoint := strings.TrimRight(c.config.APIBaseURL, "/") +
+		"/api/threads/" + url.PathEscape(threadID) + "/artifacts"
+
+	req, err := http.NewRequest(http.MethodGet, endpoint, nil)
+	if err != nil {
+		ctx.JSON(http.StatusInternalServerError, map[string]string{"error": "build_request_failed", "message": err.Error()})
+		return
+	}
+	c.applyDirectoryUserHeader(req, ctx.GetLoginUID())
+
+	res, err := c.httpClient().Do(req)
+	if err != nil {
+		ctx.JSON(http.StatusBadGateway, map[string]string{"error": "thread_artifacts_unavailable", "message": err.Error()})
+		return
+	}
+	defer res.Body.Close()
+
+	body, _ := io.ReadAll(res.Body)
+	ctx.Data(res.StatusCode, "application/json; charset=utf-8", body)
+}
+
+// proxyPostThreadArtifact proxies `POST /api/threads/:threadId/artifacts`
+// (Phase 4.5 declareArtifact) to Clowder 3004. The bridge forwards the
+// caller's JSON body verbatim and adds the standard user header so the
+// upstream can scope the operation.
+func (c *Clowder) proxyPostThreadArtifact(ctx *wkhttp.Context) {
+	threadID := strings.TrimSpace(ctx.Param("threadId"))
+	if threadID == "" {
+		ctx.JSON(http.StatusBadRequest, map[string]string{"error": "thread_id_required"})
+		return
+	}
+	if !c.config.IsConfigured() {
+		ctx.JSON(http.StatusBadGateway, map[string]string{"error": "clowder_bridge_not_configured"})
+		return
+	}
+	body, err := io.ReadAll(ctx.Request.Body)
+	if err != nil {
+		ctx.JSON(http.StatusBadRequest, map[string]string{"error": "invalid_body", "message": err.Error()})
+		return
+	}
+	endpoint := strings.TrimRight(c.config.APIBaseURL, "/") +
+		"/api/threads/" + url.PathEscape(threadID) + "/artifacts"
+
+	req, err := http.NewRequest(http.MethodPost, endpoint, bytes.NewReader(body))
+	if err != nil {
+		ctx.JSON(http.StatusInternalServerError, map[string]string{"error": "build_request_failed", "message": err.Error()})
+		return
+	}
+	req.Header.Set("Content-Type", "application/json")
+	c.applyDirectoryUserHeader(req, ctx.GetLoginUID())
+
+	res, err := c.httpClient().Do(req)
+	if err != nil {
+		ctx.JSON(http.StatusBadGateway, map[string]string{"error": "thread_artifact_create_unavailable", "message": err.Error()})
+		return
+	}
+	defer res.Body.Close()
+
+	respBody, _ := io.ReadAll(res.Body)
+	ctx.Data(res.StatusCode, "application/json; charset=utf-8", respBody)
+}
+
+// proxyCreateThread proxies `POST /api/threads` to Clowder 3004. im_web's
+// CoordinatorKickoffCard calls this through the bridge so a project group
+// thread can be created from im_web without depending on the clowder-ai
+// web UI. The result includes a thread.id which the front-end uses to
+// navigate within im_web (not to the clowder-ai web /thread/:id page).
+func (c *Clowder) proxyCreateThread(ctx *wkhttp.Context) {
+	if !c.config.IsConfigured() {
+		ctx.JSON(http.StatusBadGateway, map[string]string{"error": "clowder_bridge_not_configured"})
+		return
+	}
+	body, err := io.ReadAll(ctx.Request.Body)
+	if err != nil {
+		ctx.JSON(http.StatusBadRequest, map[string]string{"error": "invalid_body", "message": err.Error()})
+		return
+	}
+	endpoint := strings.TrimRight(c.config.APIBaseURL, "/") + "/api/threads"
+
+	req, err := http.NewRequest(http.MethodPost, endpoint, bytes.NewReader(body))
+	if err != nil {
+		ctx.JSON(http.StatusInternalServerError, map[string]string{"error": "build_request_failed", "message": err.Error()})
+		return
+	}
+	req.Header.Set("Content-Type", "application/json")
+	c.applyDirectoryUserHeader(req, ctx.GetLoginUID())
+
+	res, err := c.httpClient().Do(req)
+	if err != nil {
+		ctx.JSON(http.StatusBadGateway, map[string]string{"error": "thread_create_unavailable", "message": err.Error()})
+		return
+	}
+	defer res.Body.Close()
+
+	respBody, _ := io.ReadAll(res.Body)
+	ctx.Data(res.StatusCode, "application/json; charset=utf-8", respBody)
+}
+
 func (c *Clowder) connectCatContact(ctx *wkhttp.Context) {
 	var req catContactRequest
 	if err := ctx.BindJSON(&req); err != nil {
@@ -222,7 +543,7 @@ func (c *Clowder) connectCatContact(ctx *wkhttp.Context) {
 		ctx.JSON(http.StatusBadGateway, map[string]string{"error": "cat_directory_unavailable", "message": err.Error()})
 		return
 	}
-	response, ok := catContactResponse(req.CatID, directory, "existing")
+	response, ok := catContactResponse(req.CatID, directory.Agents, "existing")
 	if !ok {
 		ctx.JSON(http.StatusNotFound, map[string]string{"error": "cat_not_found"})
 		return
@@ -252,11 +573,11 @@ func (c *Clowder) createCatAndConnect(ctx *wkhttp.Context) {
 		return
 	}
 	if directory, err := c.fetchCatDirectory(ctx.GetLoginUID()); err == nil {
-		if response, ok := catContactResponse(name, directory, "runtime-created"); ok {
+		if response, ok := catContactResponse(name, directory.Agents, "runtime-created"); ok {
 			ctx.JSON(http.StatusOK, response)
 			return
 		}
-		if response, ok := catContactResponse(alias, directory, "runtime-created"); ok {
+		if response, ok := catContactResponse(alias, directory.Agents, "runtime-created"); ok {
 			ctx.JSON(http.StatusOK, response)
 			return
 		}
@@ -571,41 +892,49 @@ func (c *Clowder) fallbackAgentDirectory(userID string, cause error) (AgentDirec
 }
 
 func (c *Clowder) fetchTemplateCandidateDirectory(userID string) (AgentDirectoryResponse, error) {
-	if !c.config.IsConfigured() {
-		return AgentDirectoryResponse{}, fmt.Errorf("clowder bridge is not configured")
-	}
-	endpoint, err := url.Parse(strings.TrimRight(c.config.APIBaseURL, "/") + "/api/cat-templates")
+	templates, err := c.fetchCatTemplates(userID)
 	if err != nil {
 		return AgentDirectoryResponse{}, err
 	}
 
-	req, err := http.NewRequest(http.MethodGet, endpoint.String(), nil)
-	if err != nil {
-		return AgentDirectoryResponse{}, err
-	}
-	c.applyDirectoryUserHeader(req, userID)
-
-	res, err := c.httpClient().Do(req)
-	if err != nil {
-		return AgentDirectoryResponse{}, err
-	}
-	defer res.Body.Close()
-	if res.StatusCode < 200 || res.StatusCode >= 300 {
-		return AgentDirectoryResponse{}, fmt.Errorf("clowder cat templates failed: %s", res.Status)
-	}
-
-	var response catTemplatesResponse
-	if err := json.NewDecoder(res.Body).Decode(&response); err != nil {
-		return AgentDirectoryResponse{}, err
-	}
-
-	agents := make([]ClowderAgent, 0, len(response.Templates))
-	for _, template := range response.Templates {
+	agents := make([]ClowderAgent, 0, len(templates))
+	for _, template := range templates {
 		if agent, ok := catTemplateCandidateAgent(template); ok {
 			agents = append(agents, agent)
 		}
 	}
 	return AgentDirectoryResponse{Agents: agents}, nil
+}
+
+func (c *Clowder) fetchCatTemplates(userID string) ([]catTemplate, error) {
+	if !c.config.IsConfigured() {
+		return nil, fmt.Errorf("clowder bridge is not configured")
+	}
+	endpoint, err := url.Parse(strings.TrimRight(c.config.APIBaseURL, "/") + "/api/cat-templates")
+	if err != nil {
+		return nil, err
+	}
+
+	req, err := http.NewRequest(http.MethodGet, endpoint.String(), nil)
+	if err != nil {
+		return nil, err
+	}
+	c.applyDirectoryUserHeader(req, userID)
+
+	res, err := c.httpClient().Do(req)
+	if err != nil {
+		return nil, err
+	}
+	defer res.Body.Close()
+	if res.StatusCode < 200 || res.StatusCode >= 300 {
+		return nil, fmt.Errorf("clowder cat templates failed: %s", res.Status)
+	}
+
+	var response catTemplatesResponse
+	if err := json.NewDecoder(res.Body).Decode(&response); err != nil {
+		return nil, err
+	}
+	return response.Templates, nil
 }
 
 func (c *Clowder) applyDirectoryUserHeader(req *http.Request, userID string) {
@@ -647,6 +976,87 @@ func catTemplateCandidateAgent(template catTemplate) (ClowderAgent, bool) {
 	}, true
 }
 
+func catRoleTemplateCandidate(template catTemplate) (ClowderCatTemplate, bool) {
+	agent, ok := catTemplateCandidateAgent(template)
+	if !ok {
+		return ClowderCatTemplate{}, false
+	}
+	return ClowderCatTemplate{
+		RoleTemplateID:     agent.CatID,
+		CatID:              agent.CatID,
+		DisplayName:        agent.DisplayName,
+		Aliases:            agent.Aliases,
+		MentionPatterns:    agent.MentionPatterns,
+		Avatar:             agent.Avatar,
+		PersonalitySummary: agent.PersonalitySummary,
+		CapabilitySummary:  agent.CapabilitySummary,
+		Cloneable:          true,
+		Source:             "role-template",
+	}, true
+}
+
+func catRoleTemplatesFromTemplates(templates []catTemplate) []ClowderCatTemplate {
+	result := make([]ClowderCatTemplate, 0, len(templates))
+	seen := map[string]bool{}
+	for _, template := range templates {
+		candidate, ok := catRoleTemplateCandidate(template)
+		if !ok {
+			continue
+		}
+		key := strings.ToLower(candidate.RoleTemplateID)
+		if seen[key] {
+			continue
+		}
+		seen[key] = true
+		result = append(result, candidate)
+	}
+	return result
+}
+
+func catRoleTemplateFromAgent(agent ClowderAgent) (ClowderCatTemplate, bool) {
+	catID := strings.TrimSpace(agent.CatID)
+	if catID == "" {
+		return ClowderCatTemplate{}, false
+	}
+	displayName := strings.TrimSpace(agent.DisplayName)
+	if displayName == "" {
+		displayName = catID
+	}
+	return ClowderCatTemplate{
+		RoleTemplateID:     catID,
+		CatID:              catID,
+		DisplayName:        displayName,
+		Aliases:            agent.Aliases,
+		MentionPatterns:    agent.MentionPatterns,
+		Avatar:             agent.Avatar,
+		PersonalitySummary: agent.PersonalitySummary,
+		CapabilitySummary:  agent.CapabilitySummary,
+		Cloneable:          true,
+		Source:             "role-template",
+	}, true
+}
+
+func catRoleTemplatesFromFallbackAgents(agents []ClowderAgent) []ClowderCatTemplate {
+	result := make([]ClowderCatTemplate, 0, len(agents))
+	seen := map[string]bool{}
+	for _, agent := range agents {
+		if agent.Source != "disconnected" {
+			return []ClowderCatTemplate{}
+		}
+		candidate, ok := catRoleTemplateFromAgent(agent)
+		if !ok {
+			continue
+		}
+		key := strings.ToLower(candidate.RoleTemplateID)
+		if seen[key] {
+			continue
+		}
+		seen[key] = true
+		result = append(result, candidate)
+	}
+	return result
+}
+
 func templateCandidateMentions(values ...string) []string {
 	mentions := make([]string, 0, len(values))
 	seen := map[string]bool{}
@@ -666,15 +1076,25 @@ func templateCandidateMentions(values ...string) []string {
 	return mentions
 }
 
-func (c *Clowder) fetchCatDirectory(userID string) (AgentDirectoryResponse, error) {
+func (c *Clowder) fetchCatDirectory(userID string) (CatDirectoryResponse, error) {
 	directory, err := c.fetchAgentDirectory(clowderAIDirectChannelID, 1, userID)
 	if err != nil {
-		return AgentDirectoryResponse{}, err
+		return CatDirectoryResponse{}, err
 	}
 	for idx := range directory.Agents {
 		directory.Agents[idx] = decorateCatDirectoryContact(directory.Agents[idx])
 	}
-	return directory, nil
+	templates := catRoleTemplatesFromFallbackAgents(directory.Agents)
+	if len(templates) == 0 {
+		rawTemplates, templateErr := c.fetchCatTemplates(userID)
+		if templateErr == nil {
+			templates = catRoleTemplatesFromTemplates(rawTemplates)
+		}
+	}
+	return CatDirectoryResponse{
+		Agents:    directory.Agents,
+		Templates: templates,
+	}, nil
 }
 
 func (c *Clowder) sendCommand(channelID string, channelType uint8, userID string, text string) (RouteResponse, error) {
@@ -705,13 +1125,13 @@ func (c *Clowder) sendInboundTextWithRouting(channelID string, channelType uint8
 	})
 }
 
-func catContactResponse(catID string, directory AgentDirectoryResponse, source string) (catContactEnvelope, bool) {
+func catContactResponse(catID string, agents []ClowderAgent, source string) (catContactEnvelope, bool) {
 	needle := strings.TrimSpace(catID)
 	if needle == "" {
 		return catContactEnvelope{}, false
 	}
 	normalizedNeedle := normalizeCatLookup(needle)
-	for _, agent := range directory.Agents {
+	for _, agent := range agents {
 		if normalizeCatLookup(agent.CatID) == normalizedNeedle ||
 			normalizeCatLookup(agent.DisplayName) == normalizedNeedle ||
 			containsNormalized(agent.MentionPatterns, normalizedNeedle) ||

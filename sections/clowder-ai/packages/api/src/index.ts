@@ -22,6 +22,7 @@ import {
   getConfigSessionStrategy,
   getDefaultCatId,
   loadCatConfig,
+  loadCatTemplateConfig,
   isCatAvailable,
   toAllCatConfigs,
 } from './config/cat-config-loader.js';
@@ -91,6 +92,7 @@ import { createMessageStore } from './domains/cats/services/stores/factories/Mes
 import { createPendingRequestStore } from './domains/cats/services/stores/factories/PendingRequestStoreFactory.js';
 import { createProposalStore } from './domains/cats/services/stores/factories/ProposalStoreFactory.js';
 import { createPushSubscriptionStore } from './domains/cats/services/stores/factories/PushSubscriptionStoreFactory.js';
+import { createCoordinatorKickoffStore } from './domains/cats/services/stores/factories/CoordinatorKickoffStoreFactory.js';
 import { createReadStateStore } from './domains/cats/services/stores/factories/ReadStateStoreFactory.js';
 import { createSummaryStore } from './domains/cats/services/stores/factories/SummaryStoreFactory.js';
 import { createTaskStore } from './domains/cats/services/stores/factories/TaskStoreFactory.js';
@@ -269,6 +271,7 @@ function catConfigToDirectoryAgent(config: CatConfig, source: ThreadCatDirectory
     avatar: config.avatar,
     personalitySummary: config.personality,
     capabilitySummary: config.teamStrengths ?? config.roleDescription,
+    ...(config.restrictions && config.restrictions.length > 0 ? { restrictions: [...config.restrictions] } : {}),
     source,
   };
 }
@@ -277,10 +280,17 @@ function getTemplateDirectoryAgents(): ThreadCatDirectoryAgent[] {
   try {
     const projectRoot = resolveActiveProjectRoot();
     const templatePath = resolveProjectTemplatePath(projectRoot);
-    const templateConfig = loadCatConfig(templatePath);
-    return Object.values(toAllCatConfigs(templateConfig))
-      .filter((config) => config.isDefaultVariant !== false)
-      .map((config) => catConfigToDirectoryAgent(config, 'disconnected'));
+    const template = loadCatTemplateConfig(templatePath);
+    return (template.roleTemplates ?? []).map((role) => ({
+      catId: role.id,
+      displayName: role.name,
+      ...(role.nickname ? { aliases: [`@${role.nickname}`] } : {}),
+      avatar: role.avatar,
+      personalitySummary: role.personality,
+      capabilitySummary: role.teamStrengths ?? role.roleDescription,
+      ...(role.restrictions && role.restrictions.length > 0 ? { restrictions: [...role.restrictions] } : {}),
+      source: 'disconnected',
+    }));
   } catch {
     return [];
   }
@@ -1442,6 +1452,9 @@ async function main(): Promise<void> {
   }
 
   // Register routes (socketManager injected, no circular import)
+  // Phase 1.5: Coordinator kickoff store — declared here so it can be injected
+  // into messagesRoutes (which is registered just below).
+  const coordinatorKickoffStore = createCoordinatorKickoffStore(redis);
   const messagesOpts = {
     registry,
     messageStore,
@@ -1460,6 +1473,7 @@ async function main(): Promise<void> {
     ...(f101GameStore ? { gameStore: f101GameStore } : {}),
     ...(f101SharedDriver ? { autoPlayer: f101SharedDriver } : {}),
     holdBallCancelDeps: { dynamicTaskStore, taskRunner: taskRunnerV2 },
+    coordinatorKickoffStore,
   };
   await app.register(messagesRoutes, messagesOpts);
   await app.register(queueRoutes, {
@@ -2237,6 +2251,23 @@ async function main(): Promise<void> {
 
   // F-BLOAT: Progressive disclosure docs endpoints (no auth, static content)
   await app.register(registerCallbackDocsRoutes);
+
+  // Phase 1.6: Coordinator kickoff REST API (im_web pulls on mount, dismisses on close)
+  const { coordinatorKickoffRoutes } = await import('./routes/coordinator-kickoff.js');
+  await app.register(coordinatorKickoffRoutes, { kickoffStore: coordinatorKickoffStore });
+
+  // Phase 4.2: Workspace path validation (read-only preview of the same
+  // rules enforced by `POST /api/threads`).
+  const { workspacePathsRoutes } = await import('./routes/workspace-paths.js');
+  await app.register(workspacePathsRoutes, { log: app.log });
+
+  // Phase 4.5 + 5.2: thread tasks + artifacts REST API.
+  const { threadTasksRoutes } = await import('./routes/thread-tasks.js');
+  await app.register(threadTasksRoutes, {
+    taskStore,
+    ...(threadStore ? { threadStore } : {}),
+    log: app.log,
+  });
 
   // F088: Register connector webhook routes BEFORE listen (Fastify requires it)
   const connectorWebhookHandlers = new Map<string, import('./routes/connector-webhooks.js').ConnectorWebhookHandler>();
