@@ -12,7 +12,14 @@ TSDD_DIR="$ROOT_DIR/sections/im/TangSengDaoDaoServer"
 IM_WEB_DIR="$ROOT_DIR/sections/im_web"
 IM_WEB_VERSION_LABEL="${IM_WEB_VERSION_LABEL:-IM Web V3.0 (TangSengDaoDao Vue + Clowder bridge)}"
 
-CLOWDER_URL="${CLOWDER_URL:-http://127.0.0.1:3003}"
+CLOWDER_URL="${CLOWDER_URL:-http://127.0.0.1:3004}"
+CLOWDER_WEB_URL="${CLOWDER_WEB_URL:-http://127.0.0.1:3003}"
+CLOWDER_API_PORT="${CLOWDER_API_PORT:-3004}"
+CLOWDER_WEB_PORT="${CLOWDER_WEB_PORT:-3003}"
+# Start the clowder-ai web (PWA, port 3003) alongside the API? Default: off.
+# Single-web entry goal: most users only need IM Web (3000). Flip on with
+# CLOWDER_WEB=1 when you want the Clowder MissionControl / FeatureBoard UI.
+CLOWDER_WEB="${CLOWDER_WEB:-0}"
 CLOWDER_CONNECTOR_SECRET="${CLOWDER_CONNECTOR_SECRET:-dev-shared-secret}"
 CLOWDER_CONNECTOR_ID="${CLOWDER_CONNECTOR_ID:-im-web}"
 CLOWDER_DEFAULT_OWNER_USER_ID="${CLOWDER_DEFAULT_OWNER_USER_ID:-user-1}"
@@ -56,11 +63,17 @@ Starts the integrated seedcmp demo:
   Docker: MySQL, Redis, MinIO
   Local:  WuKongIM, Clowder, TangSengDaoDaoServer, IM Web
 
+By default only the Clowder API (3004) is started — the clowder-ai web
+on 3003 is a developer / admin surface and is opt-in via CLOWDER_WEB=1.
+This keeps the day-to-day IM Web flow on a single web origin (3000).
+
 Notes:
   start reuses existing local processes. Use restart after code changes.
 
 Environment overrides:
-  CLOWDER_URL=http://127.0.0.1:3003
+  CLOWDER_URL=http://127.0.0.1:3004       (API origin; im_web talks to this)
+  CLOWDER_WEB_URL=http://127.0.0.1:3003   (clowder-ai web origin; admin)
+  CLOWDER_WEB=0|1                         (default 0; set 1 to launch web)
   CLOWDER_CONNECTOR_SECRET=dev-shared-secret
   CLOWDER_DEFAULT_OWNER_USER_ID=user-1
   CLOWDER_PNPM_VERSION=9.15.4
@@ -68,9 +81,6 @@ Environment overrides:
   TANGSENG_WAIT_TIMEOUT=180
   REDIS_MODE=auto|docker|external
   INFRA_IMAGE_PREFIX=docker.example.com/
-  MYSQL_IMAGE=m.daocloud.io/docker.io/library/mysql:8.0.33
-  REDIS_IMAGE=m.daocloud.io/docker.io/library/redis:7
-  MINIO_IMAGE=m.daocloud.io/quay.io/minio/minio:latest
 EOF
 }
 
@@ -427,21 +437,52 @@ start_all() {
   wait_bg_port wukongim 127.0.0.1 5001 "WuKongIM API"
 
   ensure_clowder_pnpm_wrapper
-  start_bg clowder "$CLOWDER_DIR" env \
-    IM_WEB_CLOWDER_ENABLED=true \
-    CLOWDER_CONNECTOR_ID="$CLOWDER_CONNECTOR_ID" \
-    CLOWDER_CONNECTOR_SECRET="$CLOWDER_CONNECTOR_SECRET" \
-    CLOWDER_OUTBOUND_CALLBACK_URL="$CLOWDER_OUTBOUND_CALLBACK_URL" \
-    DEFAULT_OWNER_USER_ID="$CLOWDER_DEFAULT_OWNER_USER_ID" \
-    REDIS_PORT=6379 \
-    REDIS_URL=redis://127.0.0.1:6379 \
-    REDIS_KEY_PREFIX=seedcmp:cat-cafe: \
-    ONNXRUNTIME_NODE_INSTALL_CUDA=skip \
-    PATH="$CLOWDER_PNPM_BIN_DIR:$PATH" \
-    PNPM_HOME="$CLOWDER_DIR/.pnpm-home" \
-    npm_config_store_dir="$CLOWDER_DIR/.pnpm-store" \
-    $CLOWDER_PNPM_CMD start:direct --quick
-  wait_bg_port clowder 127.0.0.1 3003 "Clowder Web"
+
+  # Single-web-entry default: start only the Clowder API (port 3004) so the
+  # user can run with just IM Web (3000). When CLOWDER_WEB=1, fall back to
+  # the integrated start:direct launcher which boots both API and the
+  # clowder-ai web (port 3003) in one go.
+  if [ "$CLOWDER_WEB" = "1" ]; then
+    log "starting Clowder (API + web, port 3004 + 3003)..."
+    start_bg clowder-web "$CLOWDER_DIR" env \
+      IM_WEB_CLOWDER_ENABLED=true \
+      CLOWDER_CONNECTOR_ID="$CLOWDER_CONNECTOR_ID" \
+      CLOWDER_CONNECTOR_SECRET="$CLOWDER_CONNECTOR_SECRET" \
+      CLOWDER_OUTBOUND_CALLBACK_URL="$CLOWDER_OUTBOUND_CALLBACK_URL" \
+      DEFAULT_OWNER_USER_ID="$CLOWDER_DEFAULT_OWNER_USER_ID" \
+      REDIS_PORT=6379 \
+      REDIS_URL=redis://127.0.0.1:6379 \
+      REDIS_KEY_PREFIX=seedcmp:cat-cafe: \
+      ONNXRUNTIME_NODE_INSTALL_CUDA=skip \
+      PATH="$CLOWDER_PNPM_BIN_DIR:$PATH" \
+      PNPM_HOME="$CLOWDER_DIR/.pnpm-home" \
+      npm_config_store_dir="$CLOWDER_DIR/.pnpm-store" \
+      $CLOWDER_PNPM_CMD start:direct --quick
+    wait_bg_port clowder-web 127.0.0.1 3004 "Clowder API"
+    wait_bg_port clowder-web 127.0.0.1 3003 "Clowder Web"
+  else
+    log "starting Clowder API only (port 3004, no web at 3003)..."
+    # Clowder API is a node process — cd into packages/api and run the
+    # prebuilt dist bundle (or the tsx-watched dev entry if dist is stale).
+    # We use the start script so production-mode scripts (port probing,
+    # signal handling) work the same as the integrated launcher.
+    start_bg clowder-api "$CLOWDER_DIR/packages/api" env \
+      IM_WEB_CLOWDER_ENABLED=true \
+      CLOWDER_CONNECTOR_ID="$CLOWDER_CONNECTOR_ID" \
+      CLOWDER_CONNECTOR_SECRET="$CLOWDER_CONNECTOR_SECRET" \
+      CLOWDER_OUTBOUND_CALLBACK_URL="$CLOWDER_OUTBOUND_CALLBACK_URL" \
+      DEFAULT_OWNER_USER_ID="$CLOWDER_DEFAULT_OWNER_USER_ID" \
+      REDIS_PORT=6379 \
+      REDIS_URL=redis://127.0.0.1:6379 \
+      REDIS_KEY_PREFIX=seedcmp:cat-cafe: \
+      ONNXRUNTIME_NODE_INSTALL_CUDA=skip \
+      PATH="$CLOWDER_PNPM_BIN_DIR:$PATH" \
+      PNPM_HOME="$CLOWDER_DIR/.pnpm-home" \
+      npm_config_store_dir="$CLOWDER_DIR/.pnpm-store" \
+      NODE_ENV=production \
+      $CLOWDER_PNPM_CMD start
+    wait_bg_port clowder-api 127.0.0.1 3004 "Clowder API"
+  fi
 
   start_bg tangseng "$TSDD_DIR" env \
     IM_WEB_CLOWDER_ENABLED=true \
@@ -452,6 +493,9 @@ start_all() {
     ./tsdd_server -config ./configs/tsdd.yaml
   wait_bg_port tangseng 127.0.0.1 8090 "TangSeng API" "$TANGSENG_WAIT_TIMEOUT"
 
+  # im_web uses CLOWDER_URL (the API) — never the web — for V3.0 chat flows.
+  # The single-web goal is achieved by leaving the clowder-ai web
+  # uninstalled unless CLOWDER_WEB=1 was passed.
   start_bg im-web "$IM_WEB_DIR" env \
     VITE_API_BASE_URL=http://127.0.0.1:8090/v1/ \
     VITE_TANGSENG_PROXY_TARGET=http://127.0.0.1:8090 \
@@ -461,13 +505,21 @@ start_all() {
 
   log "ready:"
   log "  IM Web:  http://localhost:3000"
-  log "  Clowder: $CLOWDER_URL"
+  log "  Clowder API: http://localhost:3004"
+  if [ "$CLOWDER_WEB" = "1" ]; then
+    log "  Clowder Web: $CLOWDER_WEB_URL (admin / MissionControl)"
+  fi
   log "  Logs:    $LOG_DIR"
 }
 
 stop_all() {
   stop_pid im-web
   stop_pid tangseng
+  # Either the unified `clowder-web` name (when CLOWDER_WEB=1) or the
+  # API-only `clowder-api` name (default). Stop both — stop_pid no-ops
+  # when the pid file is missing.
+  stop_pid clowder-web
+  stop_pid clowder-api
   stop_pid clowder
   stop_pid wukongim
   stop_project_port 3000 "IM Web"
@@ -481,7 +533,6 @@ stop_all() {
   stop_project_port 5200 "WuKongIM WebSocket"
   stop_project_port 5301 "WuKongIM Manager"
   stop_project_port 7000 "WuKongIM Monitor"
-  stop_project_port 3003 "Clowder Web"
   if command -v docker >/dev/null 2>&1; then
     local containers=("$MINIO_CONTAINER" "$MYSQL_CONTAINER")
     if [ "$REDIS_MODE" != "external" ]; then
@@ -537,7 +588,12 @@ status_all() {
   status_runtime_one im-web
   log "processes:"
   status_one wukongim
-  status_one clowder
+  # Either clowder-api (default, API-only) or clowder-web (when CLOWDER_WEB=1).
+  if pid_alive "$PID_DIR/clowder-web.pid"; then
+    status_one clowder-web
+  else
+    status_one clowder-api
+  fi
   status_one tangseng
   status_one im-web
   if command -v docker >/dev/null 2>&1; then
@@ -558,7 +614,7 @@ status_all() {
     fi
   fi
   log "ports:"
-  for item in "5001 WuKongIM" "3003 Clowder" "8090 TangSeng" "3000 IM-Web"; do
+  for item in "5001 WuKongIM" "3004 Clowder-API" "3003 Clowder-Web" "8090 TangSeng" "3000 IM-Web"; do
     set -- $item
     if (echo >"/dev/tcp/127.0.0.1/$1") >/dev/null 2>&1; then
       printf '  %-5s open    %s\n' "$1" "$2"
