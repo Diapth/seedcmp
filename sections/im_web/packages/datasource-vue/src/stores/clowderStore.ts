@@ -28,10 +28,14 @@ import {
   type ClowderDeploymentActionResponse,
   type ClowderGroupAutoReplyMode,
   type ClowderGroupCatStateResponse,
+  type ClowderMaomiWorkspace,
   type ClowderThreadTask,
   type ClowderThreadTaskDiagnostics,
   type ClowderThreadTasksRequestOptions,
   type ClowderThreadTasksResponse,
+  type ClowderWorkspaceBindingResponse,
+  type ClowderWorkspaceProposal,
+  type ClowderWorkspaceRootResponse,
   type IMConnectorPermission
 } from '../api/clowder';
 import {
@@ -210,9 +214,11 @@ function normalizeThreadTasksResponse(threadId: string, response: ClowderThreadT
       state: tasks.length > 0 ? 'ok' : 'success_empty',
       taskCount: tasks.length,
       queryThreadId: response?.threadId || threadId,
+      activeWorkspaceId: undefined,
       observedTaskIds: [],
       missingTaskIds: [],
-      mismatchedTasks: []
+      mismatchedTasks: [],
+      workspaceMismatchedTaskIds: []
     }
   };
 }
@@ -242,6 +248,11 @@ export const useClowderStore = defineStore('clowder', () => {
   const groupPrompts = ref<Record<string, string>>({});
   const groupAutoReplyModes = ref<Record<string, ClowderGroupAutoReplyMode>>({});
   const threadTaskStates = ref<Record<string, ThreadTaskLoadState>>({});
+  const workspaceRoot = ref<ClowderWorkspaceRootResponse | undefined>();
+  const workspaces = ref<ClowderMaomiWorkspace[]>([]);
+  const workspaceBindings = ref<Record<string, ClowderWorkspaceBindingResponse>>({});
+  const workspaceLoading = ref(false);
+  const workspaceError = ref<string | undefined>();
   // Phase 2.2: coordinator project group chat kickoff records (one per coordinationId).
   // Surfaced as a "Create Project Group Chat?" card in ClowderConversationPanel.
   const kickoffs = ref<Record<string, CoordinatorKickoff>>({});
@@ -324,6 +335,111 @@ export const useClowderStore = defineStore('clowder', () => {
     const trimmed = String(threadId || '').trim();
     if (!trimmed) return { state: 'not_bound' };
     return threadTaskStates.value[trimmed] || { state: 'loading', threadId: trimmed, tasks: [] };
+  }
+
+  function getWorkspaceBinding(threadId?: string | null) {
+    const trimmed = String(threadId || '').trim();
+    return trimmed ? workspaceBindings.value[trimmed] : undefined;
+  }
+
+  function getActiveWorkspace(threadId?: string | null) {
+    return getWorkspaceBinding(threadId)?.activeWorkspace || undefined;
+  }
+
+  async function loadWorkspaceRoot() {
+    workspaceLoading.value = true;
+    workspaceError.value = undefined;
+    try {
+      workspaceRoot.value = await clowderApi.getWorkspaceRoot();
+      return workspaceRoot.value;
+    } catch (err) {
+      workspaceError.value = err instanceof Error ? err.message : 'Maomi workspace root unavailable';
+      throw err;
+    } finally {
+      workspaceLoading.value = false;
+    }
+  }
+
+  async function loadWorkspaces() {
+    workspaceLoading.value = true;
+    workspaceError.value = undefined;
+    try {
+      const response = await clowderApi.listWorkspaces({ status: 'active' });
+      workspaces.value = response.workspaces || [];
+      return workspaces.value;
+    } catch (err) {
+      workspaceError.value = err instanceof Error ? err.message : 'Maomi workspaces unavailable';
+      throw err;
+    } finally {
+      workspaceLoading.value = false;
+    }
+  }
+
+  async function loadWorkspaceBinding(threadId: string) {
+    const trimmed = String(threadId || '').trim();
+    if (!trimmed) return undefined;
+    workspaceLoading.value = true;
+    workspaceError.value = undefined;
+    try {
+      const binding = await clowderApi.getWorkspaceBinding(trimmed);
+      workspaceBindings.value = { ...workspaceBindings.value, [trimmed]: binding };
+      return binding;
+    } catch (err) {
+      workspaceError.value = err instanceof Error ? err.message : 'Maomi workspace binding unavailable';
+      throw err;
+    } finally {
+      workspaceLoading.value = false;
+    }
+  }
+
+  async function proposeWorkspace(input: { intentText: string; threadId?: string }): Promise<ClowderWorkspaceProposal> {
+    const response = await clowderApi.proposeWorkspace(input);
+    return response.proposal;
+  }
+
+  async function createWorkspace(input: {
+    slug: string;
+    displayName: string;
+    sourceIntent?: string;
+    createdBy?: 'user' | 'coordinator' | 'cat' | 'system';
+    threadId?: string;
+  }) {
+    workspaceLoading.value = true;
+    workspaceError.value = undefined;
+    try {
+      const response = await clowderApi.createWorkspace(input);
+      const workspace = response.workspace;
+      workspaces.value = [
+        workspace,
+        ...workspaces.value.filter(item => item.workspaceId !== workspace.workspaceId && item.id !== workspace.id)
+      ];
+      if (input.threadId) {
+        await loadWorkspaceBinding(input.threadId);
+      }
+      return workspace;
+    } catch (err) {
+      workspaceError.value = err instanceof Error ? err.message : 'Maomi workspace create failed';
+      throw err;
+    } finally {
+      workspaceLoading.value = false;
+    }
+  }
+
+  async function setWorkspaceBinding(threadId: string, workspaceId: string | null) {
+    const trimmed = String(threadId || '').trim();
+    if (!trimmed) throw new Error('threadId is required');
+    workspaceLoading.value = true;
+    workspaceError.value = undefined;
+    try {
+      const binding = await clowderApi.setWorkspaceBinding(trimmed, { workspaceId });
+      workspaceBindings.value = { ...workspaceBindings.value, [trimmed]: binding };
+      return binding;
+    } catch (err) {
+      workspaceError.value = err instanceof Error ? err.message : 'Maomi workspace binding failed';
+      throw err;
+    } finally {
+      workspaceLoading.value = false;
+    }
   }
 
   async function fetchThreadTasks(
@@ -1219,6 +1335,11 @@ export const useClowderStore = defineStore('clowder', () => {
     groupPrompts.value = {};
     groupAutoReplyModes.value = {};
     threadTaskStates.value = {};
+    workspaceRoot.value = undefined;
+    workspaces.value = [];
+    workspaceBindings.value = {};
+    workspaceLoading.value = false;
+    workspaceError.value = undefined;
     kickoffs.value = {};
     loading.value = false;
     error.value = undefined;
@@ -1249,6 +1370,19 @@ export const useClowderStore = defineStore('clowder', () => {
     groupPrompts,
     groupAutoReplyModes,
     threadTaskStates,
+    workspaceRoot,
+    workspaces,
+    workspaceBindings,
+    workspaceLoading,
+    workspaceError,
+    getWorkspaceBinding,
+    getActiveWorkspace,
+    loadWorkspaceRoot,
+    loadWorkspaces,
+    loadWorkspaceBinding,
+    proposeWorkspace,
+    createWorkspace,
+    setWorkspaceBinding,
     getThreadTasksState,
     fetchThreadTasks,
     getCatContactById,

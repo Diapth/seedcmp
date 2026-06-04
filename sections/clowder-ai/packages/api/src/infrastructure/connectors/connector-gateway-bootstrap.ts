@@ -18,6 +18,8 @@ import * as lark from '@larksuiteoapi/node-sdk';
 import type { FastifyBaseLogger } from 'fastify';
 import { isCatAvailable } from '../../config/cat-config-loader.js';
 import type { ConnectorWebhookHandler, WebhookHandleResult } from '../../routes/connector-webhooks.js';
+import type { IMaomiWorkspaceStore } from '../../domains/maomi-workspaces/MaomiWorkspaceStore.js';
+import type { IThreadWorkspaceBindingStore } from '../../domains/maomi-workspaces/ThreadWorkspaceBindingStore.js';
 import { getDefaultUploadDir } from '../../utils/upload-paths.js';
 import { deliverConnectorMessage } from '../email/deliver-connector-message.js';
 import { DingTalkAdapter } from './adapters/DingTalkAdapter.js';
@@ -144,6 +146,7 @@ export interface ConnectorGatewayDeps {
       threadId: string,
       state: { v: 1; connectorId: string; externalChatId: string; createdAt: number; lastCommandAt?: number } | null,
     ): void | Promise<void>;
+    updateProjectPath?(threadId: string, projectPath: string): void | Promise<void>;
     /** F142: participant activity for /cats and /status */
     getParticipantsWithActivity?(
       threadId: string,
@@ -176,6 +179,8 @@ export interface ConnectorGatewayDeps {
   readonly defaultUserId: string;
   readonly defaultCatId: CatId;
   readonly redis?: RedisClient | undefined;
+  readonly maomiWorkspaceStore?: IMaomiWorkspaceStore;
+  readonly threadWorkspaceBindingStore?: IThreadWorkspaceBindingStore;
   readonly log: FastifyBaseLogger;
   readonly frontendBaseUrl?: string | undefined;
   /** F142: agent service registry for /cats command */
@@ -374,6 +379,8 @@ export async function startConnectorGateway(
     bindingStore,
     threadStore: deps.threadStore,
     ...(deps.backlogStore ? { backlogStore: deps.backlogStore } : {}),
+    ...(deps.maomiWorkspaceStore ? { maomiWorkspaceStore: deps.maomiWorkspaceStore } : {}),
+    ...(deps.threadWorkspaceBindingStore ? { threadWorkspaceBindingStore: deps.threadWorkspaceBindingStore } : {}),
     frontendBaseUrl: deps.frontendBaseUrl ?? 'http://localhost:3003',
     permissionStore,
     // F142: wire /cats and /status deps (threadStore has getParticipantsWithActivity at runtime)

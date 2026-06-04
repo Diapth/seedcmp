@@ -125,6 +125,10 @@ const clowderPromptContext = computed(() => {
 });
 
 const clowderConversationKey = computed(() => `${props.channelId}-${Number(props.channelType)}`);
+const activeClowderWorkspace = computed(() => {
+  const threadId = clowderStore.conversations[clowderConversationKey.value]?.binding?.threadId;
+  return clowderStore.getActiveWorkspace(threadId);
+});
 
 const groupAutoReplyMode = computed(() => {
   if (props.channelType !== 2) return 'mentions_only';
@@ -541,7 +545,11 @@ function addDeploymentConfirmationCard(
   const catDisplayName = getCatDisplayName(firstCatId) || 'Clowder';
   const clientMsgNo = `deployment-card-${Date.now()}-${Math.random().toString(16).slice(2)}`;
   const deploymentRequestId = `deploy-${props.channelType}-${props.channelId}-${Date.now()}-${Math.random().toString(16).slice(2)}`;
-  const missingFields = intent.missingFields || [];
+  const workspace = activeClowderWorkspace.value;
+  const target = intent.target === '待确认目标' && workspace
+    ? workspace.relativePath
+    : intent.target;
+  const missingFields = (intent.missingFields || []).filter(field => !(field === 'target' && workspace));
   messageStore.addMessage(props.channelId, props.channelType, {
     messageID: clientMsgNo,
     messageSeq: 0,
@@ -552,8 +560,10 @@ function addDeploymentConfirmationCard(
       type: 7,
       cardType: 'deployment',
       title: '确认部署',
-      target: intent.target,
+      target,
       environment: intent.environment,
+      workspaceId: workspace?.workspaceId || workspace?.id,
+      workspacePath: workspace?.relativePath,
       status: missingFields.length ? 'needs_fields' : 'pending_confirmation',
       deploymentRequestId,
       missingFields,
@@ -567,6 +577,8 @@ function addDeploymentConfirmationCard(
         deploymentRequestId,
         text,
         sourceMessageId: clientMsgNo,
+        workspaceId: workspace?.workspaceId || workspace?.id,
+        workspacePath: workspace?.relativePath,
         targetCatIds: effectiveTargetCatIds,
         triggerReason,
         promptContext: buildClowderPromptContext(text, effectiveTargetCatIds, triggerReason, replyTarget)

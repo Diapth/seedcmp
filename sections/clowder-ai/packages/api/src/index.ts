@@ -535,6 +535,17 @@ async function main(): Promise<void> {
   const taskStore = createTaskStore(redis);
   const { RuntimeWorkspaceStore } = await import('./domains/runtime-workspaces/RuntimeWorkspaceStore.js');
   const runtimeWorkspaceStore = new RuntimeWorkspaceStore();
+  const { findLaunchedProjectRoot, resolveMaomiWorkspaceRoot } = await import(
+    './domains/maomi-workspaces/workspace-root.js'
+  );
+  const { createMaomiWorkspaceStore, createThreadWorkspaceBindingStore } = await import(
+    './domains/maomi-workspaces/factory.js'
+  );
+  const maomiWorkspaceRoot = await resolveMaomiWorkspaceRoot({
+    launchedProjectRoot: findLaunchedProjectRoot(process.cwd()),
+  });
+  const maomiWorkspaceStore = createMaomiWorkspaceStore(maomiWorkspaceRoot.rootPath, redis);
+  const threadWorkspaceBindingStore = createThreadWorkspaceBindingStore(redis);
   const labelStore = createLabelStore(redis);
   const communityIssueStore = createCommunityIssueStore(redis);
   if (redis) {
@@ -1375,6 +1386,8 @@ async function main(): Promise<void> {
     sessionChainStore,
     runtimeSessionStore,
     runtimeWorkspaceStore,
+    maomiWorkspaceStore,
+    threadWorkspaceBindingStore,
     transcriptWriter,
     transcriptReader,
     sessionSealer,
@@ -1477,6 +1490,8 @@ async function main(): Promise<void> {
     ...(f101SharedDriver ? { autoPlayer: f101SharedDriver } : {}),
     holdBallCancelDeps: { dynamicTaskStore, taskRunner: taskRunnerV2 },
     coordinatorKickoffStore,
+    maomiWorkspaceStore,
+    threadWorkspaceBindingStore,
   };
   await app.register(messagesRoutes, messagesOpts);
   await app.register(queueRoutes, {
@@ -1656,6 +1671,8 @@ async function main(): Promise<void> {
     socketManager,
     callbackAuthNotifier,
     taskStore,
+    maomiWorkspaceStore,
+    threadWorkspaceBindingStore,
     backlogStore,
     threadStore,
     sessionChainStore,
@@ -1723,6 +1740,8 @@ async function main(): Promise<void> {
     ...(readStateStore ? { readStateStore } : {}),
     guideSessionStore,
     labelStore,
+    maomiWorkspaceStore,
+    threadWorkspaceBindingStore,
     indexBuilder: memoryServices.indexBuilder as
       | { markThreadDirty(threadId: string): void; flushDirtyThreads?(): number | Promise<number> }
       | undefined,
@@ -2269,7 +2288,17 @@ async function main(): Promise<void> {
   await app.register(threadTasksRoutes, {
     taskStore,
     ...(threadStore ? { threadStore } : {}),
+    maomiWorkspaceStore,
+    threadWorkspaceBindingStore,
     log: app.log,
+  });
+
+  const { maomiWorkspaceRoutes } = await import('./routes/maomi-workspaces.js');
+  await app.register(maomiWorkspaceRoutes, {
+    workspaceRoot: maomiWorkspaceRoot,
+    workspaceStore: maomiWorkspaceStore,
+    bindingStore: threadWorkspaceBindingStore,
+    threadStore,
   });
 
   // V3-32: expose project-scoped runtime/agent workspaces for the bound thread.
@@ -2899,6 +2928,8 @@ async function main(): Promise<void> {
     defaultUserId: 'default-user' as const,
     defaultCatId: resolveConnectorGatewayDefaultCatId(getDefaultCatId()),
     redis: redisClient ?? undefined,
+    maomiWorkspaceStore,
+    threadWorkspaceBindingStore,
     log: app.log,
     agentRegistry,
     catCreator: createImWebCatCreator(),

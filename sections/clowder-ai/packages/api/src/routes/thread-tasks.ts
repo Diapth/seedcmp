@@ -23,11 +23,15 @@ import type { FastifyPluginAsync, FastifyRequest } from 'fastify';
 import { createCatId, type CatId, type TaskItem } from '@cat-cafe/shared';
 import type { ITaskStore } from '../domains/cats/services/stores/ports/TaskStore.js';
 import type { IThreadStore } from '../domains/cats/services/stores/ports/ThreadStore.js';
+import type { IMaomiWorkspaceStore } from '../domains/maomi-workspaces/MaomiWorkspaceStore.js';
+import type { IThreadWorkspaceBindingStore } from '../domains/maomi-workspaces/ThreadWorkspaceBindingStore.js';
 import { isUnderAllowedRoot, validateProjectPath } from '../utils/project-path.js';
 
 export interface ThreadTasksRoutesOptions {
   taskStore: ITaskStore;
   threadStore?: IThreadStore;
+  maomiWorkspaceStore?: IMaomiWorkspaceStore;
+  threadWorkspaceBindingStore?: IThreadWorkspaceBindingStore;
   log: {
     warn: (obj: object, msg?: string) => void;
     error: (obj: object, msg?: string) => void;
@@ -43,6 +47,8 @@ const ARTIFACT_REF_PREFIX = 'artifact:';
 export interface ThreadArtifact {
   path: string;                // relative to projectPath
   absolutePath: string;        // absolute when known
+  workspaceId?: string;
+  workspaceRelativePath?: string;
   kind: ArtifactKind;
   description?: string;
   ownerCatId: string;
@@ -57,6 +63,9 @@ export interface ThreadTaskMismatchDiagnostic {
   taskId: string;
   expectedThreadId: string;
   actualThreadId: string;
+  expectedWorkspaceId?: string | null;
+  taskWorkspaceId?: string | null;
+  threadWorkspaceMismatch?: boolean;
   title?: string;
   ownerCatId?: string | null;
   status?: string;
@@ -66,9 +75,11 @@ export interface ThreadTaskDiagnostics {
   state: ThreadTaskDiagnosticsState;
   taskCount: number;
   queryThreadId: string;
+  activeWorkspaceId?: string | null;
   observedTaskIds: string[];
   missingTaskIds: string[];
   mismatchedTasks: ThreadTaskMismatchDiagnostic[];
+  workspaceMismatchedTaskIds: string[];
 }
 
 interface ParsedArtifactRef {
@@ -101,10 +112,14 @@ async function buildThreadTaskDiagnostics(
   threadId: string,
   tasks: TaskItem[],
   observedTaskIds: string[],
+  activeWorkspaceId?: string | null,
 ): Promise<ThreadTaskDiagnostics> {
   const inThread = new Set(tasks.map((task) => task.id));
   const missingTaskIds: string[] = [];
   const mismatchedTasks: ThreadTaskMismatchDiagnostic[] = [];
+  const workspaceMismatchedTaskIds = tasks
+    .filter((task) => activeWorkspaceId && task.workspaceId && task.workspaceId !== activeWorkspaceId)
+    .map((task) => task.id);
 
   for (const taskId of observedTaskIds) {
     if (inThread.has(taskId)) continue;
@@ -118,6 +133,9 @@ async function buildThreadTaskDiagnostics(
         taskId,
         expectedThreadId: threadId,
         actualThreadId: task.threadId,
+        expectedWorkspaceId: activeWorkspaceId ?? null,
+        taskWorkspaceId: task.workspaceId ?? null,
+        threadWorkspaceMismatch: Boolean(activeWorkspaceId && task.workspaceId && task.workspaceId !== activeWorkspaceId),
         title: task.title,
         ownerCatId: task.ownerCatId ?? null,
         status: task.status,
@@ -128,6 +146,8 @@ async function buildThreadTaskDiagnostics(
   let state: ThreadTaskDiagnosticsState = tasks.length > 0 ? 'ok' : 'success_empty';
   if (mismatchedTasks.length > 0) {
     state = 'thread_binding_mismatch';
+  } else if (workspaceMismatchedTaskIds.length > 0) {
+    state = 'thread_binding_mismatch';
   } else if (missingTaskIds.length > 0) {
     state = 'created_task_missing';
   }
@@ -136,9 +156,11 @@ async function buildThreadTaskDiagnostics(
     state,
     taskCount: tasks.length,
     queryThreadId: threadId,
+    activeWorkspaceId: activeWorkspaceId ?? null,
     observedTaskIds,
     missingTaskIds,
     mismatchedTasks,
+    workspaceMismatchedTaskIds,
   };
 }
 
@@ -208,6 +230,8 @@ export function findOrCreateArtifactTask(
   path: string,
   kind: ArtifactKind,
   description: string | undefined,
+  workspaceId?: string,
+  workspaceRelativePath?: string,
 ): Promise<TaskItem> {
   // Try to find an existing task for this owner within the coordination.
   // We look for the first task on this thread owned by this cat, scoped to
@@ -223,7 +247,13 @@ export function findOrCreateArtifactTask(
     if (existing) {
       const refs = appendArtifactRef(existing.artifactRefs, path, kind, description);
       if (refs.length !== (existing.artifactRefs ?? []).length) {
-        const updated = await Promise.resolve(taskStore.update(existing.id, { artifactRefs: refs }));
+        const updated = await Promise.resolve(
+          taskStore.update(existing.id, {
+            artifactRefs: refs,
+            ...(workspaceId ? { workspaceId } : {}),
+            ...(workspaceRelativePath ? { workspaceRelativePath } : {}),
+          }),
+        );
         return updated ?? existing;
       }
       return existing;
@@ -240,6 +270,8 @@ export function findOrCreateArtifactTask(
         ownerCatId: createCatId(ownerCatId),
         ...(coordinationId ? { coordinationId } : {}),
         artifactRefs: [serializeArtifactRef(path, kind, description)],
+        ...(workspaceId ? { workspaceId } : {}),
+        ...(workspaceRelativePath ? { workspaceRelativePath } : {}),
       }),
     );
     // Touch updatedAt to surface the task in list queries.
@@ -255,6 +287,8 @@ export function buildThreadArtifact(
   kind: ArtifactKind,
   description: string | undefined,
   source: ThreadArtifactSource = 'task_ref',
+  workspaceId?: string,
+  workspaceRelativePath?: string,
 ): ThreadArtifact {
   const absolutePath = isAbsolute(path) ? path : resolve(projectPath, path);
   const outsideProject = Boolean(projectPath && !isPathInsideRoot(absolutePath, projectPath));
@@ -263,6 +297,8 @@ export function buildThreadArtifact(
   return {
     path: projectPath && !outsideProject ? absolutePath.slice(projectPath.length).replace(/^[\\/]+/, '') : path,
     absolutePath,
+    ...(workspaceId ? { workspaceId } : {}),
+    ...(workspaceRelativePath ? { workspaceRelativePath } : {}),
     kind,
     description,
     ownerCatId: task.ownerCatId ?? 'unknown',
@@ -286,12 +322,21 @@ export const threadTasksRoutes: FastifyPluginAsync<ThreadTasksRoutesOptions> = a
       return reply.status(400).send({ error: 'threadId is required' });
     }
     const tasks = await Promise.resolve(opts.taskStore.listByThread(threadId));
+    const binding = opts.threadWorkspaceBindingStore
+      ? await opts.threadWorkspaceBindingStore.get(threadId)
+      : null;
     const query = request.query as { expectedTaskId?: unknown; observedTaskIds?: unknown };
     const observedTaskIds = Array.from(new Set([
       ...stringListFromQuery(query.expectedTaskId),
       ...stringListFromQuery(query.observedTaskIds),
     ]));
-    const diagnostics = await buildThreadTaskDiagnostics(opts.taskStore, threadId, tasks, observedTaskIds);
+    const diagnostics = await buildThreadTaskDiagnostics(
+      opts.taskStore,
+      threadId,
+      tasks,
+      observedTaskIds,
+      binding?.activeWorkspaceId ?? null,
+    );
     return reply.send({ threadId, tasks, diagnostics });
   });
 
@@ -308,6 +353,9 @@ export const threadTasksRoutes: FastifyPluginAsync<ThreadTasksRoutesOptions> = a
       description?: string;
       ownerCatId?: string;
       coordinationId?: string;
+      workspaceId?: string;
+      relativePath?: string;
+      workspaceRelativePath?: string;
     } ?? {};
     const userId = String(body.userId ?? '').trim();
     const path = String(body.path ?? '').trim();
@@ -315,6 +363,8 @@ export const threadTasksRoutes: FastifyPluginAsync<ThreadTasksRoutesOptions> = a
     const description = body.description?.trim();
     const ownerCatId = String(body.ownerCatId ?? '').trim();
     const coordinationId = body.coordinationId?.trim();
+    const workspaceId = body.workspaceId?.trim();
+    const workspaceRelativePath = (body.workspaceRelativePath ?? body.relativePath)?.trim();
 
     if (!userId) return reply.status(400).send({ error: 'userId is required' });
     if (!path) return reply.status(400).send({ error: 'path is required' });
@@ -329,16 +379,42 @@ export const threadTasksRoutes: FastifyPluginAsync<ThreadTasksRoutesOptions> = a
     const thread = opts.threadStore ? await Promise.resolve(opts.threadStore.get(threadId)) : null;
     const projectPath = thread?.projectPath;
     let absolutePath: string;
+    let artifactProjectPath = projectPath;
+    let resolvedWorkspaceId = workspaceId;
+    let resolvedWorkspaceRelativePath = workspaceRelativePath;
+    if (workspaceId && opts.maomiWorkspaceStore) {
+      const workspace = await opts.maomiWorkspaceStore.get(workspaceId);
+      if (!workspace) {
+        return reply.status(404).send({ error: 'workspace not found', workspaceId });
+      }
+      artifactProjectPath = workspace.rootPath;
+      if (!resolvedWorkspaceRelativePath && !isAbsolute(path)) {
+        resolvedWorkspaceRelativePath = path;
+      }
+    } else if (!workspaceId && opts.threadWorkspaceBindingStore && opts.maomiWorkspaceStore) {
+      const binding = await opts.threadWorkspaceBindingStore.get(threadId);
+      if (binding?.activeWorkspaceId) {
+        const workspace = await opts.maomiWorkspaceStore.get(binding.activeWorkspaceId);
+        if (workspace) {
+          resolvedWorkspaceId = workspace.id;
+          artifactProjectPath = workspace.rootPath;
+          if (!resolvedWorkspaceRelativePath && !isAbsolute(path)) {
+            resolvedWorkspaceRelativePath = path;
+          }
+        }
+      }
+    }
+
     if (isAbsolute(path)) {
       absolutePath = path;
-    } else if (projectPath) {
-      absolutePath = resolve(projectPath, path);
+    } else if (artifactProjectPath) {
+      absolutePath = resolve(artifactProjectPath, path);
     } else {
       return reply.status(400).send({ error: 'path is absolute but thread has no projectPath to bound it' });
     }
 
-    if (projectPath) {
-      const projectAbs = await validateProjectPath(projectPath);
+    if (artifactProjectPath) {
+      const projectAbs = await validateProjectPath(artifactProjectPath);
       if (!projectAbs) {
         return reply.status(400).send({ error: 'thread projectPath is no longer a valid workspace directory' });
       }
@@ -370,13 +446,28 @@ export const threadTasksRoutes: FastifyPluginAsync<ThreadTasksRoutesOptions> = a
         absolutePath,
         kind,
         description,
+        resolvedWorkspaceId,
+        resolvedWorkspaceRelativePath,
       );
     } catch (err) {
       opts.log.error({ err, threadId, path }, '[thread-artifacts] failed to attach artifact');
       return reply.status(500).send({ error: 'failed to attach artifact' });
     }
 
-    return reply.send({ task, artifact: { path: absolutePath, kind, description } });
+    if (resolvedWorkspaceId) {
+      await opts.maomiWorkspaceStore?.linkTask(resolvedWorkspaceId, task.id);
+    }
+
+    return reply.send({
+      task,
+      artifact: {
+        path: absolutePath,
+        kind,
+        description,
+        workspaceId: resolvedWorkspaceId,
+        workspaceRelativePath: resolvedWorkspaceRelativePath,
+      },
+    });
   });
 
   // ----- Phase 4.6: GET /api/threads/:threadId/artifacts -----
@@ -386,8 +477,17 @@ export const threadTasksRoutes: FastifyPluginAsync<ThreadTasksRoutesOptions> = a
       return reply.status(400).send({ error: 'threadId is required' });
     }
     const thread = opts.threadStore ? await Promise.resolve(opts.threadStore.get(threadId)) : null;
+    const binding = opts.threadWorkspaceBindingStore
+      ? await opts.threadWorkspaceBindingStore.get(threadId)
+      : null;
+    const activeWorkspace = binding?.activeWorkspaceId && opts.maomiWorkspaceStore
+      ? await opts.maomiWorkspaceStore.get(binding.activeWorkspaceId)
+      : null;
     const projectPath = thread?.projectPath
       ? await validateProjectPath(thread.projectPath)
+      : null;
+    const activeWorkspacePath = activeWorkspace?.rootPath
+      ? await validateProjectPath(activeWorkspace.rootPath)
       : null;
     const tasks = await Promise.resolve(opts.taskStore.listByThread(threadId));
 
@@ -396,11 +496,16 @@ export const threadTasksRoutes: FastifyPluginAsync<ThreadTasksRoutesOptions> = a
       const refs = task.artifactRefs ?? [];
       for (const ref of refs) {
         const parsedRef = parseArtifactRef(ref);
-        if (!projectPath) {
+        const effectiveProjectPath = activeWorkspacePath ?? projectPath;
+        const workspaceId = task.workspaceId ?? activeWorkspace?.id;
+        const workspaceRelativePath = task.workspaceRelativePath ?? (!isAbsolute(parsedRef.path) ? parsedRef.path : undefined);
+        if (!effectiveProjectPath) {
           const owner = task.ownerCatId ?? 'unknown';
           artifacts.push({
             path: parsedRef.path,
             absolutePath: parsedRef.path,
+            ...(workspaceId ? { workspaceId } : {}),
+            ...(workspaceRelativePath ? { workspaceRelativePath } : {}),
             kind: parsedRef.kind,
             ...(parsedRef.description ? { description: parsedRef.description } : {}),
             ownerCatId: owner,
@@ -414,11 +519,13 @@ export const threadTasksRoutes: FastifyPluginAsync<ThreadTasksRoutesOptions> = a
         }
         const artifact = buildThreadArtifact(
           task,
-          projectPath,
+          effectiveProjectPath,
           parsedRef.path,
           parsedRef.kind,
           parsedRef.description,
           parsedRef.source,
+          workspaceId,
+          workspaceRelativePath,
         );
         artifacts.push(artifact);
       }

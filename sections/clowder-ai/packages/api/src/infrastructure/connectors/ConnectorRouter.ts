@@ -424,18 +424,12 @@ export class ConnectorRouter {
       const platformLabel = def?.displayName ?? connectorId;
       const title =
         chatType === 'group' ? `${platformLabel}群聊 · ${chatName || externalChatId.slice(-8)}` : `${platformLabel} DM`;
-      const thread = await threadStore.create(this.opts.defaultUserId, title, findMonorepoRoot());
+      const thread = await threadStore.create(this.opts.defaultUserId, title);
       binding = await bindingStore.bind(connectorId, externalChatId, thread.id, this.opts.defaultUserId);
       log.info(
         { connectorId, externalChatId, threadId: thread.id },
         '[ConnectorRouter] New thread created for external chat',
       );
-    } else if (threadStore.get && threadStore.updateProjectPath) {
-      // ISSUE-16 lazy heal: backfill projectPath for threads created before the fix
-      const existing = await threadStore.get(binding.threadId);
-      if (existing && (!existing.projectPath || existing.projectPath === 'default')) {
-        await threadStore.updateProjectPath(binding.threadId, findMonorepoRoot());
-      }
     }
 
     // 3. Post connector message

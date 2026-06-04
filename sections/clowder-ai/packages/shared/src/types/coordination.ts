@@ -28,6 +28,17 @@ export interface CoordinationContext {
   readonly artifactRefs?: readonly string[];
 }
 
+export interface WorkspaceProposal {
+  readonly displayName: string;
+  readonly slug: string;
+  readonly rootPath: string;
+  readonly relativePath: string;
+  readonly sourceIntent: string;
+  readonly confidence: number;
+  readonly collision?: 'none' | 'existing_active' | 'existing_archived' | 'slug_taken';
+  readonly existingWorkspaceId?: string;
+}
+
 /**
  * When a coordinator finishes its first intake reply, it may emit a fenced
  * `cat-recommendation` JSON block suggesting cats to invite into a new project
@@ -40,5 +51,6 @@ export interface CoordinatorKickoff {
   readonly messageId: string;
   readonly suggestedCats: readonly CatId[];
   readonly reason?: string;
+  readonly workspaceProposal?: WorkspaceProposal;
   readonly createdAt: number;
 }

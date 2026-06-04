@@ -11,6 +11,7 @@
  */
 
 import type { CoordinatorKickoff } from '@cat-cafe/shared';
+import type { IMaomiWorkspaceStore } from '../../../maomi-workspaces/MaomiWorkspaceStore.js';
 import type { ICoordinatorKickoffStore } from '../stores/ports/CoordinatorKickoffStore.js';
 import {
   hasCoordinatorRecommendation,
@@ -29,6 +30,7 @@ export interface CoordinatorKickoffTriggerDeps {
     warn: (obj: object, msg?: string) => void;
     error: (obj: object, msg?: string) => void;
   };
+  maomiWorkspaceStore?: IMaomiWorkspaceStore;
 }
 
 export interface MaybeEmitCoordinatorKickoffInput {
@@ -42,6 +44,10 @@ export interface MaybeEmitCoordinatorKickoffInput {
   phase: string;
   /** Coordination id of an existing kickoff, if any — suppress duplicates. */
   existingKickoffCoordinationId?: string;
+  /** User-facing request that produced the recommendation, used for workspace proposal. */
+  sourceIntent?: string;
+  /** Current conversation thread, if this proposal should bind there before group creation. */
+  threadId?: string;
 }
 
 /**
@@ -69,11 +75,20 @@ export async function maybeEmitCoordinatorKickoff(
     return null;
   }
 
+  const sourceIntent = input.sourceIntent?.trim() || rec.reason || input.replyText.slice(0, 200);
+  const workspaceProposal = deps.maomiWorkspaceStore
+    ? await deps.maomiWorkspaceStore.propose(input.userId, sourceIntent, input.threadId).catch((err) => {
+        deps.log.warn({ err, coordinationId: input.coordinationId }, '[coordinator-kickoff] workspace proposal failed');
+        return null;
+      })
+    : null;
+
   const kickoff: CoordinatorKickoff = {
     coordinationId: input.coordinationId,
     messageId: input.messageId,
     suggestedCats: rec.suggestedCats,
     ...(rec.reason ? { reason: rec.reason } : {}),
+    ...(workspaceProposal ? { workspaceProposal } : {}),
     createdAt: Date.now(),
   };
 

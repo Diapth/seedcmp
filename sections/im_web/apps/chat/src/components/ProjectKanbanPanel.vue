@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { computed, onMounted, onUnmounted, watch } from 'vue';
-import { useClowderStore, type ClowderAgent, type ClowderThreadTask } from '@tsdaodao/datasource-vue';
+import { useClowderStore, type ClowderAgent, type ClowderMaomiWorkspace, type ClowderThreadTask } from '@tsdaodao/datasource-vue';
 import CatWorkBadge from './CatWorkBadge.vue';
 
 defineOptions({ name: 'ProjectKanbanPanel' });
@@ -9,6 +9,7 @@ interface Props {
   threadId: string;
   agentDirectory?: ClowderAgent[];
   observedTaskIds?: string[];
+  activeWorkspace?: ClowderMaomiWorkspace;
 }
 
 const props = defineProps<Props>();
@@ -35,6 +36,7 @@ const diagnostics = computed(() => ('diagnostics' in loadState.value ? loadState
 const observedTaskIdsKey = computed(() => (props.observedTaskIds || []).join(','));
 const successEmpty = computed(() => loadState.value.state === 'success_empty');
 const createdTaskMissing = computed(() => diagnostics.value?.state === 'created_task_missing');
+const workspaceMismatchIds = computed(() => diagnostics.value?.workspaceMismatchedTaskIds || []);
 
 const tasksByStatus = computed(() => {
   const map: Record<TaskStatus, TaskItem[]> = {
@@ -114,7 +116,12 @@ defineExpose({ refresh });
 <template>
   <div class="kanban-panel" data-testid="project-kanban-panel">
     <div class="kanban-panel__header">
-      <h4>看板</h4>
+      <div>
+        <h4>看板</h4>
+        <span v-if="activeWorkspace" class="kanban-panel__workspace">
+          {{ activeWorkspace.relativePath }}
+        </span>
+      </div>
       <button
         type="button"
         class="kanban-panel__refresh"
@@ -132,6 +139,12 @@ defineExpose({ refresh });
     <p v-else-if="mismatch" class="kanban-panel__error">
       聊天中的任务 {{ mismatch.expectedTaskId || '已创建任务' }} 属于 Thread
       {{ mismatch.actualThreadId || '未知' }}，当前看板查询的是 {{ mismatch.threadId }}。
+      <span v-if="diagnostics?.activeWorkspaceId">
+        Active workspace: {{ diagnostics.activeWorkspaceId }}。
+      </span>
+    </p>
+    <p v-else-if="workspaceMismatchIds.length > 0" class="kanban-panel__error">
+      当前 thread 有 {{ workspaceMismatchIds.length }} 个任务属于其他 workspace，请检查 conversation binding 或切换 workspace。
     </p>
     <p v-else-if="createdTaskMissing" class="kanban-panel__error">
       聊天中出现的任务 id 未在任务存储中找到，请刷新 conversation 或稍后重试。
@@ -162,6 +175,9 @@ defineExpose({ refresh });
           >
             <div class="kanban-panel__task-title">{{ task.title }}</div>
             <div class="kanban-panel__task-id">#{{ shortTaskId(task.id) }}</div>
+            <div v-if="task.workspaceRelativePath || task.workspaceId" class="kanban-panel__task-workspace">
+              {{ task.workspaceRelativePath || task.workspaceId }}
+            </div>
             <div v-if="task.why" class="kanban-panel__task-why">{{ task.why }}</div>
             <div class="kanban-panel__task-owner">
               <CatWorkBadge
@@ -218,7 +234,7 @@ defineExpose({ refresh });
   padding: 12px;
   background: var(--color-bg-1, #fdf8f3);
   border: 1px solid var(--color-border-2, #e5e0d8);
-  border-radius: 14px;
+  border-radius: 8px;
 }
 
 .kanban-panel__header {
@@ -231,6 +247,14 @@ defineExpose({ refresh });
   margin: 0;
   font-size: 14px;
   font-weight: 600;
+}
+
+.kanban-panel__workspace,
+.kanban-panel__task-workspace {
+  display: block;
+  margin-top: 2px;
+  color: var(--color-text-3, #6b6b6b);
+  font-size: 11px;
 }
 
 .kanban-panel__refresh {

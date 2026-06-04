@@ -683,6 +683,7 @@ async function handleDeploymentCardAction(payload: { action: 'confirm' | 'cancel
       sourceMessageId: String(request.sourceMessageId || clientMsgNo),
       target: String(content.target || ''),
       environment: String(content.environment || ''),
+      workspaceId: String(content.workspaceId || request.workspaceId || ''),
       missingFields,
       directCatId: getClowderCatIdFromContactId(props.channelId),
       targetCatIds,

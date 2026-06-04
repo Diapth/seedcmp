@@ -77,6 +77,15 @@ func (c *Clowder) Route(r *wkhttp.WKHttp) {
 		auth.GET("/thread/:threadId/artifacts", c.proxyThreadArtifacts)
 		auth.POST("/thread/:threadId/artifacts", c.proxyPostThreadArtifact)
 		auth.GET("/thread/:threadId/workspaces", c.proxyThreadWorkspaces)
+		auth.GET("/thread/:threadId/workspace-binding", c.proxyGetThreadWorkspaceBinding)
+		auth.PUT("/thread/:threadId/workspace-binding", c.proxyPutThreadWorkspaceBinding)
+		// V3-37: user-visible Maomi project workspaces.
+		auth.GET("/maomi-workspaces/root", c.proxyMaomiWorkspaceRoot)
+		auth.POST("/maomi-workspaces/propose", c.proxyPostMaomiWorkspacePropose)
+		auth.POST("/maomi-workspaces", c.proxyPostMaomiWorkspace)
+		auth.GET("/maomi-workspaces", c.proxyListMaomiWorkspaces)
+		auth.GET("/maomi-workspaces/:workspaceId", c.proxyGetMaomiWorkspace)
+		auth.POST("/maomi-workspaces/:workspaceId/archive", c.proxyArchiveMaomiWorkspace)
 		// im_web creates new project group threads via
 		// POST /v1/threads (handled by the bridge below).
 		auth.POST("/threads", c.proxyCreateThread)
@@ -539,6 +548,111 @@ func (c *Clowder) proxyThreadWorkspaces(ctx *wkhttp.Context) {
 
 	body, _ := io.ReadAll(res.Body)
 	ctx.Data(res.StatusCode, "application/json; charset=utf-8", body)
+}
+
+func (c *Clowder) proxyToClowder(ctx *wkhttp.Context, method string, upstreamPath string, body io.Reader, unavailableCode string) {
+	if !c.config.IsConfigured() {
+		ctx.JSON(http.StatusBadGateway, map[string]string{"error": "clowder_bridge_not_configured"})
+		return
+	}
+	endpoint := strings.TrimRight(c.config.APIBaseURL, "/") + upstreamPath
+	if method == http.MethodGet {
+		if rawQuery := strings.TrimSpace(ctx.Request.URL.RawQuery); rawQuery != "" {
+			endpoint += "?" + rawQuery
+		}
+	}
+	req, err := http.NewRequest(method, endpoint, body)
+	if err != nil {
+		ctx.JSON(http.StatusInternalServerError, map[string]string{"error": "build_request_failed", "message": err.Error()})
+		return
+	}
+	if method != http.MethodGet {
+		req.Header.Set("Content-Type", "application/json")
+	}
+	c.applyDirectoryUserHeader(req, ctx.GetLoginUID())
+
+	res, err := c.httpClient().Do(req)
+	if err != nil {
+		ctx.JSON(http.StatusBadGateway, map[string]string{"error": unavailableCode, "message": err.Error()})
+		return
+	}
+	defer res.Body.Close()
+
+	respBody, _ := io.ReadAll(res.Body)
+	ctx.Data(res.StatusCode, "application/json; charset=utf-8", respBody)
+}
+
+func (c *Clowder) readJSONBody(ctx *wkhttp.Context) ([]byte, bool) {
+	body, err := io.ReadAll(ctx.Request.Body)
+	if err != nil {
+		ctx.JSON(http.StatusBadRequest, map[string]string{"error": "invalid_body", "message": err.Error()})
+		return nil, false
+	}
+	return body, true
+}
+
+func (c *Clowder) proxyMaomiWorkspaceRoot(ctx *wkhttp.Context) {
+	c.proxyToClowder(ctx, http.MethodGet, "/api/maomi-workspaces/root", nil, "maomi_workspace_root_unavailable")
+}
+
+func (c *Clowder) proxyPostMaomiWorkspacePropose(ctx *wkhttp.Context) {
+	body, ok := c.readJSONBody(ctx)
+	if !ok {
+		return
+	}
+	c.proxyToClowder(ctx, http.MethodPost, "/api/maomi-workspaces/propose", bytes.NewReader(body), "maomi_workspace_propose_unavailable")
+}
+
+func (c *Clowder) proxyPostMaomiWorkspace(ctx *wkhttp.Context) {
+	body, ok := c.readJSONBody(ctx)
+	if !ok {
+		return
+	}
+	c.proxyToClowder(ctx, http.MethodPost, "/api/maomi-workspaces", bytes.NewReader(body), "maomi_workspace_create_unavailable")
+}
+
+func (c *Clowder) proxyListMaomiWorkspaces(ctx *wkhttp.Context) {
+	c.proxyToClowder(ctx, http.MethodGet, "/api/maomi-workspaces", nil, "maomi_workspace_list_unavailable")
+}
+
+func (c *Clowder) proxyGetMaomiWorkspace(ctx *wkhttp.Context) {
+	workspaceID := strings.TrimSpace(ctx.Param("workspaceId"))
+	if workspaceID == "" {
+		ctx.JSON(http.StatusBadRequest, map[string]string{"error": "workspace_id_required"})
+		return
+	}
+	c.proxyToClowder(ctx, http.MethodGet, "/api/maomi-workspaces/"+url.PathEscape(workspaceID), nil, "maomi_workspace_get_unavailable")
+}
+
+func (c *Clowder) proxyArchiveMaomiWorkspace(ctx *wkhttp.Context) {
+	workspaceID := strings.TrimSpace(ctx.Param("workspaceId"))
+	if workspaceID == "" {
+		ctx.JSON(http.StatusBadRequest, map[string]string{"error": "workspace_id_required"})
+		return
+	}
+	c.proxyToClowder(ctx, http.MethodPost, "/api/maomi-workspaces/"+url.PathEscape(workspaceID)+"/archive", nil, "maomi_workspace_archive_unavailable")
+}
+
+func (c *Clowder) proxyGetThreadWorkspaceBinding(ctx *wkhttp.Context) {
+	threadID := strings.TrimSpace(ctx.Param("threadId"))
+	if threadID == "" {
+		ctx.JSON(http.StatusBadRequest, map[string]string{"error": "thread_id_required"})
+		return
+	}
+	c.proxyToClowder(ctx, http.MethodGet, "/api/threads/"+url.PathEscape(threadID)+"/workspace-binding", nil, "thread_workspace_binding_unavailable")
+}
+
+func (c *Clowder) proxyPutThreadWorkspaceBinding(ctx *wkhttp.Context) {
+	threadID := strings.TrimSpace(ctx.Param("threadId"))
+	if threadID == "" {
+		ctx.JSON(http.StatusBadRequest, map[string]string{"error": "thread_id_required"})
+		return
+	}
+	body, ok := c.readJSONBody(ctx)
+	if !ok {
+		return
+	}
+	c.proxyToClowder(ctx, http.MethodPut, "/api/threads/"+url.PathEscape(threadID)+"/workspace-binding", bytes.NewReader(body), "thread_workspace_binding_update_unavailable")
 }
 
 // proxyCreateThread proxies `POST /api/threads` to Clowder 3004. im_web's

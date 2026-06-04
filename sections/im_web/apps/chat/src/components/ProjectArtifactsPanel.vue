@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { computed, onMounted, ref, watch } from 'vue';
 import { apiClient } from '@tsdaodao/base-vue';
-import type { ClowderAgent } from '@tsdaodao/datasource-vue';
+import type { ClowderAgent, ClowderMaomiWorkspace } from '@tsdaodao/datasource-vue';
 import CatWorkBadge from './CatWorkBadge.vue';
 
 defineOptions({ name: 'ProjectArtifactsPanel' });
@@ -9,6 +9,7 @@ defineOptions({ name: 'ProjectArtifactsPanel' });
 interface Props {
   threadId: string;
   agentDirectory?: ClowderAgent[];
+  activeWorkspace?: ClowderMaomiWorkspace;
 }
 
 const props = defineProps<Props>();
@@ -19,6 +20,8 @@ type ArtifactStatus = 'available' | 'missing' | 'outside_project' | 'forbidden' 
 interface ThreadArtifact {
   path: string;
   absolutePath: string;
+  workspaceId?: string;
+  workspaceRelativePath?: string;
   kind: ArtifactKind;
   description?: string;
   ownerCatId: string;
@@ -52,9 +55,9 @@ const loading = ref(false);
 const error = ref<string | null>(null);
 let pollTimer: ReturnType<typeof setInterval> | null = null;
 
-const artifactsByOwner = computed(() => {
+function groupArtifactsByOwner(input: ThreadArtifact[]) {
   const map = new Map<string, ThreadArtifact[]>();
-  for (const a of artifacts.value) {
+  for (const a of input) {
     const list = map.get(a.ownerCatId) ?? [];
     list.push(a);
     map.set(a.ownerCatId, list);
@@ -63,7 +66,22 @@ const artifactsByOwner = computed(() => {
     ownerCatId,
     items: items.sort((a, b) => b.createdAt - a.createdAt),
   }));
+}
+
+const activeWorkspaceArtifacts = computed(() => {
+  if (!props.activeWorkspace?.workspaceId && !props.activeWorkspace?.id) return artifacts.value;
+  const activeId = props.activeWorkspace.workspaceId || props.activeWorkspace.id;
+  return artifacts.value.filter((artifact) => !artifact.workspaceId || artifact.workspaceId === activeId);
 });
+
+const otherWorkspaceArtifacts = computed(() => {
+  if (!props.activeWorkspace?.workspaceId && !props.activeWorkspace?.id) return [];
+  const activeId = props.activeWorkspace.workspaceId || props.activeWorkspace.id;
+  return artifacts.value.filter((artifact) => artifact.workspaceId && artifact.workspaceId !== activeId);
+});
+
+const activeArtifactsByOwner = computed(() => groupArtifactsByOwner(activeWorkspaceArtifacts.value));
+const otherArtifactsByOwner = computed(() => groupArtifactsByOwner(otherWorkspaceArtifacts.value));
 
 function lookupAgent(catId: string): ClowderAgent | undefined {
   return props.agentDirectory?.find((a) => a.catId === catId);
@@ -196,36 +214,11 @@ if (typeof window !== 'undefined') {
     </div>
 
     <div v-else class="artifacts-panel__groups">
-      <section v-if="workspaces.length > 0" class="artifacts-panel__workspace-section">
+      <section v-if="activeWorkspace" class="artifacts-panel__workspace-section">
         <header class="artifacts-panel__group-header">
-          <span class="artifacts-panel__owner-name">Runtime Workspaces</span>
+          <span class="artifacts-panel__owner-name">Project Workspace</span>
+          <span class="artifacts-panel__workspace-label">{{ activeWorkspace.relativePath }}</span>
         </header>
-        <ul class="artifacts-panel__list">
-          <li
-            v-for="workspace in workspaces"
-            :key="workspace.id"
-            class="artifacts-panel__item"
-          >
-            <div class="artifacts-panel__workspace">
-              <div class="artifacts-panel__workspace-main">
-                <span class="artifacts-panel__filename">{{ workspace.path.split('/').pop() }}</span>
-                <span class="artifacts-panel__kind">{{ formatWorkspaceType(workspace.type) }}</span>
-                <span
-                  class="artifacts-panel__status"
-                  :class="workspace.projectScoped ? 'artifacts-panel__status--available' : 'artifacts-panel__status--outside_project'"
-                >
-                  {{ workspace.projectScoped ? '项目内' : '待检查' }}
-                </span>
-              </div>
-              <div class="artifacts-panel__desc">
-                @{{ workspaceOwner(workspace) }} · {{ workspace.dirtyStatus }} · {{ workspace.cleanupPolicy }}
-              </div>
-              <div class="artifacts-panel__reason">
-                {{ workspace.path }}
-              </div>
-            </div>
-          </li>
-        </ul>
       </section>
 
       <div v-if="hasDiagnosticArtifacts()" class="artifacts-panel__diagnostic">
@@ -235,8 +228,59 @@ if (typeof window !== 'undefined') {
         <span v-if="diagnostics.forbidden">无权限 {{ diagnostics.forbidden }}</span>
       </div>
       <section
-        v-for="group in artifactsByOwner"
-        :key="group.ownerCatId"
+        v-for="group in activeArtifactsByOwner"
+        :key="'active:' + group.ownerCatId"
+        class="artifacts-panel__group"
+      >
+        <header class="artifacts-panel__group-header">
+          <CatWorkBadge
+            v-if="lookupAgent(group.ownerCatId)"
+            :cat="lookupAgent(group.ownerCatId)!"
+            :available="true"
+            :selected="false"
+            compact
+          />
+          <span v-else class="artifacts-panel__owner-name">
+            @{{ group.ownerCatId }}
+          </span>
+        </header>
+        <ul class="artifacts-panel__list">
+          <li
+            v-for="artifact in group.items"
+            :key="artifact.taskId + ':' + artifact.path"
+            class="artifacts-panel__item"
+          >
+            <button
+              type="button"
+              class="artifacts-panel__item-btn"
+              :class="{ 'is-unavailable': artifactStatus(artifact) !== 'available' }"
+              :disabled="artifactStatus(artifact) !== 'available'"
+              @click="openArtifact(artifact)"
+            >
+              <span class="artifacts-panel__filename">{{ artifact.workspaceRelativePath || artifact.path.split('/').pop() }}</span>
+              <span class="artifacts-panel__kind">
+                {{ artifact.kind }}
+              </span>
+              <span
+                class="artifacts-panel__status"
+                :class="`artifacts-panel__status--${artifactStatus(artifact)}`"
+              >
+                {{ artifactStatusText(artifactStatus(artifact)) }}
+              </span>
+              <span v-if="artifact.description" class="artifacts-panel__desc">
+                {{ artifact.description }}
+              </span>
+            </button>
+            <div v-if="artifactStatusReason(artifact)" class="artifacts-panel__reason">
+              {{ artifactStatusReason(artifact) }}
+            </div>
+          </li>
+        </ul>
+      </section>
+
+      <section
+        v-for="group in otherArtifactsByOwner"
+        :key="'other:' + group.ownerCatId"
         class="artifacts-panel__group"
       >
         <header class="artifacts-panel__group-header">
@@ -284,6 +328,38 @@ if (typeof window !== 'undefined') {
           </li>
         </ul>
       </section>
+
+      <section v-if="workspaces.length > 0" class="artifacts-panel__workspace-section">
+        <header class="artifacts-panel__group-header">
+          <span class="artifacts-panel__owner-name">Runtime Workspaces</span>
+        </header>
+        <ul class="artifacts-panel__list">
+          <li
+            v-for="workspace in workspaces"
+            :key="workspace.id"
+            class="artifacts-panel__item"
+          >
+            <div class="artifacts-panel__workspace">
+              <div class="artifacts-panel__workspace-main">
+                <span class="artifacts-panel__filename">{{ workspace.path.split('/').pop() }}</span>
+                <span class="artifacts-panel__kind">{{ formatWorkspaceType(workspace.type) }}</span>
+                <span
+                  class="artifacts-panel__status"
+                  :class="workspace.projectScoped ? 'artifacts-panel__status--available' : 'artifacts-panel__status--outside_project'"
+                >
+                  {{ workspace.projectScoped ? '项目内' : '待检查' }}
+                </span>
+              </div>
+              <div class="artifacts-panel__desc">
+                @{{ workspaceOwner(workspace) }} · {{ workspace.dirtyStatus }} · {{ workspace.cleanupPolicy }}
+              </div>
+              <div class="artifacts-panel__reason">
+                {{ workspace.path }}
+              </div>
+            </div>
+          </li>
+        </ul>
+      </section>
     </div>
   </div>
 </template>
@@ -296,7 +372,7 @@ if (typeof window !== 'undefined') {
   padding: 12px;
   background: var(--color-bg-1, #fdf8f3);
   border: 1px solid var(--color-border-2, #e5e0d8);
-  border-radius: 14px;
+  border-radius: 8px;
 }
 
 .artifacts-panel__header {
@@ -402,6 +478,12 @@ if (typeof window !== 'undefined') {
   font-size: 13px;
   font-weight: 600;
   color: var(--color-text-2, #3a3a3a);
+}
+
+.artifacts-panel__workspace-label {
+  margin-left: 8px;
+  color: var(--color-text-3, #6b6b6b);
+  font-size: 12px;
 }
 
 .artifacts-panel__list {

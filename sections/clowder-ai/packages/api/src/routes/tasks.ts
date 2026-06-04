@@ -22,8 +22,8 @@ export interface TasksRoutesOptions {
 
 const VALID_STATUSES = ['todo', 'doing', 'blocked', 'done'] as const;
 
-/** createdBy accepts any registered catId OR 'user' */
-const createdBySchema = z.union([catIdSchema(), z.literal('user')]);
+/** createdBy accepts any registered catId, human user, or coordinator workflow. */
+const createdBySchema = z.union([catIdSchema(), z.literal('user'), z.literal('coordinator')]);
 
 const createSchema = z.object({
   threadId: z.string().min(1),
@@ -34,6 +34,8 @@ const createSchema = z.object({
   coordinationId: z.string().min(1).optional(),
   dependsOn: z.array(z.string().min(1)).optional(),
   artifactRefs: z.array(z.string().min(1)).optional(),
+  workspaceId: z.string().min(1).optional(),
+  workspaceRelativePath: z.string().min(1).optional(),
 });
 
 const updateSchema = z
@@ -44,6 +46,8 @@ const updateSchema = z
     why: z.string().max(1000).optional(),
     dependsOn: z.array(z.string().min(1)).optional(),
     artifactRefs: z.array(z.string().min(1)).optional(),
+    workspaceId: z.string().min(1).optional(),
+    workspaceRelativePath: z.string().min(1).optional(),
   })
   .refine((data) => Object.keys(data).length > 0, {
     message: 'At least one field must be provided',
@@ -55,12 +59,14 @@ function toCreateInput(data: z.infer<typeof createSchema>): CreateTaskInput {
     threadId: data.threadId,
     title: data.title,
     why: data.why,
-    createdBy: data.createdBy as CatId | 'user',
+    createdBy: data.createdBy as CreateTaskInput['createdBy'],
   };
   if (data.ownerCatId != null) input.ownerCatId = data.ownerCatId as CatId;
   if (data.coordinationId) input.coordinationId = data.coordinationId;
   if (data.dependsOn) input.dependsOn = data.dependsOn;
   if (data.artifactRefs) input.artifactRefs = data.artifactRefs;
+  if (data.workspaceId) input.workspaceId = data.workspaceId;
+  if (data.workspaceRelativePath) input.workspaceRelativePath = data.workspaceRelativePath;
   return input;
 }
 
@@ -73,6 +79,8 @@ function toUpdateInput(data: z.infer<typeof updateSchema>): UpdateTaskInput {
   if (data.ownerCatId !== undefined) input.ownerCatId = data.ownerCatId as CatId | null;
   if (data.dependsOn !== undefined) input.dependsOn = data.dependsOn;
   if (data.artifactRefs !== undefined) input.artifactRefs = data.artifactRefs;
+  if (data.workspaceId !== undefined) input.workspaceId = data.workspaceId;
+  if (data.workspaceRelativePath !== undefined) input.workspaceRelativePath = data.workspaceRelativePath;
   return input;
 }
 

@@ -14,6 +14,8 @@ interface DeploymentActionRecord {
   actorUserId: string;
   target?: string;
   environment?: string;
+  workspaceId?: string;
+  workspacePath?: string;
   missingFields: string[];
   createdAt: number;
 }
@@ -71,6 +73,8 @@ export const connectorDeploymentActionRoutes: FastifyPluginAsync = async (app) =
       actorUserId,
       target: String(body.target || '').trim() || undefined,
       environment: String(body.environment || '').trim() || undefined,
+      workspaceId: String(body.workspaceId || '').trim() || undefined,
+      workspacePath: String(body.workspacePath || body.rootPath || '').trim() || undefined,
       missingFields,
       createdAt: Date.now(),
     };

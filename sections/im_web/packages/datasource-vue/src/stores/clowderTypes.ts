@@ -84,5 +84,15 @@ export interface CoordinatorKickoff {
   messageId: string;
   suggestedCats: readonly string[];
   reason?: string;
+  workspaceProposal?: {
+    displayName: string;
+    slug: string;
+    rootPath: string;
+    relativePath: string;
+    sourceIntent: string;
+    confidence: number;
+    collision?: 'none' | 'existing_active' | 'existing_archived' | 'slug_taken';
+    existingWorkspaceId?: string;
+  };
   createdAt: number;
 }

@@ -79,6 +79,8 @@ export class RedisTaskStore implements ITaskStore {
       coordinationId: input.coordinationId,
       dependsOn: input.dependsOn,
       artifactRefs: input.artifactRefs,
+      workspaceId: input.workspaceId,
+      workspaceRelativePath: input.workspaceRelativePath,
     };
 
     await this.writeTask(task);
@@ -137,6 +139,8 @@ export class RedisTaskStore implements ITaskStore {
         coordinationId: input.coordinationId,
         dependsOn: input.dependsOn,
         artifactRefs: input.artifactRefs,
+        workspaceId: input.workspaceId,
+        workspaceRelativePath: input.workspaceRelativePath,
       };
       const written = await this.writeTask(task, { syncSubject: false, requireSubjectOwner: true });
       if (!written) {
@@ -193,6 +197,8 @@ export class RedisTaskStore implements ITaskStore {
         coordinationId: input.coordinationId,
         dependsOn: input.dependsOn,
         artifactRefs: input.artifactRefs,
+        workspaceId: input.workspaceId,
+        workspaceRelativePath: input.workspaceRelativePath,
       };
       const written = await this.writeTask(task, { syncSubject: false, requireSubjectOwner: true });
       if (!written) {
@@ -217,6 +223,8 @@ export class RedisTaskStore implements ITaskStore {
       coordinationId: input.coordinationId ?? existing.coordinationId,
       dependsOn: input.dependsOn ?? existing.dependsOn,
       artifactRefs: input.artifactRefs ?? existing.artifactRefs,
+      workspaceId: input.workspaceId ?? existing.workspaceId,
+      workspaceRelativePath: input.workspaceRelativePath ?? existing.workspaceRelativePath,
       updatedAt: now,
     };
 
@@ -277,6 +285,8 @@ export class RedisTaskStore implements ITaskStore {
       ...(input.automationState !== undefined ? { automationState: input.automationState } : {}),
       ...(input.dependsOn !== undefined ? { dependsOn: input.dependsOn } : {}),
       ...(input.artifactRefs !== undefined ? { artifactRefs: input.artifactRefs } : {}),
+      ...(input.workspaceId !== undefined ? { workspaceId: input.workspaceId } : {}),
+      ...(input.workspaceRelativePath !== undefined ? { workspaceRelativePath: input.workspaceRelativePath } : {}),
       updatedAt: Date.now(),
     };
 
@@ -503,6 +513,12 @@ export class RedisTaskStore implements ITaskStore {
     if (task.artifactRefs) {
       out.artifactRefs = JSON.stringify(task.artifactRefs);
     }
+    if (task.workspaceId) {
+      out.workspaceId = task.workspaceId;
+    }
+    if (task.workspaceRelativePath) {
+      out.workspaceRelativePath = task.workspaceRelativePath;
+    }
     return out;
   }
 
@@ -521,6 +537,8 @@ export class RedisTaskStore implements ITaskStore {
       updatedAt: parseInt(data.updatedAt ?? '0', 10),
       userId: data.userId || undefined,
       coordinationId: data.coordinationId || undefined,
+      workspaceId: data.workspaceId || undefined,
+      workspaceRelativePath: data.workspaceRelativePath || undefined,
     };
     let task = base;
     if (data.automationState) {

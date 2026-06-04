@@ -343,6 +343,10 @@ export interface InvocationDeps {
   readonly runtimeSessionStore?: IRuntimeSessionStore;
   /** V3-32: project-scoped runtime/workspace metadata ledger. */
   readonly runtimeWorkspaceStore?: IRuntimeWorkspaceStore;
+  /** V3-37: user-visible Maomi project workspaces. */
+  readonly maomiWorkspaceStore?: import('../../../../maomi-workspaces/MaomiWorkspaceStore.js').IMaomiWorkspaceStore;
+  /** V3-37: active workspace binding per thread. */
+  readonly threadWorkspaceBindingStore?: import('../../../../maomi-workspaces/ThreadWorkspaceBindingStore.js').IThreadWorkspaceBindingStore;
   /** F24 Phase B: Session sealer for auto-seal when context threshold reached */
   readonly sessionSealer?: ISessionSealer;
   /** F24 Phase C: Transcript writer for event collection + flush on seal */
@@ -747,12 +751,28 @@ export async function* invokeSingleCat(deps: InvocationDeps, params: InvocationP
 
     // Resolve workingDirectory from thread's projectPath
     let workingDirectory: string | undefined;
+    let activeMaomiWorkspace:
+      | import('../../../../maomi-workspaces/MaomiWorkspaceStore.js').MaomiWorkspace
+      | null = null;
     let bootcampWorkspaceError: Error | undefined;
     if (threadStore) {
       try {
         const thread = await preflightRace(Promise.resolve(threadStore.get(threadId)), 'threadStore.get', signal);
         if (thread?.createdAt) threadCreatedAt = thread.createdAt;
-        if (thread?.projectPath && thread.projectPath !== 'default') {
+        const binding = deps.threadWorkspaceBindingStore
+          ? await preflightRace(Promise.resolve(deps.threadWorkspaceBindingStore.get(threadId)), 'threadWorkspaceBindingStore.get', signal)
+          : null;
+        if (binding?.activeWorkspaceId && deps.maomiWorkspaceStore) {
+          activeMaomiWorkspace = await preflightRace(
+            Promise.resolve(deps.maomiWorkspaceStore.get(binding.activeWorkspaceId)),
+            'maomiWorkspaceStore.get',
+            signal,
+          );
+          if (activeMaomiWorkspace && isUnderAllowedRoot(activeMaomiWorkspace.rootPath)) {
+            workingDirectory = activeMaomiWorkspace.rootPath;
+          }
+        }
+        if (!workingDirectory && thread?.projectPath && thread.projectPath !== 'default') {
           // F101: Game threads use virtual projectPaths (e.g. 'games/werewolf') for
           // categorization only — they are not real filesystem directories. Skip them
           // to avoid triggering the F070 governance gate on a non-existent path.
@@ -801,6 +821,11 @@ export async function* invokeSingleCat(deps: InvocationDeps, params: InvocationP
           callbackEnv.CLOWDER_PROJECT_RUNTIME_ROOT = projectRuntimeRoot.runtimeRoot;
           callbackEnv.CAT_CAFE_PROJECT_RUNTIME_ROOT = projectRuntimeRoot.runtimeRoot;
           callbackEnv.CAT_CAFE_PROJECT_ROOT = projectRuntimeRoot.projectRoot;
+          if (activeMaomiWorkspace) {
+            callbackEnv.MAOMI_WORKSPACE_ID = activeMaomiWorkspace.id;
+            callbackEnv.MAOMI_WORKSPACE_ROOT = activeMaomiWorkspace.rootPath;
+            callbackEnv.MAOMI_PROJECT_ROOT = activeMaomiWorkspace.rootPath;
+          }
           callbackEnv.CLOWDER_WORKSPACE_ID = registeredRuntimeWorkspace?.id ?? `${threadId}:${invocationId}`;
           callbackEnv.ALLOWED_WORKSPACE_DIRS = buildAllowedWorkspaceDirs(
             projectRuntimeRoot.projectRoot,
@@ -1280,13 +1305,16 @@ export async function* invokeSingleCat(deps: InvocationDeps, params: InvocationP
     const runtimeWorkspaceHint = projectRuntimeRoot
       ? [
           '[Project runtime workspace policy]',
+          activeMaomiWorkspace
+            ? `Active Maomi workspace: ${activeMaomiWorkspace.displayName} (${activeMaomiWorkspace.relativePath}, workspaceId=${activeMaomiWorkspace.id})`
+            : '',
           `Bound project root: ${projectRuntimeRoot.projectRoot}`,
           `Project runtime root: ${projectRuntimeRoot.runtimeRoot}`,
           registeredRuntimeWorkspace
             ? `Registered agent workspace: ${registeredRuntimeWorkspace.path} (workspaceId=${registeredRuntimeWorkspace.id})`
             : 'Registered agent workspace: unavailable; keep project runtime output under the project runtime root.',
           'Use the bound project root for canonical edits. If you need an isolated checkout, QA copy, patch staging, cache, or generated workspace output, place it under CLOWDER_PROJECT_RUNTIME_ROOT and declare resulting artifacts instead of writing project-specific work under /tmp.',
-        ].join('\n')
+        ].filter(Boolean).join('\n')
       : '';
     const promptWithMission = [missionPrefix, runtimeWorkspaceHint, prompt].filter(Boolean).join('\n\n');
 

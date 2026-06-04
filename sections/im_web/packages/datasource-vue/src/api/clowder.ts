@@ -177,6 +177,7 @@ export interface ClowderDeploymentActionRequest extends ClowderConversationRef {
   sourceMessageId?: string;
   target?: string;
   environment?: string;
+  workspaceId?: string;
   missingFields?: string[];
   directCatId?: string;
   targetCatIds?: string[];
@@ -255,6 +256,8 @@ export interface ClowderThreadTask {
   artifactRefs?: readonly string[];
   dependsOn?: readonly string[];
   coordinationId?: string;
+  workspaceId?: string;
+  workspaceRelativePath?: string;
 }
 
 export type ClowderThreadTaskDiagnosticsState =
@@ -267,6 +270,9 @@ export interface ClowderThreadTaskMismatchDiagnostic {
   taskId: string;
   expectedThreadId: string;
   actualThreadId: string;
+  expectedWorkspaceId?: string | null;
+  taskWorkspaceId?: string | null;
+  threadWorkspaceMismatch?: boolean;
   title?: string;
   ownerCatId?: string | null;
   status?: string;
@@ -276,9 +282,11 @@ export interface ClowderThreadTaskDiagnostics {
   state: ClowderThreadTaskDiagnosticsState;
   taskCount: number;
   queryThreadId: string;
+  activeWorkspaceId?: string | null;
   observedTaskIds: string[];
   missingTaskIds: string[];
   mismatchedTasks: ClowderThreadTaskMismatchDiagnostic[];
+  workspaceMismatchedTaskIds?: string[];
 }
 
 export interface ClowderThreadTasksResponse {
@@ -290,6 +298,66 @@ export interface ClowderThreadTasksResponse {
 export interface ClowderThreadTasksRequestOptions {
   expectedTaskId?: string;
   observedTaskIds?: string[];
+}
+
+export type ClowderMaomiWorkspaceStatus = 'active' | 'archived' | 'discarded';
+
+export interface ClowderMaomiWorkspace {
+  id: string;
+  workspaceId: string;
+  userId?: string;
+  slug: string;
+  displayName: string;
+  rootPath: string;
+  relativePath: string;
+  sourceIntent?: string;
+  linkedThreadIds: string[];
+  linkedTaskIds: string[];
+  createdBy?: string;
+  createdAt: number;
+  updatedAt: number;
+  lastActiveAt: number;
+  status: ClowderMaomiWorkspaceStatus;
+}
+
+export interface ClowderWorkspaceProposal {
+  displayName: string;
+  slug: string;
+  rootPath: string;
+  relativePath: string;
+  sourceIntent: string;
+  confidence: number;
+  collision?: 'none' | 'existing_active' | 'existing_archived' | 'slug_taken';
+  existingWorkspaceId?: string;
+}
+
+export interface ClowderWorkspaceBinding {
+  threadId: string;
+  userId: string;
+  activeWorkspaceId: string | null;
+  recentWorkspaceIds: string[];
+  updatedAt: number;
+}
+
+export interface ClowderWorkspaceBindingResponse {
+  threadId: string;
+  binding: ClowderWorkspaceBinding;
+  activeWorkspace: ClowderMaomiWorkspace | null;
+  diagnostics?: {
+    state: 'ok' | 'no_active_workspace' | 'project_path_mismatch';
+    threadProjectPath?: string | null;
+    activeWorkspaceId?: string | null;
+    activeWorkspaceRoot?: string | null;
+  };
+}
+
+export interface ClowderWorkspaceRootResponse {
+  workspaceRoot: string;
+  rootPath: string;
+  source: string;
+  diagnostics?: {
+    insideLaunchedProject?: boolean;
+  };
 }
 
 function unwrapApiData<T>(response: T | { data?: T }): T {
@@ -343,6 +411,41 @@ export const clowderApi = {
       { params },
     );
     return unwrapApiData(response as unknown as ClowderThreadTasksResponse | { data?: ClowderThreadTasksResponse });
+  },
+  async getWorkspaceRoot() {
+    const response = await apiClient.get<ClowderWorkspaceRootResponse>('clowder/maomi-workspaces/root');
+    return unwrapApiData(response as unknown as ClowderWorkspaceRootResponse | { data?: ClowderWorkspaceRootResponse });
+  },
+  async proposeWorkspace(data: { intentText: string; threadId?: string }) {
+    const response = await apiClient.post<{ proposal: ClowderWorkspaceProposal }>('clowder/maomi-workspaces/propose', data);
+    return unwrapApiData(response as unknown as { proposal: ClowderWorkspaceProposal } | { data?: { proposal: ClowderWorkspaceProposal } });
+  },
+  async createWorkspace(data: {
+    slug: string;
+    displayName: string;
+    sourceIntent?: string;
+    createdBy?: 'user' | 'coordinator' | 'cat' | 'system';
+    threadId?: string;
+  }) {
+    const response = await apiClient.post<{ workspace: ClowderMaomiWorkspace }>('clowder/maomi-workspaces', data);
+    return unwrapApiData(response as unknown as { workspace: ClowderMaomiWorkspace } | { data?: { workspace: ClowderMaomiWorkspace } });
+  },
+  async listWorkspaces(params?: { status?: ClowderMaomiWorkspaceStatus }) {
+    const response = await apiClient.get<{ workspaces: ClowderMaomiWorkspace[] }>('clowder/maomi-workspaces', { params });
+    return unwrapApiData(response as unknown as { workspaces: ClowderMaomiWorkspace[] } | { data?: { workspaces: ClowderMaomiWorkspace[] } });
+  },
+  async getWorkspaceBinding(threadId: string) {
+    const response = await apiClient.get<ClowderWorkspaceBindingResponse>(
+      `clowder/thread/${encodeURIComponent(threadId)}/workspace-binding`,
+    );
+    return unwrapApiData(response as unknown as ClowderWorkspaceBindingResponse | { data?: ClowderWorkspaceBindingResponse });
+  },
+  async setWorkspaceBinding(threadId: string, data: { workspaceId: string | null; mirrorProjectPath?: boolean }) {
+    const response = await apiClient.put<ClowderWorkspaceBindingResponse>(
+      `clowder/thread/${encodeURIComponent(threadId)}/workspace-binding`,
+      data,
+    );
+    return unwrapApiData(response as unknown as ClowderWorkspaceBindingResponse | { data?: ClowderWorkspaceBindingResponse });
   },
   sendDeploymentAction(data: ClowderDeploymentActionRequest) {
     return apiClient.post<ClowderDeploymentActionResponse>('clowder/conversation/deployment-action', data);

@@ -1,6 +1,5 @@
 <script setup lang="ts">
 import { computed, onMounted, ref, watch } from 'vue';
-import { apiClient } from '@tsdaodao/base-vue';
 import { useClowderStore, type ClowderAgent, type CoordinatorKickoff } from '@tsdaodao/datasource-vue';
 import CatWorkBadge from './CatWorkBadge.vue';
 
@@ -21,16 +20,24 @@ const emit = defineEmits<{
 
 const clowderStore = useClowderStore();
 
-const title = ref(`项目群聊 · ${new Date().toLocaleDateString('zh-CN')}`);
-const projectPath = ref('');
+const title = ref(props.kickoff.workspaceProposal?.displayName || `项目群聊 · ${new Date().toLocaleDateString('zh-CN')}`);
+const workspaceSlug = ref(props.kickoff.workspaceProposal?.slug || '');
+const workspaceDisplayName = ref(props.kickoff.workspaceProposal?.displayName || title.value);
+const workspaceProposal = ref(props.kickoff.workspaceProposal);
 const selectedCatIds = ref<Set<string>>(new Set(props.kickoff.suggestedCats ?? []));
 const showAddMore = ref(false);
 const availableExtraCats = ref<ClowderAgent[]>([]);
 const creating = ref(false);
 const createError = ref<string | null>(null);
-const pathError = ref<string | null>(null);
-const pathValidating = ref(false);
-const pathHint = ref<string | null>(null);
+
+const currentThreadId = computed(() => {
+  const conversation = clowderStore.getConversation(props.channelId, props.channelType);
+  return conversation?.binding?.threadId || '';
+});
+
+const workspaceRelativePath = computed(() => {
+  return workspaceProposal.value?.relativePath || (workspaceSlug.value ? `maomi_workspace/${workspaceSlug.value}` : '');
+});
 
 const recommendedAgents = computed<ClowderAgent[]>(() => {
   const directory = clowderStore.agentDirectories[`${props.channelId}-${props.channelType}`];
@@ -65,46 +72,6 @@ function toggleCat(catId: string) {
   selectedCatIds.value = next;
 }
 
-async function validatePath() {
-  pathError.value = null;
-  pathHint.value = null;
-  const trimmed = projectPath.value.trim();
-  if (!trimmed) {
-    return;
-  }
-  pathValidating.value = true;
-  try {
-    const response = await apiClient.get<{
-      valid: boolean;
-      absolute?: string;
-      reason?: string;
-    }>('clowder/workspace/validate', { params: { path: trimmed } });
-    const data = response.data;
-    if (!data || typeof data !== 'object') {
-      pathError.value = '路径校验失败';
-      return;
-    }
-    if (data.valid) {
-      pathHint.value = `已锁定到 ${data.absolute}`;
-    } else {
-      pathError.value = data.reason || '路径无效';
-    }
-  } catch (err) {
-    pathError.value = err instanceof Error ? err.message : '路径校验失败';
-  } finally {
-    pathValidating.value = false;
-  }
-}
-
-watch(projectPath, (next) => {
-  if (next.trim().length > 0) {
-    void validatePath();
-  } else {
-    pathError.value = null;
-    pathHint.value = null;
-  }
-});
-
 async function handleCreate() {
   if (creating.value) return;
   const trimmedTitle = title.value.trim();
@@ -112,8 +79,12 @@ async function handleCreate() {
     createError.value = '请填写群聊标题';
     return;
   }
-  if (!projectPath.value.trim()) {
-    createError.value = '请填写项目路径(workspace 内的目录)';
+  if (!workspaceSlug.value.trim()) {
+    createError.value = '请填写项目工作区 slug';
+    return;
+  }
+  if (!/^[a-z0-9][a-z0-9._-]{0,62}$/.test(workspaceSlug.value.trim())) {
+    createError.value = 'slug 只能使用小写字母、数字、点、下划线和连字符';
     return;
   }
   if (selectedCatIds.value.size === 0) {
@@ -123,6 +94,21 @@ async function handleCreate() {
   creating.value = true;
   createError.value = null;
   try {
+    let workspaceId = workspaceProposal.value?.collision === 'existing_active'
+      ? workspaceProposal.value.existingWorkspaceId
+      : undefined;
+    if (!workspaceId) {
+      const workspace = await clowderStore.createWorkspace({
+        slug: workspaceSlug.value.trim(),
+        displayName: workspaceDisplayName.value.trim() || trimmedTitle,
+        sourceIntent: workspaceProposal.value?.sourceIntent || props.kickoff.reason,
+        createdBy: 'coordinator',
+        threadId: currentThreadId.value || undefined,
+      });
+      workspaceId = workspace.workspaceId || workspace.id;
+    } else if (currentThreadId.value) {
+      await clowderStore.setWorkspaceBinding(currentThreadId.value, workspaceId);
+    }
     const response = await fetch(
       '/v1/threads',
       {
@@ -131,7 +117,7 @@ async function handleCreate() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           title: trimmedTitle,
-          projectPath: projectPath.value.trim(),
+          workspaceId,
           preferredCats: Array.from(selectedCatIds.value),
         }),
       },
@@ -166,6 +152,16 @@ onMounted(() => {
     clowderStore
       .loadAgentDirectory({ channelId: props.channelId, channelType: props.channelType as 1 | 2 })
       .catch(() => undefined);
+  }
+  if (!workspaceProposal.value && props.kickoff.reason) {
+    clowderStore.proposeWorkspace({
+      intentText: props.kickoff.reason,
+      threadId: currentThreadId.value || undefined,
+    }).then((proposal) => {
+      workspaceProposal.value = proposal;
+      workspaceSlug.value = proposal.slug;
+      workspaceDisplayName.value = proposal.displayName;
+    }).catch(() => undefined);
   }
 });
 </script>
@@ -229,20 +225,24 @@ onMounted(() => {
           />
         </label>
         <label class="coordinator-kickoff-card__field">
-          <span>项目路径(workspace 内)</span>
+          <span>项目工作区</span>
           <input
-            v-model="projectPath"
+            v-model="workspaceDisplayName"
             type="text"
-            placeholder="例如: ~/projects/todo-app 或 /Users/me/projects/todo-app"
+            maxlength="100"
+            placeholder="项目名称"
           />
-          <span v-if="pathError" class="coordinator-kickoff-card__hint coordinator-kickoff-card__hint--err">
-            {{ pathError }}
-          </span>
-          <span v-else-if="pathValidating" class="coordinator-kickoff-card__hint">
-            校验中…
-          </span>
-          <span v-else-if="pathHint" class="coordinator-kickoff-card__hint">
-            {{ pathHint }}
+        </label>
+        <label class="coordinator-kickoff-card__field">
+          <span>工作区 slug</span>
+          <input
+            v-model="workspaceSlug"
+            type="text"
+            maxlength="63"
+            placeholder="wedding"
+          />
+          <span class="coordinator-kickoff-card__hint">
+            {{ workspaceRelativePath || 'maomi_workspace/<slug>' }}
           </span>
         </label>
       </div>
@@ -277,7 +277,7 @@ onMounted(() => {
 .coordinator-kickoff-card {
   background: var(--color-bg-1, #fdf8f3);
   border: 1px solid var(--color-border-2, #e5e0d8);
-  border-radius: 16px;
+  border-radius: 8px;
   padding: 16px;
   margin: 8px 12px 12px;
   max-width: 560px;

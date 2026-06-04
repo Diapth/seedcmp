@@ -174,6 +174,10 @@ export interface AgentRouterOptions {
   runtimeSessionStore?: IRuntimeSessionStore;
   /** V3-32: project-scoped runtime/workspace metadata ledger. */
   runtimeWorkspaceStore?: import('../../../../runtime-workspaces/RuntimeWorkspaceStore.js').IRuntimeWorkspaceStore;
+  /** V3-37: user-visible Maomi project workspaces. */
+  maomiWorkspaceStore?: import('../../../../maomi-workspaces/MaomiWorkspaceStore.js').IMaomiWorkspaceStore;
+  /** V3-37: active workspace binding per thread. */
+  threadWorkspaceBindingStore?: import('../../../../maomi-workspaces/ThreadWorkspaceBindingStore.js').IThreadWorkspaceBindingStore;
   /** F24 Phase C: Transcript writer for event recording */
   transcriptWriter?: TranscriptWriter;
   /** F24 Phase D: Transcript reader for bootstrap injection */
@@ -241,6 +245,12 @@ export class AgentRouter {
   private runtimeWorkspaceStore:
     | import('../../../../runtime-workspaces/RuntimeWorkspaceStore.js').IRuntimeWorkspaceStore
     | undefined;
+  private maomiWorkspaceStore:
+    | import('../../../../maomi-workspaces/MaomiWorkspaceStore.js').IMaomiWorkspaceStore
+    | undefined;
+  private threadWorkspaceBindingStore:
+    | import('../../../../maomi-workspaces/ThreadWorkspaceBindingStore.js').IThreadWorkspaceBindingStore
+    | undefined;
   private transcriptWriter: TranscriptWriter | undefined;
   private transcriptReader: TranscriptReader | undefined;
   private sessionSealer: ISessionSealer | undefined;
@@ -306,6 +316,8 @@ export class AgentRouter {
     this.sessionChainStore = options.sessionChainStore;
     this.runtimeSessionStore = options.runtimeSessionStore;
     this.runtimeWorkspaceStore = options.runtimeWorkspaceStore;
+    this.maomiWorkspaceStore = options.maomiWorkspaceStore;
+    this.threadWorkspaceBindingStore = options.threadWorkspaceBindingStore;
     this.transcriptWriter = options.transcriptWriter;
     this.transcriptReader = options.transcriptReader;
     this.sessionSealer = options.sessionSealer;
@@ -885,6 +897,8 @@ export class AgentRouter {
         ...(this.sessionChainStore ? { sessionChainStore: this.sessionChainStore } : {}),
         ...(this.runtimeSessionStore ? { runtimeSessionStore: this.runtimeSessionStore } : {}),
         ...(this.runtimeWorkspaceStore ? { runtimeWorkspaceStore: this.runtimeWorkspaceStore } : {}),
+        ...(this.maomiWorkspaceStore ? { maomiWorkspaceStore: this.maomiWorkspaceStore } : {}),
+        ...(this.threadWorkspaceBindingStore ? { threadWorkspaceBindingStore: this.threadWorkspaceBindingStore } : {}),
         ...(this.transcriptWriter ? { transcriptWriter: this.transcriptWriter } : {}),
         ...(this.transcriptReader ? { transcriptReader: this.transcriptReader } : {}),
         ...(this.sessionSealer ? { sessionSealer: this.sessionSealer } : {}),

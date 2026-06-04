@@ -1,9 +1,13 @@
-import { describe, expect, it } from 'vitest'
-import { fireEvent, render, screen } from '@testing-library/vue'
+import { afterEach, describe, expect, it } from 'vitest'
+import { cleanup, fireEvent, render, screen } from '@testing-library/vue'
 import CardCell from '../../../packages/base-vue/src/components/messages/CardCell.vue'
 import { detectDeploymentIntent } from '../src/utils/deploymentIntent'
 
 describe('deployment confirmation card', () => {
+  afterEach(() => {
+    cleanup()
+  })
+
   it('renders deployment intent as an explicit confirmable card', () => {
     render(CardCell, {
       props: {

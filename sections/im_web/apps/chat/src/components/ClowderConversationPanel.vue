@@ -85,6 +85,10 @@ const boundThreadId = computed<string | null>(() => {
   if (!binding) return null;
   return binding.threadId || null;
 });
+const activeWorkspace = computed(() => clowderStore.getActiveWorkspace(boundThreadId.value));
+const workspaceBindingDiagnostics = computed(() =>
+  boundThreadId.value ? clowderStore.getWorkspaceBinding(boundThreadId.value)?.diagnostics : undefined,
+);
 
 function textFromMessage(message: { content?: unknown }): string {
   const content = message.content;
@@ -143,6 +147,9 @@ async function refresh() {
   const health = await clowderStore.refreshStatus().catch(() => clowderStore.status);
   if (health.state === 'error' || health.reachable === false) return;
   await clowderStore.loadConversation(conversationRef.value).catch(() => undefined);
+  if (boundThreadId.value) {
+    await clowderStore.loadWorkspaceBinding(boundThreadId.value).catch(() => undefined);
+  }
   if (props.channelType === 2) {
     await clowderStore.loadGroupCats(props.channelId).catch(() => undefined);
   }
@@ -226,6 +233,7 @@ watch(subTab, (next) => {
 });
 
 watch(boundThreadId, () => {
+  if (boundThreadId.value) void clowderStore.loadWorkspaceBinding(boundThreadId.value);
   if (subTab.value === 'kanban') void refreshKanban();
 });
 
@@ -306,6 +314,19 @@ watch(deliveryRefreshToken, (token) => {
       </section>
 
       <section class="panel-section">
+        <div class="section-label">Workspace</div>
+        <div v-if="activeWorkspace" class="workspace-summary">
+          <strong>{{ activeWorkspace.displayName }}</strong>
+          <span>{{ activeWorkspace.relativePath }}</span>
+          <small>{{ activeWorkspace.linkedThreadIds.length }} threads · {{ activeWorkspace.linkedTaskIds.length }} tasks</small>
+        </div>
+        <div v-else class="muted">No active workspace</div>
+        <div v-if="workspaceBindingDiagnostics?.state === 'project_path_mismatch'" class="error-text">
+          projectPath mismatch: {{ workspaceBindingDiagnostics.threadProjectPath }}
+        </div>
+      </section>
+
+      <section class="panel-section">
         <div class="section-label">Focus</div>
         <div class="focus-row">
           <span>{{ currentFocus || 'Default routing' }}</span>
@@ -368,11 +389,12 @@ watch(deliveryRefreshToken, (token) => {
         :thread-id="boundThreadId"
         :agent-directory="agents"
         :observed-task-ids="observedTaskIds"
+        :active-workspace="activeWorkspace"
       />
     </div>
 
     <div v-else-if="subTab === 'artifacts' && boundThreadId" class="panel-body panel-body--scrollable">
-      <ProjectArtifactsPanel :thread-id="boundThreadId" :agent-directory="agents" />
+      <ProjectArtifactsPanel :thread-id="boundThreadId" :agent-directory="agents" :active-workspace="activeWorkspace" />
     </div>
 
     <div v-else class="panel-body">
@@ -478,12 +500,25 @@ watch(deliveryRefreshToken, (token) => {
 }
 
 .thread-id,
-.focus-row {
+.focus-row,
+.workspace-summary {
   min-width: 0;
   overflow: hidden;
   font-size: 13px;
   text-overflow: ellipsis;
   white-space: nowrap;
+}
+
+.workspace-summary {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  white-space: normal;
+}
+
+.workspace-summary span,
+.workspace-summary small {
+  color: var(--text-secondary);
 }
 
 .focus-row {

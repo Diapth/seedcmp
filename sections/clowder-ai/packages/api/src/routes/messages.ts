@@ -44,6 +44,8 @@ import {
   createCoordinationContext,
 } from '../domains/cats/services/agents/routing/lead-agent-selector.js';
 import type { ICoordinatorKickoffStore } from '../domains/cats/services/stores/ports/CoordinatorKickoffStore.js';
+import type { IMaomiWorkspaceStore } from '../domains/maomi-workspaces/MaomiWorkspaceStore.js';
+import type { IThreadWorkspaceBindingStore } from '../domains/maomi-workspaces/ThreadWorkspaceBindingStore.js';
 import {
   accumulateTextParts,
   flattenTextParts,
@@ -151,6 +153,9 @@ export interface MessagesRoutesOptions {
   holdBallCancelDeps?: HoldBallCancelDeps;
   /** Phase 1.5: persisted CoordinatorKickoff state (one per coordinationId). */
   coordinatorKickoffStore?: ICoordinatorKickoffStore;
+  /** V3-37: user-visible workspace proposal in coordinator kickoff. */
+  maomiWorkspaceStore?: IMaomiWorkspaceStore;
+  threadWorkspaceBindingStore?: IThreadWorkspaceBindingStore;
 }
 
 const log = createModuleLogger('routes/messages');
@@ -1131,10 +1136,13 @@ export const messagesRoutes: FastifyPluginAsync<MessagesRoutesOptions> = async (
                   replyText: assistantText,
                   messageId: createResult.invocationId,
                   phase: coordination.phase,
+                  sourceIntent: content,
+                  threadId: resolvedThreadId,
                   ...(existingKickoff ? { existingKickoffCoordinationId: existingKickoff.coordinationId } : {}),
                 },
                 {
                   kickoffStore: opts.coordinatorKickoffStore,
+                  ...(opts.maomiWorkspaceStore ? { maomiWorkspaceStore: opts.maomiWorkspaceStore } : {}),
                   emit: (uid, evt, data) => opts.socketManager.emitToUser(uid, evt, data),
                   log,
                 },
