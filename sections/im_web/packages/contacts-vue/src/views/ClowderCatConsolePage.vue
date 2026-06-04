@@ -24,11 +24,6 @@ const form = reactive({
   capabilitiesText: ''
 });
 
-const canCreate = computed(() => form.name.trim().length > 0 &&
-  form.clientId !== '' &&
-  form.authType !== '' &&
-  form.accountRef.trim().length > 0);
-
 const roleTemplateOptions = computed(() => clowderStore.catRoleTemplates);
 
 const selectedRoleTemplate = computed(() =>
@@ -44,9 +39,26 @@ const recommendedModel = computed(() =>
   modelOptions.value.find(model => !model.disabled)?.id ||
   '');
 
+const isOAuthAuth = computed(() => form.authType === 'oauth');
+
+const defaultOAuthAccountRef = computed(() => {
+  if (form.clientId === 'openai') return 'codex';
+  if (form.clientId === 'anthropic') return 'claude';
+  return '';
+});
+
+const resolvedAccountRef = computed(() =>
+  isOAuthAuth.value ? defaultOAuthAccountRef.value : form.accountRef.trim()
+);
+
+const canCreate = computed(() => form.name.trim().length > 0 &&
+  form.clientId !== '' &&
+  form.authType !== '' &&
+  resolvedAccountRef.value.length > 0);
+
 const availableCats = computed(() => {
   const query = searchQuery.value.trim().toLowerCase();
-  const cats = clowderStore.catContactDirectory;
+  const cats = clowderStore.catContactDirectory.filter(cat => cat.connected);
   if (!query) return cats;
   return cats.filter(cat => [
     cat.displayName,
@@ -69,6 +81,10 @@ onMounted(() => {
 });
 
 watch(() => form.clientId, () => {
+  applyRecommendedModel();
+});
+
+watch(() => form.authType, () => {
   applyRecommendedModel();
 });
 
@@ -100,7 +116,7 @@ function resetForm() {
 }
 
 function applyRecommendedModel() {
-  if (!form.clientId) {
+  if (!form.clientId || isOAuthAuth.value) {
     form.defaultModel = '';
     return;
   }
@@ -119,15 +135,6 @@ function applyRoleTemplate() {
 
 function openCat(cat: ClowderCatContact) {
   router.push(`/chat/conversation/${cat.directConversationId}/1`);
-}
-
-async function connectCat(cat: ClowderCatContact) {
-  feedback.value = '';
-  const connected = await clowderStore.connectExistingCat(cat.catId).catch(error => {
-    feedback.value = error instanceof Error ? error.message : '添加猫猫联系人失败';
-    return undefined;
-  });
-  if (connected) openCat(connected);
 }
 
 function requestDeleteCat(cat: ClowderCatContact) {
@@ -179,8 +186,8 @@ async function createCatAndConnect() {
     roleTemplateId: form.roleTemplateId || undefined,
     clientId,
     authType,
-    accountRef: form.accountRef.trim(),
-    defaultModel: form.defaultModel.trim() || undefined,
+    accountRef: resolvedAccountRef.value,
+    ...(!isOAuthAuth.value ? { defaultModel: form.defaultModel.trim() || undefined } : {}),
     personality: form.personality.trim() || undefined,
     capabilities: capabilities.length > 0 ? capabilities : undefined
   }).catch(error => {
@@ -260,14 +267,14 @@ function back() {
             <option value="oauth">OAuth 账号</option>
           </select>
         </label>
-        <label class="field">
+        <label v-if="!isOAuthAuth" class="field">
           <span>账号引用</span>
           <input
             v-model="form.accountRef"
-            :placeholder="form.authType === 'oauth' ? '例如：codex / claude' : '例如：openai-prod / anthropic-prod'"
+            placeholder="例如：openai-prod / anthropic-prod"
           />
         </label>
-        <label v-if="form.clientId && modelOptions.length > 0" class="field">
+        <label v-if="form.clientId && !isOAuthAuth && modelOptions.length > 0" class="field">
           <span>默认模型</span>
           <select v-model="form.defaultModel">
             <option
@@ -280,7 +287,7 @@ function back() {
             </option>
           </select>
         </label>
-        <label v-else-if="form.clientId" class="field">
+        <label v-else-if="form.clientId && !isOAuthAuth" class="field">
           <span>默认模型</span>
           <input v-model="form.defaultModel" placeholder="例如：gpt-5.4 或 claude-sonnet-4-6" />
         </label>
@@ -319,7 +326,7 @@ function back() {
           />
         </label>
         <div v-if="availableCats.length === 0" class="empty-state">
-          暂无可连接猫猫
+          暂无猫猫联系人
         </div>
         <div v-else class="cat-list">
           <div v-for="cat in availableCats" :key="cat.id" class="cat-row" :class="{ unavailable: !cat.available }">
@@ -351,14 +358,6 @@ function back() {
                 删除
               </button>
             </div>
-            <button
-              v-else
-              class="primary-btn compact"
-              :disabled="!cat.available || clowderStore.loading"
-              @click="connectCat(cat)"
-            >
-              添加到联系人
-            </button>
           </div>
         </div>
       </section>
