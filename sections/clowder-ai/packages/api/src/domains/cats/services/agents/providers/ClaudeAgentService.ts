@@ -19,7 +19,6 @@ import { existsSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { dirname, isAbsolute, join, resolve } from 'node:path';
 import { type CatId, createCatId } from '@cat-cafe/shared';
-import { getCatEffort } from '../../../../../config/cat-config-loader.js';
 import { getCatModel } from '../../../../../config/cat-models.js';
 import { createModuleLogger } from '../../../../../infrastructure/logger.js';
 import { formatCliExitError } from '../../../../../utils/cli-format.js';
@@ -51,6 +50,7 @@ const ANTHROPIC_PROFILE_BASE_URL = 'CAT_CAFE_ANTHROPIC_BASE_URL';
 // F198: exported so ClaudeBgCarrierService and other carriers can reuse the
 // same model-override env key (single source of truth).
 export const ANTHROPIC_MODEL_OVERRIDE_KEY = 'CAT_CAFE_ANTHROPIC_MODEL_OVERRIDE';
+const CLAUDE_CHOKIDAR_USEPOLLING_KEY = 'CHOKIDAR_USEPOLLING';
 
 // F198: exported for reuse in resolveClaudeModelSelection consumers.
 export function isKnownAnthropicModel(model: string): boolean {
@@ -148,6 +148,7 @@ export function buildClaudeEnvOverrides(callbackEnv?: Record<string, string>): R
 
   env.CLAUDECODE = null;
   env.CLAUDE_CODE_ENTRYPOINT = null;
+  env[CLAUDE_CHOKIDAR_USEPOLLING_KEY] = callbackEnv?.[CLAUDE_CHOKIDAR_USEPOLLING_KEY] ?? 'true';
 
   if (IS_WINDOWS) {
     const gitBash = findGitBashPath();
@@ -292,16 +293,12 @@ export class ClaudeAgentService implements AgentService {
       'stream-json',
       '--include-partial-messages',
       '--verbose',
-      '--effort',
-      getCatEffort(this.catId as string, undefined, 'anthropic'),
       '--permission-mode',
       PERMISSION_MODE,
       // api_key mode: skip user-level ~/.claude/settings.json to prevent config pollution.
       // subscription mode: include user-level so CLI reads auth from ~/.claude/settings.json.
       '--setting-sources',
       isApiKeyMode ? 'project,local' : 'project,local,user',
-      // Enable Chrome MCP integration (built-in, requires Chrome + extension running)
-      '--chrome',
     ];
 
     // Only pass --model for known Anthropic models. For third-party models

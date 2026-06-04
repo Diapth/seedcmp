@@ -12,9 +12,8 @@ import { PassThrough } from 'node:stream';
 import { mock, test } from 'node:test';
 import { ensureFakeCliOnPath } from './helpers/fake-cli-path.js';
 
-const { ClaudeAgentService, pickGitBashPathFromWhere, resolveDefaultClaudeMcpServerPath } = await import(
-  '../dist/domains/cats/services/agents/providers/ClaudeAgentService.js'
-);
+const { ClaudeAgentService, buildClaudeEnvOverrides, pickGitBashPathFromWhere, resolveDefaultClaudeMcpServerPath } =
+  await import('../dist/domains/cats/services/agents/providers/ClaudeAgentService.js');
 
 ensureFakeCliOnPath('claude');
 
@@ -158,6 +157,29 @@ test('F203 AC-C5: -p carrier advertises native L0 injection to route layer', () 
   const service = createClaudeAgentService({ model: 'claude-test-model' });
 
   assert.equal(service.injectsL0Natively(), true);
+});
+
+test('Claude CLI child env defaults to polling file watchers to avoid ENOSPC', () => {
+  const env = buildClaudeEnvOverrides({
+    CAT_CAFE_ANTHROPIC_PROFILE_MODE: 'subscription',
+  });
+
+  assert.equal(env.CHOKIDAR_USEPOLLING, 'true');
+  assert.equal(env.ANTHROPIC_API_KEY, null);
+});
+
+test('Claude CLI default argv avoids unsupported optional flags', async () => {
+  const proc = createMockProcess();
+  const spawnFn = createMockSpawnFn(proc);
+  const service = createClaudeAgentService({ spawnFn, model: '' });
+
+  const promise = collect(service.invoke('hi'));
+  emitClaudeEvents(proc, [{ type: 'result', subtype: 'success' }]);
+  await promise;
+
+  const args = spawnFn.mock.calls[0].arguments[1];
+  assert.ok(!args.includes('--effort'));
+  assert.ok(!args.includes('--chrome'));
 });
 
 test('F203 AC-C5: -p carrier reports L0 compile failure without spawning claude and removes temp dir', async () => {
