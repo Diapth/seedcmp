@@ -3,6 +3,7 @@ package clowder
 import (
 	"testing"
 
+	"github.com/TangSengDaoDao/TangSengDaoDaoServerLib/common"
 	"github.com/TangSengDaoDao/TangSengDaoDaoServerLib/config"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -40,6 +41,29 @@ func TestMessagesListenForwardsConfiguredMessages(t *testing.T) {
 	assert.Equal(t, "2:group-clowder", forwarder.messages[0].ExternalChatID)
 	assert.Equal(t, "@codex hello", forwarder.messages[0].Text)
 	assert.Equal(t, "u_10001", forwarder.messages[0].Sender.ID)
+}
+
+func TestMessagesListenUsesCanonicalExternalChatForVirtualDirect(t *testing.T) {
+	bridge := New(config.NewContext(config.New()))
+	bridge.config.Enabled = true
+	bridge.config.APIBaseURL = "http://127.0.0.1:3000"
+	bridge.config.ConnectorSecret = "shared-secret"
+	bridge.config.DefaultOwnerUserID = "owner-1"
+	forwarder := &recordingForwarder{}
+
+	bridge.MessagesListen([]*config.MessageResp{{
+		ChannelID:    "clowder_cat:coordinator",
+		ChannelType:  common.ChannelTypePerson.Uint8(),
+		FromUID:      "u_10001",
+		MessageIDStr: "m1",
+		ClientMsgNo:  "c1",
+		MessageSeq:   11,
+		Timestamp:    1780000000,
+		Payload:      []byte(`{"type":1,"content":"请创建任务"}`),
+	}}, forwarder)
+
+	require.Len(t, forwarder.messages, 1)
+	assert.Equal(t, "1:"+common.GetFakeChannelIDWith("u_10001", "clowder_cat:coordinator"), forwarder.messages[0].ExternalChatID)
 }
 
 func TestMessagesListenWithRolesAddsGroupRoleSnapshot(t *testing.T) {

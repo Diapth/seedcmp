@@ -412,6 +412,9 @@ func (c *Clowder) proxyThreadTasks(ctx *wkhttp.Context) {
 	}
 	endpoint := strings.TrimRight(c.config.APIBaseURL, "/") +
 		"/api/threads/" + url.PathEscape(threadID) + "/tasks"
+	if rawQuery := strings.TrimSpace(ctx.Request.URL.RawQuery); rawQuery != "" {
+		endpoint += "?" + rawQuery
+	}
 
 	req, err := http.NewRequest(http.MethodGet, endpoint, nil)
 	if err != nil {
@@ -838,12 +841,25 @@ func (c *Clowder) bindConversation(ctx *wkhttp.Context) {
 		ctx.JSON(http.StatusBadGateway, map[string]string{"error": "bind_failed", "message": err.Error()})
 		return
 	}
+	threadID := strings.TrimSpace(response.ThreadID)
+	if threadID == "" {
+		directory, err := c.fetchAgentDirectory(req.ChannelID, req.ChannelType, ctx.GetLoginUID())
+		if err != nil {
+			ctx.JSON(http.StatusBadGateway, map[string]string{"error": "bind_lookup_failed", "message": err.Error()})
+			return
+		}
+		threadID = strings.TrimSpace(directory.ThreadID)
+	}
+	if threadID == "" {
+		ctx.JSON(http.StatusBadGateway, map[string]string{"error": "bind_thread_missing"})
+		return
+	}
 	ctx.JSON(http.StatusOK, IMConnectorBinding{
 		ConnectorID:    ConnectorID,
 		ExternalChatID: externalChatIDForUser(req.ChannelID, req.ChannelType, ctx.GetLoginUID()),
 		ChannelID:      req.ChannelID,
 		ChannelType:    req.ChannelType,
-		ThreadID:       response.ThreadID,
+		ThreadID:       threadID,
 		UserID:         ctx.GetLoginUID(),
 		Status:         BindingStatusActive,
 	})

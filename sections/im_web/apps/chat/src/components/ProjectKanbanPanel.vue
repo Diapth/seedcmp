@@ -1,7 +1,6 @@
 <script setup lang="ts">
-import { computed, onMounted, ref, watch } from 'vue';
-import { apiClient } from '@tsdaodao/base-vue';
-import type { ClowderAgent } from '@tsdaodao/datasource-vue';
+import { computed, onMounted, onUnmounted, watch } from 'vue';
+import { useClowderStore, type ClowderAgent, type ClowderThreadTask } from '@tsdaodao/datasource-vue';
 import CatWorkBadge from './CatWorkBadge.vue';
 
 defineOptions({ name: 'ProjectKanbanPanel' });
@@ -9,29 +8,15 @@ defineOptions({ name: 'ProjectKanbanPanel' });
 interface Props {
   threadId: string;
   agentDirectory?: ClowderAgent[];
+  observedTaskIds?: string[];
 }
 
 const props = defineProps<Props>();
 
 type TaskStatus = 'todo' | 'doing' | 'blocked' | 'done';
+type TaskItem = ClowderThreadTask;
 
-interface TaskItem {
-  id: string;
-  threadId: string;
-  title: string;
-  ownerCatId: string | null;
-  status: TaskStatus;
-  why: string;
-  createdAt: number;
-  updatedAt: number;
-  artifactRefs?: readonly string[];
-  dependsOn?: readonly string[];
-  coordinationId?: string;
-}
-
-const tasks = ref<TaskItem[]>([]);
-const loading = ref(false);
-const error = ref<string | null>(null);
+const clowderStore = useClowderStore();
 let pollTimer: ReturnType<typeof setInterval> | null = null;
 
 const SECTIONS: Array<{ key: TaskStatus; label: string; icon: string }> = [
@@ -40,6 +25,16 @@ const SECTIONS: Array<{ key: TaskStatus; label: string; icon: string }> = [
   { key: 'todo', label: '待办', icon: '○' },
   { key: 'done', label: '已完成', icon: '●' },
 ];
+
+const loadState = computed(() => clowderStore.getThreadTasksState(props.threadId));
+const tasks = computed<TaskItem[]>(() => ('tasks' in loadState.value ? loadState.value.tasks : []));
+const loading = computed(() => loadState.value.state === 'loading');
+const routeError = computed(() => loadState.value.state === 'route_failed' ? loadState.value : null);
+const mismatch = computed(() => loadState.value.state === 'thread_binding_mismatch' ? loadState.value : null);
+const diagnostics = computed(() => ('diagnostics' in loadState.value ? loadState.value.diagnostics : undefined));
+const observedTaskIdsKey = computed(() => (props.observedTaskIds || []).join(','));
+const successEmpty = computed(() => loadState.value.state === 'success_empty');
+const createdTaskMissing = computed(() => diagnostics.value?.state === 'created_task_missing');
 
 const tasksByStatus = computed(() => {
   const map: Record<TaskStatus, TaskItem[]> = {
@@ -76,21 +71,16 @@ function lookupAgent(catId: string): ClowderAgent | undefined {
   return props.agentDirectory?.find((a) => a.catId === catId);
 }
 
+function shortTaskId(taskId: string): string {
+  const parts = taskId.split('-');
+  return parts.length > 1 ? parts.slice(-2).join('-') : taskId.slice(-12);
+}
+
 async function refresh() {
   if (!props.threadId) return;
-  loading.value = true;
-  error.value = null;
-  try {
-    const response = await apiClient.get<{ tasks?: TaskItem[] }>(
-      `clowder/thread/${encodeURIComponent(props.threadId)}/tasks`,
-    );
-    const list = response.data?.tasks ?? [];
-    tasks.value = Array.isArray(list) ? list : [];
-  } catch (err) {
-    error.value = err instanceof Error ? err.message : '加载任务失败';
-  } finally {
-    loading.value = false;
-  }
+  await clowderStore.fetchThreadTasks(props.threadId, {
+    observedTaskIds: props.observedTaskIds?.length ? props.observedTaskIds : undefined,
+  });
 }
 
 onMounted(() => {
@@ -103,16 +93,22 @@ onMounted(() => {
 watch(
   () => props.threadId,
   () => {
-    tasks.value = [];
     void refresh();
   },
 );
 
-if (typeof window !== 'undefined') {
-  window.addEventListener('beforeunload', () => {
-    if (pollTimer !== null) clearInterval(pollTimer);
-  });
-}
+watch(observedTaskIdsKey, (next, previous) => {
+  if (next !== previous) void refresh();
+});
+
+onUnmounted(() => {
+  if (pollTimer !== null) {
+    clearInterval(pollTimer);
+    pollTimer = null;
+  }
+});
+
+defineExpose({ refresh });
 </script>
 
 <template>
@@ -129,15 +125,25 @@ if (typeof window !== 'undefined') {
       </button>
     </div>
 
-    <p v-if="error" class="kanban-panel__error">{{ error }}</p>
+    <p v-if="loading && tasks.length === 0" class="kanban-panel__empty">加载任务中…</p>
+    <p v-else-if="routeError" class="kanban-panel__error">
+      任务查询失败<span v-if="routeError.status"> ({{ routeError.status }})</span>：{{ routeError.error }}
+    </p>
+    <p v-else-if="mismatch" class="kanban-panel__error">
+      聊天中的任务 {{ mismatch.expectedTaskId || '已创建任务' }} 属于 Thread
+      {{ mismatch.actualThreadId || '未知' }}，当前看板查询的是 {{ mismatch.threadId }}。
+    </p>
+    <p v-else-if="createdTaskMissing" class="kanban-panel__error">
+      聊天中出现的任务 id 未在任务存储中找到，请刷新 conversation 或稍后重试。
+    </p>
     <p
-      v-else-if="!loading && tasks.length === 0"
+      v-else-if="successEmpty"
       class="kanban-panel__empty"
     >
       还没有任务。让协调者分配任务后,这里会显示各猫的工作状态。
     </p>
 
-    <div v-else class="kanban-panel__columns">
+    <div v-if="tasks.length > 0" class="kanban-panel__columns">
       <section
         v-for="section in SECTIONS"
         :key="section.key"
@@ -155,17 +161,18 @@ if (typeof window !== 'undefined') {
             class="kanban-panel__task"
           >
             <div class="kanban-panel__task-title">{{ task.title }}</div>
+            <div class="kanban-panel__task-id">#{{ shortTaskId(task.id) }}</div>
             <div v-if="task.why" class="kanban-panel__task-why">{{ task.why }}</div>
-            <div v-if="task.ownerCatId" class="kanban-panel__task-owner">
+            <div class="kanban-panel__task-owner">
               <CatWorkBadge
-                v-if="lookupAgent(task.ownerCatId)"
+                v-if="task.ownerCatId && lookupAgent(task.ownerCatId)"
                 :cat="lookupAgent(task.ownerCatId)!"
                 :available="true"
                 :selected="false"
                 compact
               />
               <span v-else class="kanban-panel__owner-name">
-                @{{ task.ownerCatId }}
+                {{ task.ownerCatId ? `@${task.ownerCatId}` : '未分配' }}
               </span>
             </div>
           </li>
@@ -321,6 +328,13 @@ if (typeof window !== 'undefined') {
   font-weight: 600;
   color: var(--color-text-1, #1a1a1a);
   word-break: break-word;
+}
+
+.kanban-panel__task-id {
+  margin-top: 2px;
+  font-size: 10px;
+  color: var(--color-text-3, #6b6b6b);
+  word-break: break-all;
 }
 
 .kanban-panel__task-why {

@@ -37,6 +37,7 @@ export interface ThreadTasksRoutesOptions {
 export type ArtifactKind = 'code' | 'doc' | 'image' | 'preview' | 'file' | 'patch' | 'workspace' | 'other';
 export type ThreadArtifactStatus = 'available' | 'missing' | 'outside_project' | 'forbidden';
 export type ThreadArtifactSource = 'declared' | 'task_ref';
+export type ThreadTaskDiagnosticsState = 'ok' | 'success_empty' | 'thread_binding_mismatch' | 'created_task_missing';
 const ARTIFACT_REF_PREFIX = 'artifact:';
 
 export interface ThreadArtifact {
@@ -52,6 +53,24 @@ export interface ThreadArtifact {
   reason?: string;
 }
 
+export interface ThreadTaskMismatchDiagnostic {
+  taskId: string;
+  expectedThreadId: string;
+  actualThreadId: string;
+  title?: string;
+  ownerCatId?: string | null;
+  status?: string;
+}
+
+export interface ThreadTaskDiagnostics {
+  state: ThreadTaskDiagnosticsState;
+  taskCount: number;
+  queryThreadId: string;
+  observedTaskIds: string[];
+  missingTaskIds: string[];
+  mismatchedTasks: ThreadTaskMismatchDiagnostic[];
+}
+
 interface ParsedArtifactRef {
   path: string;
   kind: ArtifactKind;
@@ -62,6 +81,65 @@ interface ParsedArtifactRef {
 function threadIdFromParams(req: FastifyRequest): string {
   const params = req.params as { threadId?: string };
   return String(params?.threadId ?? '').trim();
+}
+
+function stringListFromQuery(value: unknown): string[] {
+  const values = Array.isArray(value) ? value : [value];
+  const out: string[] = [];
+  for (const item of values) {
+    if (typeof item !== 'string') continue;
+    for (const part of item.split(',')) {
+      const trimmed = part.trim();
+      if (trimmed && !out.includes(trimmed)) out.push(trimmed);
+    }
+  }
+  return out;
+}
+
+async function buildThreadTaskDiagnostics(
+  taskStore: ITaskStore,
+  threadId: string,
+  tasks: TaskItem[],
+  observedTaskIds: string[],
+): Promise<ThreadTaskDiagnostics> {
+  const inThread = new Set(tasks.map((task) => task.id));
+  const missingTaskIds: string[] = [];
+  const mismatchedTasks: ThreadTaskMismatchDiagnostic[] = [];
+
+  for (const taskId of observedTaskIds) {
+    if (inThread.has(taskId)) continue;
+    const task = await Promise.resolve(taskStore.get(taskId));
+    if (!task) {
+      missingTaskIds.push(taskId);
+      continue;
+    }
+    if (task.threadId !== threadId) {
+      mismatchedTasks.push({
+        taskId,
+        expectedThreadId: threadId,
+        actualThreadId: task.threadId,
+        title: task.title,
+        ownerCatId: task.ownerCatId ?? null,
+        status: task.status,
+      });
+    }
+  }
+
+  let state: ThreadTaskDiagnosticsState = tasks.length > 0 ? 'ok' : 'success_empty';
+  if (mismatchedTasks.length > 0) {
+    state = 'thread_binding_mismatch';
+  } else if (missingTaskIds.length > 0) {
+    state = 'created_task_missing';
+  }
+
+  return {
+    state,
+    taskCount: tasks.length,
+    queryThreadId: threadId,
+    observedTaskIds,
+    missingTaskIds,
+    mismatchedTasks,
+  };
 }
 
 function isPathInsideRoot(child: string, root: string): boolean {
@@ -208,7 +286,13 @@ export const threadTasksRoutes: FastifyPluginAsync<ThreadTasksRoutesOptions> = a
       return reply.status(400).send({ error: 'threadId is required' });
     }
     const tasks = await Promise.resolve(opts.taskStore.listByThread(threadId));
-    return reply.send({ tasks });
+    const query = request.query as { expectedTaskId?: unknown; observedTaskIds?: unknown };
+    const observedTaskIds = Array.from(new Set([
+      ...stringListFromQuery(query.expectedTaskId),
+      ...stringListFromQuery(query.observedTaskIds),
+    ]));
+    const diagnostics = await buildThreadTaskDiagnostics(opts.taskStore, threadId, tasks, observedTaskIds);
+    return reply.send({ threadId, tasks, diagnostics });
   });
 
   // ----- Phase 4.5: POST /api/threads/:threadId/artifacts -----

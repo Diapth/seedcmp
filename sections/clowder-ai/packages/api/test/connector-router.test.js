@@ -494,6 +494,38 @@ describe('ConnectorRouter', () => {
       assert.equal(binding.hubThreadId, result.threadId);
     });
 
+    it('returns conversation threadId for IM Web commands and keeps Hub as diagnostic metadata', async () => {
+      bindingStore.bind('im-web', '1:direct-chat', 'thread-old', 'owner-1');
+      const ctxRouter = new ConnectorRouter({
+        bindingStore,
+        dedup: new InboundMessageDedup(),
+        messageStore,
+        threadStore,
+        invokeTrigger: cmdTrigger,
+        socketManager,
+        defaultUserId: 'owner-1',
+        defaultCatId: 'opus',
+        log: noopLog(),
+        commandLayer: mockCommandLayer({
+          '/new': {
+            kind: 'new',
+            response: 'Created',
+            newActiveThreadId: 'thread-conversation-new',
+            contextThreadId: 'thread-conversation-new',
+          },
+        }),
+        adapters: new Map([['im-web', mockAdapter()]]),
+      });
+
+      const result = await ctxRouter.route('im-web', '1:direct-chat', '/new Wedding', 'ext-im-new-1');
+
+      assert.equal(result.kind, 'command');
+      assert.equal(result.threadId, 'thread-conversation-new');
+      assert.ok(result.hubThreadId);
+      assert.notEqual(result.hubThreadId, result.threadId);
+      assert.equal(bindingStore.getByExternal('im-web', '1:direct-chat').hubThreadId, result.hubThreadId);
+    });
+
     it('broadcasts command exchange to Hub thread WebSocket (ISSUE-8 8A)', async () => {
       bindingStore.bind('feishu', 'chat-hub-bc', 'thread-conv-bc', 'owner-1');
       const ctxSocket = mockSocketManager();

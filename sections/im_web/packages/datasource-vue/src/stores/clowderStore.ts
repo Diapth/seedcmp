@@ -28,6 +28,10 @@ import {
   type ClowderDeploymentActionResponse,
   type ClowderGroupAutoReplyMode,
   type ClowderGroupCatStateResponse,
+  type ClowderThreadTask,
+  type ClowderThreadTaskDiagnostics,
+  type ClowderThreadTasksRequestOptions,
+  type ClowderThreadTasksResponse,
   type IMConnectorPermission
 } from '../api/clowder';
 import {
@@ -83,6 +87,22 @@ interface ClowderAgentDirectoryRuntimeState {
   preferred: ClowderAgent[];
   lastActive?: ClowderAgent;
 }
+
+export type ThreadTaskLoadState =
+  | { state: 'not_bound' }
+  | { state: 'loading'; threadId: string; tasks: ClowderThreadTask[]; diagnostics?: ClowderThreadTaskDiagnostics; lastRefreshAt?: number }
+  | { state: 'success'; threadId: string; tasks: ClowderThreadTask[]; diagnostics?: ClowderThreadTaskDiagnostics; lastRefreshAt: number }
+  | { state: 'success_empty'; threadId: string; tasks: ClowderThreadTask[]; diagnostics?: ClowderThreadTaskDiagnostics; lastRefreshAt: number }
+  | { state: 'route_failed'; threadId: string; tasks: ClowderThreadTask[]; status?: number; error: string; lastRefreshAt?: number }
+  | {
+      state: 'thread_binding_mismatch';
+      threadId: string;
+      tasks: ClowderThreadTask[];
+      expectedTaskId?: string;
+      actualThreadId?: string;
+      diagnostics: ClowderThreadTaskDiagnostics;
+      lastRefreshAt: number;
+    };
 
 function normalizeAgentDirectory(response: ClowderAgentDirectoryResponse): ClowderAgentDirectoryRuntimeState {
   const agents = response.agents || [];
@@ -180,6 +200,33 @@ function normalizeGroupAutoReplyMode(mode?: string, proactiveReplies?: boolean):
   return proactiveReplies === false ? 'mentions_only' : 'soft_mentions';
 }
 
+function normalizeThreadTasksResponse(threadId: string, response: ClowderThreadTasksResponse): ClowderThreadTasksResponse {
+  const tasks = Array.isArray(response?.tasks) ? response.tasks : [];
+  return {
+    ...response,
+    threadId: response?.threadId || threadId,
+    tasks,
+    diagnostics: response?.diagnostics || {
+      state: tasks.length > 0 ? 'ok' : 'success_empty',
+      taskCount: tasks.length,
+      queryThreadId: response?.threadId || threadId,
+      observedTaskIds: [],
+      missingTaskIds: [],
+      mismatchedTasks: []
+    }
+  };
+}
+
+function taskErrorMessage(err: unknown) {
+  const shaped = err as { msg?: string; message?: string; error?: { message?: string; msg?: string }; status?: number };
+  return shaped?.msg || shaped?.message || shaped?.error?.message || shaped?.error?.msg || '加载任务失败';
+}
+
+function taskErrorStatus(err: unknown) {
+  const shaped = err as { status?: number; error?: { response?: { status?: number } }; response?: { status?: number } };
+  return shaped?.status || shaped?.response?.status || shaped?.error?.response?.status;
+}
+
 export const useClowderStore = defineStore('clowder', () => {
   const status = ref<ClowderConnectionStatus>(defaultStatus());
   const conversations = ref<Record<string, ClowderConversationStateResponse>>({});
@@ -194,6 +241,7 @@ export const useClowderStore = defineStore('clowder', () => {
   const groupCatMemberships = ref<Record<string, ClowderCatContact[]>>({});
   const groupPrompts = ref<Record<string, string>>({});
   const groupAutoReplyModes = ref<Record<string, ClowderGroupAutoReplyMode>>({});
+  const threadTaskStates = ref<Record<string, ThreadTaskLoadState>>({});
   // Phase 2.2: coordinator project group chat kickoff records (one per coordinationId).
   // Surfaced as a "Create Project Group Chat?" card in ClowderConversationPanel.
   const kickoffs = ref<Record<string, CoordinatorKickoff>>({});
@@ -265,6 +313,87 @@ export const useClowderStore = defineStore('clowder', () => {
 
   function getConversation(channelId: string, channelType: number) {
     return conversations.value[conversationKey(channelId, channelType)];
+  }
+
+  function previousTasksForThread(threadId: string): ClowderThreadTask[] {
+    const current = threadTaskStates.value[threadId];
+    return current && 'tasks' in current ? current.tasks : [];
+  }
+
+  function getThreadTasksState(threadId?: string | null): ThreadTaskLoadState {
+    const trimmed = String(threadId || '').trim();
+    if (!trimmed) return { state: 'not_bound' };
+    return threadTaskStates.value[trimmed] || { state: 'loading', threadId: trimmed, tasks: [] };
+  }
+
+  async function fetchThreadTasks(
+    threadId: string,
+    options: ClowderThreadTasksRequestOptions = {}
+  ): Promise<ThreadTaskLoadState> {
+    const trimmed = String(threadId || '').trim();
+    if (!trimmed) return { state: 'not_bound' };
+
+    const previous = previousTasksForThread(trimmed);
+    const current = threadTaskStates.value[trimmed];
+    threadTaskStates.value[trimmed] = {
+      state: 'loading',
+      threadId: trimmed,
+      tasks: previous,
+      diagnostics: current && 'diagnostics' in current
+        ? current.diagnostics
+        : undefined,
+      lastRefreshAt: current && 'lastRefreshAt' in current
+        ? current.lastRefreshAt
+        : undefined
+    };
+
+    try {
+      const response = normalizeThreadTasksResponse(trimmed, await clowderApi.getThreadTasks(trimmed, options));
+      const now = Date.now();
+      const diagnostics = response.diagnostics;
+      let next: ThreadTaskLoadState;
+      if (diagnostics?.state === 'thread_binding_mismatch') {
+        const mismatch = diagnostics.mismatchedTasks[0];
+        next = {
+          state: 'thread_binding_mismatch',
+          threadId: response.threadId,
+          tasks: response.tasks,
+          expectedTaskId: mismatch?.taskId || options.expectedTaskId || options.observedTaskIds?.[0],
+          actualThreadId: mismatch?.actualThreadId,
+          diagnostics,
+          lastRefreshAt: now
+        };
+      } else if (response.tasks.length === 0) {
+        next = {
+          state: 'success_empty',
+          threadId: response.threadId,
+          tasks: [],
+          diagnostics,
+          lastRefreshAt: now
+        };
+      } else {
+        next = {
+          state: 'success',
+          threadId: response.threadId,
+          tasks: response.tasks,
+          diagnostics,
+          lastRefreshAt: now
+        };
+      }
+      threadTaskStates.value[trimmed] = next;
+      return next;
+    } catch (err) {
+      const next: ThreadTaskLoadState = {
+        state: 'route_failed',
+        threadId: trimmed,
+        tasks: previous,
+        status: taskErrorStatus(err),
+        error: taskErrorMessage(err),
+        lastRefreshAt: Date.now()
+      };
+      threadTaskStates.value[trimmed] = next;
+      return next;
+    }
   }
 
   async function loadAgentDirectory(refInput: ClowderConversationRef) {
@@ -1089,6 +1218,7 @@ export const useClowderStore = defineStore('clowder', () => {
     groupCatMemberships.value = {};
     groupPrompts.value = {};
     groupAutoReplyModes.value = {};
+    threadTaskStates.value = {};
     kickoffs.value = {};
     loading.value = false;
     error.value = undefined;
@@ -1118,6 +1248,9 @@ export const useClowderStore = defineStore('clowder', () => {
     groupCatMemberships,
     groupPrompts,
     groupAutoReplyModes,
+    threadTaskStates,
+    getThreadTasksState,
+    fetchThreadTasks,
     getCatContactById,
     connectExistingCat,
     createCatAndConnect,

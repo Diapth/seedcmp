@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"testing"
 
+	"github.com/TangSengDaoDao/TangSengDaoDaoServerLib/common"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -55,6 +56,20 @@ func TestNormalizeInboundMessageFallsBackToPayloadString(t *testing.T) {
 	assert.Equal(t, "1:u_2", normalized.ExternalChatID)
 	assert.Equal(t, "direct", normalized.ChatType)
 	assert.Equal(t, "plain text", normalized.Text)
+}
+
+func TestNormalizeInboundMessageUsesCanonicalExternalChatForVirtualDirect(t *testing.T) {
+	normalized, err := NormalizeInboundMessage(RawIMMessage{
+		ChannelID:   "clowder_cat:coordinator",
+		ChannelType: common.ChannelTypePerson.Uint8(),
+		FromUID:     "u_1",
+		MessageID:   "m1",
+		ClientMsgNo: "c1",
+		Payload:     []byte(`{"type":1,"content":"做一个婚礼网页"}`),
+	})
+
+	require.NoError(t, err)
+	assert.Equal(t, "1:"+common.GetFakeChannelIDWith("u_1", "clowder_cat:coordinator"), normalized.ExternalChatID)
 }
 
 func TestNormalizeInboundMessageMapsAttachments(t *testing.T) {

@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { computed, onMounted, onUnmounted, ref, watch } from 'vue';
-import { useClowderStore, type ClowderAgent, type ClowderChannelType, type ClowderGroupAutoReplyMode, type CoordinatorKickoff } from '@tsdaodao/datasource-vue';
+import { useClowderStore, useMessageStore, type ClowderAgent, type ClowderChannelType, type ClowderGroupAutoReplyMode, type CoordinatorKickoff } from '@tsdaodao/datasource-vue';
 import { useRouter } from 'vue-router';
 import CoordinatorKickoffCard from './CoordinatorKickoffCard.vue';
 import ProjectKanbanPanel from './ProjectKanbanPanel.vue';
@@ -19,14 +19,18 @@ const emit = defineEmits<{
 }>();
 
 const clowderStore = useClowderStore();
+const messageStore = useMessageStore();
 const router = useRouter();
 
 type SubTab = 'overview' | 'kanban' | 'artifacts';
+type ProjectKanbanPanelExpose = { refresh: () => Promise<void> | void };
 const subTab = ref<SubTab>('overview');
+const kanbanPanelRef = ref<ProjectKanbanPanelExpose | null>(null);
 
 const stateTokens = 'ready disabled denied loading error';
 const KICKOFF_REFRESH_INTERVAL_MS = 30_000;
 const KICKOFF_MAX_AGE_MS = 30 * 60_000;
+const TASK_ID_PATTERN = /\b\d{16,}-\d{6,}-[0-9a-f]{8,}\b/gi;
 let kickoffRefreshTimer: ReturnType<typeof setInterval> | null = null;
 
 const conversationRef = computed(() => ({
@@ -81,6 +85,58 @@ const boundThreadId = computed<string | null>(() => {
   if (!binding) return null;
   return binding.threadId || null;
 });
+
+function textFromMessage(message: { content?: unknown }): string {
+  const content = message.content;
+  if (typeof content === 'string') {
+    try {
+      const parsed = JSON.parse(content) as { text?: unknown; content?: unknown };
+      return String(parsed.text || parsed.content || content);
+    } catch {
+      return content;
+    }
+  }
+  if (content && typeof content === 'object') {
+    const payload = content as { text?: unknown; content?: unknown; markdown?: unknown };
+    return String(payload.text || payload.content || payload.markdown || '');
+  }
+  return '';
+}
+
+const observedTaskIds = computed(() => {
+  const ids = new Set<string>();
+  const recent = messageStore.getChannelMessages(props.channelId, props.channelType).slice(-80);
+  for (const message of recent) {
+    const text = textFromMessage(message);
+    const matches = text.match(TASK_ID_PATTERN) || [];
+    for (const match of matches) ids.add(match);
+  }
+  return Array.from(ids);
+});
+
+const observedTaskIdsKey = computed(() => observedTaskIds.value.join(','));
+const deliveryRefreshToken = computed(() => {
+  const delivery = conversation.value?.lastDelivery;
+  if (!delivery) return '';
+  return [
+    delivery.state,
+    delivery.threadId,
+    delivery.invocationId,
+    delivery.lastUpdatedAt,
+  ].filter(Boolean).join(':');
+});
+
+async function refreshKanban() {
+  const threadId = boundThreadId.value;
+  if (!threadId) return;
+  if (kanbanPanelRef.value?.refresh) {
+    await kanbanPanelRef.value.refresh();
+    return;
+  }
+  await clowderStore.fetchThreadTasks(threadId, {
+    observedTaskIds: observedTaskIds.value.length ? observedTaskIds.value : undefined,
+  });
+}
 
 async function refresh() {
   if (!props.visible || !props.channelId) return;
@@ -164,6 +220,26 @@ onMounted(() => {
 onUnmounted(stopKickoffPolling);
 
 watch(() => [props.visible, props.channelId, props.channelType], refresh);
+
+watch(subTab, (next) => {
+  if (next === 'kanban') void refreshKanban();
+});
+
+watch(boundThreadId, () => {
+  if (subTab.value === 'kanban') void refreshKanban();
+});
+
+watch(observedTaskIdsKey, () => {
+  if (subTab.value === 'kanban') void refreshKanban();
+});
+
+watch(deliveryRefreshToken, (token) => {
+  if (!token || subTab.value !== 'kanban') return;
+  const state = conversation.value?.lastDelivery?.state;
+  if (state === 'delivered' || state === 'failed' || state === 'skipped' || state === 'duplicate') {
+    void refreshKanban();
+  }
+});
 </script>
 
 <template>
@@ -287,7 +363,12 @@ watch(() => [props.visible, props.channelId, props.channelType], refresh);
     </div>
 
     <div v-else-if="subTab === 'kanban' && boundThreadId" class="panel-body panel-body--scrollable">
-      <ProjectKanbanPanel :thread-id="boundThreadId" :agent-directory="agents" />
+      <ProjectKanbanPanel
+        ref="kanbanPanelRef"
+        :thread-id="boundThreadId"
+        :agent-directory="agents"
+        :observed-task-ids="observedTaskIds"
+      />
     </div>
 
     <div v-else-if="subTab === 'artifacts' && boundThreadId" class="panel-body panel-body--scrollable">

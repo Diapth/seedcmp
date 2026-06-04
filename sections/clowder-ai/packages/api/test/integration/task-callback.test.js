@@ -237,6 +237,65 @@ describe('Task Callback Integration', () => {
     assert.equal(createEvent.room, 'thread:thread-1');
   });
 
+  test('thread task route returns callback-created tasks with diagnostics', async () => {
+    const app = await createApp();
+    const { invocationId, callbackToken } = await registry.create('user-1', 'opus', 'thread-1');
+
+    const created = await app.inject({
+      method: 'POST',
+      url: '/api/callbacks/create-task',
+      payload: {
+        invocationId,
+        callbackToken,
+        title: 'Make wedding page',
+        why: 'User asked coordinator to create the first page',
+        ownerCatId: 'codex',
+      },
+    });
+
+    assert.equal(created.statusCode, 201);
+    const taskId = created.json().task.id;
+
+    const listed = await app.inject({
+      method: 'GET',
+      url: `/api/threads/thread-1/tasks?expectedTaskId=${encodeURIComponent(taskId)}`,
+    });
+
+    assert.equal(listed.statusCode, 200);
+    const body = listed.json();
+    assert.equal(body.threadId, 'thread-1');
+    assert.equal(body.tasks.length, 1);
+    assert.equal(body.tasks[0].id, taskId);
+    assert.equal(body.diagnostics.state, 'ok');
+    assert.equal(body.diagnostics.taskCount, 1);
+    assert.deepEqual(body.diagnostics.mismatchedTasks, []);
+  });
+
+  test('thread task route reports expected task bound to another thread', async () => {
+    const app = await createApp();
+    const task = taskStore.create({
+      threadId: 'thread-other',
+      title: 'Task in another invocation thread',
+      why: 'Regression guard for IM Web binding mismatch',
+      createdBy: 'user',
+      ownerCatId: 'codex',
+    });
+
+    const response = await app.inject({
+      method: 'GET',
+      url: `/api/threads/thread-current/tasks?expectedTaskId=${encodeURIComponent(task.id)}`,
+    });
+
+    assert.equal(response.statusCode, 200);
+    const body = response.json();
+    assert.equal(body.threadId, 'thread-current');
+    assert.equal(body.tasks.length, 0);
+    assert.equal(body.diagnostics.state, 'thread_binding_mismatch');
+    assert.equal(body.diagnostics.mismatchedTasks[0].taskId, task.id);
+    assert.equal(body.diagnostics.mismatchedTasks[0].expectedThreadId, 'thread-current');
+    assert.equal(body.diagnostics.mismatchedTasks[0].actualThreadId, 'thread-other');
+  });
+
   test('MCP create-task rejects invalid credentials', async () => {
     const app = await createApp();
 

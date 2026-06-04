@@ -11,6 +11,7 @@ export type ClowderRoutingMode = 'mention' | 'ask' | 'focus' | 'preferred' | 'la
 export type ClowderStreamState = 'placeholder' | 'chunk' | 'final' | 'cleanup';
 export type ClowderCatSource = 'existing' | 'runtime-created' | 'disconnected' | 'stale';
 export type ClowderGroupAutoReplyMode = 'off' | 'mentions_only' | 'soft_mentions';
+export type ClowderTaskStatus = 'todo' | 'doing' | 'blocked' | 'done';
 
 export interface ClowderConversationRef {
   channelId: string;
@@ -239,6 +240,63 @@ export interface ClowderGroupCatStateResponse {
   autoReplyMode?: ClowderGroupAutoReplyMode;
 }
 
+export interface ClowderThreadTask {
+  id: string;
+  kind?: string;
+  threadId: string;
+  title: string;
+  ownerCatId: string | null;
+  status: ClowderTaskStatus;
+  why: string;
+  createdBy?: string;
+  createdAt: number;
+  updatedAt: number;
+  userId?: string;
+  artifactRefs?: readonly string[];
+  dependsOn?: readonly string[];
+  coordinationId?: string;
+}
+
+export type ClowderThreadTaskDiagnosticsState =
+  | 'ok'
+  | 'success_empty'
+  | 'thread_binding_mismatch'
+  | 'created_task_missing';
+
+export interface ClowderThreadTaskMismatchDiagnostic {
+  taskId: string;
+  expectedThreadId: string;
+  actualThreadId: string;
+  title?: string;
+  ownerCatId?: string | null;
+  status?: string;
+}
+
+export interface ClowderThreadTaskDiagnostics {
+  state: ClowderThreadTaskDiagnosticsState;
+  taskCount: number;
+  queryThreadId: string;
+  observedTaskIds: string[];
+  missingTaskIds: string[];
+  mismatchedTasks: ClowderThreadTaskMismatchDiagnostic[];
+}
+
+export interface ClowderThreadTasksResponse {
+  threadId: string;
+  tasks: ClowderThreadTask[];
+  diagnostics?: ClowderThreadTaskDiagnostics;
+}
+
+export interface ClowderThreadTasksRequestOptions {
+  expectedTaskId?: string;
+  observedTaskIds?: string[];
+}
+
+function unwrapApiData<T>(response: T | { data?: T }): T {
+  const maybeData = (response as { data?: T })?.data;
+  return maybeData === undefined ? (response as T) : maybeData;
+}
+
 export const clowderApi = {
   getStatus() {
     return apiClient.get<ClowderConnectionStatus>('clowder/status');
@@ -275,6 +333,16 @@ export const clowderApi = {
   },
   sendConversationMessage(data: ClowderMessageRequest) {
     return apiClient.post<Record<string, unknown>>('clowder/conversation/message', data);
+  },
+  async getThreadTasks(threadId: string, options: ClowderThreadTasksRequestOptions = {}) {
+    const params: Record<string, string> = {};
+    if (options.expectedTaskId) params.expectedTaskId = options.expectedTaskId;
+    if (options.observedTaskIds?.length) params.observedTaskIds = options.observedTaskIds.join(',');
+    const response = await apiClient.get<ClowderThreadTasksResponse>(
+      `clowder/thread/${encodeURIComponent(threadId)}/tasks`,
+      { params },
+    );
+    return unwrapApiData(response as unknown as ClowderThreadTasksResponse | { data?: ClowderThreadTasksResponse });
   },
   sendDeploymentAction(data: ClowderDeploymentActionRequest) {
     return apiClient.post<ClowderDeploymentActionResponse>('clowder/conversation/deployment-action', data);

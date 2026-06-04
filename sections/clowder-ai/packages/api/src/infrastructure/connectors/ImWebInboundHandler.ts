@@ -107,6 +107,13 @@ export class ImWebInboundHandler implements ConnectorWebhookHandler {
 
     if (result.kind === 'routed') return result;
     if (result.kind === 'skipped') return result;
+    if (result.kind === 'command' && result.threadId) {
+      return {
+        kind: 'routed',
+        threadId: result.threadId,
+        messageId: result.messageId ?? 'command',
+      };
+    }
     return { kind: 'processed', messageId: result.messageId };
   }
 

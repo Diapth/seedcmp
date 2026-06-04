@@ -51,7 +51,7 @@ function emitConnectorMessage(
 export type RouteResult =
   | { kind: 'routed'; threadId: string; messageId: string }
   | { kind: 'skipped'; reason: string }
-  | { kind: 'command'; threadId?: string; messageId?: string };
+  | { kind: 'command'; threadId?: string; hubThreadId?: string; messageId?: string };
 
 export interface ConnectorRouterOptions {
   readonly bindingStore: IConnectorThreadBindingStore;
@@ -396,7 +396,13 @@ export class ConnectorRouter {
         }
 
         const result: RouteResult = { kind: 'command' };
-        if (hubThreadId) (result as { threadId?: string }).threadId = hubThreadId;
+        const conversationThreadId = cmdResult.newActiveThreadId ?? cmdResult.contextThreadId;
+        if (connectorId === 'im-web') {
+          if (conversationThreadId) (result as { threadId?: string }).threadId = conversationThreadId;
+        } else if (hubThreadId) {
+          (result as { threadId?: string }).threadId = hubThreadId;
+        }
+        if (hubThreadId) (result as { hubThreadId?: string }).hubThreadId = hubThreadId;
         if (stored?.responseId) (result as { messageId?: string }).messageId = stored.responseId;
         return result;
       }
