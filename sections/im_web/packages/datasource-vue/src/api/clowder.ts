@@ -86,6 +86,28 @@ export interface ClowderPlatformModelOption {
   disabledReason?: string;
 }
 
+export type ClowderLocalOAuthProvider = 'codex' | 'claude';
+
+export interface ClowderLocalOAuthConfigFile {
+  path: string;
+  exists: boolean;
+  readable: boolean;
+}
+
+export interface ClowderLocalOAuthConfigSummary {
+  provider: ClowderLocalOAuthProvider;
+  authConfigured: boolean;
+  configPresent: boolean;
+  configFiles: ClowderLocalOAuthConfigFile[];
+  defaultModel?: string;
+  profile?: string;
+  diagnostics?: string[];
+}
+
+export interface ClowderLocalOAuthCapabilitiesResponse {
+  providers: ClowderLocalOAuthConfigSummary[];
+}
+
 export interface IMConnectorPermission {
   connectorId: ClowderConnectorId;
   externalChatId: string;
@@ -229,6 +251,9 @@ export const clowderApi = {
   },
   getCatDirectory(params?: { query?: string; includeUnavailable?: boolean }) {
     return apiClient.get<ClowderCatDirectoryResponse>('clowder/cats', { params });
+  },
+  getLocalAuthCapabilities() {
+    return apiClient.get<ClowderLocalOAuthCapabilitiesResponse>('clowder/local-auth/capabilities');
   },
   connectCatContact(data: { catId: string }) {
     return apiClient.post<ClowderCatContactResponse>('clowder/cats/connect', data);

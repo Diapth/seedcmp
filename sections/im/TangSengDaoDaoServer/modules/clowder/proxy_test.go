@@ -301,6 +301,48 @@ func TestDecorateCatDirectoryContactAllowsDisconnectedTemplateCandidateToBeAdded
 	assert.Equal(t, "disconnected", agent.Source)
 }
 
+func TestFetchLocalAuthCapabilitiesProxiesRedactedProbe(t *testing.T) {
+	var gotPath string
+	var gotUser string
+	upstream := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		gotPath = r.URL.RequestURI()
+		gotUser = r.Header.Get("x-cat-cafe-user")
+		require.Equal(t, http.MethodGet, r.Method)
+		_ = json.NewEncoder(w).Encode(map[string]interface{}{
+			"providers": []map[string]interface{}{
+				{
+					"provider":       "codex",
+					"authConfigured": true,
+					"configPresent":  true,
+					"configFiles": []map[string]interface{}{
+						{"path": "~/.codex/auth.json", "exists": true, "readable": true},
+					},
+				},
+			},
+		})
+	}))
+	defer upstream.Close()
+
+	c := New(nil)
+	c.SetConfig(commonmodule.ClowderBridgeConfig{
+		Enabled:            true,
+		APIBaseURL:         upstream.URL,
+		ConnectorID:        "im-web",
+		ConnectorSecret:    "secret",
+		DefaultOwnerUserID: "owner-1",
+		RequestTimeout:     time.Second,
+		SignatureTolerance: time.Minute,
+	})
+
+	statusCode, body, err := c.fetchLocalAuthCapabilities("im-user-1")
+
+	require.NoError(t, err)
+	assert.Equal(t, http.StatusOK, statusCode)
+	assert.Contains(t, string(body), `"provider":"codex"`)
+	assert.Equal(t, "/api/local-auth/capabilities", gotPath)
+	assert.Equal(t, "owner-1", gotUser)
+}
+
 func TestRouteTextForDirectCatUsesPlainMentionToAutoCreateThread(t *testing.T) {
 	text := routeTextForCatRequest(conversationRefRequest{
 		Text:        "你好，今天状态如何？",

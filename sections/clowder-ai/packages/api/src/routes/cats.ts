@@ -104,9 +104,9 @@ const baseCatSchema = z.object({
  *  runtime in validateAccountBindingOrThrow where authType is available. */
 const modelSchema = z.string().transform((v) => v.replace(/\/+$/, ''));
 
-const createNormalCatSchema = baseCatSchema.extend({
+export const createNormalCatSchema = baseCatSchema.extend({
   clientId: clientSchema.exclude(['antigravity']),
-  defaultModel: modelSchema,
+  defaultModel: modelSchema.default(''),
   mcpSupport: z.boolean().optional(),
   cli: cliSchema.optional(),
   cliConfigArgs: z.array(z.string().min(1)).optional(),
@@ -120,7 +120,7 @@ const createAntigravityCatSchema = baseCatSchema.extend({
   commandArgs: z.array(z.string().min(1)).min(1).optional(),
 });
 
-const createCatSchema = z.discriminatedUnion('clientId', [createNormalCatSchema, createAntigravityCatSchema]);
+export const createCatSchema = z.discriminatedUnion('clientId', [createNormalCatSchema, createAntigravityCatSchema]);
 
 const updateCatSchema = z.object({
   name: z.string().min(1).optional(),

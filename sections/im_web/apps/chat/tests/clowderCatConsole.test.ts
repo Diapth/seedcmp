@@ -40,6 +40,8 @@ describe('Clowder cat console', () => {
     expect(page.default).toContain('form.accountRef')
     expect(page.default).toContain('authType,')
     expect(page.default).toContain('accountRef: resolvedAccountRef.value')
+    expect(page.default).toContain('selectedOAuthConfig')
+    expect(page.default).toContain('loadLocalOAuthCapabilities')
     expect(page.default).toContain('console-layout')
     expect(page.default).toContain('cat-row')
     expect(page.default).not.toContain('connectExistingCat')
@@ -86,6 +88,10 @@ describe('Clowder cat console', () => {
     expect(page.default).toContain("!isOAuthAuth.value ? { defaultModel: form.defaultModel.trim() || undefined } : {}")
     expect(page.default).toContain('form.clientId && !isOAuthAuth && modelOptions.length > 0')
     expect(page.default).toContain('form.clientId && !isOAuthAuth')
+    expect(page.default).toContain('本机 OAuth')
+    expect(page.default).toContain('clowderStore.loadLocalOAuthCapabilities()')
+    expect(page.default).toContain('!oauthConfigMissing.value')
+    expect(page.default).toContain('CLI 默认模型')
   })
 
   it('shows only existing connected cats in the contacts list', async () => {

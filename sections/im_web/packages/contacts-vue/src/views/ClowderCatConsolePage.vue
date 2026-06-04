@@ -47,6 +47,30 @@ const defaultOAuthAccountRef = computed(() => {
   return '';
 });
 
+const selectedOAuthProvider = computed<'' | 'codex' | 'claude'>(() => {
+  if (form.clientId === 'openai') return 'codex';
+  if (form.clientId === 'anthropic') return 'claude';
+  return '';
+});
+
+const selectedOAuthConfig = computed(() => {
+  const provider = selectedOAuthProvider.value;
+  return provider ? clowderStore.localOAuthCapabilities[provider] : undefined;
+});
+
+const oauthConfigMissing = computed(() =>
+  isOAuthAuth.value &&
+  form.clientId !== '' &&
+  selectedOAuthConfig.value !== undefined &&
+  selectedOAuthConfig.value.authConfigured === false
+);
+
+const oauthProbeReady = computed(() =>
+  !isOAuthAuth.value ||
+  form.clientId === '' ||
+  (selectedOAuthConfig.value !== undefined && !clowderStore.localOAuthLoading)
+);
+
 const resolvedAccountRef = computed(() =>
   isOAuthAuth.value ? defaultOAuthAccountRef.value : form.accountRef.trim()
 );
@@ -54,7 +78,9 @@ const resolvedAccountRef = computed(() =>
 const canCreate = computed(() => form.name.trim().length > 0 &&
   form.clientId !== '' &&
   form.authType !== '' &&
-  resolvedAccountRef.value.length > 0);
+  resolvedAccountRef.value.length > 0 &&
+  oauthProbeReady.value &&
+  !oauthConfigMissing.value);
 
 const availableCats = computed(() => {
   const query = searchQuery.value.trim().toLowerCase();
@@ -82,10 +108,12 @@ onMounted(() => {
 
 watch(() => form.clientId, () => {
   applyRecommendedModel();
+  loadLocalOAuthCapabilities();
 });
 
 watch(() => form.authType, () => {
   applyRecommendedModel();
+  loadLocalOAuthCapabilities();
 });
 
 watch(modelOptions, () => {
@@ -131,6 +159,43 @@ function applyRoleTemplate() {
   if (!template) return;
   if (!form.personality.trim()) form.personality = template.personalitySummary || '';
   if (!form.capabilitiesText.trim()) form.capabilitiesText = template.capabilitySummary || '';
+}
+
+function oauthProviderLabel() {
+  if (selectedOAuthProvider.value === 'codex') return 'Codex';
+  if (selectedOAuthProvider.value === 'claude') return 'Claude Code';
+  return 'CLI';
+}
+
+function oauthLoginCommand() {
+  if (selectedOAuthProvider.value === 'codex') return 'codex login';
+  if (selectedOAuthProvider.value === 'claude') return 'claude login';
+  return 'CLI login';
+}
+
+function oauthStatusText() {
+  if (clowderStore.localOAuthLoading) return '正在检查本机 CLI 配置';
+  if (clowderStore.localOAuthError) return clowderStore.localOAuthError;
+  const config = selectedOAuthConfig.value;
+  if (!config) return '尚未完成本机配置检查';
+  if (config.authConfigured) return `已检测到 ${oauthProviderLabel()} 本机登录，创建时使用 CLI 默认配置`;
+  return config.diagnostics?.[0] || `未检测到本机登录，请先运行 ${oauthLoginCommand()}`;
+}
+
+function oauthConfigDetail() {
+  const config = selectedOAuthConfig.value;
+  if (!config || !config.authConfigured) return '';
+  return [
+    config.profile ? `配置档：${config.profile}` : '',
+    config.defaultModel ? `CLI 默认模型：${config.defaultModel}` : ''
+  ].filter(Boolean).join(' · ');
+}
+
+async function loadLocalOAuthCapabilities() {
+  if (!isOAuthAuth.value || !form.clientId) return;
+  await clowderStore.loadLocalOAuthCapabilities().catch(error => {
+    feedback.value = error instanceof Error ? error.message : '本机 OAuth 配置检查失败';
+  });
 }
 
 function openCat(cat: ClowderCatContact) {
@@ -267,6 +332,20 @@ function back() {
             <option value="oauth">OAuth 账号</option>
           </select>
         </label>
+        <div
+          v-if="isOAuthAuth && form.clientId"
+          class="oauth-status"
+          :class="{ ready: selectedOAuthConfig?.authConfigured, missing: selectedOAuthConfig && !selectedOAuthConfig.authConfigured }"
+        >
+          <div class="oauth-status-title">
+            <span>{{ oauthProviderLabel() }} 本机 OAuth</span>
+            <span class="oauth-status-badge">
+              {{ selectedOAuthConfig?.authConfigured ? '已配置' : clowderStore.localOAuthLoading ? '检查中' : '需登录' }}
+            </span>
+          </div>
+          <span>{{ oauthStatusText() }}</span>
+          <span v-if="oauthConfigDetail()" class="muted">{{ oauthConfigDetail() }}</span>
+        </div>
         <label v-if="!isOAuthAuth" class="field">
           <span>账号引用</span>
           <input
@@ -493,6 +572,56 @@ function back() {
 .template-name {
   color: var(--text-primary);
   font-weight: 600;
+}
+
+.oauth-status {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+  margin: -2px 0 12px;
+  padding: 10px;
+  border: var(--border-hairline);
+  border-radius: var(--radius-sm);
+  background-color: var(--bg-secondary);
+  color: var(--text-secondary);
+  font-size: 12px;
+  line-height: 1.45;
+}
+
+.oauth-status.ready {
+  border-color: rgba(15, 118, 110, 0.25);
+}
+
+.oauth-status.missing {
+  border-color: rgba(161, 98, 7, 0.28);
+}
+
+.oauth-status-title {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  color: var(--text-primary);
+  font-weight: 600;
+}
+
+.oauth-status-badge {
+  flex-shrink: 0;
+  border-radius: var(--radius-sm);
+  padding: 1px 5px;
+  background-color: rgba(22, 93, 255, 0.08);
+  color: var(--primary-color, #165dff);
+  font-size: 10px;
+}
+
+.oauth-status.missing .oauth-status-badge {
+  background-color: rgba(161, 98, 7, 0.1);
+  color: #a16207;
+}
+
+.oauth-status.ready .oauth-status-badge {
+  background-color: rgba(15, 118, 110, 0.1);
+  color: #0f766e;
 }
 
 .muted {

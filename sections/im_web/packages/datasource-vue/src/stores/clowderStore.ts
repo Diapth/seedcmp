@@ -17,6 +17,9 @@ import {
   type ClowderCatRoleTemplate,
   type ClowderCreateCatRequest,
   type ClowderDeleteCatResponse,
+  type ClowderLocalOAuthCapabilitiesResponse,
+  type ClowderLocalOAuthConfigSummary,
+  type ClowderLocalOAuthProvider,
   type ClowderPlatformModelOption,
   type ClowderConversationRef,
   type ClowderConversationStateResponse,
@@ -184,6 +187,9 @@ export const useClowderStore = defineStore('clowder', () => {
   const catContactDirectory = ref<ClowderCatContact[]>([]);
   const catRoleTemplates = ref<ClowderCatRoleTemplate[]>([]);
   const platformModelOptions = ref<Record<string, ClowderPlatformModelOption[]>>({});
+  const localOAuthCapabilities = ref<Partial<Record<ClowderLocalOAuthProvider, ClowderLocalOAuthConfigSummary>>>({});
+  const localOAuthLoading = ref(false);
+  const localOAuthError = ref<string | undefined>();
   const connectedCatContacts = ref<ClowderCatContact[]>([]);
   const groupCatMemberships = ref<Record<string, ClowderCatContact[]>>({});
   const groupPrompts = ref<Record<string, string>>({});
@@ -484,6 +490,30 @@ export const useClowderStore = defineStore('clowder', () => {
       throw err;
     } finally {
       loading.value = false;
+    }
+  }
+
+  async function loadLocalOAuthCapabilities() {
+    localOAuthLoading.value = true;
+    localOAuthError.value = undefined;
+    try {
+      const response = await clowderApi.getLocalAuthCapabilities() as unknown;
+      const payload = ((response as { data?: ClowderLocalOAuthCapabilitiesResponse }).data || response) as ClowderLocalOAuthCapabilitiesResponse;
+      const providers = Array.isArray(payload?.providers) ? payload.providers : [];
+      const next: Partial<Record<ClowderLocalOAuthProvider, ClowderLocalOAuthConfigSummary>> = {};
+      for (const provider of providers) {
+        const key = provider.provider;
+        if (key === 'codex' || key === 'claude') {
+          next[key] = provider;
+        }
+      }
+      localOAuthCapabilities.value = next;
+      return next;
+    } catch (err) {
+      localOAuthError.value = err instanceof Error ? err.message : '本机 OAuth 配置检查失败';
+      throw err;
+    } finally {
+      localOAuthLoading.value = false;
     }
   }
 
@@ -1052,6 +1082,9 @@ export const useClowderStore = defineStore('clowder', () => {
     catContactDirectory.value = [];
     catRoleTemplates.value = [];
     platformModelOptions.value = {};
+    localOAuthCapabilities.value = {};
+    localOAuthLoading.value = false;
+    localOAuthError.value = undefined;
     connectedCatContacts.value = [];
     groupCatMemberships.value = {};
     groupPrompts.value = {};
@@ -1077,6 +1110,10 @@ export const useClowderStore = defineStore('clowder', () => {
     catContactDirectory,
     catRoleTemplates,
     platformModelOptions,
+    localOAuthCapabilities,
+    localOAuthLoading,
+    localOAuthError,
+    loadLocalOAuthCapabilities,
     connectedCatContacts,
     groupCatMemberships,
     groupPrompts,

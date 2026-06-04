@@ -51,6 +51,7 @@ func (c *Clowder) Route(r *wkhttp.WKHttp) {
 		auth.GET("/conversation", c.conversation)
 		auth.GET("/conversation/agents", c.agentDirectory)
 		auth.GET("/cats", c.catDirectory)
+		auth.GET("/local-auth/capabilities", c.localAuthCapabilities)
 		auth.POST("/cats/connect", c.connectCatContact)
 		auth.POST("/cats", c.createCatAndConnect)
 		auth.DELETE("/cats/:catId", c.deleteCatContact)
@@ -245,6 +246,15 @@ func (c *Clowder) catDirectory(ctx *wkhttp.Context) {
 		return
 	}
 	ctx.JSON(http.StatusOK, directory)
+}
+
+func (c *Clowder) localAuthCapabilities(ctx *wkhttp.Context) {
+	statusCode, body, err := c.fetchLocalAuthCapabilities(ctx.GetLoginUID())
+	if err != nil {
+		ctx.JSON(http.StatusBadGateway, map[string]string{"error": "local_auth_capabilities_unavailable", "message": err.Error()})
+		return
+	}
+	ctx.Data(statusCode, "application/json; charset=utf-8", body)
 }
 
 // getCoordinatorKickoff proxies `GET /api/coordinator/kickoff/:coordinationId`
@@ -733,6 +743,29 @@ func (c *Clowder) deleteCatFromUpstream(catID string, userID string) (int, []byt
 	}
 	defer res.Body.Close()
 	body, _ := io.ReadAll(res.Body)
+	return res.StatusCode, body, nil
+}
+
+func (c *Clowder) fetchLocalAuthCapabilities(userID string) (int, []byte, error) {
+	if !c.config.IsConfigured() {
+		return 0, nil, fmt.Errorf("clowder bridge is not configured")
+	}
+	endpoint := strings.TrimRight(c.config.APIBaseURL, "/") + "/api/local-auth/capabilities"
+	req, err := http.NewRequest(http.MethodGet, endpoint, nil)
+	if err != nil {
+		return 0, nil, err
+	}
+	c.applyDirectoryUserHeader(req, userID)
+
+	res, err := c.httpClient().Do(req)
+	if err != nil {
+		return 0, nil, err
+	}
+	defer res.Body.Close()
+	body, readErr := io.ReadAll(res.Body)
+	if readErr != nil {
+		return 0, nil, readErr
+	}
 	return res.StatusCode, body, nil
 }
 
