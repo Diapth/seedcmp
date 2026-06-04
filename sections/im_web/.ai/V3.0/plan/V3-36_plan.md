@@ -283,3 +283,17 @@ pnpm test -- connector-deployment-action deployment-request
 - `本地/local` 是用户报告里的明确验收点，必须进环境枚举。
 - V3-37 落地后，deployment target 候选应优先使用 active Maomi workspace；V3-37 未完成前，也要用当前 thread/project/artifact 生成临时候选。
 - 高风险部署确认必须保留 action idempotency、actor user、时间戳和最终执行状态。
+
+## 8. 落地结果
+
+- [x] 后端补齐 deployment request store、request CRUD 路由和 confirm/cancel 归并。
+- [x] TangSeng bridge 补齐 deployment request proxy 路由。
+- [x] IM Web datasource/store 补齐 request create/load/patch/action。
+- [x] deployment parser 支持 `本地/local/localhost` 与 active request follow-up。
+- [x] deployment card 支持 target 输入、环境 quick replies 和字段更新。
+- [x] MessageInput / MessageList 串起 request 创建、补字段、确认、刷新恢复。
+- [x] 增加 store / route / UI / contract 测试。
+- [x] 通过 `pnpm --dir sections/clowder-ai/packages/api build`。
+- [x] 通过 `go test ./modules/clowder`。
+- [x] 通过 `pnpm --dir sections/im_web type-check`。
+- [x] 通过 `pnpm exec vitest run tests/deploymentCard.test.ts tests/clowderCommandContracts.test.ts --config vitest.config.ts --pool=threads --poolOptions.threads.singleThread=true`。

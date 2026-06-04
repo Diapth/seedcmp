@@ -13,11 +13,17 @@ import {
   useUserStore,
   useClowderStore
 } from '@tsdaodao/datasource-vue';
+import type { ClowderDeploymentRequest } from '@tsdaodao/datasource-vue';
 import { useRobotConfigStore } from '@tsdaodao/contacts-vue';
 import WKSDK, { CMDContent } from 'wukongimjssdk';
 import { getClowderCatDisplayNameFromPayload } from '@tsdaodao/base-vue/utils/clowderMessageIdentity';
 import { resolveGroupCatAutoReplyTrigger, type GroupCatAutoReplyReason } from '../utils/clowderGroupAutoReplyPolicy';
 import { detectDeploymentIntent, type DeploymentIntent } from '../utils/deploymentIntent';
+import {
+  buildDeploymentCardMessage,
+  buildDeploymentTargetCandidates,
+  DEFAULT_DEPLOYMENT_ENVIRONMENT_CANDIDATES,
+} from '../utils/deploymentRequestCard';
 
 const props = defineProps<{
   channelId: string;
@@ -532,61 +538,83 @@ function getCatDisplayName(catId: string) {
   return direct?.displayName || catId;
 }
 
-function addDeploymentConfirmationCard(
+function isActiveDeploymentRequest(request: ClowderDeploymentRequest | null | undefined) {
+  return Boolean(request && ['needs_fields', 'pending_confirmation'].includes(request.status));
+}
+
+function resolveDeploymentRequestTargetCatIds(targetCatIds: string[]) {
+  const directCatId = getClowderCatIdFromContactId(props.channelId);
+  return targetCatIds.length ? targetCatIds : (directCatId ? [directCatId] : []);
+}
+
+function buildDeploymentRequestFieldPayload(
   intent: DeploymentIntent,
+  options: { includeEnvironmentCandidates?: boolean } = {}
+) {
+  const workspace = activeClowderWorkspace.value;
+  const target = intent.target === '待确认目标' ? undefined : intent.target;
+  const environment = intent.environment === '待确认环境' ? undefined : intent.environment;
+  return {
+    ...(target ? { target } : {}),
+    ...(environment ? { environment } : {}),
+    targetCandidates: buildDeploymentTargetCandidates(workspace, target || null),
+    ...(workspace?.workspaceId || workspace?.id ? { workspaceId: workspace.workspaceId || workspace.id } : {}),
+    ...(workspace?.relativePath ? { workspacePath: workspace.relativePath } : {}),
+    ...(options.includeEnvironmentCandidates ? { environmentCandidates: DEFAULT_DEPLOYMENT_ENVIRONMENT_CANDIDATES } : {})
+  };
+}
+
+function buildDeploymentRequestCreatePayload(
+  intent: DeploymentIntent,
+  text: string,
+  sourceMessageId: string
+) {
+  return {
+    channelId: props.channelId,
+    channelType: props.channelType as 1 | 2,
+    threadId: clowderStore.conversations[clowderConversationKey.value]?.binding?.threadId,
+    sourceMessageId,
+    originalText: text,
+    ...buildDeploymentRequestFieldPayload(intent, { includeEnvironmentCandidates: true })
+  };
+}
+
+function buildDeploymentRequestUpdatePayload(
+  intent: DeploymentIntent,
+  sourceMessageId: string
+) {
+  return {
+    sourceMessageId,
+    ...buildDeploymentRequestFieldPayload(intent)
+  };
+}
+
+function addDeploymentConfirmationCard(
+  deploymentRequest: ClowderDeploymentRequest,
   text: string,
   targetCatIds: string[],
   triggerReason?: GroupCatAutoReplyReason,
-  replyTarget?: any
+  replyTarget?: any,
+  sourceMessageId?: string,
+  error?: string
 ) {
-  const directCatId = getClowderCatIdFromContactId(props.channelId);
-  const effectiveTargetCatIds = targetCatIds.length ? targetCatIds : (directCatId ? [directCatId] : []);
+  const effectiveTargetCatIds = resolveDeploymentRequestTargetCatIds(targetCatIds);
   const firstCatId = effectiveTargetCatIds[0] || '';
   const catDisplayName = getCatDisplayName(firstCatId) || 'Clowder';
-  const clientMsgNo = `deployment-card-${Date.now()}-${Math.random().toString(16).slice(2)}`;
-  const deploymentRequestId = `deploy-${props.channelType}-${props.channelId}-${Date.now()}-${Math.random().toString(16).slice(2)}`;
-  const workspace = activeClowderWorkspace.value;
-  const target = intent.target === '待确认目标' && workspace
-    ? workspace.relativePath
-    : intent.target;
-  const missingFields = (intent.missingFields || []).filter(field => !(field === 'target' && workspace));
-  messageStore.addMessage(props.channelId, props.channelType, {
-    messageID: clientMsgNo,
-    messageSeq: 0,
-    clientMsgNo,
-    fromUID: props.channelType === 2 ? (userStore.currentUser?.uid || CLOWDER_AI_ROBOT_ID) : CLOWDER_AI_ROBOT_ID,
-    timestamp: Math.floor(Date.now() / 1000),
-    content: {
-      type: 7,
-      cardType: 'deployment',
-      title: '确认部署',
-      target,
-      environment: intent.environment,
-      workspaceId: workspace?.workspaceId || workspace?.id,
-      workspacePath: workspace?.relativePath,
-      status: missingFields.length ? 'needs_fields' : 'pending_confirmation',
-      deploymentRequestId,
-      missingFields,
-      disabledReason: missingFields.length
-        ? `请先补充${missingFields.map(field => field === 'target' ? '部署目标' : '部署环境').join('、')}`
-        : '',
-      connectorId: 'im-web',
-      catId: firstCatId,
-      catDisplayName,
-      deploymentRequest: {
-        deploymentRequestId,
-        text,
-        sourceMessageId: clientMsgNo,
-        workspaceId: workspace?.workspaceId || workspace?.id,
-        workspacePath: workspace?.relativePath,
-        targetCatIds: effectiveTargetCatIds,
-        triggerReason,
-        promptContext: buildClowderPromptContext(text, effectiveTargetCatIds, triggerReason, replyTarget)
-      }
-    },
-    isRevoked: false,
-    status: 'success'
-  }, { countUnread: false });
+  const cardMessage = buildDeploymentCardMessage(deploymentRequest, {
+    channelType: props.channelType,
+    currentUserId: userStore.currentUser?.uid,
+    robotId: CLOWDER_AI_ROBOT_ID,
+    sourceText: text,
+    sourceMessageId,
+    targetCatIds: effectiveTargetCatIds,
+    triggerReason,
+    promptContext: buildClowderPromptContext(text, effectiveTargetCatIds, triggerReason, replyTarget),
+    catId: firstCatId,
+    catDisplayName,
+    error
+  });
+  messageStore.addMessage(props.channelId, props.channelType, cardMessage, { countUnread: false });
 }
 
 function openImagePicker() {
@@ -999,7 +1027,11 @@ async function handleSend() {
     recentMessages: buildRecentAutoReplyMessages()
   });
   const targetCatIds = autoReplyDecision.targetCatIds;
-  const deploymentIntent = detectDeploymentIntent(text);
+  const cachedDeploymentRequest = clowderStore.getDeploymentRequest(props.channelId, props.channelType);
+  const cachedActiveDeploymentRequest = isActiveDeploymentRequest(cachedDeploymentRequest) ? cachedDeploymentRequest : null;
+  const deploymentIntent = detectDeploymentIntent(text, {
+    hasActiveRequest: Boolean(cachedActiveDeploymentRequest)
+  });
   const needsDeploymentConfirmation = deploymentIntent.shouldConfirm &&
     (isClowderAiConversation.value || isClowderCatConversation.value || autoReplyDecision.shouldRoute);
 
@@ -1024,13 +1056,41 @@ async function handleSend() {
   }
 
   try {
-    await messageStore.sendMessage(props.channelId, props.channelType, text, options);
+    const sentMessage = await messageStore.sendMessage(props.channelId, props.channelType, text, options);
     if (replyTargetSnapshot && isSameReplyTarget(messageStore.replyTarget, replyTargetSnapshot)) {
       messageStore.setReplyTarget(null);
     }
     mentionedUids.value = [];
     if (needsDeploymentConfirmation) {
-      addDeploymentConfirmationCard(deploymentIntent, text, targetCatIds, autoReplyDecision.reason, replyTargetSnapshot);
+      try {
+        const loadedDeploymentRequest = cachedActiveDeploymentRequest || await clowderStore.loadActiveDeploymentRequest({
+          channelId: props.channelId,
+          channelType: props.channelType as 1 | 2
+        }).catch(() => null);
+        const activeDeploymentRequest = isActiveDeploymentRequest(loadedDeploymentRequest) ? loadedDeploymentRequest : null;
+        const resolvedIntent = detectDeploymentIntent(text, {
+          hasActiveRequest: Boolean(activeDeploymentRequest)
+        });
+        const deploymentRequest = activeDeploymentRequest
+          ? await clowderStore.updateDeploymentRequestFields(
+            activeDeploymentRequest.id,
+            buildDeploymentRequestUpdatePayload(resolvedIntent, sentMessage.clientMsgNo)
+          )
+          : await clowderStore.createDeploymentRequest(
+            buildDeploymentRequestCreatePayload(resolvedIntent, text, sentMessage.clientMsgNo)
+          );
+        addDeploymentConfirmationCard(
+          deploymentRequest,
+          text,
+          targetCatIds,
+          autoReplyDecision.reason,
+          replyTargetSnapshot,
+          sentMessage.clientMsgNo
+        );
+      } catch (deploymentErr) {
+        console.error('Failed to sync deployment request', deploymentErr);
+        ArcoMessage.error('部署请求更新失败，请稍后重试');
+      }
     } else if (isClowderAiConversation.value || isClowderCatConversation.value || autoReplyDecision.shouldRoute) {
       await sendClowderRouteMessage(text, targetCatIds, autoReplyDecision.reason, replyTargetSnapshot);
     }

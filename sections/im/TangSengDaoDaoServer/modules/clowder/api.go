@@ -61,6 +61,9 @@ func (c *Clowder) Route(r *wkhttp.WKHttp) {
 		auth.POST("/conversation/focus", c.setFocus)
 		auth.POST("/conversation/focus/clear", c.clearFocus)
 		auth.POST("/conversation/message", c.conversationMessage)
+		auth.POST("/conversation/deployment-request", c.conversationDeploymentRequest)
+		auth.RouterGroup.PATCH("/conversation/deployment-request/:deploymentRequestId", auth.L.WKHttpHandler(c.conversationDeploymentRequestUpdate))
+		auth.GET("/conversation/deployment-request/active", c.conversationDeploymentRequestActive)
 		auth.POST("/conversation/deployment-action", c.conversationDeploymentAction)
 		// Phase 2: Coordinator kickoff — proxy GET/dismiss to Clowder 3004.
 		// See sections/clowder-ai/packages/api/src/routes/coordinator-kickoff.ts.
@@ -1072,6 +1075,37 @@ func (c *Clowder) conversationDeploymentAction(ctx *wkhttp.Context) {
 
 	respBody, _ := io.ReadAll(res.Body)
 	ctx.Data(res.StatusCode, "application/json; charset=utf-8", respBody)
+}
+
+func (c *Clowder) conversationDeploymentRequest(ctx *wkhttp.Context) {
+	body, ok := c.readJSONBody(ctx)
+	if !ok {
+		return
+	}
+	c.proxyToClowder(ctx, http.MethodPost, "/api/connectors/im-web/deployment-requests", bytes.NewReader(body), "deployment_request_unavailable")
+}
+
+func (c *Clowder) conversationDeploymentRequestUpdate(ctx *wkhttp.Context) {
+	deploymentRequestID := strings.TrimSpace(ctx.Param("deploymentRequestId"))
+	if deploymentRequestID == "" {
+		ctx.JSON(http.StatusBadRequest, map[string]string{"error": "deployment_request_id_required"})
+		return
+	}
+	body, ok := c.readJSONBody(ctx)
+	if !ok {
+		return
+	}
+	c.proxyToClowder(
+		ctx,
+		http.MethodPatch,
+		"/api/connectors/im-web/deployment-requests/"+url.PathEscape(deploymentRequestID),
+		bytes.NewReader(body),
+		"deployment_request_update_unavailable",
+	)
+}
+
+func (c *Clowder) conversationDeploymentRequestActive(ctx *wkhttp.Context) {
+	c.proxyToClowder(ctx, http.MethodGet, "/api/connectors/im-web/deployment-requests/active", nil, "deployment_request_active_unavailable")
 }
 
 func (c *Clowder) outbound(ctx *wkhttp.Context) {

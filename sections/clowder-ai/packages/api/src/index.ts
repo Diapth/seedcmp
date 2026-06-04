@@ -98,6 +98,7 @@ import { createSummaryStore } from './domains/cats/services/stores/factories/Sum
 import { createTaskStore } from './domains/cats/services/stores/factories/TaskStoreFactory.js';
 import { createThreadStore } from './domains/cats/services/stores/factories/ThreadStoreFactory.js';
 import { createWorkflowSopStore } from './domains/cats/services/stores/factories/WorkflowSopStoreFactory.js';
+import { createDeploymentRequestStore } from './domains/deployments/DeploymentRequestStore.js';
 import { RedisInvocationRecordStore } from './domains/cats/services/stores/redis/RedisInvocationRecordStore.js';
 import { RedisMessageStore } from './domains/cats/services/stores/redis/RedisMessageStore.js';
 import { MlxAudioTtsProvider } from './domains/cats/services/tts/MlxAudioTtsProvider.js';
@@ -572,6 +573,7 @@ async function main(): Promise<void> {
   const invocationRecordStore = createInvocationRecordStore(redis);
   const draftStore = createDraftStore(redis);
   const readStateStore = createReadStateStore(redis);
+  const deploymentRequestStore = createDeploymentRequestStore(redis);
   const { ExecutionDigestStore } = await import('./domains/projects/execution-digest-store.js');
   const executionDigestStore = new ExecutionDigestStore();
 
@@ -2310,7 +2312,10 @@ async function main(): Promise<void> {
 
   // V3-29: IM Web deployment confirmation cards send structured actions.
   const { connectorDeploymentActionRoutes } = await import('./routes/connector-deployment-action.js');
-  await app.register(connectorDeploymentActionRoutes);
+  await app.register(connectorDeploymentActionRoutes, { deploymentRequestStore });
+
+  const { connectorDeploymentRequestRoutes } = await import('./routes/connector-deployment-requests.js');
+  await app.register(connectorDeploymentRequestRoutes, { deploymentRequestStore });
 
   // F088: Register connector webhook routes BEFORE listen (Fastify requires it)
   const connectorWebhookHandlers = new Map<string, import('./routes/connector-webhooks.js').ConnectorWebhookHandler>();

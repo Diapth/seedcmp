@@ -24,8 +24,11 @@ import {
   type ClowderConversationRef,
   type ClowderConversationStateResponse,
   type ClowderConnectionStatus,
+  type ClowderCreateDeploymentRequest,
   type ClowderDeploymentActionRequest,
   type ClowderDeploymentActionResponse,
+  type ClowderDeploymentRequest,
+  type ClowderUpdateDeploymentRequest,
   type ClowderGroupAutoReplyMode,
   type ClowderGroupCatStateResponse,
   type ClowderMaomiWorkspace,
@@ -253,6 +256,7 @@ export const useClowderStore = defineStore('clowder', () => {
   const workspaceBindings = ref<Record<string, ClowderWorkspaceBindingResponse>>({});
   const workspaceLoading = ref(false);
   const workspaceError = ref<string | undefined>();
+  const deploymentRequests = ref<Record<string, ClowderDeploymentRequest>>({});
   // Phase 2.2: coordinator project group chat kickoff records (one per coordinationId).
   // Surfaced as a "Create Project Group Chat?" card in ClowderConversationPanel.
   const kickoffs = ref<Record<string, CoordinatorKickoff>>({});
@@ -1221,7 +1225,76 @@ export const useClowderStore = defineStore('clowder', () => {
 
   async function sendDeploymentAction(input: ClowderDeploymentActionRequest): Promise<ClowderDeploymentActionResponse> {
     const response = await clowderApi.sendDeploymentAction(input);
+    const deploymentRequest = (response as any)?.deploymentRequest as ClowderDeploymentRequest | undefined;
+    if (deploymentRequest) {
+      setDeploymentRequest(deploymentRequest);
+    }
     return response as unknown as ClowderDeploymentActionResponse;
+  }
+
+  function deploymentRequestKey(channelId: string, channelType: number) {
+    return conversationKey(channelId, channelType);
+  }
+
+  function setDeploymentRequest(request: ClowderDeploymentRequest) {
+    const key = deploymentRequestKey(request.channelId, request.channelType);
+    deploymentRequests.value = {
+      ...deploymentRequests.value,
+      [key]: request,
+    };
+    return request;
+  }
+
+  function clearDeploymentRequest(channelId: string, channelType: number) {
+    const key = deploymentRequestKey(channelId, channelType);
+    if (!(key in deploymentRequests.value)) return;
+    const next = { ...deploymentRequests.value };
+    delete next[key];
+    deploymentRequests.value = next;
+  }
+
+  function getDeploymentRequest(channelId: string, channelType: number): ClowderDeploymentRequest | undefined {
+    return deploymentRequests.value[deploymentRequestKey(channelId, channelType)];
+  }
+
+  async function createDeploymentRequest(input: ClowderCreateDeploymentRequest): Promise<ClowderDeploymentRequest> {
+    const response = await clowderApi.createDeploymentRequest(input);
+    const deploymentRequest = response.deploymentRequest;
+    if (!deploymentRequest) {
+      throw new Error('Clowder deployment request create failed');
+    }
+    return setDeploymentRequest(deploymentRequest);
+  }
+
+  async function updateDeploymentRequestFields(
+    deploymentRequestId: string,
+    input: ClowderUpdateDeploymentRequest,
+  ): Promise<ClowderDeploymentRequest> {
+    const response = await clowderApi.updateDeploymentRequest(deploymentRequestId, input);
+    const deploymentRequest = response.deploymentRequest;
+    if (!deploymentRequest) {
+      throw new Error('Clowder deployment request update failed');
+    }
+    return setDeploymentRequest(deploymentRequest);
+  }
+
+  async function loadActiveDeploymentRequest(refInput: ClowderConversationRef): Promise<ClowderDeploymentRequest | null> {
+    try {
+      const response = await clowderApi.getActiveDeploymentRequest(refInput);
+      const deploymentRequest = response.deploymentRequest;
+      if (!deploymentRequest) {
+        clearDeploymentRequest(refInput.channelId, refInput.channelType);
+        return null;
+      }
+      return setDeploymentRequest(deploymentRequest);
+    } catch (err: any) {
+      const status = err?.response?.status || err?.status;
+      if (status === 404) {
+        clearDeploymentRequest(refInput.channelId, refInput.channelType);
+        return null;
+      }
+      throw err;
+    }
   }
 
   // Phase 2.2: kickoff actions. kickoffs come from the Clowder API either
@@ -1340,6 +1413,7 @@ export const useClowderStore = defineStore('clowder', () => {
     workspaceBindings.value = {};
     workspaceLoading.value = false;
     workspaceError.value = undefined;
+    deploymentRequests.value = {};
     kickoffs.value = {};
     loading.value = false;
     error.value = undefined;
@@ -1375,6 +1449,8 @@ export const useClowderStore = defineStore('clowder', () => {
     workspaceBindings,
     workspaceLoading,
     workspaceError,
+    deploymentRequests,
+    getDeploymentRequest,
     getWorkspaceBinding,
     getActiveWorkspace,
     loadWorkspaceRoot,
@@ -1385,6 +1461,9 @@ export const useClowderStore = defineStore('clowder', () => {
     setWorkspaceBinding,
     getThreadTasksState,
     fetchThreadTasks,
+    loadActiveDeploymentRequest,
+    createDeploymentRequest,
+    updateDeploymentRequestFields,
     getCatContactById,
     connectExistingCat,
     createCatAndConnect,
@@ -1400,6 +1479,8 @@ export const useClowderStore = defineStore('clowder', () => {
     clearFocus,
     sendConversationMessage,
     sendDeploymentAction,
+    setDeploymentRequest,
+    clearDeploymentRequest,
     kickoffs,
     setKickoff,
     removeKickoff,

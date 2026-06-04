@@ -169,6 +169,86 @@ export interface ClowderMessageRequest extends ClowderConversationRef {
   promptContext?: string;
 }
 
+export type ClowderDeploymentEnvironment = 'local' | 'preview' | 'testing' | 'staging' | 'production' | 'development';
+export type ClowderDeploymentRequestStatus =
+  | 'needs_fields'
+  | 'pending_confirmation'
+  | 'confirmed'
+  | 'running'
+  | 'succeeded'
+  | 'failed'
+  | 'cancelled';
+export type ClowderDeploymentMissingField = 'target' | 'environment';
+
+export interface ClowderDeploymentTargetCandidate {
+  id: string;
+  label: string;
+  value: string;
+  source: 'active_workspace' | 'recent_workspace' | 'artifact' | 'preview' | 'task' | 'text';
+  workspaceId?: string;
+  path?: string;
+}
+
+export interface ClowderDeploymentEnvironmentCandidate {
+  id: ClowderDeploymentEnvironment;
+  label: string;
+  value: ClowderDeploymentEnvironment;
+}
+
+export interface ClowderDeploymentRequest {
+  id: string;
+  userId: string;
+  connectorId: ClowderConnectorId;
+  channelId: string;
+  channelType: ClowderChannelType;
+  threadId?: string;
+  externalChatId?: string;
+  sourceMessageId?: string;
+  cardMessageId?: string;
+  originalText: string;
+  target: string | null;
+  environment: ClowderDeploymentEnvironment | null;
+  missingFields: ClowderDeploymentMissingField[];
+  status: ClowderDeploymentRequestStatus;
+  targetCandidates: ClowderDeploymentTargetCandidate[];
+  environmentCandidates: ClowderDeploymentEnvironmentCandidate[];
+  workspaceId?: string;
+  workspacePath?: string;
+  createdAt: number;
+  updatedAt: number;
+}
+
+export interface ClowderCreateDeploymentRequest extends ClowderConversationRef {
+  threadId?: string;
+  externalChatId?: string;
+  sourceMessageId?: string;
+  cardMessageId?: string;
+  originalText: string;
+  target?: string | null;
+  environment?: ClowderDeploymentEnvironment | string | null;
+  targetCandidates?: ClowderDeploymentTargetCandidate[];
+  environmentCandidates?: ClowderDeploymentEnvironmentCandidate[];
+  workspaceId?: string;
+  workspacePath?: string;
+  forceNew?: boolean;
+}
+
+export interface ClowderUpdateDeploymentRequest {
+  target?: string | null;
+  environment?: ClowderDeploymentEnvironment | string | null;
+  sourceMessageId?: string;
+  cardMessageId?: string;
+  targetCandidates?: ClowderDeploymentTargetCandidate[];
+  workspaceId?: string;
+  workspacePath?: string;
+}
+
+export interface ClowderDeploymentRequestResponse {
+  deploymentRequest: ClowderDeploymentRequest;
+  activeRequestExists?: boolean;
+  duplicate?: boolean;
+}
+
 export interface ClowderDeploymentActionRequest extends ClowderConversationRef {
   deploymentRequestId: string;
   action: 'confirm' | 'cancel';
@@ -189,10 +269,11 @@ export interface ClowderDeploymentActionResponse {
   ok: boolean;
   deploymentRequestId: string;
   action: 'confirm' | 'cancel';
-  status: 'confirmed' | 'cancelled' | 'needs_fields' | 'failed';
+  status: 'confirmed' | 'cancelled' | 'needs_fields' | 'failed' | 'running';
   missingFields?: string[];
   message?: string;
   actionId?: string;
+  deploymentRequest?: ClowderDeploymentRequest;
 }
 
 export interface ClowderCreateCatRequest {
@@ -446,6 +527,23 @@ export const clowderApi = {
       data,
     );
     return unwrapApiData(response as unknown as ClowderWorkspaceBindingResponse | { data?: ClowderWorkspaceBindingResponse });
+  },
+  createDeploymentRequest(data: ClowderCreateDeploymentRequest) {
+    return apiClient.post<ClowderDeploymentRequestResponse>('clowder/conversation/deployment-request', data)
+      .then((response) => unwrapApiData(response as unknown as ClowderDeploymentRequestResponse | { data?: ClowderDeploymentRequestResponse }));
+  },
+  updateDeploymentRequest(id: string, data: ClowderUpdateDeploymentRequest) {
+    return apiClient.patch<ClowderDeploymentRequestResponse>(
+      `clowder/conversation/deployment-request/${encodeURIComponent(id)}`,
+      data,
+    ).then((response) => unwrapApiData(response as unknown as ClowderDeploymentRequestResponse | { data?: ClowderDeploymentRequestResponse }));
+  },
+  async getActiveDeploymentRequest(params: ClowderConversationRef) {
+    const response = await apiClient.get<ClowderDeploymentRequestResponse>(
+      'clowder/conversation/deployment-request/active',
+      { params },
+    );
+    return unwrapApiData(response as unknown as ClowderDeploymentRequestResponse | { data?: ClowderDeploymentRequestResponse });
   },
   sendDeploymentAction(data: ClowderDeploymentActionRequest) {
     return apiClient.post<ClowderDeploymentActionResponse>('clowder/conversation/deployment-action', data);

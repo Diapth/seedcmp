@@ -13,6 +13,7 @@ import {
   getClowderCatDisplayNameFromPayload,
   isClowderPayload
 } from '@tsdaodao/base-vue/utils/clowderMessageIdentity';
+import { buildDeploymentCardMessage } from '../utils/deploymentRequestCard';
 import {
   TextCell,
   ImageCell,
@@ -68,6 +69,7 @@ const editDialogVisible = ref(false);
 const editDialogText = ref('');
 const channelKey = computed(() => `${props.channelId}-${props.channelType}`);
 const deploymentActionKeys = new Set<string>();
+const deploymentFieldKeys = new Set<string>();
 
 const messages = computed(() => {
   return messageStore.messages[channelKey.value] || [];
@@ -171,6 +173,10 @@ watch(messages, (newMsgs) => {
     userStore.getUsersByIds([...new Set(missingUids)]);
   }
 }, { immediate: true, deep: true });
+
+watch(() => [props.channelId, props.channelType], () => {
+  void hydrateActiveDeploymentRequestCard();
+}, { immediate: true });
 
 function shouldShowTime(msg: any, index: number): boolean {
   if (index === 0) return true;
@@ -650,6 +656,81 @@ function updateDeploymentCardStatus(msg: any, status: string, extra: Record<stri
   });
 }
 
+function upsertDeploymentCardFromRequest(
+  sourceMessage: any,
+  deploymentRequest: any,
+  extra: { error?: string } = {},
+) {
+  const sourceContent = sourceMessage?.content || {};
+  const requestContext = sourceContent.deploymentRequest || {};
+  const deploymentCard = buildDeploymentCardMessage(deploymentRequest, {
+    channelType: props.channelType,
+    currentUserId: userStore.currentUser?.uid,
+    robotId: 'clowder_ai',
+    sourceText: String(requestContext.text || sourceContent.originalText || deploymentRequest.originalText || ''),
+    sourceMessageId: String(requestContext.sourceMessageId || deploymentRequest.sourceMessageId || sourceMessage?.clientMsgNo || ''),
+    targetCatIds: Array.isArray(requestContext.targetCatIds) ? requestContext.targetCatIds : [],
+    triggerReason: requestContext.triggerReason,
+    promptContext: requestContext.promptContext,
+    catId: String(sourceContent.catId || ''),
+    catDisplayName: String(sourceContent.catDisplayName || ''),
+    error: extra.error,
+  });
+  messageStore.addMessage(props.channelId, props.channelType, deploymentCard, { countUnread: false });
+}
+
+async function hydrateActiveDeploymentRequestCard() {
+  try {
+    const deploymentRequest = await clowderStore.loadActiveDeploymentRequest({
+      channelId: props.channelId,
+      channelType: props.channelType as 1 | 2,
+    });
+    if (!deploymentRequest) return;
+    upsertDeploymentCardFromRequest(null, deploymentRequest);
+  } catch (err) {
+    console.warn('[MessageList] Failed to hydrate active deployment request', err);
+  }
+}
+
+async function handleDeploymentFieldUpdate(payload: { field: 'target' | 'environment'; value: string; message: any }) {
+  const msg = payload.message;
+  const clientMsgNo = String(msg?.clientMsgNo || '');
+  const content = msg?.content || {};
+  const request = content.deploymentRequest || {};
+  const deploymentRequestId = String(content.deploymentRequestId || request.deploymentRequestId || clientMsgNo || '').trim();
+  const actionKey = `${deploymentRequestId}:${payload.field}:${String(payload.value || '').trim()}`;
+  if (!clientMsgNo || !deploymentRequestId || deploymentFieldKeys.has(actionKey)) return;
+
+  const currentStatus = String(content.status || 'pending_confirmation');
+  if (['confirmed', 'running', 'cancelled', 'canceled', 'submitting'].includes(currentStatus)) return;
+
+  const previousStatus = currentStatus;
+  const fieldValue = String(payload.value || '').trim();
+  deploymentFieldKeys.add(actionKey);
+  updateDeploymentCardStatus(msg, 'submitting', { error: '' });
+  try {
+    const response = await clowderStore.updateDeploymentRequestFields(deploymentRequestId, {
+      ...(payload.field === 'target' ? { target: fieldValue || null } : { environment: fieldValue || null }),
+      sourceMessageId: String(request.sourceMessageId || clientMsgNo),
+      cardMessageId: clientMsgNo,
+      ...(payload.field === 'target' && Array.isArray(content.targetCandidates)
+        ? { targetCandidates: content.targetCandidates }
+        : {}),
+      ...(content.workspaceId || request.workspaceId ? { workspaceId: String(content.workspaceId || request.workspaceId || '') } : {}),
+      ...(content.workspacePath || request.workspacePath ? { workspacePath: String(content.workspacePath || request.workspacePath || '') } : {}),
+    });
+    upsertDeploymentCardFromRequest(msg, response);
+    Message.success(payload.field === 'target' ? '已更新部署目标' : '已更新部署环境');
+  } catch (err: any) {
+    updateDeploymentCardStatus(msg, previousStatus === 'needs_fields' ? 'needs_fields' : previousStatus, {
+      error: err?.message || err?.msg || '部署字段更新失败，可重试'
+    });
+    Message.error(err?.message || err?.msg || '部署字段更新失败');
+  } finally {
+    deploymentFieldKeys.delete(actionKey);
+  }
+}
+
 async function handleDeploymentCardAction(payload: { action: 'confirm' | 'cancel'; message: any }) {
   const msg = payload.message;
   const clientMsgNo = String(msg?.clientMsgNo || '');
@@ -694,11 +775,15 @@ async function handleDeploymentCardAction(payload: { action: 'confirm' | 'cancel
       ].filter(Boolean).join('\n')
     });
     const nextStatus = response.status || (payload.action === 'cancel' ? 'cancelled' : 'confirmed');
-    updateDeploymentCardStatus(msg, nextStatus, {
-      actionId,
-      missingFields: response.missingFields || missingFields,
-      error: ''
-    });
+    if (response.deploymentRequest) {
+      upsertDeploymentCardFromRequest(msg, response.deploymentRequest);
+    } else {
+      updateDeploymentCardStatus(msg, nextStatus, {
+        actionId,
+        missingFields: response.missingFields || missingFields,
+        error: ''
+      });
+    }
     Message.success(payload.action === 'cancel' ? '已取消部署' : '已确认部署');
   } catch (err: any) {
     updateDeploymentCardStatus(msg, previousStatus === 'needs_fields' ? 'needs_fields' : 'failed', {
@@ -793,6 +878,7 @@ async function handleDeploymentCardAction(payload: { action: 'confirm' | 'cancel
             :message="item.msg"
             :is-me="isMe(item.msg)"
             @action="handleDeploymentCardAction"
+            @deployment-field-update="handleDeploymentFieldUpdate"
           />
           <FileCell
             v-else-if="item.msg.content?.type === 8"

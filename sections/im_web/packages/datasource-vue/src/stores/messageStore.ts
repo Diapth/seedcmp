@@ -1297,7 +1297,7 @@ export const useMessageStore = defineStore('message', () => {
     text: string,
     options?: SendMessageOptions,
     retryClientMsgNo?: string
-  ) {
+  ): Promise<Message> {
     const version = resetVersion.value;
     const pending = buildPendingTextMessage(text, options, retryClientMsgNo);
     addMessage(channelId, channelType, pending);
@@ -1316,7 +1316,7 @@ export const useMessageStore = defineStore('message', () => {
       }
 
       const res = await WKSDK.shared().chatManager.send(textMsg, channel);
-      if (version !== resetVersion.value) return;
+      if (version !== resetVersion.value) return pending;
       if (res) {
         registerPendingAckAlias(res.clientSeq, pending.clientMsgNo);
         // Update the pending message in-place using our own clientMsgNo.
@@ -1332,6 +1332,7 @@ export const useMessageStore = defineStore('message', () => {
         removePendingMessage(pending.clientMsgNo);
       }
       clearReplyTargetAfterSuccessfulSend(options?.reply);
+      return pending;
     } catch (err) {
       sendingFromThisTab.delete(pending.clientMsgNo);
       addMessage(channelId, channelType, {
