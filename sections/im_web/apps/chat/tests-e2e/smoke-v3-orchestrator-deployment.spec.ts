@@ -140,6 +140,9 @@ async function commitDeploymentTarget(page: Page, card: Locator, target: string)
     }
   }
 
+  await sendChatMessage(page, `部署 ${target} 到 preview 环境。`);
+  await page.waitForTimeout(1000);
+
   let confirmableCardIndex = -1;
   await expect.poll(async () => {
     confirmableCardIndex = await findConfirmableDeploymentCardIndex(page, target);
