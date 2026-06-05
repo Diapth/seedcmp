@@ -19,6 +19,7 @@ describe('F156 D-2: Security Headers', () => {
     app = Fastify();
     await app.register(securityHeadersPlugin);
     app.get('/api/test', async () => ({ ok: true }));
+    app.get('/api/deployments/deploy_test/preview/', async () => '<!doctype html><title>preview</title>');
     app.get('/health', async () => ({ status: 'ok' }));
     await app.ready();
   });
@@ -43,6 +44,13 @@ describe('F156 D-2: Security Headers', () => {
     const res = await app.inject({ method: 'GET', url: '/health' });
     assert.equal(res.headers['x-frame-options'], 'DENY');
     assert.ok(res.headers['content-security-policy']?.includes("frame-ancestors 'none'"));
+  });
+
+  it('allows deployment preview pages to be embedded by IM Web', async () => {
+    const res = await app.inject({ method: 'GET', url: '/api/deployments/deploy_test/preview/' });
+    assert.equal(res.statusCode, 200);
+    assert.equal(res.headers['x-frame-options'], undefined);
+    assert.equal(res.headers['content-security-policy'], undefined);
   });
 
   it('does not break response body', async () => {

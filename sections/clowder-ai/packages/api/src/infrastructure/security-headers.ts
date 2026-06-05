@@ -68,6 +68,11 @@ function isHostAllowed(hostname: string, allowlist: HostAllowlist): boolean {
   return allowlist.patterns.some((re) => re.test(syntheticOrigin));
 }
 
+function isFrameEmbeddableDeploymentPreview(url: string): boolean {
+  const pathname = String(url || '').split('?', 1)[0] || '';
+  return /^\/api\/deployments\/[^/]+\/preview(?:\/|$)/.test(pathname);
+}
+
 function securityHeaders(app: FastifyInstance, opts: SecurityHeadersOptions, done: () => void) {
   const origins = opts.allowedOrigins ?? resolveFrontendCorsOrigins(process.env);
   const apiUrl = opts.apiBaseUrl ?? process.env.NEXT_PUBLIC_API_URL;
@@ -85,7 +90,11 @@ function securityHeaders(app: FastifyInstance, opts: SecurityHeadersOptions, don
   });
 
   // F156 D-2: Anti-Clickjacking headers
-  app.addHook('onSend', (_request, reply, _payload, next) => {
+  app.addHook('onSend', (request, reply, _payload, next) => {
+    if (isFrameEmbeddableDeploymentPreview(request.url)) {
+      next();
+      return;
+    }
     reply.header('X-Frame-Options', 'DENY');
     reply.header('Content-Security-Policy', "frame-ancestors 'none'");
     next();
