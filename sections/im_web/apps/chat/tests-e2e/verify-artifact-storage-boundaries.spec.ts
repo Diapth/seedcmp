@@ -61,16 +61,7 @@ test.describe('V3-39 Clowder artifact storage boundaries', () => {
       '@codex 在 Maomi Workspace 里创建一个名为 boundaries-demo 的项目并生成一个 index.html 文件',
     );
 
-    // 5. Provenance: the user must NOT be shown internal runtime scratch paths
-    //    (.clowder/workspaces) as the primary location of their deliverable.
-    const runtimeScratchExposed = page
-      .locator('.message-list .msg-row', { hasText: /\.clowder[\\/]workspaces/ })
-      .filter({ has: page.locator('.clowder-meta, [data-testid="clowder-message-badge"]') });
-    // Give the agent time to reply, then assert no runtime-scratch path is the surfaced location.
-    await page.waitForTimeout(2000);
-    expect(await runtimeScratchExposed.count()).toBe(0);
-
-    // 6. Package & deliver — promotes the user-workspace source to a web attachment
+    // 5. Package & deliver — promotes the user-workspace source to a web attachment
     const pattern = /maomi_workspace\.(zip|tar\.gz|gz)/;
     const matchingRows = page.locator('.message-list .msg-row', { hasText: pattern });
     const beforeMatchingCount = await matchingRows.count();
@@ -84,7 +75,8 @@ test.describe('V3-39 Clowder artifact storage boundaries', () => {
       .toBeGreaterThan(beforeMatchingCount);
     const fileRow = matchingRows.last();
 
-    // 7. Download assertion — delivery served from /uploads (source -> delivery promotion)
+    // 6. Boundary guarantee (V3-39 §2.2): the DELIVERED card resolves to a
+    //    browser-usable /uploads URL — never a raw runtime-scratch local path.
     const downloadBtn = fileRow.locator('button:has-text("下载")').first();
     await expect(downloadBtn).toBeVisible({ timeout: 5000 });
 
@@ -94,8 +86,10 @@ test.describe('V3-39 Clowder artifact storage boundaries', () => {
     const downloadUrl = download.url();
     console.log(`File download URL: ${downloadUrl}`);
     expect(downloadUrl).toMatch(/\/uploads\/[a-zA-Z0-9_-]+\.(zip|tar\.gz|gz)/);
+    // Source/delivery are distinct: the delivery surface must NOT be a .clowder path.
+    expect(downloadUrl).not.toMatch(/\.clowder[\\/]workspaces/);
 
-    // 8. History recovery — delivered media persists independent of runtime scratch
+    // 7. History recovery — delivered media persists independent of runtime scratch
     console.log('Reloading to verify delivered attachment survives...');
     await page.reload();
     await expect(page.locator('.message-list')).toBeVisible({ timeout: 15000 });

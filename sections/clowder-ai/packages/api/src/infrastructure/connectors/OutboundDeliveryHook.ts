@@ -7,6 +7,7 @@ import { gzipSync } from 'node:zlib';
 import { type CatId, catRegistry, type RichBlock } from '@cat-cafe/shared';
 import type { FastifyBaseLogger } from 'fastify';
 import { publishGeneratedImage } from '../../domains/cats/services/agents/providers/generated-image-publication.js';
+import { buildArtifactProvenance, rootsFromEnv } from '../../domains/artifacts/artifact-provenance.js';
 import { sanitizeFilenameStem, type SupportedImageMime } from '../../utils/image-storage.js';
 import { getDefaultUploadDir, resolveInternalRouteUrl } from '../../utils/upload-paths.js';
 import { ConnectorMessageFormatter, type MessageEnvelope, type MessageOrigin } from './ConnectorMessageFormatter.js';
@@ -81,9 +82,13 @@ export interface ThreadMeta {
 }
 
 interface PublishedLocalFile {
+  /** Browser-usable delivery reference (e.g. /uploads/x.tar.gz). */
   readonly url: string;
+  /** On-disk path of the published delivery copy. */
   readonly absPath: string;
   readonly fileName?: string;
+  /** V3-39 §2.2: original source the delivery was published from (distinct from `url`). */
+  readonly sourcePath?: string;
 }
 
 interface ResolvedPublishableFile {
@@ -673,10 +678,28 @@ export class OutboundDeliveryHook {
       await copyFile(resolvedSource.sourcePath, absPath);
 
       const urlPath = `/uploads/${targetFileName}`;
+      const provenance = buildArtifactProvenance({
+        sourcePath: resolvedSource.sourcePath,
+        deliveryUrl: urlPath,
+        roots: rootsFromEnv(process.env),
+        ...(baseName ? { downloadName: baseName } : {}),
+      });
+      this.opts.log.info(
+        {
+          sourcePath: provenance.sourcePath,
+          sourceLayer: provenance.sourceLayer,
+          ...(provenance.workspaceRelativePath
+            ? { workspaceRelativePath: provenance.workspaceRelativePath }
+            : {}),
+          deliveryUrl: provenance.deliveryUrl,
+        },
+        '[OutboundDeliveryHook] artifact provenance (source vs delivery)',
+      );
       return {
         url: urlPath,
         absPath,
         fileName: baseName,
+        sourcePath: resolvedSource.sourcePath,
       };
     } catch (err) {
       this.opts.log.warn({ err, url, sourcePath: resolvedSource.sourcePath }, '[OutboundDeliveryHook] local file publish failed');
