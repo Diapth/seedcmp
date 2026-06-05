@@ -70,6 +70,10 @@ func (c *Clowder) Route(r *wkhttp.WKHttp) {
 		auth.GET("/coordinator/kickoff/:coordinationId", c.getCoordinatorKickoff)
 		auth.GET("/coordinator/kickoffs", c.listCoordinatorKickoffs)
 		auth.POST("/coordinator/kickoff/:coordinationId/dismiss", c.dismissCoordinatorKickoff)
+		auth.POST("/coordinator/coordination", c.proxyCreateCoordination)
+		auth.GET("/coordinator/coordination/:coordinationId", c.proxyGetCoordination)
+		auth.RouterGroup.PATCH("/coordinator/coordination/:coordinationId", auth.L.WKHttpHandler(c.proxyPatchCoordination))
+		auth.POST("/coordinator/coordination/:coordinationId/cancel", c.proxyCancelCoordination)
 		// Phase 4.2: Workspace path validation — read-only preview of the
 		// rules enforced by `POST /api/threads` in Clowder 3004.
 		auth.GET("/workspace/validate", c.validateWorkspacePath)
@@ -77,6 +81,7 @@ func (c *Clowder) Route(r *wkhttp.WKHttp) {
 		// We don't know the threadId prefix here, so we proxy the
 		// `/v1/clowder/thread/...` shape to `/api/threads/...` upstream.
 		auth.GET("/thread/:threadId/tasks", c.proxyThreadTasks)
+		auth.GET("/thread/:threadId/coordinations", c.proxyThreadCoordinations)
 		auth.GET("/thread/:threadId/artifacts", c.proxyThreadArtifacts)
 		auth.POST("/thread/:threadId/artifacts", c.proxyPostThreadArtifact)
 		auth.GET("/thread/:threadId/workspaces", c.proxyThreadWorkspaces)
@@ -634,6 +639,58 @@ func (c *Clowder) proxyArchiveMaomiWorkspace(ctx *wkhttp.Context) {
 		return
 	}
 	c.proxyToClowder(ctx, http.MethodPost, "/api/maomi-workspaces/"+url.PathEscape(workspaceID)+"/archive", nil, "maomi_workspace_archive_unavailable")
+}
+
+func (c *Clowder) proxyCreateCoordination(ctx *wkhttp.Context) {
+	body, ok := c.readJSONBody(ctx)
+	if !ok {
+		return
+	}
+	c.proxyToClowder(ctx, http.MethodPost, "/api/coordinator/coordination", bytes.NewReader(body), "coordination_create_unavailable")
+}
+
+func (c *Clowder) proxyGetCoordination(ctx *wkhttp.Context) {
+	coordinationID := strings.TrimSpace(ctx.Param("coordinationId"))
+	if coordinationID == "" {
+		ctx.JSON(http.StatusBadRequest, map[string]string{"error": "coordination_id_required"})
+		return
+	}
+	c.proxyToClowder(ctx, http.MethodGet, "/api/coordinator/coordination/"+url.PathEscape(coordinationID), nil, "coordination_unavailable")
+}
+
+func (c *Clowder) proxyPatchCoordination(ctx *wkhttp.Context) {
+	coordinationID := strings.TrimSpace(ctx.Param("coordinationId"))
+	if coordinationID == "" {
+		ctx.JSON(http.StatusBadRequest, map[string]string{"error": "coordination_id_required"})
+		return
+	}
+	body, ok := c.readJSONBody(ctx)
+	if !ok {
+		return
+	}
+	c.proxyToClowder(ctx, http.MethodPatch, "/api/coordinator/coordination/"+url.PathEscape(coordinationID), bytes.NewReader(body), "coordination_update_unavailable")
+}
+
+func (c *Clowder) proxyCancelCoordination(ctx *wkhttp.Context) {
+	coordinationID := strings.TrimSpace(ctx.Param("coordinationId"))
+	if coordinationID == "" {
+		ctx.JSON(http.StatusBadRequest, map[string]string{"error": "coordination_id_required"})
+		return
+	}
+	body, ok := c.readJSONBody(ctx)
+	if !ok {
+		return
+	}
+	c.proxyToClowder(ctx, http.MethodPost, "/api/coordinator/coordination/"+url.PathEscape(coordinationID)+"/cancel", bytes.NewReader(body), "coordination_cancel_unavailable")
+}
+
+func (c *Clowder) proxyThreadCoordinations(ctx *wkhttp.Context) {
+	threadID := strings.TrimSpace(ctx.Param("threadId"))
+	if threadID == "" {
+		ctx.JSON(http.StatusBadRequest, map[string]string{"error": "thread_id_required"})
+		return
+	}
+	c.proxyToClowder(ctx, http.MethodGet, "/api/threads/"+url.PathEscape(threadID)+"/coordinations", nil, "thread_coordinations_unavailable")
 }
 
 func (c *Clowder) proxyGetThreadWorkspaceBinding(ctx *wkhttp.Context) {

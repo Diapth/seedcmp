@@ -93,6 +93,7 @@ import { createPendingRequestStore } from './domains/cats/services/stores/factor
 import { createProposalStore } from './domains/cats/services/stores/factories/ProposalStoreFactory.js';
 import { createPushSubscriptionStore } from './domains/cats/services/stores/factories/PushSubscriptionStoreFactory.js';
 import { createCoordinatorKickoffStore } from './domains/cats/services/stores/factories/CoordinatorKickoffStoreFactory.js';
+import { createCoordinatorStore } from './domains/cats/services/stores/factories/CoordinatorStoreFactory.js';
 import { createReadStateStore } from './domains/cats/services/stores/factories/ReadStateStoreFactory.js';
 import { createSummaryStore } from './domains/cats/services/stores/factories/SummaryStoreFactory.js';
 import { createTaskStore } from './domains/cats/services/stores/factories/TaskStoreFactory.js';
@@ -574,6 +575,7 @@ async function main(): Promise<void> {
   const draftStore = createDraftStore(redis);
   const readStateStore = createReadStateStore(redis);
   const deploymentRequestStore = createDeploymentRequestStore(redis);
+  const coordinatorStore = createCoordinatorStore(redis);
   const { ExecutionDigestStore } = await import('./domains/projects/execution-digest-store.js');
   const executionDigestStore = new ExecutionDigestStore();
 
@@ -2279,6 +2281,9 @@ async function main(): Promise<void> {
   // Phase 1.6: Coordinator kickoff REST API (im_web pulls on mount, dismisses on close)
   const { coordinatorKickoffRoutes } = await import('./routes/coordinator-kickoff.js');
   await app.register(coordinatorKickoffRoutes, { kickoffStore: coordinatorKickoffStore });
+
+  const { coordinatorCoordinationRoutes } = await import('./routes/coordinator-coordination.js');
+  await app.register(coordinatorCoordinationRoutes, { coordinatorStore });
 
   // Phase 4.2: Workspace path validation (read-only preview of the same
   // rules enforced by `POST /api/threads`).

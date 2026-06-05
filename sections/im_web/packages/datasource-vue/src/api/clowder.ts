@@ -12,6 +12,16 @@ export type ClowderStreamState = 'placeholder' | 'chunk' | 'final' | 'cleanup';
 export type ClowderCatSource = 'existing' | 'runtime-created' | 'disconnected' | 'stale';
 export type ClowderGroupAutoReplyMode = 'off' | 'mentions_only' | 'soft_mentions';
 export type ClowderTaskStatus = 'todo' | 'doing' | 'blocked' | 'done';
+export type ClowderCoordinationStatus =
+  | 'planning'
+  | 'dispatching'
+  | 'running'
+  | 'aggregating'
+  | 'succeeded'
+  | 'failed'
+  | 'cancelled';
+export type ClowderCoordinationDispatchMode = 'parallel' | 'serial' | 'mixed';
+export type ClowderCoordinationSubtaskStatus = 'todo' | 'doing' | 'blocked' | 'done' | 'failed' | 'cancelled';
 
 export interface ClowderConversationRef {
   channelId: string;
@@ -274,6 +284,72 @@ export interface ClowderDeploymentActionResponse {
   message?: string;
   actionId?: string;
   deploymentRequest?: ClowderDeploymentRequest;
+}
+
+export interface ClowderCoordinationSubtask {
+  id: string;
+  title: string;
+  description?: string;
+  targetCatId?: string;
+  status: ClowderCoordinationSubtaskStatus;
+  artifactRefs: string[];
+  dependsOn: string[];
+  result?: string;
+  failureReason?: string;
+  createdAt: number;
+  updatedAt: number;
+}
+
+export interface ClowderCoordination {
+  coordinationId: string;
+  threadId: string;
+  sourceMessageId?: string;
+  createdBy: string;
+  status: ClowderCoordinationStatus;
+  goal: string;
+  assumptions: string[];
+  subtasks: ClowderCoordinationSubtask[];
+  targetCatIds: string[];
+  dispatchMode: ClowderCoordinationDispatchMode;
+  aggregateSummary?: string;
+  failureReason?: string;
+  createdAt: number;
+  updatedAt: number;
+  completedAt?: number;
+}
+
+export interface ClowderCreateCoordinationRequest {
+  coordinationId?: string;
+  threadId: string;
+  sourceMessageId?: string;
+  createdBy?: string;
+  goal: string;
+  assumptions?: string[];
+  subtasks?: Array<Partial<ClowderCoordinationSubtask> & { title: string }>;
+  targetCatIds?: string[];
+  dispatchMode?: ClowderCoordinationDispatchMode;
+  status?: ClowderCoordinationStatus;
+  idempotencyKey?: string;
+}
+
+export interface ClowderUpdateCoordinationRequest {
+  status?: ClowderCoordinationStatus;
+  assumptions?: string[];
+  subtasks?: Array<Partial<ClowderCoordinationSubtask> & { title: string }>;
+  targetCatIds?: string[];
+  dispatchMode?: ClowderCoordinationDispatchMode;
+  aggregateSummary?: string;
+  failureReason?: string;
+}
+
+export interface ClowderCoordinationResponse {
+  coordination: ClowderCoordination;
+  duplicate?: boolean;
+}
+
+export interface ClowderThreadCoordinationsResponse {
+  threadId: string;
+  coordinations: ClowderCoordination[];
 }
 
 export interface ClowderCreateCatRequest {
@@ -547,6 +623,36 @@ export const clowderApi = {
   },
   sendDeploymentAction(data: ClowderDeploymentActionRequest) {
     return apiClient.post<ClowderDeploymentActionResponse>('clowder/conversation/deployment-action', data);
+  },
+  async createCoordination(data: ClowderCreateCoordinationRequest) {
+    const response = await apiClient.post<ClowderCoordinationResponse>('clowder/coordinator/coordination', data);
+    return unwrapApiData(response as unknown as ClowderCoordinationResponse | { data?: ClowderCoordinationResponse });
+  },
+  async updateCoordination(coordinationId: string, data: ClowderUpdateCoordinationRequest) {
+    const response = await apiClient.patch<ClowderCoordinationResponse>(
+      `clowder/coordinator/coordination/${encodeURIComponent(coordinationId)}`,
+      data,
+    );
+    return unwrapApiData(response as unknown as ClowderCoordinationResponse | { data?: ClowderCoordinationResponse });
+  },
+  async getCoordination(coordinationId: string) {
+    const response = await apiClient.get<ClowderCoordinationResponse>(
+      `clowder/coordinator/coordination/${encodeURIComponent(coordinationId)}`,
+    );
+    return unwrapApiData(response as unknown as ClowderCoordinationResponse | { data?: ClowderCoordinationResponse });
+  },
+  async listThreadCoordinations(threadId: string) {
+    const response = await apiClient.get<ClowderThreadCoordinationsResponse>(
+      `clowder/thread/${encodeURIComponent(threadId)}/coordinations`,
+    );
+    return unwrapApiData(response as unknown as ClowderThreadCoordinationsResponse | { data?: ClowderThreadCoordinationsResponse });
+  },
+  async cancelCoordination(coordinationId: string, reason?: string) {
+    const response = await apiClient.post<ClowderCoordinationResponse>(
+      `clowder/coordinator/coordination/${encodeURIComponent(coordinationId)}/cancel`,
+      reason ? { reason } : {},
+    );
+    return unwrapApiData(response as unknown as ClowderCoordinationResponse | { data?: ClowderCoordinationResponse });
   },
   syncGroupCats(data: ClowderGroupCatSyncRequest) {
     return apiClient.post<Record<string, unknown>>('clowder/group/cats/sync', data);

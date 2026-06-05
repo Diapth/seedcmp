@@ -24,10 +24,13 @@ import {
   type ClowderConversationRef,
   type ClowderConversationStateResponse,
   type ClowderConnectionStatus,
+  type ClowderCoordination,
+  type ClowderCreateCoordinationRequest,
   type ClowderCreateDeploymentRequest,
   type ClowderDeploymentActionRequest,
   type ClowderDeploymentActionResponse,
   type ClowderDeploymentRequest,
+  type ClowderUpdateCoordinationRequest,
   type ClowderUpdateDeploymentRequest,
   type ClowderGroupAutoReplyMode,
   type ClowderGroupCatStateResponse,
@@ -236,6 +239,24 @@ function taskErrorStatus(err: unknown) {
   return shaped?.status || shaped?.response?.status || shaped?.error?.response?.status;
 }
 
+const AGENT_DIRECTORY_CACHE_MS = 5_000;
+const CAT_DIRECTORY_CACHE_MS = 10_000;
+const ACTIVE_DEPLOYMENT_CACHE_MS = 5_000;
+const MISSING_ACTIVE_DEPLOYMENT_CACHE_MS = 15_000;
+
+function isFresh(cache: Map<string, number>, key: string, ttlMs: number) {
+  const loadedAt = cache.get(key);
+  return loadedAt !== undefined && Date.now() - loadedAt < ttlMs;
+}
+
+function catDirectoryRequestKey(params?: { query?: string; includeUnavailable?: boolean }) {
+  const query = String(params?.query || '').trim();
+  return JSON.stringify({
+    query,
+    includeUnavailable: params?.includeUnavailable === true
+  });
+}
+
 export const useClowderStore = defineStore('clowder', () => {
   const status = ref<ClowderConnectionStatus>(defaultStatus());
   const conversations = ref<Record<string, ClowderConversationStateResponse>>({});
@@ -257,11 +278,20 @@ export const useClowderStore = defineStore('clowder', () => {
   const workspaceLoading = ref(false);
   const workspaceError = ref<string | undefined>();
   const deploymentRequests = ref<Record<string, ClowderDeploymentRequest>>({});
+  const coordinations = ref<Record<string, ClowderCoordination>>({});
+  const threadCoordinationIds = ref<Record<string, string[]>>({});
   // Phase 2.2: coordinator project group chat kickoff records (one per coordinationId).
   // Surfaced as a "Create Project Group Chat?" card in ClowderConversationPanel.
   const kickoffs = ref<Record<string, CoordinatorKickoff>>({});
   const loading = ref(false);
   const error = ref<string | undefined>();
+  const agentDirectoryRequests = new Map<string, Promise<ClowderAgentDirectoryRuntimeState>>();
+  const agentDirectoryLoadedAt = new Map<string, number>();
+  const catDirectoryRequests = new Map<string, Promise<ClowderCatContact[]>>();
+  const catDirectoryLoadedAt = new Map<string, number>();
+  const activeDeploymentRequests = new Map<string, Promise<ClowderDeploymentRequest | null>>();
+  const activeDeploymentLoadedAt = new Map<string, number>();
+  const missingActiveDeploymentUntil = new Map<string, number>();
 
   const isReady = computed(() => status.value.enabled && status.value.configured && status.value.reachable);
 
@@ -517,12 +547,20 @@ export const useClowderStore = defineStore('clowder', () => {
   }
 
   async function loadAgentDirectory(refInput: ClowderConversationRef) {
+    const key = conversationKey(refInput.channelId, refInput.channelType);
+    const cached = agentDirectories.value[key];
+    if (cached && isFresh(agentDirectoryLoadedAt, key, AGENT_DIRECTORY_CACHE_MS)) {
+      return cached;
+    }
+    const existingRequest = agentDirectoryRequests.get(key);
+    if (existingRequest) return existingRequest;
+
     loading.value = true;
     error.value = undefined;
-    try {
+    const request = (async () => {
       const directory = normalizeAgentDirectory(await clowderApi.getAgentDirectory(refInput) as unknown as ClowderAgentDirectoryResponse);
-      const key = conversationKey(refInput.channelId, refInput.channelType);
       agentDirectories.value[key] = directory;
+      agentDirectoryLoadedAt.set(key, Date.now());
       const current = conversations.value[key];
       conversations.value[key] = normalizeConversationState({
         status: current?.status || status.value,
@@ -534,10 +572,17 @@ export const useClowderStore = defineStore('clowder', () => {
         disabledReason: current?.disabledReason
       });
       return directory;
+    })();
+    agentDirectoryRequests.set(key, request);
+    try {
+      return await request;
     } catch (err) {
       error.value = err instanceof Error ? err.message : 'Clowder agent directory unavailable';
       throw err;
     } finally {
+      if (agentDirectoryRequests.get(key) === request) {
+        agentDirectoryRequests.delete(key);
+      }
       loading.value = false;
     }
   }
@@ -726,18 +771,33 @@ export const useClowderStore = defineStore('clowder', () => {
   }
 
   async function loadCatContactDirectory(params?: { query?: string; includeUnavailable?: boolean }) {
+    const key = catDirectoryRequestKey(params);
+    if (isFresh(catDirectoryLoadedAt, key, CAT_DIRECTORY_CACHE_MS)) {
+      return catContactDirectory.value;
+    }
+    const existingRequest = catDirectoryRequests.get(key);
+    if (existingRequest) return existingRequest;
+
     loading.value = true;
     error.value = undefined;
-    try {
+    const request = (async () => {
       const response = await clowderApi.getCatDirectory(params) as unknown as ClowderCatDirectoryResponse;
       const directory = normalizeCatDirectory(response);
       catRoleTemplates.value = normalizeRoleTemplates(response, directory);
       platformModelOptions.value = normalizePlatformModelOptions(response?.clientDefaults);
+      catDirectoryLoadedAt.set(key, Date.now());
       return applyCatDirectoryRefresh(directory);
+    })();
+    catDirectoryRequests.set(key, request);
+    try {
+      return await request;
     } catch (err) {
       error.value = err instanceof Error ? err.message : 'Clowder cat directory unavailable';
       throw err;
     } finally {
+      if (catDirectoryRequests.get(key) === request) {
+        catDirectoryRequests.delete(key);
+      }
       loading.value = false;
     }
   }
@@ -1238,6 +1298,8 @@ export const useClowderStore = defineStore('clowder', () => {
 
   function setDeploymentRequest(request: ClowderDeploymentRequest) {
     const key = deploymentRequestKey(request.channelId, request.channelType);
+    missingActiveDeploymentUntil.delete(key);
+    activeDeploymentLoadedAt.set(key, Date.now());
     deploymentRequests.value = {
       ...deploymentRequests.value,
       [key]: request,
@@ -1247,6 +1309,7 @@ export const useClowderStore = defineStore('clowder', () => {
 
   function clearDeploymentRequest(channelId: string, channelType: number) {
     const key = deploymentRequestKey(channelId, channelType);
+    activeDeploymentLoadedAt.delete(key);
     if (!(key in deploymentRequests.value)) return;
     const next = { ...deploymentRequests.value };
     delete next[key];
@@ -1279,22 +1342,117 @@ export const useClowderStore = defineStore('clowder', () => {
   }
 
   async function loadActiveDeploymentRequest(refInput: ClowderConversationRef): Promise<ClowderDeploymentRequest | null> {
-    try {
+    const key = deploymentRequestKey(refInput.channelId, refInput.channelType);
+    const cached = deploymentRequests.value[key];
+    if (cached && isFresh(activeDeploymentLoadedAt, key, ACTIVE_DEPLOYMENT_CACHE_MS)) {
+      return cached;
+    }
+    if (!cached && Date.now() < (missingActiveDeploymentUntil.get(key) || 0)) {
+      return null;
+    }
+    const existingRequest = activeDeploymentRequests.get(key);
+    if (existingRequest) return existingRequest;
+
+    const request = (async () => {
       const response = await clowderApi.getActiveDeploymentRequest(refInput);
-      const deploymentRequest = response.deploymentRequest;
+      const deploymentRequest = response?.deploymentRequest;
       if (!deploymentRequest) {
         clearDeploymentRequest(refInput.channelId, refInput.channelType);
+        missingActiveDeploymentUntil.set(key, Date.now() + MISSING_ACTIVE_DEPLOYMENT_CACHE_MS);
         return null;
       }
       return setDeploymentRequest(deploymentRequest);
+    })();
+    activeDeploymentRequests.set(key, request);
+    try {
+      return await request;
     } catch (err: any) {
       const status = err?.response?.status || err?.status;
       if (status === 404) {
         clearDeploymentRequest(refInput.channelId, refInput.channelType);
+        missingActiveDeploymentUntil.set(key, Date.now() + MISSING_ACTIVE_DEPLOYMENT_CACHE_MS);
         return null;
       }
       throw err;
+    } finally {
+      if (activeDeploymentRequests.get(key) === request) {
+        activeDeploymentRequests.delete(key);
+      }
     }
+  }
+
+  function setCoordination(coordination: ClowderCoordination) {
+    coordinations.value = {
+      ...coordinations.value,
+      [coordination.coordinationId]: coordination,
+    };
+    const current = threadCoordinationIds.value[coordination.threadId] || [];
+    const nextIds = [coordination.coordinationId, ...current.filter(id => id !== coordination.coordinationId)];
+    threadCoordinationIds.value = {
+      ...threadCoordinationIds.value,
+      [coordination.threadId]: nextIds,
+    };
+    return coordination;
+  }
+
+  function getCoordination(coordinationId: string): ClowderCoordination | undefined {
+    return coordinations.value[coordinationId];
+  }
+
+  function getThreadCoordinations(threadId: string): ClowderCoordination[] {
+    return (threadCoordinationIds.value[threadId] || [])
+      .map(id => coordinations.value[id])
+      .filter((coordination): coordination is ClowderCoordination => !!coordination);
+  }
+
+  async function createCoordination(input: ClowderCreateCoordinationRequest): Promise<ClowderCoordination> {
+    const response = await clowderApi.createCoordination(input);
+    if (!response.coordination) {
+      throw new Error('Clowder coordination create failed');
+    }
+    return setCoordination(response.coordination);
+  }
+
+  async function updateCoordination(
+    coordinationId: string,
+    input: ClowderUpdateCoordinationRequest,
+  ): Promise<ClowderCoordination> {
+    const response = await clowderApi.updateCoordination(coordinationId, input);
+    if (!response.coordination) {
+      throw new Error('Clowder coordination update failed');
+    }
+    return setCoordination(response.coordination);
+  }
+
+  async function loadCoordination(coordinationId: string): Promise<ClowderCoordination | null> {
+    const trimmed = String(coordinationId || '').trim();
+    if (!trimmed) return null;
+    const response = await clowderApi.getCoordination(trimmed);
+    if (!response.coordination) return null;
+    return setCoordination(response.coordination);
+  }
+
+  async function loadThreadCoordinations(threadId: string): Promise<ClowderCoordination[]> {
+    const trimmed = String(threadId || '').trim();
+    if (!trimmed) return [];
+    const response = await clowderApi.listThreadCoordinations(trimmed);
+    const list = Array.isArray(response.coordinations) ? response.coordinations : [];
+    for (const coordination of list) {
+      setCoordination(coordination);
+    }
+    threadCoordinationIds.value = {
+      ...threadCoordinationIds.value,
+      [trimmed]: list.map(coordination => coordination.coordinationId),
+    };
+    return list;
+  }
+
+  async function cancelCoordination(coordinationId: string, reason?: string): Promise<ClowderCoordination> {
+    const response = await clowderApi.cancelCoordination(coordinationId, reason);
+    if (!response.coordination) {
+      throw new Error('Clowder coordination cancel failed');
+    }
+    return setCoordination(response.coordination);
   }
 
   // Phase 2.2: kickoff actions. kickoffs come from the Clowder API either
@@ -1414,6 +1572,8 @@ export const useClowderStore = defineStore('clowder', () => {
     workspaceLoading.value = false;
     workspaceError.value = undefined;
     deploymentRequests.value = {};
+    coordinations.value = {};
+    threadCoordinationIds.value = {};
     kickoffs.value = {};
     loading.value = false;
     error.value = undefined;
@@ -1450,7 +1610,11 @@ export const useClowderStore = defineStore('clowder', () => {
     workspaceLoading,
     workspaceError,
     deploymentRequests,
+    coordinations,
+    threadCoordinationIds,
     getDeploymentRequest,
+    getCoordination,
+    getThreadCoordinations,
     getWorkspaceBinding,
     getActiveWorkspace,
     loadWorkspaceRoot,
@@ -1464,6 +1628,11 @@ export const useClowderStore = defineStore('clowder', () => {
     loadActiveDeploymentRequest,
     createDeploymentRequest,
     updateDeploymentRequestFields,
+    createCoordination,
+    updateCoordination,
+    loadCoordination,
+    loadThreadCoordinations,
+    cancelCoordination,
     getCatContactById,
     connectExistingCat,
     createCatAndConnect,
