@@ -88,21 +88,21 @@ This file records the required real Web checks for the orchestrator and P2 deplo
 
 ### Stage 3
 
-- Login user:
-- OAuth platform:
-- OAuth status:
-- Cat name:
-- Cat alias:
+- Login user: 18337488675
+- OAuth platform: Codex
+- OAuth status: local Codex account available through existing Clowder cat configuration
+- Cat name: xtz coordinator with dd/cs target cats
+- Cat alias: @xtz; prompt also included @协调者
 - Conversation type: group
-- Group chat ID:
-- Thread ID:
-- Coordination ID:
+- Group chat ID: 16e006b0b84f40faaa77a271e69b5021
+- Thread ID: thread_mq1afgliuch3zzzg
+- Coordination ID: coord_e2bfd0fd-0329-4d60-ad87-d19f77a308c4
 - Deployment request ID:
-- Prompt: /status; @协调者 继续上一轮任务，补充移动端注意事项并重新汇总。
-- Screenshot paths:
-- Result:
+- Prompt: /status; @协调者 @xtz 阶段3真实面板验收：继续上一轮任务，补充移动端注意事项并重新汇总。这次不要写代码；请立即调用 cat_cafe_multi_mention 工具唤起 dd 和 cs，targets 必须是 ["dd","cs"]，callbackTo 是 xtz。question 请写：dd 补充移动端版式和交互注意事项，cs 检查移动端可访问性和质量风险。等至少一个目标猫回复后，请输出 Coordinator / Multi-Mention 结果汇总。
+- Screenshot paths: docs/manual-test-artifacts/stage3-group-open.png; docs/manual-test-artifacts/stage3-command-menu.png; docs/manual-test-artifacts/stage3-status-sent.png; docs/manual-test-artifacts/stage3-prompt-sent.png; docs/manual-test-artifacts/stage3-summary-card.png; docs/manual-test-artifacts/stage3-coordination-tab.png; docs/manual-test-artifacts/stage3-subtask-locate.png; docs/manual-test-artifacts/stage3-mobile-panel.png
+- Result: passed
 - Failure reason:
-- Notes:
+- Notes: Final committed code was restarted before validation. The first Stage 3 trial included "部署风险" and was intentionally discarded because it triggered the deployment confirmation path; the logged prompt above was the real accepted orchestrator run. Backend created multi-mention request 2c8bc3ea-e8c5-40ac-97cb-7baa506d6f0f and real dd/cs invocations a72afed0-7b60-4294-954e-3a3112ebeae7 / 41ac67ea-d9a4-4c40-8bbc-aea428773419. The persisted coordination succeeded with targetCatIds xtz/dd/cs; dd and cs multi-mention subtasks were done. Web showed the coordinator summary card with retry/cancel actions, the new "协调任务" panel tab, clickable subtask locate behavior, and no DeepSeek fallback. Mobile check at 390x844 measured right dock bottom 608 and input top 644, so the panel did not cover the composer.
 
 ### Stage 4
 
