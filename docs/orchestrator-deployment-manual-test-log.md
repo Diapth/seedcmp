@@ -70,21 +70,21 @@ This file records the required real Web checks for the orchestrator and P2 deplo
 
 ### Stage 2
 
-- Login user:
-- OAuth platform:
-- OAuth status:
-- Cat name:
-- Cat alias:
+- Login user: 18337488675
+- OAuth platform: Codex
+- OAuth status: local Codex account available through existing Clowder cat configuration
+- Cat name: xtz
+- Cat alias: @xtz
 - Conversation type: group
-- Group chat ID:
-- Thread ID:
-- Coordination ID:
+- Group chat ID: 16e006b0b84f40faaa77a271e69b5021
+- Thread ID: thread_mq1afgliuch3zzzg
+- Coordination ID: coord_4b74a2d9-b045-465d-8d26-6bb4e73ff20f
 - Deployment request ID:
-- Prompt: @协调者 请协调 @claude-dev 和 @codex-qa 做一个最小餐厅落地页：Claude 负责实现 HTML，Codex 负责检查可访问性和部署风险，最后你汇总。
-- Screenshot paths:
-- Result:
+- Prompt: @xtz 阶段2真实派发验收：这次不要只给计划。请立即调用 cat_cafe_multi_mention 工具唤起 dd 和 cs，targets 必须是 ["dd","cs"]，callbackTo 是 xtz。question 请写：dd 负责给出最小餐厅落地页 HTML 实现方案，cs 负责检查可访问性和部署风险。等至少一个目标猫回复后，请输出 Coordinator / Multi-Mention 汇总。
+- Screenshot paths: docs/manual-test-artifacts/stage2-dispatch-group-open.png; docs/manual-test-artifacts/stage2-dispatch-prompt-sent.png; docs/manual-test-artifacts/stage2-dispatch-first-reply.png; docs/manual-test-artifacts/stage2-dispatch-final-aggregate.png; docs/manual-test-artifacts/stage2-dispatch-panel.png
+- Result: passed
 - Failure reason:
-- Notes:
+- Notes: Local configured coordinator-style cat is xtz rather than @协调者/@claude-dev. The real Web prompt triggered multi-mention request b0fceb46-9ddf-437a-9f51-c710e21dc2f8, created real dd and cs invocations, delivered both sub-agent replies, and persisted a succeeded coordination aggregate. Chat and screenshots showed no DeepSeek fallback.
 
 ### Stage 3
 
