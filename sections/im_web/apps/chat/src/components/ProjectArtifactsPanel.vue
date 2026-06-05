@@ -55,6 +55,18 @@ const loading = ref(false);
 const error = ref<string | null>(null);
 let pollTimer: ReturnType<typeof setInterval> | null = null;
 
+/**
+ * apiClient's response interceptor unwraps to the response body, so callers
+ * receive the payload directly. Some code paths still hand back an axios-like
+ * `{ data: <body> }`; tolerate both so we never read `undefined.artifacts`.
+ */
+function unwrapBody<T>(response: unknown): T | undefined {
+  if (!response || typeof response !== 'object') return undefined;
+  const maybe = response as { data?: unknown };
+  if (maybe.data && typeof maybe.data === 'object') return maybe.data as T;
+  return response as T;
+}
+
 function groupArtifactsByOwner(input: ThreadArtifact[]) {
   const map = new Map<string, ThreadArtifact[]>();
   for (const a of input) {
@@ -152,13 +164,18 @@ async function refresh() {
       ),
       apiClient.get<{ workspaces?: RuntimeWorkspaceRecord[] }>(
         `clowder/thread/${encodeURIComponent(props.threadId)}/workspaces`,
-      ).catch(() => ({ data: { workspaces: [] } })),
+      ).catch(() => ({ workspaces: [] })),
     ]);
-    const list = response.data?.artifacts ?? [];
+    // apiClient's response interceptor already unwraps to the response body,
+    // so the resolved value IS the payload (not an AxiosResponse). Tolerate
+    // both shapes (`.data` present or not) to be safe across client configs.
+    const artifactBody = unwrapBody<{ artifacts?: ThreadArtifact[]; diagnostics?: Record<string, number> }>(response);
+    const workspaceBody = unwrapBody<{ workspaces?: RuntimeWorkspaceRecord[] }>(workspaceResponse);
+    const list = artifactBody?.artifacts ?? [];
     artifacts.value = Array.isArray(list) ? list : [];
-    const workspaceList = workspaceResponse.data?.workspaces ?? [];
+    const workspaceList = workspaceBody?.workspaces ?? [];
     workspaces.value = Array.isArray(workspaceList) ? workspaceList : [];
-    diagnostics.value = response.data?.diagnostics || {};
+    diagnostics.value = artifactBody?.diagnostics || {};
   } catch (err) {
     error.value = err instanceof Error ? err.message : '加载产物失败';
   } finally {
