@@ -3,6 +3,7 @@ import { mkdtemp, mkdir, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { afterEach, beforeEach, describe, it } from 'node:test';
+import { setTimeout as delay } from 'node:timers/promises';
 
 import Fastify from 'fastify';
 import { DeploymentExecutor } from '../../dist/domains/deployments/DeploymentExecutor.js';
@@ -32,6 +33,22 @@ function buildApp({ deploymentsDir, allowedRoots, publicBaseUrl }) {
   app.register(deploymentRoutes, { deploymentJobStore });
   app.register(connectorDeploymentActionRoutes, { deploymentRequestStore, deploymentJobStore, deploymentExecutor });
   return { app, deploymentRequestStore, deploymentJobStore };
+}
+
+async function waitForDeploymentRequest(app, requestId, predicate, attempts = 30) {
+  let last;
+  for (let index = 0; index < attempts; index += 1) {
+    const response = await app.inject({
+      method: 'GET',
+      url: `/api/connectors/im-web/deployment-requests/${encodeURIComponent(requestId)}`,
+      headers: HEADERS,
+    });
+    assert.equal(response.statusCode, 200);
+    last = JSON.parse(response.payload).deploymentRequest;
+    if (predicate(last)) return last;
+    await delay(50);
+  }
+  assert.fail(`deployment request did not reach expected state; last=${JSON.stringify(last)}`);
 }
 
 describe('deployment request routes', () => {
@@ -118,6 +135,14 @@ describe('deployment request routes', () => {
     const active = JSON.parse(activeRes.payload).deploymentRequest;
     assert.equal(active.id, created.id);
     assert.equal(active.status, 'pending_confirmation');
+
+    const detailRes = await app.inject({
+      method: 'GET',
+      url: `/api/connectors/im-web/deployment-requests/${encodeURIComponent(created.id)}`,
+      headers: HEADERS,
+    });
+    assert.equal(detailRes.statusCode, 200);
+    assert.equal(JSON.parse(detailRes.payload).deploymentRequest.id, created.id);
   });
 
   it('persists confirm and cancel actions through the request store', async () => {
@@ -156,11 +181,13 @@ describe('deployment request routes', () => {
     });
     assert.equal(confirmRes.statusCode, 200);
     const confirmed = JSON.parse(confirmRes.payload);
-    assert.equal(confirmed.status, 'succeeded');
-    assert.equal(confirmed.deployment.status, 'succeeded');
-    assert.equal(confirmed.deploymentRequest.status, 'succeeded');
-    assert.match(confirmed.deploymentRequest.previewUrl, /^http:\/\/api\.test\/api\/deployments\/deploy_/);
-    assert.match(confirmed.deploymentRequest.downloadUrl, /^http:\/\/api\.test\/api\/deployments\/deploy_/);
+    assert.equal(confirmed.status, 'queued');
+    assert.equal(confirmed.deployment.status, 'queued');
+    assert.equal(confirmed.deploymentRequest.status, 'queued');
+
+    const completed = await waitForDeploymentRequest(app, requestId, (request) => request.status === 'succeeded');
+    assert.match(completed.previewUrl, /^http:\/\/api\.test\/api\/deployments\/deploy_/);
+    assert.match(completed.downloadUrl, /^http:\/\/api\.test\/api\/deployments\/deploy_/);
 
     const previewRes = await app.inject({
       method: 'GET',

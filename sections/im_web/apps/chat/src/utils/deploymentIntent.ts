@@ -14,8 +14,15 @@ const DEPLOYMENT_KEYWORDS = [
   '部署',
   '上线',
   '发布',
+  '生成预览链接',
+  '预览链接',
+  '打包源码',
+  '源码包',
+  '下载源码包',
   'deploy',
   'deployment',
+  'preview link',
+  'source package',
   'release',
   'rollout'
 ];
@@ -43,6 +50,8 @@ const DEPLOYMENT_FILLER_TOKENS = new Set([
   '呀',
   '哈',
   '请',
+  '我',
+  '我们',
   '麻烦',
   '辛苦',
   '谢谢',
@@ -107,6 +116,12 @@ function detectTarget(text: string, allowLoose = false) {
   const chineseTargetAfter = text.match(/(?:部署|上线|发布)\s*(?:到|至|给|把|将)?\s*([^\s,，。！？!?;；、]{1,80}?)(?=(?:\s*(?:到|至|在|于|环境|环境是|环境为|,|，|。|！|!|？|\?|;|；)|$))/);
   if (chineseTargetAfter?.[1]) {
     const target = sanitizeTargetCandidate(chineseTargetAfter[1]);
+    if (target !== '待确认目标') return target;
+  }
+
+  const packageOrPreviewTarget = text.match(/(?:把|将|为)\s*([^\s,，。！？!?;；、`"“”']{1,80})\s*(?:生成预览链接|打包源码|下载源码包|源码包|预览链接)/);
+  if (packageOrPreviewTarget?.[1]) {
+    const target = sanitizeTargetCandidate(packageOrPreviewTarget[1]);
     if (target !== '待确认目标') return target;
   }
 

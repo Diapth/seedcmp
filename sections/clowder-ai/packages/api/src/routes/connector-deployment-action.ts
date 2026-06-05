@@ -172,17 +172,45 @@ export const connectorDeploymentActionRoutes: FastifyPluginAsync<ConnectorDeploy
             downloadUrl: null,
             containerPlan: null,
           }) ?? deploymentRequest;
-          deployment = await deploymentExecutor.execute(deployment, deploymentRequest);
-          status = deployment.status;
-          deploymentRequest = await deploymentRequestStore.updateExecution(deploymentRequestId, {
-            status: deployment.status,
-            deploymentJobId: deployment.id,
-            previewUrl: deployment.previewUrl ?? null,
-            downloadUrl: deployment.downloadUrl ?? null,
-            logsSummary: summarizeJobLogs(deployment),
-            failureReason: deployment.failureReason ?? null,
-            containerPlan: deployment.containerPlan ?? null,
-          }) ?? deploymentRequest;
+          status = 'queued';
+          const queuedDeployment = deployment;
+          const queuedRequest = deploymentRequest;
+          void (async () => {
+            await deploymentRequestStore.updateExecution(deploymentRequestId, {
+              status: 'running',
+              deploymentJobId: queuedDeployment.id,
+              logsSummary: summarizeJobLogs(await deploymentJobStore.get(queuedDeployment.id)),
+              failureReason: null,
+              previewUrl: null,
+              downloadUrl: null,
+              containerPlan: null,
+            });
+            const completedDeployment = await deploymentExecutor.execute(queuedDeployment, queuedRequest);
+            await deploymentRequestStore.updateExecution(deploymentRequestId, {
+              status: completedDeployment.status,
+              deploymentJobId: completedDeployment.id,
+              previewUrl: completedDeployment.previewUrl ?? null,
+              downloadUrl: completedDeployment.downloadUrl ?? null,
+              logsSummary: summarizeJobLogs(completedDeployment),
+              failureReason: completedDeployment.failureReason ?? null,
+              containerPlan: completedDeployment.containerPlan ?? null,
+            });
+          })().catch(async (err) => {
+            const failureReason = err instanceof Error ? err.message : String(err);
+            request.log.error({ err, deploymentRequestId }, 'background deployment execution failed');
+            await deploymentJobStore.appendLog(queuedDeployment.id, 'error', failureReason).catch(() => null);
+            const failedDeployment = await deploymentJobStore.update(queuedDeployment.id, {
+              status: 'failed',
+              failureReason,
+              completedAt: Date.now(),
+            }).catch(() => null);
+            await deploymentRequestStore.updateExecution(deploymentRequestId, {
+              status: 'failed',
+              deploymentJobId: queuedDeployment.id,
+              logsSummary: summarizeJobLogs(failedDeployment),
+              failureReason,
+            }).catch(() => null);
+          });
         }
       } else {
         deploymentRequest = await deploymentRequestStore.cancel(deploymentRequestId) ?? deploymentRequest;

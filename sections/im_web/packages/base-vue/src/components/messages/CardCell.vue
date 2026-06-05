@@ -39,9 +39,15 @@ const props = defineProps<{
       environment?: string;
       destination?: string;
       status?: string;
+      statusLabel?: string;
       confirmText?: string;
       cancelText?: string;
       deploymentRequestId?: string;
+      deploymentJobId?: string;
+      previewUrl?: string;
+      downloadUrl?: string;
+      logsSummary?: string[];
+      failureReason?: string;
       missingFields?: string[];
       disabledReason?: string;
       error?: string;
@@ -64,7 +70,7 @@ const props = defineProps<{
 }>();
 
 const emit = defineEmits<{
-  (event: 'action', payload: { action: 'confirm' | 'cancel'; message: any }): void;
+  (event: 'action', payload: { action: 'confirm' | 'cancel' | 'retry' | 'open-preview' | 'download'; message: any }): void;
   (event: 'deployment-field-update', payload: { field: 'target' | 'environment'; value: string; message: any }): void;
 }>();
 
@@ -85,6 +91,7 @@ const deploymentEnvironmentCandidates = computed(() => {
   return candidates.length ? candidates : DEFAULT_ENVIRONMENT_CANDIDATES;
 });
 const deploymentStatus = computed(() => {
+  if (content.value.statusLabel) return String(content.value.statusLabel);
   const status = String(content.value.status || 'pending_confirmation');
   if (status === 'needs_fields') return '需要补充信息';
   if (status === 'submitting') return '提交中';
@@ -103,6 +110,7 @@ const deploymentActionDisabled = computed(() => {
   const status = String(content.value.status || 'pending_confirmation');
   return ['confirmed', 'queued', 'running', 'succeeded', 'cancelled', 'canceled', 'submitting'].includes(status);
 });
+const deploymentCanRetry = computed(() => String(content.value.status || '') === 'failed');
 const deploymentConfirmDisabled = computed(() => {
   return deploymentActionDisabled.value || deploymentMissingFields.value.length > 0 || String(content.value.status || '') === 'needs_fields';
 });
@@ -130,7 +138,12 @@ watch(
   { immediate: true },
 );
 
-function handleDeploymentAction(action: 'confirm' | 'cancel') {
+function handleDeploymentAction(action: 'confirm' | 'cancel' | 'retry' | 'open-preview' | 'download') {
+  if (action === 'open-preview' || action === 'download') {
+    emit('action', { action, message: props.message });
+    return;
+  }
+  if (action === 'retry' && !deploymentCanRetry.value) return;
   if (action === 'confirm' && deploymentConfirmDisabled.value) return;
   if (action === 'cancel' && deploymentActionDisabled.value) return;
   emit('action', { action, message: props.message });
@@ -213,6 +226,7 @@ function applyEnvironmentCandidate(candidate: DeploymentEnvironmentCandidate) {
             :key="candidate.id"
             type="button"
             class="deployment-candidate"
+            :title="candidate.value"
             @click="applyTargetCandidate(candidate)"
           >
             {{ candidate.label }}
@@ -244,30 +258,37 @@ function applyEnvironmentCandidate(candidate: DeploymentEnvironmentCandidate) {
         {{ content.failureReason }}
       </p>
       <div v-if="deploymentPreviewUrl || deploymentDownloadUrl" class="deployment-links">
-        <a
+        <button
           v-if="deploymentPreviewUrl"
+          type="button"
           class="deployment-link"
-          :href="deploymentPreviewUrl"
-          target="_blank"
-          rel="noopener noreferrer"
+          @click="handleDeploymentAction('open-preview')"
         >
           打开预览
-        </a>
-        <a
+        </button>
+        <button
           v-if="deploymentDownloadUrl"
+          type="button"
           class="deployment-link"
-          :href="deploymentDownloadUrl"
-          target="_blank"
-          rel="noopener noreferrer"
+          @click="handleDeploymentAction('download')"
         >
           下载源码包
-        </a>
+        </button>
       </div>
       <ul v-if="deploymentLogsSummary.length > 0" class="deployment-log-list">
         <li v-for="(line, index) in deploymentLogsSummary" :key="index">{{ line }}</li>
       </ul>
       <div class="deployment-actions">
         <button
+          v-if="deploymentCanRetry"
+          type="button"
+          class="deployment-btn primary"
+          @click="handleDeploymentAction('retry')"
+        >
+          重试
+        </button>
+        <button
+          v-else
           type="button"
           class="deployment-btn primary"
           :disabled="deploymentConfirmDisabled"
@@ -482,6 +503,7 @@ function applyEnvironmentCandidate(candidate: DeploymentEnvironmentCandidate) {
 }
 
 .deployment-candidate {
+  max-width: 100%;
   height: 28px;
   padding: 0 10px;
   border: var(--border-hairline);
@@ -491,6 +513,9 @@ function applyEnvironmentCandidate(candidate: DeploymentEnvironmentCandidate) {
   cursor: pointer;
   font-size: 11px;
   line-height: 26px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .deployment-candidate.active {
@@ -523,7 +548,9 @@ function applyEnvironmentCandidate(candidate: DeploymentEnvironmentCandidate) {
   padding: 0 10px;
   border: var(--border-hairline);
   border-radius: var(--radius-sm);
+  background: var(--bg-primary);
   color: var(--primary-color, #165dff);
+  cursor: pointer;
   font-size: 12px;
   line-height: 26px;
   text-decoration: none;

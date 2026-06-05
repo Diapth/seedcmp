@@ -71,6 +71,11 @@ const editDialogText = ref('');
 const channelKey = computed(() => `${props.channelId}-${props.channelType}`);
 const deploymentActionKeys = new Set<string>();
 const deploymentFieldKeys = new Set<string>();
+const deploymentPollableStatuses = new Set(['confirmed', 'queued', 'running', 'submitting']);
+const deploymentTerminalStatuses = new Set(['succeeded', 'failed', 'cancelled', 'canceled']);
+const deploymentPollIntervalMs = 2500;
+let deploymentPollTimer: ReturnType<typeof setInterval> | null = null;
+let deploymentPollInFlight = false;
 const coordinatorActionKey = ref('');
 const coordinationHydrationIds = new Set<string>();
 
@@ -130,6 +135,19 @@ const visibleMessages = computed(() => {
     msg,
     index: visibleStart.value + index
   }));
+});
+
+const pollingDeploymentRequestIds = computed(() => {
+  const ids = new Set<string>();
+  for (const msg of messages.value) {
+    if (!isDeploymentCardMessage(msg)) continue;
+    const content = msg.content || {};
+    const status = String(content.status || 'pending_confirmation');
+    if (!deploymentPollableStatuses.has(status)) continue;
+    const requestId = getDeploymentRequestIdFromMessage(msg);
+    if (requestId) ids.add(requestId);
+  }
+  return Array.from(ids);
 });
 
 const topSpacerHeight = computed(() => visibleStart.value * estimatedRowHeight);
@@ -203,6 +221,14 @@ watch(messages, (newMsgs) => {
 
 watch(() => [props.channelId, props.channelType], () => {
   void hydrateActiveDeploymentRequestCard();
+}, { immediate: true });
+
+watch(pollingDeploymentRequestIds, (ids) => {
+  if (ids.length > 0) {
+    startDeploymentPolling();
+  } else {
+    stopDeploymentPolling();
+  }
 }, { immediate: true });
 
 function shouldShowTime(msg: any, index: number): boolean {
@@ -909,6 +935,67 @@ function updateDeploymentCardStatus(msg: any, status: string, extra: Record<stri
   });
 }
 
+function isDeploymentCardMessage(msg: any) {
+  const content = msg?.content || msg?.payload || {};
+  const type = String(content.cardType || content.kind || '').toLowerCase();
+  return Number(content.type || 0) === 7 && ['deployment', 'deploy', 'deployment_confirmation', 'deploy_confirmation'].includes(type);
+}
+
+function getDeploymentRequestIdFromMessage(msg: any) {
+  const content = msg?.content || msg?.payload || {};
+  const request = content.deploymentRequest || {};
+  return String(content.deploymentRequestId || request.deploymentRequestId || '').trim();
+}
+
+function findDeploymentCardMessage(deploymentRequestId: string) {
+  const id = String(deploymentRequestId || '').trim();
+  if (!id) return null;
+  return messages.value.find((msg) => getDeploymentRequestIdFromMessage(msg) === id) || null;
+}
+
+function startDeploymentPolling() {
+  if (deploymentPollTimer !== null) return;
+  void refreshDeploymentRequestCards();
+  deploymentPollTimer = setInterval(() => {
+    void refreshDeploymentRequestCards();
+  }, deploymentPollIntervalMs);
+}
+
+function stopDeploymentPolling() {
+  if (deploymentPollTimer === null) return;
+  clearInterval(deploymentPollTimer);
+  deploymentPollTimer = null;
+}
+
+async function refreshDeploymentRequestCards(ids = pollingDeploymentRequestIds.value) {
+  if (deploymentPollInFlight || ids.length === 0) return;
+  deploymentPollInFlight = true;
+  try {
+    for (const deploymentRequestId of ids) {
+      const msg = findDeploymentCardMessage(deploymentRequestId);
+      if (!msg) continue;
+      const previousStatus = String((msg.content || {}).status || '');
+      if (!deploymentPollableStatuses.has(previousStatus)) continue;
+      try {
+        const deploymentRequest = await clowderStore.loadDeploymentRequest(deploymentRequestId);
+        if (!deploymentRequest) continue;
+        upsertDeploymentCardFromRequest(msg, deploymentRequest);
+        if (!deploymentTerminalStatuses.has(previousStatus) && deploymentTerminalStatuses.has(deploymentRequest.status)) {
+          if (deploymentRequest.status === 'succeeded') {
+            Message.success('部署完成');
+          } else if (deploymentRequest.status === 'failed') {
+            Message.error(deploymentRequest.failureReason || '部署失败');
+          }
+        }
+      } catch (err) {
+        console.warn('[MessageList] Failed to refresh deployment request', deploymentRequestId, err);
+      }
+    }
+  } finally {
+    deploymentPollInFlight = false;
+  }
+}
+
 function upsertDeploymentCardFromRequest(
   sourceMessage: any,
   deploymentRequest: any,
@@ -984,19 +1071,50 @@ async function handleDeploymentFieldUpdate(payload: { field: 'target' | 'environ
   }
 }
 
-async function handleDeploymentCardAction(payload: { action: 'confirm' | 'cancel'; message: any }) {
+async function handleDeploymentCardAction(payload: { action: 'confirm' | 'cancel' | 'retry' | 'open-preview' | 'download'; message: any }) {
   const msg = payload.message;
   const clientMsgNo = String(msg?.clientMsgNo || '');
   const content = msg?.content || {};
   const request = content.deploymentRequest || {};
   const deploymentRequestId = String(content.deploymentRequestId || request.deploymentRequestId || clientMsgNo || '').trim();
+
+  if (payload.action === 'open-preview') {
+    const previewUrl = String(content.previewUrl || '').trim();
+    if (!previewUrl) {
+      Message.warning('预览链接还没有生成');
+      return;
+    }
+    emit('open-preview', {
+      source: 'deployment',
+      kind: 'html',
+      url: previewUrl,
+      title: '部署预览',
+      name: `${String(content.target || '部署目标')} · ${String(content.environment || '环境')}`,
+      deploymentRequestId,
+      deploymentJobId: String(content.deploymentJobId || ''),
+    });
+    return;
+  }
+
+  if (payload.action === 'download') {
+    const downloadUrl = String(content.downloadUrl || '').trim();
+    if (!downloadUrl) {
+      Message.warning('源码包还没有生成');
+      return;
+    }
+    window.open(downloadUrl, '_blank', 'noopener,noreferrer');
+    return;
+  }
+
   const actionKey = `${deploymentRequestId}:${payload.action}`;
   if (!clientMsgNo || !deploymentRequestId || deploymentActionKeys.has(actionKey)) return;
 
   const currentStatus = String(content.status || 'pending_confirmation');
-  if (['confirmed', 'queued', 'running', 'succeeded', 'cancelled', 'canceled', 'submitting'].includes(currentStatus)) return;
+  const backendAction = payload.action === 'retry' ? 'confirm' : payload.action;
+  if (payload.action === 'retry' && currentStatus !== 'failed') return;
+  if (payload.action !== 'retry' && ['confirmed', 'queued', 'running', 'succeeded', 'cancelled', 'canceled', 'submitting'].includes(currentStatus)) return;
   const missingFields = Array.isArray(content.missingFields) ? content.missingFields : [];
-  if (payload.action === 'confirm' && (currentStatus === 'needs_fields' || missingFields.length > 0)) {
+  if (backendAction === 'confirm' && (currentStatus === 'needs_fields' || missingFields.length > 0)) {
     Message.warning(String(content.disabledReason || '请先补充部署目标和环境'));
     return;
   }
@@ -1011,7 +1129,7 @@ async function handleDeploymentCardAction(payload: { action: 'confirm' | 'cancel
       channelId: props.channelId,
       channelType: props.channelType as 1 | 2,
       deploymentRequestId,
-      action: payload.action,
+      action: backendAction,
       actionId,
       cardMessageId: clientMsgNo,
       sourceMessageId: String(request.sourceMessageId || clientMsgNo),
@@ -1037,7 +1155,8 @@ async function handleDeploymentCardAction(payload: { action: 'confirm' | 'cancel
         error: ''
       });
     }
-    Message.success(payload.action === 'cancel' ? '已取消部署' : '已确认部署');
+    if (backendAction === 'confirm') startDeploymentPolling();
+    Message.success(payload.action === 'cancel' ? '已取消部署' : payload.action === 'retry' ? '已重新提交部署' : '已确认部署');
   } catch (err: any) {
     updateDeploymentCardStatus(msg, previousStatus === 'needs_fields' ? 'needs_fields' : 'failed', {
       error: err?.message || err?.msg || '部署操作失败，可重试'
@@ -1053,6 +1172,7 @@ onMounted(() => {
 });
 
 onBeforeUnmount(() => {
+  stopDeploymentPolling();
   window.removeEventListener('clowder:locate-message', handleLocateMessageEvent);
 });
 </script>

@@ -86,9 +86,55 @@ describe('deployment confirmation card', () => {
       environment: '待确认环境',
       missingFields: ['target', 'environment']
     })
+    expect(detectDeploymentIntent('给我生成预览链接')).toMatchObject({
+      shouldConfirm: true,
+      target: '待确认目标',
+      environment: 'preview',
+      missingFields: ['target']
+    })
+    expect(detectDeploymentIntent('打包源码 packages/site/index.html')).toMatchObject({
+      shouldConfirm: true
+    })
     expect(detectDeploymentIntent('我们讨论一下发布计划，不要现在执行')).toMatchObject({
       shouldConfirm: false
     })
+  })
+
+  it('renders deployment result controls and retry actions', async () => {
+    const view = render(CardCell, {
+      props: {
+        isMe: false,
+        message: {
+          content: {
+            type: 7,
+            cardType: 'deployment',
+            title: '确认部署',
+            target: '活动页',
+            environment: 'preview',
+            status: 'failed',
+            previewUrl: '/api/deployments/deploy-1/preview/',
+            downloadUrl: '/api/deployments/deploy-1/download',
+            logsSummary: ['Deployment job queued', 'Static preview generated'],
+            failureReason: 'Source package failed'
+          }
+        }
+      }
+    })
+
+    expect(screen.getByRole('button', { name: '打开预览' })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: '下载源码包' })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: '重试' })).toBeInTheDocument()
+    expect(screen.getByText('Static preview generated')).toBeInTheDocument()
+
+    await fireEvent.click(screen.getByRole('button', { name: '打开预览' }))
+    await fireEvent.click(screen.getByRole('button', { name: '下载源码包' }))
+    await fireEvent.click(screen.getByRole('button', { name: '重试' }))
+
+    expect(view.emitted('action')?.map(([payload]) => payload.action)).toEqual([
+      'open-preview',
+      'download',
+      'retry'
+    ])
   })
 
   it('keeps underspecified deployment cards from accidental confirmation', async () => {
@@ -130,10 +176,14 @@ describe('deployment confirmation card', () => {
     expect(input.default).toContain('addDeploymentConfirmationCard')
     expect(input.default).toContain('buildDeploymentRequestCreatePayload')
     expect(input.default).toContain('buildDeploymentRequestUpdatePayload')
+    expect(input.default).toContain('buildRecentDeploymentTargetCandidates')
+    expect(input.default).toContain('shouldRouteDeploymentPromptToClowder')
     expect(list.default).toContain('handleDeploymentCardAction')
     expect(list.default).toContain('handleDeploymentFieldUpdate')
     expect(list.default).toContain('upsertDeploymentCardFromRequest')
     expect(list.default).toContain('clowderStore.sendDeploymentAction')
     expect(list.default).toContain('loadActiveDeploymentRequest')
+    expect(list.default).toContain('loadDeploymentRequest')
+    expect(list.default).toContain('startDeploymentPolling')
   })
 })

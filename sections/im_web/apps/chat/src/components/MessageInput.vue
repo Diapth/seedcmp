@@ -13,7 +13,7 @@ import {
   useUserStore,
   useClowderStore
 } from '@tsdaodao/datasource-vue';
-import type { ClowderDeploymentRequest } from '@tsdaodao/datasource-vue';
+import type { ClowderDeploymentRequest, ClowderDeploymentTargetCandidate } from '@tsdaodao/datasource-vue';
 import { useRobotConfigStore } from '@tsdaodao/contacts-vue';
 import WKSDK, { CMDContent } from 'wukongimjssdk';
 import { getClowderCatDisplayNameFromPayload } from '@tsdaodao/base-vue/utils/clowderMessageIdentity';
@@ -573,17 +573,102 @@ function resolveDeploymentRequestTargetCatIds(targetCatIds: string[]) {
   return targetCatIds.length ? targetCatIds : (directCatId ? [directCatId] : []);
 }
 
+function deploymentCandidateLabel(value: string) {
+  const tail = value.split(/[\\/]/).filter(Boolean).pop();
+  return tail || value;
+}
+
+function normalizeDeploymentTargetPath(value: string) {
+  const text = String(value || '')
+    .trim()
+    .replace(/^[`"'“”‘’]+|[`"'“”‘’.,，。!?！？;；:：]+$/g, '');
+  if (!text || text.length > 180) return '';
+  if (/^https?:\/\//i.test(text)) return '';
+  if (text === '待确认目标' || text === '待确认环境') return '';
+  return text;
+}
+
+function sourceForDeploymentTarget(value: string): ClowderDeploymentTargetCandidate['source'] {
+  if (/\.html?$/i.test(value) || /(?:^|\/)(?:index|preview)\.html?$/i.test(value)) return 'artifact';
+  if (/(?:^|\/)(?:dist|build|public|site|stage|preview)(?:\/|$)/i.test(value)) return 'preview';
+  return 'text';
+}
+
+function extractDeploymentTargetPaths(text: string) {
+  const paths: string[] = [];
+  const add = (value?: string) => {
+    const normalized = normalizeDeploymentTargetPath(value || '');
+    if (normalized) paths.push(normalized);
+  };
+  for (const match of String(text || '').matchAll(/`([^`]+)`/g)) {
+    add(match[1]);
+  }
+  for (const match of String(text || '').matchAll(/(?:^|[\s"'“”‘’])((?:\.{0,2}\/)?(?:[\w.@-]+\/)+[\w.@-]+(?:\.(?:html?|css|js|json|md|txt))?|(?:[\w.@-]+\/)*[\w.@-]+\.html?)(?=$|[\s"'“”‘’.,，。!?！？;；])/g)) {
+    add(match[1]);
+  }
+  return Array.from(new Set(paths));
+}
+
+function buildRecentDeploymentTargetCandidates(sourceText?: string): ClowderDeploymentTargetCandidate[] {
+  const candidates: ClowderDeploymentTargetCandidate[] = [];
+  const seen = new Set<string>();
+  const addCandidate = (
+    value: string,
+    source: ClowderDeploymentTargetCandidate['source'] = sourceForDeploymentTarget(value),
+    workspaceId?: string,
+  ) => {
+    const normalized = normalizeDeploymentTargetPath(value);
+    if (!normalized || seen.has(normalized)) return;
+    seen.add(normalized);
+    candidates.push({
+      id: `${source}:${normalized}`,
+      label: deploymentCandidateLabel(normalized),
+      value: normalized,
+      source,
+      ...(workspaceId ? { workspaceId } : {}),
+      path: normalized,
+    });
+  };
+
+  const activeWorkspaceId = activeClowderWorkspace.value?.workspaceId || activeClowderWorkspace.value?.id;
+  for (const path of extractDeploymentTargetPaths(sourceText || '')) {
+    addCandidate(path, sourceForDeploymentTarget(path), activeWorkspaceId);
+  }
+
+  const recentMessages = messageStore.getChannelMessages(props.channelId, props.channelType).slice(-16);
+  for (const message of recentMessages) {
+    const content = message?.content || (message as any)?.payload || {};
+    for (const value of [
+      content.artifactPath,
+      content.workspacePath,
+      content.workspaceRelativePath,
+      content.relativePath,
+      content.filePath,
+      content.path,
+      ...(Array.isArray(content.artifactRefs) ? content.artifactRefs : []),
+    ]) {
+      addCandidate(String(value || ''), 'artifact', activeWorkspaceId);
+    }
+    for (const path of extractDeploymentTargetPaths(getMessageVisibleText(message))) {
+      addCandidate(path, sourceForDeploymentTarget(path), activeWorkspaceId);
+    }
+  }
+
+  return candidates.slice(0, 6);
+}
+
 function buildDeploymentRequestFieldPayload(
   intent: DeploymentIntent,
-  options: { includeEnvironmentCandidates?: boolean } = {}
+  options: { includeEnvironmentCandidates?: boolean; sourceText?: string } = {}
 ) {
   const workspace = activeClowderWorkspace.value;
   const target = intent.target === '待确认目标' ? undefined : intent.target;
   const environment = intent.environment === '待确认环境' ? undefined : intent.environment;
+  const recentCandidates = buildRecentDeploymentTargetCandidates(options.sourceText);
   return {
     ...(target ? { target } : {}),
     ...(environment ? { environment } : {}),
-    targetCandidates: buildDeploymentTargetCandidates(workspace, target || null),
+    targetCandidates: buildDeploymentTargetCandidates(workspace, target || null, recentCandidates),
     ...(workspace?.workspaceId || workspace?.id ? { workspaceId: workspace.workspaceId || workspace.id } : {}),
     ...(workspace?.relativePath ? { workspacePath: workspace.relativePath } : {}),
     ...(options.includeEnvironmentCandidates ? { environmentCandidates: DEFAULT_DEPLOYMENT_ENVIRONMENT_CANDIDATES } : {})
@@ -601,18 +686,24 @@ function buildDeploymentRequestCreatePayload(
     threadId: clowderStore.conversations[clowderConversationKey.value]?.binding?.threadId,
     sourceMessageId,
     originalText: text,
-    ...buildDeploymentRequestFieldPayload(intent, { includeEnvironmentCandidates: true })
+    ...buildDeploymentRequestFieldPayload(intent, { includeEnvironmentCandidates: true, sourceText: text })
   };
 }
 
 function buildDeploymentRequestUpdatePayload(
   intent: DeploymentIntent,
-  sourceMessageId: string
+  sourceMessageId: string,
+  text = ''
 ) {
   return {
     sourceMessageId,
-    ...buildDeploymentRequestFieldPayload(intent)
+    ...buildDeploymentRequestFieldPayload(intent, { sourceText: text })
   };
+}
+
+function shouldRouteDeploymentPromptToClowder(text: string, shouldRoute: boolean) {
+  if (!shouldRoute) return false;
+  return /(生成|创建|做一个|实现|写一个|制作|协调|请让|Claude|Codex|猫猫|agent|Agent|单文件|活动页|页面|产物)/i.test(text);
 }
 
 function addDeploymentConfirmationCard(
@@ -1108,7 +1199,7 @@ async function handleSend() {
         const deploymentRequest = activeDeploymentRequest
           ? await clowderStore.updateDeploymentRequestFields(
             activeDeploymentRequest.id,
-            buildDeploymentRequestUpdatePayload(resolvedIntent, sentMessage.clientMsgNo)
+            buildDeploymentRequestUpdatePayload(resolvedIntent, sentMessage.clientMsgNo, text)
           )
           : await clowderStore.createDeploymentRequest(
             buildDeploymentRequestCreatePayload(resolvedIntent, text, sentMessage.clientMsgNo)
@@ -1121,6 +1212,9 @@ async function handleSend() {
           replyTargetSnapshot,
           sentMessage.clientMsgNo
         );
+        if (shouldRouteDeploymentPromptToClowder(text, autoReplyDecision.shouldRoute)) {
+          await sendClowderRouteMessage(text, targetCatIds, autoReplyDecision.reason, replyTargetSnapshot);
+        }
       } catch (deploymentErr) {
         console.error('Failed to sync deployment request', deploymentErr);
         ArcoMessage.error('部署请求更新失败，请稍后重试');

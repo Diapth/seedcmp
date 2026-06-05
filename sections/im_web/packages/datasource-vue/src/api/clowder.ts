@@ -633,6 +633,12 @@ export const clowderApi = {
     );
     return unwrapApiData(response as unknown as ClowderDeploymentRequestResponse | { data?: ClowderDeploymentRequestResponse });
   },
+  async getDeploymentRequest(id: string) {
+    const response = await apiClient.get<ClowderDeploymentRequestResponse>(
+      `clowder/conversation/deployment-request/${encodeURIComponent(id)}`,
+    );
+    return unwrapApiData(response as unknown as ClowderDeploymentRequestResponse | { data?: ClowderDeploymentRequestResponse });
+  },
   sendDeploymentAction(data: ClowderDeploymentActionRequest) {
     return apiClient.post<ClowderDeploymentActionResponse>('clowder/conversation/deployment-action', data);
   },

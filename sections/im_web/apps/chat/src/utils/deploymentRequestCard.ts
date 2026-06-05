@@ -63,6 +63,7 @@ export function getDeploymentCardClientMsgNo(deploymentRequestId: string) {
 export function buildDeploymentTargetCandidates(
   workspace?: DeploymentWorkspaceLike | null,
   currentTarget?: string | null,
+  extraCandidates: ClowderDeploymentTargetCandidate[] = [],
 ): ClowderDeploymentTargetCandidate[] {
   const candidates: ClowderDeploymentTargetCandidate[] = [];
   const seen = new Set<string>();
@@ -102,6 +103,10 @@ export function buildDeploymentTargetCandidates(
     });
   }
 
+  for (const candidate of extraCandidates) {
+    pushCandidate(candidate);
+  }
+
   return candidates;
 }
 
@@ -125,6 +130,7 @@ export function buildDeploymentCardMessage(
       type: 7,
       cardType: 'deployment',
       title: '确认部署',
+      statusLabel: deploymentStatusLabel(deploymentRequest.status),
       target: deploymentRequest.target || '待确认目标',
       environment: deploymentRequest.environment || '待确认环境',
       workspaceId: deploymentRequest.workspaceId,

@@ -1381,6 +1381,21 @@ export const useClowderStore = defineStore('clowder', () => {
     }
   }
 
+  async function loadDeploymentRequest(deploymentRequestId: string): Promise<ClowderDeploymentRequest | null> {
+    const trimmed = String(deploymentRequestId || '').trim();
+    if (!trimmed) return null;
+    try {
+      const response = await clowderApi.getDeploymentRequest(trimmed);
+      const deploymentRequest = response?.deploymentRequest;
+      if (!deploymentRequest) return null;
+      return setDeploymentRequest(deploymentRequest);
+    } catch (err: any) {
+      const status = err?.response?.status || err?.status;
+      if (status === 404) return null;
+      throw err;
+    }
+  }
+
   function setCoordination(coordination: ClowderCoordination) {
     coordinations.value = {
       ...coordinations.value,
@@ -1626,6 +1641,7 @@ export const useClowderStore = defineStore('clowder', () => {
     getThreadTasksState,
     fetchThreadTasks,
     loadActiveDeploymentRequest,
+    loadDeploymentRequest,
     createDeploymentRequest,
     updateDeploymentRequestFields,
     createCoordination,

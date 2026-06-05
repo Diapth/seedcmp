@@ -236,6 +236,23 @@ async function handleOpenPreview(payload: any) {
     return;
   }
 
+  if (payload?.source === 'deployment') {
+    if (!payload?.url) return;
+    activeRightDockTab.value = 'preview';
+    sidePreview.value = {
+      visible: true,
+      type: 'deployment-preview',
+      title: payload?.title || '部署预览',
+      subtitle: payload?.name || payload?.deploymentRequestId || '',
+      sourceUrl: payload.url,
+      sourceText: '',
+      extension: 'html',
+      loading: false,
+      error: ''
+    };
+    return;
+  }
+
   activeRightDockTab.value = 'preview';
   const type = filePreviewType(payload?.kind || '');
   sidePreview.value = {

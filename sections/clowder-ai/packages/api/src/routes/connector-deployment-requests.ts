@@ -232,4 +232,19 @@ export const connectorDeploymentRequestRoutes: FastifyPluginAsync<ConnectorDeplo
     }
     return reply.send(responseBody(deploymentRequest));
   });
+
+  app.get('/api/connectors/im-web/deployment-requests/:id', async (request, reply) => {
+    const params = request.params as { id?: string };
+    const deploymentRequestId = String(params?.id ?? '').trim();
+    if (!deploymentRequestId) {
+      return reply.status(400).send({ error: 'deploymentRequestId is required' });
+    }
+
+    const userId = routeUserId(request);
+    const deploymentRequest = await opts.deploymentRequestStore.get(deploymentRequestId);
+    if (!deploymentRequest || deploymentRequest.userId !== userId) {
+      return reply.status(404).send({ error: 'deployment request not found', deploymentRequestId });
+    }
+    return reply.send(responseBody(deploymentRequest));
+  });
 };
