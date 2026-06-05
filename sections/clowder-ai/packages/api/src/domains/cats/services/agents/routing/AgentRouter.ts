@@ -945,6 +945,7 @@ export class AgentRouter {
       resolvedCatIds: resolvedTargetCats,
       explicitMentionCatIds,
       coordinatorAvailable: !options?.disableCoordinator && this.isRoutableCat(COORDINATOR_CAT_ID),
+      message,
     });
     const targetCats = targetCatsForLeadSelection(leadSelection, resolvedTargetCats);
     if (options?.persist && leadSelection.mode === 'coordinator' && this.threadStore) {

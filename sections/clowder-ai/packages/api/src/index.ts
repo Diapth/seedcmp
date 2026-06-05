@@ -1685,6 +1685,7 @@ async function main(): Promise<void> {
     agentRegistry,
     router,
     invocationRecordStore,
+    coordinatorStore,
     invocationTracker,
     deliveryCursorStore,
     validateRepo,

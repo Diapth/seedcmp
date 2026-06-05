@@ -32,6 +32,23 @@ describe('LeadAgentSelector', () => {
     assert.deepEqual(targetCatsForLeadSelection(selection, ['codex']), ['codex']);
   });
 
+  test('routes complex single-mention work to coordinator with participant', async () => {
+    const { selectLeadAgent, targetCatsForLeadSelection } = await import(
+      '../dist/domains/cats/services/agents/routing/lead-agent-selector.js'
+    );
+    const selection = selectLeadAgent({
+      resolvedCatIds: ['codex'],
+      explicitMentionCatIds: ['codex'],
+      coordinatorAvailable: true,
+      message: '@codex 请实现并测试一个页面，然后部署到 preview 环境。',
+    });
+
+    assert.equal(selection.mode, 'coordinator');
+    assert.equal(selection.reason, 'complex_task');
+    assert.deepEqual(selection.participantCatIds, ['codex']);
+    assert.deepEqual(targetCatsForLeadSelection(selection, ['codex']), ['coordinator']);
+  });
+
   test('routes multi-mention messages to coordinator with participants', async () => {
     const { selectLeadAgent, targetCatsForLeadSelection } = await import(
       '../dist/domains/cats/services/agents/routing/lead-agent-selector.js'

@@ -6,6 +6,7 @@ export type LeadSelectionReason =
   | 'no_mention'
   | 'explicit_coordinator'
   | 'multi_mention'
+  | 'complex_task'
   | 'direct_mention'
   | 'coordinator_unavailable'
   | 'fallback'

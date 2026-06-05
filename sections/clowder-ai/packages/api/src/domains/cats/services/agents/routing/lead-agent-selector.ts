@@ -3,6 +3,9 @@ import type { CatId, CoordinationContext, LeadSelection } from '@cat-cafe/shared
 
 export const COORDINATOR_CAT_ID = createCatId('coordinator');
 
+const COMPLEX_COORDINATOR_TRIGGER_RE =
+  /(协调者|协调|分工|拆分|拆解|协作|计划|规划|实现并测试|测试并部署|部署|发布|预览|打包源码|下载源码|汇总|主\s*Agent|orchestrator|coordinator|\bPM\b|\bplan\b|\bdispatch\b|\bdeploy\b|\brelease\b|\bpreview\b)/i;
+
 function uniqueCatIds(catIds: readonly CatId[]): CatId[] {
   const out: CatId[] = [];
   const seen = new Set<string>();
@@ -23,6 +26,7 @@ export function selectLeadAgent(input: {
   resolvedCatIds: readonly CatId[];
   explicitMentionCatIds: readonly CatId[];
   coordinatorAvailable: boolean;
+  message?: string;
 }): LeadSelection {
   const resolved = uniqueCatIds(input.resolvedCatIds);
   const explicit = uniqueCatIds(input.explicitMentionCatIds);
@@ -64,12 +68,26 @@ export function selectLeadAgent(input: {
     };
   }
 
+  if (explicit.length === 1 && shouldTriggerCoordinatorForMessage(input.message)) {
+    return {
+      leadCatId: COORDINATOR_CAT_ID,
+      participantCatIds: explicit,
+      mode: 'coordinator',
+      reason: 'complex_task',
+    };
+  }
+
   return {
     leadCatId: explicit[0]!,
     participantCatIds: [],
     mode: 'direct',
     reason: 'direct_mention',
   };
+}
+
+export function shouldTriggerCoordinatorForMessage(message: string | undefined): boolean {
+  if (!message) return false;
+  return COMPLEX_COORDINATOR_TRIGGER_RE.test(message);
 }
 
 export function targetCatsForLeadSelection(selection: LeadSelection, resolvedCatIds: readonly CatId[]): CatId[] {
@@ -107,6 +125,7 @@ export function buildCoordinatorDispatchMessage(message: string, coordination: C
     '1. 先给出需求理解、任务拆解、计划和交付口径。',
     '2. 需要跨轮跟踪时，调用 cat_cafe_create_task 创建或更新毛线球，并携带 coordinationId；子任务用 dependsOn / artifactRefs 保留链路。',
     '3. 需要并行协作时，用 cat_cafe_multi_mention 拉 1-3 个最相关 Agent；优先考虑 participantCatIds，但不要超过安全上限。',
+    '   调用 cat_cafe_multi_mention 时必须传 coordinationId，并把每个子任务的验收标准写入 question/context。',
     '4. 高风险操作必须走 permission flow；冲突时汇总分歧、给出裁决依据，必要时请求用户确认。',
     '5. 聚合结果并给出产物入口；代码/网页走 Workspace 文件、Preview、Git/Changes，文档走 generate_document 或 rich block。',
     '6. **项目群聊推荐（首条 intake 回复时使用）**：如果你认为用户需求适合多人协作完成一个持续性项目,在回复末尾追加一个 JSON 块:',

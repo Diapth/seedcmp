@@ -11,6 +11,12 @@ import { z } from 'zod';
 import type { InvocationQueue } from '../domains/cats/services/agents/invocation/InvocationQueue.js';
 import type { InvocationTracker } from '../domains/cats/services/agents/invocation/InvocationTracker.js';
 import { stampVisibleTurn } from '../domains/cats/services/agents/invocation/visible-turn.js';
+import { finalizeCoordinatorAggregation } from '../domains/cats/services/agents/routing/CoordinatorAggregator.js';
+import {
+  markCoordinatorDispatchResponse,
+  prepareCoordinatorDispatch,
+  resolveActiveCoordination,
+} from '../domains/cats/services/agents/routing/CoordinatorDispatcher.js';
 import { resolveCatTarget } from '../domains/cats/services/agents/routing/cat-target-resolver.js';
 import {
   type MultiMentionCreateParams,
@@ -18,6 +24,7 @@ import {
 } from '../domains/cats/services/agents/routing/MultiMentionOrchestrator.js';
 import { parseIntent } from '../domains/cats/services/context/IntentParser.js';
 import type { AgentRouter } from '../domains/cats/services/index.js';
+import type { ICoordinatorStore } from '../domains/cats/services/stores/ports/CoordinatorStore.js';
 import type { IInvocationRecordStore } from '../domains/cats/services/stores/ports/InvocationRecordStore.js';
 import type { IMessageStore } from '../domains/cats/services/stores/ports/MessageStore.js';
 import type { SocketManager } from '../infrastructure/websocket/index.js';
@@ -42,6 +49,8 @@ const multiMentionSchema = z.object({
   question: z.string().min(1).max(5000),
   callbackTo: z.string().min(1),
   context: z.string().max(5000).optional(),
+  coordinationId: z.string().min(1).max(200).optional(),
+  dispatchMode: z.enum(['parallel', 'serial', 'mixed']).optional(),
   idempotencyKey: z.string().min(1).max(200).optional(),
   timeoutMinutes: z.number().int().min(3).max(20).optional(),
   searchEvidenceRefs: z.array(z.string()).optional(),
@@ -75,17 +84,27 @@ export interface MultiMentionRouteDeps {
     ): void;
     unregisterEntryCompleteHook?(entryId: string): void;
   };
+  /** Phase 2: persisted coordinator state for plan/dispatch/aggregation display. */
+  coordinatorStore?: ICoordinatorStore | undefined;
 }
 
 // ── Timeout tracking ────────────────────────────────────────────────
 const activeTimers = new Map<string, ReturnType<typeof setTimeout>>();
 
-function scheduleTimeout(requestId: string, timeoutMinutes: number, log: FastifyBaseLogger): void {
+function scheduleTimeout(
+  deps: MultiMentionRouteDeps,
+  requestId: string,
+  threadId: string,
+  userId: string,
+  timeoutMinutes: number,
+  log: FastifyBaseLogger,
+): void {
   const ms = timeoutMinutes * 60_000;
   const timer = setTimeout(() => {
     const orch = getMultiMentionOrchestrator();
     log.info({ requestId, timeoutMinutes }, '[F086] Multi-mention timeout fired');
     orch.handleTimeout(requestId);
+    void flushResult(deps, requestId, threadId, userId, log);
     activeTimers.delete(requestId);
   }, ms);
   // Unref so it doesn't keep the process alive
@@ -152,6 +171,17 @@ function dispatchViaQueue(
         }
         const finalResponse = responseText || (status === 'failed' ? '[dispatch error]' : '');
         const newStatus = orch.recordResponse(requestId, catId, finalResponse);
+        const result = orch.getResult(requestId);
+        void markCoordinatorDispatchResponse(deps.coordinatorStore, {
+          threadId,
+          coordinationId: result.request.coordinationId,
+          requestId,
+          catId,
+          status: status === 'failed' ? 'failed' : 'received',
+          content: finalResponse,
+        }).catch((err) => {
+          log.warn({ err, requestId, catId }, '[Phase2] coordination subtask response update failed');
+        });
         log.info(
           { requestId, catId, newStatus, responseLength: finalResponse.length },
           '[F122B B6] multi-mention queue response recorded',
@@ -301,6 +331,15 @@ async function dispatchToTarget(
 
     // Record response in orchestrator
     const newStatus = orch.recordResponse(requestId, targetCatId, finalResponse);
+    const result = orch.getResult(requestId);
+    await markCoordinatorDispatchResponse(deps.coordinatorStore, {
+      threadId,
+      coordinationId: result.request.coordinationId,
+      requestId,
+      catId: targetCatId,
+      status: 'received',
+      content: finalResponse,
+    });
     log.info(
       { requestId, targetCatId, newStatus, responseLength: finalResponse.length, toolsUsed: toolsUsed.length },
       '[F086] Multi-mention response recorded',
@@ -340,6 +379,17 @@ async function dispatchToTarget(
       targetCatId,
       `[dispatch error: ${err instanceof Error ? err.message : String(err)}]`,
     );
+    const result = orch.getResult(requestId);
+    await markCoordinatorDispatchResponse(deps.coordinatorStore, {
+      threadId,
+      coordinationId: result.request.coordinationId,
+      requestId,
+      catId: targetCatId,
+      status: 'failed',
+      content: err instanceof Error ? err.message : String(err),
+    }).catch((updateErr) => {
+      log.warn({ updateErr, requestId, targetCatId }, '[Phase2] coordination failure update failed');
+    });
   } finally {
     // F122 AC-A7: unconditional slot release — covers early return, registerDispatch
     // throw, routeExecution crash, and normal completion. InvocationTracker.complete()
@@ -359,9 +409,22 @@ async function flushResult(
   const orch = getMultiMentionOrchestrator();
   const result = orch.getResult(requestId);
   const { messageStore, socketManager } = deps;
+  await finalizeCoordinatorAggregation(deps.coordinatorStore, {
+    threadId,
+    coordinationId: result.request.coordinationId,
+    result,
+  }).catch((err) => {
+    log.warn({ err, requestId }, '[Phase2] coordination aggregation update failed');
+  });
 
   // Build aggregated result message
-  const lines: string[] = [`## Multi-Mention 结果汇总`, '', `**问题**: ${result.request.question}`, ''];
+  const lines: string[] = [
+    `## Coordinator / Multi-Mention 结果汇总`,
+    '',
+    `**问题**: ${result.request.question}`,
+    ...(result.request.coordinationId ? [`**Coordination**: ${result.request.coordinationId}`] : []),
+    '',
+  ];
 
   for (const resp of result.responses) {
     const entry = catRegistry.tryGet(resp.catId);
@@ -463,6 +526,11 @@ export function registerMultiMentionRoutes(app: FastifyInstance, deps: MultiMent
       });
     }
 
+    const coordination = await resolveActiveCoordination(
+      deps.coordinatorStore,
+      record.threadId,
+      body.coordinationId,
+    );
     const createParams = {
       threadId: record.threadId,
       initiator: callerCatId,
@@ -471,6 +539,7 @@ export function registerMultiMentionRoutes(app: FastifyInstance, deps: MultiMent
       question: body.question,
       timeoutMinutes: body.timeoutMinutes ?? DEFAULT_TIMEOUT_MINUTES,
       ...(body.context ? { context: body.context } : {}),
+      ...(coordination ? { coordinationId: coordination.coordinationId } : body.coordinationId ? { coordinationId: body.coordinationId } : {}),
       ...(body.idempotencyKey ? { idempotencyKey: body.idempotencyKey } : {}),
       ...(body.triggerType ? { triggerType: body.triggerType as MultiMentionCreateParams['triggerType'] } : {}),
       ...(body.searchEvidenceRefs ? { searchEvidenceRefs: body.searchEvidenceRefs } : {}),
@@ -486,7 +555,20 @@ export function registerMultiMentionRoutes(app: FastifyInstance, deps: MultiMent
 
     // Start + schedule timeout
     orch.start(mmRequest.id);
-    scheduleTimeout(mmRequest.id, mmRequest.timeoutMinutes, request.log);
+    await prepareCoordinatorDispatch(deps.coordinatorStore, {
+      threadId: record.threadId,
+      coordinationId: mmRequest.coordinationId,
+      requestId: mmRequest.id,
+      question: body.question,
+      context: body.context,
+      targetCatIds,
+      dispatchMode: body.dispatchMode ?? (targetCatIds.length > 1 ? 'parallel' : 'serial'),
+      triggerType: body.triggerType,
+    }).catch((err) => {
+      request.log.warn({ err, requestId: mmRequest.id }, '[Phase2] coordination dispatch preparation failed');
+      return null;
+    });
+    scheduleTimeout(deps, mmRequest.id, record.threadId, record.userId, mmRequest.timeoutMinutes, request.log);
 
     // Dispatch to all targets in parallel (fire and forget)
     // F122B B6: Use InvocationQueue when available, legacy direct dispatch as fallback

@@ -22,6 +22,7 @@ export interface MultiMentionCreateParams {
   question: string;
   context?: string | undefined;
   idempotencyKey?: string | undefined;
+  coordinationId?: string | undefined;
   timeoutMinutes: number;
   triggerType?: MultiMentionTriggerType | undefined;
   searchEvidenceRefs?: string[] | undefined;
@@ -82,6 +83,7 @@ export class MultiMentionOrchestrator {
       createdAt: Date.now(),
       ...(params.context ? { context: params.context } : {}),
       ...(params.idempotencyKey ? { idempotencyKey: params.idempotencyKey } : {}),
+      ...(params.coordinationId ? { coordinationId: params.coordinationId } : {}),
       ...(params.triggerType ? { triggerType: params.triggerType } : {}),
       ...(params.searchEvidenceRefs ? { searchEvidenceRefs: [...params.searchEvidenceRefs] } : {}),
       ...(params.overrideReason ? { overrideReason: params.overrideReason } : {}),

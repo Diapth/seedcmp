@@ -30,6 +30,7 @@ import type { IRuntimeSessionStore } from '../domains/cats/services/runtime-sess
 import type { IBacklogStore } from '../domains/cats/services/stores/ports/BacklogStore.js';
 import type { DeliveryCursorStore } from '../domains/cats/services/stores/ports/DeliveryCursorStore.js';
 import type { IInvocationRecordStore } from '../domains/cats/services/stores/ports/InvocationRecordStore.js';
+import type { ICoordinatorStore } from '../domains/cats/services/stores/ports/CoordinatorStore.js';
 import {
   hydrateReplyPreview,
   type IMessageStore,
@@ -281,6 +282,7 @@ export interface CallbackRoutesOptions {
   /** For post_message @mention → invocation triggering */
   router?: AgentRouter;
   invocationRecordStore?: IInvocationRecordStore;
+  coordinatorStore?: ICoordinatorStore;
   invocationTracker?: InvocationTracker;
   /** For mention ack cursor tracking (#77) */
   deliveryCursorStore?: DeliveryCursorStore;
@@ -2273,6 +2275,7 @@ export const callbacksRoutes: FastifyPluginAsync<CallbackRoutesOptions> = async 
       ...(invocationTracker ? { invocationTracker } : {}),
       ...(opts.invocationQueue ? { invocationQueue: opts.invocationQueue } : {}),
       ...(queueProcessor ? { queueProcessor } : {}),
+      ...(opts.coordinatorStore ? { coordinatorStore: opts.coordinatorStore } : {}),
     });
     // Wire orchestrator into SocketManager for cancel propagation (P1-1 fix)
     if (typeof socketManager.setMultiMentionOrchestrator === 'function') {
