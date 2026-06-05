@@ -1,0 +1,177 @@
+# Orchestrator and Deployment Manual Test Log
+
+This file records the required real Web checks for the orchestrator and P2 deployment release plan.
+
+## Environment
+
+- Web entry: http://127.0.0.1:3000
+- Primary login: 008618337488675 / 123456
+- Backup login: 008613800138000 / 123456
+- Verification date:
+- Operator:
+
+## Stage Template
+
+### Stage N
+
+- Login user:
+- OAuth platform: Claude Code / Codex
+- OAuth status:
+- Cat name:
+- Cat alias:
+- Conversation type: direct / group
+- Group chat ID:
+- Thread ID:
+- Coordination ID:
+- Deployment request ID:
+- Prompt:
+- Screenshot paths:
+- Result: passed / failed / partial
+- Failure reason:
+- Notes:
+
+## Stage Records
+
+### Stage 0
+
+- Login user:
+- OAuth platform:
+- OAuth status:
+- Cat name:
+- Cat alias:
+- Conversation type:
+- Group chat ID:
+- Thread ID:
+- Coordination ID:
+- Deployment request ID:
+- Prompt: 请回复“阶段0验收通过”，并说明你当前使用的运行平台。
+- Screenshot paths:
+- Result:
+- Failure reason:
+- Notes:
+
+### Stage 1
+
+- Login user:
+- OAuth platform:
+- OAuth status:
+- Cat name:
+- Cat alias:
+- Conversation type: group
+- Group chat ID:
+- Thread ID:
+- Coordination ID:
+- Deployment request ID:
+- Prompt: @claude-orch 请把“做一个咖啡店首页并准备部署”的需求拆成任务，不要直接写代码，先给出分工。
+- Screenshot paths:
+- Result:
+- Failure reason:
+- Notes:
+
+### Stage 2
+
+- Login user:
+- OAuth platform:
+- OAuth status:
+- Cat name:
+- Cat alias:
+- Conversation type: group
+- Group chat ID:
+- Thread ID:
+- Coordination ID:
+- Deployment request ID:
+- Prompt: @协调者 请协调 @claude-dev 和 @codex-qa 做一个最小餐厅落地页：Claude 负责实现 HTML，Codex 负责检查可访问性和部署风险，最后你汇总。
+- Screenshot paths:
+- Result:
+- Failure reason:
+- Notes:
+
+### Stage 3
+
+- Login user:
+- OAuth platform:
+- OAuth status:
+- Cat name:
+- Cat alias:
+- Conversation type: group
+- Group chat ID:
+- Thread ID:
+- Coordination ID:
+- Deployment request ID:
+- Prompt: /status; @协调者 继续上一轮任务，补充移动端注意事项并重新汇总。
+- Screenshot paths:
+- Result:
+- Failure reason:
+- Notes:
+
+### Stage 4
+
+- Login user:
+- OAuth platform:
+- OAuth status:
+- Cat name:
+- Cat alias:
+- Conversation type: direct
+- Group chat ID:
+- Thread ID:
+- Coordination ID:
+- Deployment request ID:
+- Prompt: 请在当前项目工作区生成一个最小 HTML 页面，标题为“部署阶段4验收”，并声明为可部署产物。部署这个页面到 preview 环境。
+- Screenshot paths:
+- Result:
+- Failure reason:
+- Notes:
+
+### Stage 5
+
+- Login user:
+- OAuth platform:
+- OAuth status:
+- Cat name:
+- Cat alias:
+- Conversation type: group
+- Group chat ID:
+- Thread ID:
+- Coordination ID:
+- Deployment request ID:
+- Prompt: @协调者 请让 Claude 或 Codex 生成一个单文件活动页，然后部署到 preview 环境，部署完成后给我预览链接和源码下载链接。
+- Screenshot paths:
+- Result:
+- Failure reason:
+- Notes:
+
+### Stage 6
+
+- Login user:
+- OAuth platform:
+- OAuth status:
+- Cat name:
+- Cat alias:
+- Conversation type: group
+- Group chat ID:
+- Thread ID:
+- Coordination ID:
+- Deployment request ID:
+- Prompt: @协调者 请协调团队做一个“AgentHub 咖啡店活动页”静态页面，要求 Claude/Codex 至少一个真实执行，完成后部署到 preview 环境，最后在聊天里给我预览链接、源码下载链接、执行分工和风险说明。
+- Screenshot paths:
+- Result:
+- Failure reason:
+- Notes:
+
+### Stage 7
+
+- Login user:
+- OAuth platform:
+- OAuth status:
+- Cat name:
+- Cat alias:
+- Conversation type: group
+- Group chat ID:
+- Thread ID:
+- Coordination ID:
+- Deployment request ID:
+- Prompt:
+- Screenshot paths:
+- Result:
+- Failure reason:
+- Notes:
