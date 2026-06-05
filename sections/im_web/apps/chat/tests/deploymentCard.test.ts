@@ -186,4 +186,14 @@ describe('deployment confirmation card', () => {
     expect(list.default).toContain('loadDeploymentRequest')
     expect(list.default).toContain('startDeploymentPolling')
   })
+
+  it('guards back-to-back target and environment edits against stale card state', async () => {
+    const list = await import('../src/components/MessageList.vue?raw')
+
+    expect(list.default).toContain('deploymentFieldQueues')
+    expect(list.default).toContain('enqueueDeploymentFieldUpdate')
+    expect(list.default).toContain('findDeploymentCardMessage(deploymentRequestId) || msg')
+    expect(list.default).toContain("payload.field === 'target' ? fieldValue : existingTarget")
+    expect(list.default).toContain("payload.field === 'environment' ? fieldValue : existingEnvironment")
+  })
 })

@@ -71,6 +71,7 @@ const editDialogText = ref('');
 const channelKey = computed(() => `${props.channelId}-${props.channelType}`);
 const deploymentActionKeys = new Set<string>();
 const deploymentFieldKeys = new Set<string>();
+const deploymentFieldQueues = new Map<string, Promise<void>>();
 const deploymentPollableStatuses = new Set(['confirmed', 'queued', 'running', 'submitting']);
 const deploymentTerminalStatuses = new Set(['succeeded', 'failed', 'cancelled', 'canceled']);
 const deploymentPollIntervalMs = 2500;
@@ -953,6 +954,25 @@ function findDeploymentCardMessage(deploymentRequestId: string) {
   return messages.value.find((msg) => getDeploymentRequestIdFromMessage(msg) === id) || null;
 }
 
+function enqueueDeploymentFieldUpdate(deploymentRequestId: string, task: () => Promise<void>) {
+  const previous = deploymentFieldQueues.get(deploymentRequestId) || Promise.resolve();
+  const next = previous
+    .catch(() => undefined)
+    .then(task)
+    .finally(() => {
+      if (deploymentFieldQueues.get(deploymentRequestId) === next) {
+        deploymentFieldQueues.delete(deploymentRequestId);
+      }
+    });
+  deploymentFieldQueues.set(deploymentRequestId, next);
+  return next;
+}
+
+function deploymentEditableFieldValue(value: unknown, placeholder: string) {
+  const text = String(value || '').trim();
+  return text && text !== placeholder ? text : '';
+}
+
 function startDeploymentPolling() {
   if (deploymentPollTimer !== null) return;
   void refreshDeploymentRequestCards();
@@ -1034,41 +1054,52 @@ async function hydrateActiveDeploymentRequestCard() {
 
 async function handleDeploymentFieldUpdate(payload: { field: 'target' | 'environment'; value: string; message: any }) {
   const msg = payload.message;
-  const clientMsgNo = String(msg?.clientMsgNo || '');
   const content = msg?.content || {};
   const request = content.deploymentRequest || {};
-  const deploymentRequestId = String(content.deploymentRequestId || request.deploymentRequestId || clientMsgNo || '').trim();
-  const actionKey = `${deploymentRequestId}:${payload.field}:${String(payload.value || '').trim()}`;
-  if (!clientMsgNo || !deploymentRequestId || deploymentFieldKeys.has(actionKey)) return;
+  const deploymentRequestId = String(content.deploymentRequestId || request.deploymentRequestId || msg?.clientMsgNo || '').trim();
+  if (!deploymentRequestId) return;
+  await enqueueDeploymentFieldUpdate(deploymentRequestId, async () => {
+    const latestMsg = findDeploymentCardMessage(deploymentRequestId) || msg;
+    const clientMsgNo = String(latestMsg?.clientMsgNo || msg?.clientMsgNo || '');
+    const latestContent = latestMsg?.content || {};
+    const latestRequest = latestContent.deploymentRequest || request;
+    const actionKey = `${deploymentRequestId}:${payload.field}:${String(payload.value || '').trim()}`;
+    if (!clientMsgNo || deploymentFieldKeys.has(actionKey)) return;
 
-  const currentStatus = String(content.status || 'pending_confirmation');
-  if (['confirmed', 'queued', 'running', 'succeeded', 'cancelled', 'canceled', 'submitting'].includes(currentStatus)) return;
+    const currentStatus = String(latestContent.status || 'pending_confirmation');
+    if (['confirmed', 'queued', 'running', 'succeeded', 'cancelled', 'canceled', 'submitting'].includes(currentStatus)) return;
 
-  const previousStatus = currentStatus;
-  const fieldValue = String(payload.value || '').trim();
-  deploymentFieldKeys.add(actionKey);
-  updateDeploymentCardStatus(msg, 'submitting', { error: '' });
-  try {
-    const response = await clowderStore.updateDeploymentRequestFields(deploymentRequestId, {
-      ...(payload.field === 'target' ? { target: fieldValue || null } : { environment: fieldValue || null }),
-      sourceMessageId: String(request.sourceMessageId || clientMsgNo),
-      cardMessageId: clientMsgNo,
-      ...(payload.field === 'target' && Array.isArray(content.targetCandidates)
-        ? { targetCandidates: content.targetCandidates }
-        : {}),
-      ...(content.workspaceId || request.workspaceId ? { workspaceId: String(content.workspaceId || request.workspaceId || '') } : {}),
-      ...(content.workspacePath || request.workspacePath ? { workspacePath: String(content.workspacePath || request.workspacePath || '') } : {}),
-    });
-    upsertDeploymentCardFromRequest(msg, response);
-    Message.success(payload.field === 'target' ? '已更新部署目标' : '已更新部署环境');
-  } catch (err: any) {
-    updateDeploymentCardStatus(msg, previousStatus === 'needs_fields' ? 'needs_fields' : previousStatus, {
-      error: err?.message || err?.msg || '部署字段更新失败，可重试'
-    });
-    Message.error(err?.message || err?.msg || '部署字段更新失败');
-  } finally {
-    deploymentFieldKeys.delete(actionKey);
-  }
+    const previousStatus = currentStatus;
+    const fieldValue = String(payload.value || '').trim();
+    const existingTarget = deploymentEditableFieldValue(latestContent.target, '待确认目标');
+    const existingEnvironment = deploymentEditableFieldValue(latestContent.environment, '待确认环境');
+    const target = payload.field === 'target' ? fieldValue : existingTarget;
+    const environment = payload.field === 'environment' ? fieldValue : existingEnvironment;
+    deploymentFieldKeys.add(actionKey);
+    updateDeploymentCardStatus(latestMsg, 'submitting', { error: '' });
+    try {
+      const response = await clowderStore.updateDeploymentRequestFields(deploymentRequestId, {
+        ...(payload.field === 'target' || target ? { target: target || null } : {}),
+        ...(payload.field === 'environment' || environment ? { environment: environment || null } : {}),
+        sourceMessageId: String(latestRequest.sourceMessageId || clientMsgNo),
+        cardMessageId: clientMsgNo,
+        ...(Array.isArray(latestContent.targetCandidates)
+          ? { targetCandidates: latestContent.targetCandidates }
+          : {}),
+        ...(latestContent.workspaceId || latestRequest.workspaceId ? { workspaceId: String(latestContent.workspaceId || latestRequest.workspaceId || '') } : {}),
+        ...(latestContent.workspacePath || latestRequest.workspacePath ? { workspacePath: String(latestContent.workspacePath || latestRequest.workspacePath || '') } : {}),
+      });
+      upsertDeploymentCardFromRequest(latestMsg, response);
+      Message.success(payload.field === 'target' ? '已更新部署目标' : '已更新部署环境');
+    } catch (err: any) {
+      updateDeploymentCardStatus(latestMsg, previousStatus === 'needs_fields' ? 'needs_fields' : previousStatus, {
+        error: err?.message || err?.msg || '部署字段更新失败，可重试'
+      });
+      Message.error(err?.message || err?.msg || '部署字段更新失败');
+    } finally {
+      deploymentFieldKeys.delete(actionKey);
+    }
+  });
 }
 
 async function handleDeploymentCardAction(payload: { action: 'confirm' | 'cancel' | 'retry' | 'open-preview' | 'download'; message: any }) {
