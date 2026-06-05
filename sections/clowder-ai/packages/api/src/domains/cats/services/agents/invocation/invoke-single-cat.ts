@@ -11,8 +11,8 @@
 
 import { execFileSync } from 'node:child_process';
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
-import { readdir, rm, stat } from 'node:fs/promises';
-import { basename, dirname, join, resolve } from 'node:path';
+import { rm } from 'node:fs/promises';
+import { dirname, join, resolve } from 'node:path';
 import { type CatId, type ContextHealth, catRegistry, type MessageContent, type SessionRecord } from '@cat-cafe/shared';
 import { context, SpanStatusCode, trace } from '@opentelemetry/api';
 import {
@@ -2202,36 +2202,6 @@ export async function* invokeSingleCat(deps: InvocationDeps, params: InvocationP
           }
         }
 
-        // V3-38: Before yielding done, scan workspace for generated files
-        // and emit rich_block system_info so OutboundDeliveryHook Phase J
-        // can publish them as file attachments.
-        if (msg.type === 'done') {
-          const scanPaths = [
-            ...(registeredRuntimeWorkspace?.path ? [registeredRuntimeWorkspace.path] : []),
-            ...(workingDirectory ? [workingDirectory] : []),
-          ];
-          const seenPaths = new Set<string>();
-          for (const scanPath of scanPaths) {
-            if (seenPaths.has(scanPath)) continue;
-            seenPaths.add(scanPath);
-            try {
-              const fileBlocks = await scanWorkspaceForFileBlocks(scanPath);
-              for (const block of fileBlocks) {
-                for await (const out of streamProcessedOutputs({
-                  type: 'system_info' as const,
-                  catId,
-                  content: JSON.stringify({ type: 'rich_block', block }),
-                  timestamp: Date.now(),
-                })) {
-                  yield out;
-                }
-              }
-            } catch {
-              /* best-effort: workspace scan failure must not break delivery */
-            }
-          }
-        }
-
         // F149: Map provider_signal / liveness_signal → system_info for frontend delivery
         const deliveryMsg =
           msg.type === 'provider_signal' || msg.type === 'liveness_signal'
@@ -2511,56 +2481,4 @@ export async function* invokeSingleCat(deps: InvocationDeps, params: InvocationP
     }
     invocationSpan.end();
   }
-}
-
-/**
- * V3-38: Scan agent workspace for generated files and return candidate RichFileBlocks.
- * Only scans the immediate workspace directory (no recursion) for common artifact extensions.
- */
-async function scanWorkspaceForFileBlocks(workspacePath: string | undefined | null): Promise<
-  Array<{
-    id: string;
-    kind: 'file';
-    v: 1;
-    url: string;
-    fileName: string;
-    fileSize?: number;
-    mimeType?: string;
-  }>
-> {
-  if (!workspacePath || !existsSync(workspacePath)) return [];
-  const blocks: Awaited<ReturnType<typeof scanWorkspaceForFileBlocks>> = [];
-  const allowedExts = new Set([
-    '.zip', '.tar', '.gz', '.rar', '.7z',
-    '.pdf', '.doc', '.docx', '.xls', '.xlsx', '.ppt', '.pptx',
-    '.txt', '.csv', '.json', '.md', '.xml',
-    '.png', '.jpg', '.jpeg', '.gif', '.webp',
-    '.mp3', '.mp4', '.wav', '.mov',
-  ]);
-  try {
-    const entries = await readdir(workspacePath, { withFileTypes: true });
-    for (const entry of entries) {
-      if (!entry.isFile()) continue;
-      const ext = entry.name.slice(entry.name.lastIndexOf('.')).toLowerCase();
-      if (!allowedExts.has(ext)) continue;
-      const filePath = join(workspacePath, entry.name);
-      try {
-        const fileStat = await stat(filePath);
-        if (!fileStat.isFile()) continue;
-        blocks.push({
-          id: `file-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
-          kind: 'file' as const,
-          v: 1 as const,
-          url: filePath,
-          fileName: entry.name,
-          fileSize: fileStat.size,
-        });
-      } catch {
-        /* ignore unreadable files */
-      }
-    }
-  } catch {
-    /* ignore unreadable directories */
-  }
-  return blocks;
 }

@@ -7,8 +7,7 @@ import { type CatId, catRegistry, type RichBlock } from '@cat-cafe/shared';
 import type { FastifyBaseLogger } from 'fastify';
 import { publishGeneratedImage } from '../../domains/cats/services/agents/providers/generated-image-publication.js';
 import type { SupportedImageMime } from '../../utils/image-storage.js';
-import { getDefaultUploadDir, resolveInternalRouteUrl } from '../../utils/upload-paths.js';
-import { publishAgentFile } from './media-file-publisher.js';
+import { resolveInternalRouteUrl } from '../../utils/upload-paths.js';
 import { ConnectorMessageFormatter, type MessageEnvelope, type MessageOrigin } from './ConnectorMessageFormatter.js';
 import type { IConnectorThreadBindingStore } from './ConnectorThreadBindingStore.js';
 import { renderAllRichBlocksPlaintext } from './rich-block-plaintext.js';
@@ -85,8 +84,6 @@ export interface OutboundDeliveryHookOptions {
   readonly log: FastifyBaseLogger;
   /** Resolve a route URL (e.g. /uploads/x.png) to an absolute file path on disk. */
   readonly mediaPathResolver?: ((url: string) => string | undefined) | undefined;
-  /** V3-38: Upload directory for publishing agent workspace files to public URLs. */
-  readonly uploadDir?: string | undefined;
   /** F134: Look up a stored message by ID to retrieve its source.sender for group chat @sender replies. */
   readonly messageLookup?:
     | ((messageId: string) => Promise<{ source?: { sender?: { id: string; name?: string } } } | null>)
@@ -286,7 +283,7 @@ export class OutboundDeliveryHook {
               // (raw url could be an arbitrary local path like /etc/passwd, exploitable via Telegram InputFile)
               if (block.kind === 'file' && 'url' in block && block.url) {
                 const fileUrl = block.url as string;
-                let absPath = resolve?.(fileUrl);
+                const absPath = resolve?.(fileUrl);
                 const fileName = 'fileName' in block ? (block.fileName as string) : undefined;
                 const fileSize = Number(
                   'fileSize' in block
@@ -295,54 +292,37 @@ export class OutboundDeliveryHook {
                       ? (block as { size?: number }).size
                       : 0,
                 );
-                let publicUrl: string | undefined;
                 if (absPath) {
-                  publicUrl = resolveInternalRouteUrl(fileUrl);
                   this.opts.log.info(
-                    { blockKind: block.kind, url: fileUrl, absPath, fileName, state: 'outbound_payload_ready' },
+                    { blockKind: block.kind, url: fileUrl, absPath, fileName },
                     '[OutboundDeliveryHook] Phase J: sending file block',
                   );
-                } else if (fileUrl.startsWith('https://')) {
-                  publicUrl = fileUrl;
-                  this.opts.log.info(
-                    { blockKind: block.kind, url: fileUrl, fileName, state: 'outbound_payload_ready' },
-                    '[OutboundDeliveryHook] Phase J: sending file block via external URL',
-                  );
-                } else if (isAbsolute(fileUrl)) {
-                  // V3-38: agent workspace file not in uploads/ — try to publish it
-                  const published = await publishAgentFile(fileUrl, {
-                    fileName,
-                    uploadDir: this.opts.uploadDir,
-                    log: this.opts.log,
-                  });
-                  if (published) {
-                    absPath = published.absolutePath;
-                    publicUrl = resolveInternalRouteUrl(published.publicUrl);
-                    this.opts.log.info(
-                      { blockKind: block.kind, sourcePath: fileUrl, publicUrl, absPath, fileName, state: 'outbound_payload_ready' },
-                      '[OutboundDeliveryHook] Phase J: file block published and sending',
-                    );
-                  } else {
-                    this.opts.log.warn(
-                      { blockKind: block.kind, url: fileUrl, fileName, state: 'upload_failed' },
-                      '[OutboundDeliveryHook] Phase J: file block publish failed',
-                    );
-                  }
-                } else {
-                  this.opts.log.warn(
-                    { blockKind: block.kind, url: fileUrl, fileName, state: 'file_missing' },
-                    '[OutboundDeliveryHook] Phase J: file block skipped — resolver failed and url is not https or absolute',
-                  );
-                }
-                if (publicUrl) {
                   await adapter.sendMedia(binding.externalChatId, {
                     type: 'file',
-                    url: publicUrl,
-                    ...(absPath ? { absPath } : {}),
+                    url: resolveInternalRouteUrl(fileUrl),
+                    absPath,
                     ...(fileName ? { fileName } : {}),
                     ...(Number.isFinite(fileSize) && fileSize > 0 ? { size: fileSize } : {}),
                     ...mediaIdentity,
                   });
+                } else if (fileUrl.startsWith('https://')) {
+                  // External HTTPS URLs are safe to pass through (Feishu adapter downloads + uploads)
+                  this.opts.log.info(
+                    { blockKind: block.kind, url: fileUrl, fileName },
+                    '[OutboundDeliveryHook] Phase J: sending file block via external URL',
+                  );
+                  await adapter.sendMedia(binding.externalChatId, {
+                    type: 'file',
+                    url: fileUrl,
+                    ...(fileName ? { fileName } : {}),
+                    ...(Number.isFinite(fileSize) && fileSize > 0 ? { size: fileSize } : {}),
+                    ...mediaIdentity,
+                  });
+                } else {
+                  this.opts.log.warn(
+                    { blockKind: block.kind, url: fileUrl },
+                    '[OutboundDeliveryHook] Phase J: file block skipped — resolver failed and url is not https',
+                  );
                 }
               }
               if (block.kind === 'media_gallery' && 'items' in block) {

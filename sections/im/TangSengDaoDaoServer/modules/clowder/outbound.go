@@ -31,7 +31,6 @@ type OutboundPayload struct {
 type OutboundMediaPayload struct {
 	Type     string `json:"type"`
 	URL      string `json:"url"`
-	AbsPath  string `json:"absPath,omitempty"`
 	FileName string `json:"fileName,omitempty"`
 	Size     int64  `json:"size,omitempty"`
 	Alt      string `json:"alt,omitempty"`
@@ -224,17 +223,9 @@ func buildOutboundMessageBody(payload OutboundPayload, content string, format st
 
 	mediaType := strings.ToLower(strings.TrimSpace(payload.Media.Type))
 	mediaURL := strings.TrimSpace(payload.Media.URL)
-	absPath := strings.TrimSpace(payload.Media.AbsPath)
-
-	// Prefer URL; fallback to AbsPath if URL is empty
-	effectiveURL := mediaURL
-	if effectiveURL == "" && absPath != "" {
-		effectiveURL = absPath
-	}
-
-	if mediaType == "image" && effectiveURL != "" {
+	if mediaType == "image" && mediaURL != "" {
 		body["type"] = common.Image
-		body["url"] = effectiveURL
+		body["url"] = mediaURL
 		if payload.Media.FileName != "" {
 			body["name"] = payload.Media.FileName
 		}
@@ -246,9 +237,9 @@ func buildOutboundMessageBody(payload OutboundPayload, content string, format st
 			body["text"] = payload.Media.Alt
 		}
 	}
-	if mediaType == "file" && effectiveURL != "" {
+	if mediaType == "file" && mediaURL != "" {
 		body["type"] = common.File
-		body["url"] = effectiveURL
+		body["url"] = mediaURL
 		if payload.Media.FileName != "" {
 			body["name"] = payload.Media.FileName
 		}

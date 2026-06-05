@@ -1048,7 +1048,6 @@ export async function startConnectorGateway(
     adapters,
     log,
     mediaPathResolver,
-    uploadDir,
     messageLookup,
     resolveVoiceBlocks: async (blocks, catId) => {
       const { getVoiceBlockSynthesizer } = await import('../../domains/cats/services/tts/VoiceBlockSynthesizer.js');
