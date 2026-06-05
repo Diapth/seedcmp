@@ -124,21 +124,21 @@ This file records the required real Web checks for the orchestrator and P2 deplo
 
 ### Stage 5
 
-- Login user:
-- OAuth platform:
-- OAuth status:
-- Cat name:
-- Cat alias:
+- Login user: 008618337488675
+- OAuth platform: Codex
+- OAuth status: local Codex account available through existing Clowder cat configuration
+- Cat name: xtz coordinator with dd/cs group cats available
+- Cat alias: @xtz; prompt used @协调者
 - Conversation type: group
-- Group chat ID:
-- Thread ID:
+- Group chat ID: 16e006b0b84f40faaa77a271e69b5021
+- Thread ID: thread_mq1afgliuch3zzzg
 - Coordination ID:
-- Deployment request ID:
+- Deployment request ID: deploy_e2f50959-43df-4196-abc2-dda720e306ae
 - Prompt: @协调者 请让 Claude 或 Codex 生成一个单文件活动页，然后部署到 preview 环境，部署完成后给我预览链接和源码下载链接。
-- Screenshot paths:
-- Result:
+- Screenshot paths: docs/manual-test-artifacts/stage5/stage5-after-race-fix-open-group.png; docs/manual-test-artifacts/stage5/stage5-race-fix-before-target.png; docs/manual-test-artifacts/stage5/stage5-race-fix-target-enabled.png; docs/manual-test-artifacts/stage5/stage5-race-fix-terminal.png; docs/manual-test-artifacts/stage5/stage5-preview-iframe-rendered-after-header-fix.png
+- Result: passed
 - Failure reason:
-- Notes:
+- Notes: Restarted stack after Stage 5 code fixes before validation. The hydrated deployment card initially reproduced the real browser blocker: target missing while preview environment was already selected. After commit 8941c84, entering `packages/api/qa-test-page.html` updated the target, cleared `missingFields`, and enabled confirmation. Confirming from the chat card queued and completed deployment `deploy_e2f50959-43df-4196-abc2-dda720e306ae`; the card polled to `部署成功` and showed both preview and source download controls. Direct checks returned preview HTTP 200 with rendered HTML and download HTTP 200 with `application/gzip`. The first side-dock preview attempt showed a blank frame because the API added `X-Frame-Options: DENY`; commit 7091edd exempted deployment preview routes from anti-frame headers, and the final Web screenshot shows the deployed page rendered inside the right preview dock.
 
 ### Stage 6
 
