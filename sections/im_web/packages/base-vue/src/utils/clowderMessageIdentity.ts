@@ -176,23 +176,42 @@ function getRuntimeEnv() {
 function getClowderPublicOrigin() {
   const env = getRuntimeEnv();
   return String(
+    env.VITE_CLOWDER_API_URL ||
     env.VITE_CLOWDER_PUBLIC_URL ||
     env.VITE_CLOWDER_URL ||
     env.VITE_CLOWDER_BASE_URL ||
-    'http://localhost:3003'
+    'http://localhost:3004'
   ).replace(/\/+$/, '');
 }
 
 export function normalizeClowderFileUrl(url: string) {
   const value = String(url || '').trim();
   if (!value) return '';
-  if (/^https?:\/\//i.test(value)) return value;
+  if (/^https?:\/\//i.test(value)) {
+    try {
+      const parsed = new URL(value);
+      if (
+        (parsed.hostname === 'localhost' || parsed.hostname === '127.0.0.1') &&
+        parsed.port === '3003' &&
+        parsed.pathname.startsWith('/uploads/')
+      ) {
+        const origin = new URL(getClowderPublicOrigin());
+        parsed.protocol = origin.protocol;
+        parsed.hostname = origin.hostname;
+        parsed.port = origin.port;
+        return parsed.toString();
+      }
+    } catch {
+      return value;
+    }
+    return value;
+  }
   if (value.startsWith('/uploads/')) return `${getClowderPublicOrigin()}${value}`;
   return value;
 }
 
 export function getClowderFileBlocksFromPayload(payload: any): ClowderFileBlock[] {
-  return getClowderRichBlocksFromPayload(payload)
+  const blocks = getClowderRichBlocksFromPayload(payload)
     .filter(block => {
       const kind = blockKind(block);
       return kind === 'file' || kind === 'attachment' || Boolean((block?.fileName || block?.filename || block?.name || block?.title) && block?.url);
@@ -209,6 +228,24 @@ export function getClowderFileBlocksFromPayload(payload: any): ClowderFileBlock[
       };
     })
     .filter(block => Boolean(block.name && block.url));
+
+  const content = getClowderPayload(payload);
+  const type = Number(content.type || payload.type || 0);
+  if (type === 8) {
+    const name = normalizeFileName(content.name || content.fileName || payload.name || payload.fileName || '');
+    const url = normalizeClowderFileUrl(content.url || payload.url || '');
+    const size = Number(content.size || payload.size || 0);
+    if (name && url) {
+      blocks.push({
+        name,
+        url,
+        size: Number.isFinite(size) && size > 0 ? size : undefined,
+        raw: content
+      });
+    }
+  }
+
+  return blocks;
 }
 
 export function findClowderFileBlockForText(text: string, history: any[]) {

@@ -79,7 +79,12 @@ export interface OutboundDeliveryHookLike {
     content: string,
     catId: string,
     richBlocks?: ReadonlyArray<{ kind: string; [key: string]: unknown }>,
-    threadMeta?: { threadShortId?: string; threadTitle?: string; deepLinkUrl?: string },
+    threadMeta?: {
+      threadShortId?: string;
+      threadTitle?: string;
+      deepLinkUrl?: string;
+      artifactSearchRoots?: readonly string[];
+    },
     origin?: string,
     triggerMessageId?: string,
   ): Promise<void>;
@@ -105,6 +110,7 @@ interface ThreadMetaLike {
   threadShortId?: string;
   threadTitle?: string;
   deepLinkUrl?: string;
+  artifactSearchRoots?: readonly string[];
 }
 
 export interface QueueProcessorDeps {

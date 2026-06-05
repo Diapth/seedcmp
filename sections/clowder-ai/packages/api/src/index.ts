@@ -3,7 +3,7 @@
  * 后端 API 入口
  */
 
-import { join } from 'node:path';
+import { join, resolve } from 'node:path';
 import { type CatConfig, type CatId, CORE_COMMANDS, catRegistry } from '@cat-cafe/shared';
 import type { RedisClient } from '@cat-cafe/shared/utils';
 import { createRedisClient, SessionStore } from '@cat-cafe/shared/utils';
@@ -2546,6 +2546,52 @@ async function main(): Promise<void> {
 
   // F140 Phase 3b: connector invoke trigger (auto-invoke cat after review feedback delivery via polling)
   const frontendBaseUrl = resolveFrontendBaseUrl(process.env, app.log);
+  const buildOutboundThreadMeta = async (threadId: string) => {
+    const thread = await threadStore.get(threadId);
+    if (!thread) return undefined;
+
+    const artifactSearchRoots = new Set<string>();
+    const addRoot = (value?: string | null) => {
+      const trimmed = value?.trim();
+      if (!trimmed || trimmed === 'default' || trimmed.startsWith('games/')) return;
+      artifactSearchRoots.add(resolve(trimmed));
+    };
+
+    addRoot(thread.projectPath);
+
+    try {
+      const binding = await threadWorkspaceBindingStore.get(threadId);
+      const workspaceIds = [
+        binding?.activeWorkspaceId,
+        ...(binding?.recentWorkspaceIds ?? []),
+      ].filter(Boolean) as string[];
+      for (const workspaceId of workspaceIds) {
+        const workspace = await maomiWorkspaceStore.get(workspaceId);
+        addRoot(workspace?.rootPath);
+      }
+    } catch (err) {
+      app.log.warn({ err, threadId }, '[api] outbound thread workspace roots lookup failed');
+    }
+
+    try {
+      const runtimeWorkspaces = await runtimeWorkspaceStore.listByThread(threadId);
+      for (const workspace of runtimeWorkspaces) {
+        addRoot(workspace.path);
+        addRoot(workspace.runtimeRoot);
+        addRoot(workspace.projectRoot);
+      }
+    } catch (err) {
+      app.log.warn({ err, threadId }, '[api] outbound runtime workspace roots lookup failed');
+    }
+
+    return {
+      threadShortId: threadId.slice(0, 15),
+      threadTitle: thread.title ?? undefined,
+      deepLinkUrl: buildThreadDeepLink(frontendBaseUrl, threadId),
+      artifactSearchRoots: [...artifactSearchRoots],
+    };
+  };
+
   const invokeTrigger = new ConnectorInvokeTrigger({
     router,
     socketManager,
@@ -2553,15 +2599,7 @@ async function main(): Promise<void> {
     invocationTracker,
     invocationQueue,
     queueProcessor,
-    threadMetaLookup: async (threadId) => {
-      const thread = await threadStore.get(threadId);
-      if (!thread) return undefined;
-      return {
-        threadShortId: threadId.slice(0, 15),
-        threadTitle: thread.title ?? undefined,
-        deepLinkUrl: buildThreadDeepLink(frontendBaseUrl, threadId),
-      };
-    },
+    threadMetaLookup: buildOutboundThreadMeta,
     log: app.log,
   });
 
@@ -2976,15 +3014,7 @@ async function main(): Promise<void> {
     connectorGatewayHandle = await startConnectorGateway(gatewayConfig, gatewayDeps);
     if (connectorGatewayHandle) {
       wireGatewayHooks(connectorGatewayHandle);
-      queueProcessor.setThreadMetaLookup(async (threadId) => {
-        const thread = await threadStore.get(threadId);
-        if (!thread) return undefined;
-        return {
-          threadShortId: threadId.slice(0, 15),
-          threadTitle: thread.title ?? undefined,
-          deepLinkUrl: buildThreadDeepLink(frontendBaseUrl, threadId),
-        };
-      });
+      queueProcessor.setThreadMetaLookup(buildOutboundThreadMeta);
 
       app.log.info('[api] Connector gateway started');
     }

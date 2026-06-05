@@ -1,6 +1,6 @@
-import { mkdtemp, writeFile } from 'node:fs/promises';
-import { tmpdir } from 'node:os';
-import { join } from 'node:path';
+import { mkdir, mkdtemp, stat, writeFile } from 'node:fs/promises';
+import { homedir, tmpdir } from 'node:os';
+import { join, relative } from 'node:path';
 import assert from 'node:assert/strict';
 import { beforeEach, describe, it } from 'node:test';
 import './helpers/setup-cat-registry.js';
@@ -449,7 +449,7 @@ describe('OutboundDeliveryHook', () => {
       assert.equal(mediaSent.length, 1, 'sendMedia should be called for file block');
       assert.equal(mediaSent[0].chatId, 'chat-1');
       assert.equal(mediaSent[0].payload.type, 'file');
-      assert.equal(mediaSent[0].payload.url, 'http://localhost:3003/uploads/report.pdf');
+      assert.equal(mediaSent[0].payload.url, 'http://localhost:3004/uploads/report.pdf');
       assert.equal(mediaSent[0].payload.absPath, '/abs/uploads/report.pdf');
     });
 
@@ -614,6 +614,168 @@ describe('OutboundDeliveryHook', () => {
       assert.equal(richSent[0].blocks[0].fileSize, 86660);
       assert.equal(mediaSent.length, 1);
       assert.equal(mediaSent[0].payload.size, 86660);
+    });
+
+    it('publishes local files to the uploads directory and rewrites the URLs', async () => {
+      const mediaSent = [];
+      const richSent = [];
+      const mediaAdapter = {
+        connectorId: 'im-web',
+        async sendReply() {},
+        async sendRichMessage(chatId, text, blocks, catName) {
+          richSent.push({ chatId, text, blocks, catName });
+        },
+        async sendMedia(chatId, payload) {
+          mediaSent.push({ chatId, payload });
+        },
+      };
+
+      const tempDir = await mkdtemp(join(tmpdir(), 'clowder-local-publish-'));
+      const localFilePath = join(tempDir, 'test_workspace.zip');
+      const testContent = 'test zip content';
+      await writeFile(localFilePath, testContent);
+
+      const uploadDir = join(process.cwd(), 'uploads');
+      hook = new OutboundDeliveryHook({
+        bindingStore,
+        adapters: new Map([['im-web', mediaAdapter]]),
+        log: noopLog(),
+        mediaPathResolver: (url) => {
+          if (url.startsWith('/uploads/')) {
+            return join(uploadDir, url.slice('/uploads/'.length));
+          }
+          return undefined;
+        },
+      });
+      bindingStore.bind('im-web', 'chat-1', 'thread-abc', 'user-1');
+
+      const blocks = [{ id: 'f1', kind: 'file', v: 1, url: localFilePath, fileName: 'test_workspace.zip' }];
+      await hook.deliver('thread-abc', 'Here is the packaged workspace', 'codex', blocks);
+
+      assert.equal(mediaSent.length, 1);
+      assert.equal(mediaSent[0].payload.type, 'file');
+      assert.match(mediaSent[0].payload.url, /\/uploads\/f1-test_workspace-[a-f0-9]+\.zip/);
+      assert.ok(mediaSent[0].payload.absPath.startsWith(uploadDir));
+      assert.equal(mediaSent[0].payload.size, testContent.length);
+
+      assert.equal(richSent.length, 1);
+      assert.match(richSent[0].blocks[0].url, /\/uploads\/f1-test_workspace-[a-f0-9]+\.zip/);
+      assert.equal(richSent[0].blocks[0].fileSize, testContent.length);
+    });
+
+    it('packages active Maomi workspace when final text references a missing local archive', async () => {
+      const previousUploadDir = process.env.UPLOAD_DIR;
+      const mediaSent = [];
+      const replySent = [];
+      const mediaAdapter = {
+        connectorId: 'im-web',
+        async sendReply(chatId, content) {
+          replySent.push({ chatId, content });
+        },
+        async sendMedia(chatId, payload) {
+          mediaSent.push({ chatId, payload });
+        },
+      };
+
+      const tempDir = await mkdtemp(join(tmpdir(), 'clowder-maomi-archive-'));
+      const workspaceRoot = join(tempDir, 'maomi_workspace');
+      const uploadDir = join(tempDir, 'uploads');
+      process.env.UPLOAD_DIR = uploadDir;
+      await mkdir(workspaceRoot, { recursive: true });
+      await writeFile(join(workspaceRoot, '.clowder-root.json'), '{"kind":"maomi_workspace_root"}\n');
+      await writeFile(join(workspaceRoot, 'README.md'), '# Maomi Workspace\n');
+
+      try {
+        hook = new OutboundDeliveryHook({
+          bindingStore,
+          adapters: new Map([['im-web', mediaAdapter]]),
+          log: noopLog(),
+        });
+        bindingStore.bind('im-web', 'chat-1', 'thread-abc', 'user-1');
+
+        await hook.deliver(
+          'thread-abc',
+          '打包完成：/tmp/maomi_workspace.tar.gz',
+          'codex',
+          undefined,
+          {
+            threadShortId: 'thread-abc',
+            artifactSearchRoots: [workspaceRoot],
+          },
+        );
+
+        assert.equal(replySent.length, 0);
+        assert.equal(mediaSent.length, 1);
+        assert.equal(mediaSent[0].payload.type, 'file');
+        assert.equal(mediaSent[0].payload.fileName, 'maomi_workspace.tar.gz');
+        assert.match(mediaSent[0].payload.url, /\/uploads\/text-file-thread-abc-maomi_workspace-[a-f0-9]+\.tar\.gz/);
+        assert.ok(mediaSent[0].payload.absPath.startsWith(uploadDir));
+        const archiveInfo = await stat(mediaSent[0].payload.absPath);
+        assert.ok(archiveInfo.size > 0);
+        assert.equal(mediaSent[0].payload.size, archiveInfo.size);
+      } finally {
+        if (previousUploadDir === undefined) delete process.env.UPLOAD_DIR;
+        else process.env.UPLOAD_DIR = previousUploadDir;
+      }
+    });
+
+    it('publishes tilde-prefixed local file references from final text', async () => {
+      const previousUploadDir = process.env.UPLOAD_DIR;
+      const mediaSent = [];
+      const mediaAdapter = {
+        connectorId: 'im-web',
+        async sendReply() {},
+        async sendMedia(chatId, payload) {
+          mediaSent.push({ chatId, payload });
+        },
+      };
+
+      const tempDir = await mkdtemp(join(homedir(), '.clowder-tilde-file-'));
+      const uploadDir = join(tmpdir(), `clowder-tilde-uploads-${Date.now()}`);
+      process.env.UPLOAD_DIR = uploadDir;
+      const localFilePath = join(tempDir, 'maomi_workspace.tar.gz');
+      await writeFile(localFilePath, 'archive bytes');
+      const tildePath = `~/${relative(homedir(), localFilePath)}`;
+
+      try {
+        hook = new OutboundDeliveryHook({
+          bindingStore,
+          adapters: new Map([['im-web', mediaAdapter]]),
+          log: noopLog(),
+        });
+        bindingStore.bind('im-web', 'chat-1', 'thread-abc', 'user-1');
+
+        await hook.deliver('thread-abc', `文件在：${tildePath}`, 'codex');
+
+        assert.equal(mediaSent.length, 1);
+        assert.equal(mediaSent[0].payload.type, 'file');
+        assert.equal(mediaSent[0].payload.fileName, 'maomi_workspace.tar.gz');
+        assert.match(mediaSent[0].payload.url, /\/uploads\/text-file-thread-abc-maomi_workspace-[a-f0-9]+\.tar\.gz/);
+      } finally {
+        if (previousUploadDir === undefined) delete process.env.UPLOAD_DIR;
+        else process.env.UPLOAD_DIR = previousUploadDir;
+      }
+    });
+
+    it('throws file_delivery_failed if publishing local file fails', async () => {
+      const mediaAdapter = {
+        connectorId: 'im-web',
+        async sendReply() {},
+        async sendRichMessage() {},
+        async sendMedia() {},
+      };
+      hook = new OutboundDeliveryHook({
+        bindingStore,
+        adapters: new Map([['im-web', mediaAdapter]]),
+        log: noopLog(),
+      });
+      bindingStore.bind('im-web', 'chat-1', 'thread-abc', 'user-1');
+
+      const blocks = [{ id: 'f1', kind: 'file', v: 1, url: '/nonexistent/file.zip', fileName: 'file.zip' }];
+      await assert.rejects(
+        () => hook.deliver('thread-abc', 'Failed file', 'codex', blocks),
+        /file_delivery_failed/
+      );
     });
   });
 

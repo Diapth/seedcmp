@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import { normalizeMediaUrl, resolveMediaOrigin } from '../../../packages/base-vue/src/service/mediaUrl'
 import { resolveApiBaseUrl } from '../../../packages/base-vue/src/service/APIClient'
+import { normalizeClowderFileUrl } from '../../../packages/base-vue/src/utils/clowderMessageIdentity'
 import {
   resolveWebsocketConnectAddr,
   resolveWebsocketFallbackHost
@@ -32,6 +33,15 @@ describe('runtime environment config', () => {
     expect(resolveWebsocketConnectAddr('ws://127.0.0.1:5200/', undefined, env)).toBe('ws://im-ws.example.com:5200/')
   })
 
+  it('resolves Clowder upload file URLs against the API origin instead of the frontend port', () => {
+    expect(normalizeClowderFileUrl('/uploads/ordering-demo.tar.gz')).toBe(
+      'http://localhost:3004/uploads/ordering-demo.tar.gz'
+    )
+    expect(normalizeClowderFileUrl('http://localhost:3003/uploads/ordering-demo.tar.gz')).toBe(
+      'http://localhost:3004/uploads/ordering-demo.tar.gz'
+    )
+  })
+
   it('rewrites local API and websocket env hosts when the browser opens IM Web through a remote host', () => {
     const env = {
       VITE_API_BASE_URL: 'http://127.0.0.1:8090/v1/',
@@ -51,8 +61,13 @@ describe('runtime environment config', () => {
       baseUrl: 'http://127.0.0.1:8090/v1/',
       env,
       browserHostname: '100.79.157.76'
-    })).toBe('http://100.79.157.76:3003/uploads/sinx.png')
+    })).toBe('http://100.79.157.76:3004/uploads/sinx.png')
     expect(normalizeMediaUrl('http://localhost:3004/uploads/sinx.png', {
+      baseUrl: 'http://127.0.0.1:8090/v1/',
+      env,
+      browserHostname: '100.79.157.76'
+    })).toBe('http://100.79.157.76:3004/uploads/sinx.png')
+    expect(normalizeMediaUrl('/uploads/sinx.png', {
       baseUrl: 'http://127.0.0.1:8090/v1/',
       env,
       browserHostname: '100.79.157.76'

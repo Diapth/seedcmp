@@ -22,21 +22,16 @@ function normalizeBaseUrl(value?: string): string | null {
 }
 
 function resolveInternalRouteBaseUrl(): string {
-  const explicitPublicUrl =
-    normalizeBaseUrl(process.env.CAT_CAFE_PUBLIC_URL) ??
-    normalizeBaseUrl(process.env.CAT_CAFE_WEB_URL) ??
-    normalizeBaseUrl(process.env.FRONTEND_URL) ??
-    normalizeBaseUrl(process.env.NEXT_PUBLIC_FRONTEND_URL) ??
-    normalizeBaseUrl(process.env.NEXT_PUBLIC_APP_URL);
-  if (explicitPublicUrl) return explicitPublicUrl;
-
-  const apiUrl = normalizeBaseUrl(process.env.CAT_CAFE_API_URL) ?? normalizeBaseUrl(process.env.NEXT_PUBLIC_API_URL);
+  const apiUrl =
+    normalizeBaseUrl(process.env.CAT_CAFE_API_URL) ??
+    normalizeBaseUrl(process.env.NEXT_PUBLIC_API_URL) ??
+    normalizeBaseUrl(process.env.CAT_CAFE_PUBLIC_URL);
   if (apiUrl) return apiUrl;
 
-  const frontendPort = Number(process.env.FRONTEND_PORT);
-  if (Number.isInteger(frontendPort) && frontendPort > 0) return `http://localhost:${frontendPort}`;
+  const apiPort = Number(process.env.API_SERVER_PORT);
+  if (Number.isInteger(apiPort) && apiPort > 0) return `http://localhost:${apiPort}`;
 
-  return 'http://localhost:3003';
+  return 'http://localhost:3004';
 }
 
 export function resolveInternalRouteUrl(url: string): string {

@@ -401,7 +401,7 @@ describe('Clowder group identity recovery', () => {
     expect(recoveredFile?.content).toMatchObject({
       type: 8,
       name: 'ordering-demo.tar.gz',
-      url: 'http://localhost:3003/uploads/ordering-demo.tar.gz',
+      url: 'http://localhost:3004/uploads/ordering-demo.tar.gz',
       size: 86660,
       connector_id: 'im-web',
       catDisplayName: '布偶猫'

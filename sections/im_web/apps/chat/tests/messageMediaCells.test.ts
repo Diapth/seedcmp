@@ -65,7 +65,7 @@ describe('message media cells', () => {
 
     expect(screen.getByRole('button', { name: '下载' })).toBeInTheDocument()
     expect(fetch).toHaveBeenCalledWith(
-      'http://localhost:3003/uploads/ordering-demo.tar.gz',
+      'http://localhost:3004/uploads/ordering-demo.tar.gz',
       expect.objectContaining({ method: 'HEAD', cache: 'no-store' })
     )
     await waitFor(() => {

@@ -1,13 +1,14 @@
-import { randomBytes } from 'node:crypto';
-import { stat, unlink, writeFile } from 'node:fs/promises';
-import { tmpdir } from 'node:os';
-import { basename, extname, isAbsolute, join } from 'node:path';
+import { createHash, randomBytes } from 'node:crypto';
+import { copyFile, mkdir, readdir, readFile, stat, unlink, writeFile } from 'node:fs/promises';
+import { homedir, tmpdir } from 'node:os';
+import { basename, extname, isAbsolute, join, relative, resolve, sep } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { gzipSync } from 'node:zlib';
 import { type CatId, catRegistry, type RichBlock } from '@cat-cafe/shared';
 import type { FastifyBaseLogger } from 'fastify';
 import { publishGeneratedImage } from '../../domains/cats/services/agents/providers/generated-image-publication.js';
-import type { SupportedImageMime } from '../../utils/image-storage.js';
-import { resolveInternalRouteUrl } from '../../utils/upload-paths.js';
+import { sanitizeFilenameStem, type SupportedImageMime } from '../../utils/image-storage.js';
+import { getDefaultUploadDir, resolveInternalRouteUrl } from '../../utils/upload-paths.js';
 import { ConnectorMessageFormatter, type MessageEnvelope, type MessageOrigin } from './ConnectorMessageFormatter.js';
 import type { IConnectorThreadBindingStore } from './ConnectorThreadBindingStore.js';
 import { renderAllRichBlocksPlaintext } from './rich-block-plaintext.js';
@@ -76,7 +77,40 @@ export interface ThreadMeta {
   readonly threadTitle?: string | undefined;
   readonly featId?: string | undefined;
   readonly deepLinkUrl?: string | undefined;
+  readonly artifactSearchRoots?: readonly string[] | undefined;
 }
+
+interface PublishedLocalFile {
+  readonly url: string;
+  readonly absPath: string;
+  readonly fileName?: string;
+}
+
+interface ResolvedPublishableFile {
+  readonly sourcePath: string;
+  readonly fileName?: string;
+  readonly cleanup?: boolean;
+}
+
+interface NativeFileMediaPayload {
+  readonly type: 'file';
+  readonly url: string;
+  readonly absPath: string;
+  readonly fileName: string;
+  readonly size?: number;
+}
+
+const MAX_ARTIFACT_SEARCH_ENTRIES = 1_500;
+const MAX_ARTIFACT_SEARCH_DEPTH = 5;
+const MAX_WORKSPACE_ARCHIVE_BYTES = 50 * 1024 * 1024;
+const EXCLUDED_ARTIFACT_DIRS = new Set([
+  '.git',
+  '.next',
+  'dist',
+  'node_modules',
+  'playwright-report',
+  'test-results',
+]);
 
 export interface OutboundDeliveryHookOptions {
   readonly bindingStore: IConnectorThreadBindingStore;
@@ -186,8 +220,12 @@ export class OutboundDeliveryHook {
       });
     }
     // After resolve + fallback, normalize to a concrete array so TS narrows downstream.
-    const finalBlocks = await this.enrichLocalFileBlockSizes(resolvedBlocks ?? []);
+    let finalBlocks = resolvedBlocks ?? [];
+    finalBlocks = await this.publishLocalFileBlocks(finalBlocks, threadMeta, content);
+    finalBlocks = await this.enrichLocalFileBlockSizes(finalBlocks);
+    const textFileDeliveries = await this.publishTextFileReferences(content, threadId, threadMeta);
     const hasRichBlocks = finalBlocks.length > 0;
+    const hasOnlyNativeFileRichBlocks = finalBlocks.every((block) => block.kind === 'file');
     const outMeta = replyToSender ? { replyToSender } : undefined;
     const mediaIdentity = {
       ...(catId ? { catId } : {}),
@@ -203,10 +241,19 @@ export class OutboundDeliveryHook {
           return;
         }
         try {
+          const preferNativeFilesOnly =
+            adapter.connectorId === 'im-web' &&
+            !!adapter.sendMedia &&
+            textFileDeliveries.length > 0 &&
+            hasOnlyNativeFileRichBlocks;
+
           // Phase E: Always prefer sendFormattedReply (interactive card) when adapter supports it.
           // This ensures each cat's reply is a distinct card with identity header,
           // preventing Feishu from merging multiple cats' plain-text into one bubble.
-          if (adapter.sendFormattedReply && !hasRichBlocks) {
+          if (preferNativeFilesOnly) {
+            // IM Web should receive native file cards for file-delivery turns. Sending a
+            // filename-bearing text row first races browser smoke tests and regresses UX.
+          } else if (adapter.sendFormattedReply && !hasRichBlocks) {
             const envelope = threadMeta
               ? this.formatter.format({
                   catDisplayName: catDisplayName || 'Cat',
@@ -428,6 +475,36 @@ export class OutboundDeliveryHook {
                 ...mediaIdentity,
               });
             }
+
+            const textFileReferences = this.extractLocalFileReferences(content);
+            const unpublishedTextFileReferences = textFileReferences.filter((fileRef) => {
+              const fileName = basename(fileRef);
+              return !textFileDeliveries.some((delivery) => delivery.fileName === fileName);
+            });
+            for (const fileRef of unpublishedTextFileReferences) {
+              const publishedFile = await this.publishLocalFileReference(fileRef, {
+                blockId: `text-file-${threadId.replace(/[^a-zA-Z0-9_-]/g, '-')}`,
+                fileName: basename(fileRef),
+                threadMeta,
+                content,
+              });
+              if (!publishedFile) continue;
+              const size = await this.safeFileSize(publishedFile.absPath);
+              await adapter.sendMedia(binding.externalChatId, {
+                type: 'file',
+                url: resolveInternalRouteUrl(publishedFile.url),
+                absPath: publishedFile.absPath,
+                fileName: publishedFile.fileName ?? basename(fileRef),
+                ...(size > 0 ? { size } : {}),
+                ...mediaIdentity,
+              });
+            }
+            for (const delivery of textFileDeliveries) {
+              await adapter.sendMedia(binding.externalChatId, {
+                ...delivery,
+                ...mediaIdentity,
+              });
+            }
           }
         } catch (err) {
           this.opts.log.error(
@@ -488,10 +565,10 @@ export class OutboundDeliveryHook {
     alt?: string,
   ): Promise<{ url: string; absPath: string; alt?: string } | null> {
     if (url.startsWith('/uploads/') || url.startsWith('/api/') || url.startsWith('/avatars/')) return null;
-    if (!url.startsWith('file://') && !isAbsolute(url)) return null;
+    if (!isLocalPublishableReference(url)) return null;
     let sourcePath: string;
     try {
-      sourcePath = url.startsWith('file://') ? fileURLToPath(url) : url;
+      sourcePath = normalizeLocalReferencePath(url);
     } catch (err) {
       this.opts.log.warn({ err, url }, '[OutboundDeliveryHook] invalid local media_gallery image URL');
       return null;
@@ -530,6 +607,352 @@ export class OutboundDeliveryHook {
     }
   }
 
+  private async safeFileSize(absPath: string): Promise<number> {
+    try {
+      const fileStat = await stat(absPath);
+      return fileStat.isFile() && fileStat.size > 0 ? fileStat.size : 0;
+    } catch {
+      return 0;
+    }
+  }
+
+  private async publishTextFileReferences(
+    content: string,
+    threadId: string,
+    threadMeta?: ThreadMeta,
+  ): Promise<NativeFileMediaPayload[]> {
+    const deliveries: NativeFileMediaPayload[] = [];
+    const textFileReferences = this.extractLocalFileReferences(content);
+    for (const fileRef of textFileReferences) {
+      const publishedFile = await this.publishLocalFileReference(fileRef, {
+        blockId: `text-file-${threadId.replace(/[^a-zA-Z0-9_-]/g, '-')}`,
+        fileName: basename(fileRef),
+        threadMeta,
+        content,
+      });
+      if (!publishedFile) continue;
+      const size = await this.safeFileSize(publishedFile.absPath);
+      deliveries.push({
+        type: 'file',
+        url: resolveInternalRouteUrl(publishedFile.url),
+        absPath: publishedFile.absPath,
+        fileName: publishedFile.fileName ?? basename(fileRef),
+        ...(size > 0 ? { size } : {}),
+      });
+    }
+    return deliveries;
+  }
+
+  private async publishLocalFileReference(
+    url: string,
+    options: {
+      blockId: string;
+      fileName?: string;
+      threadMeta?: ThreadMeta;
+      content?: string;
+    },
+  ): Promise<PublishedLocalFile | null> {
+    if (url.startsWith('/uploads/') || url.startsWith('/api/') || url.startsWith('/avatars/')) return null;
+    if (!isLocalPublishableReference(url)) return null;
+
+    const resolvedSource = await this.resolvePublishableLocalFile(url, options.fileName, options.threadMeta, options.content);
+    if (!resolvedSource) {
+      return null;
+    }
+
+    try {
+      const uploadDir = getDefaultUploadDir(process.env.UPLOAD_DIR);
+      await mkdir(uploadDir, { recursive: true });
+
+      const baseName = resolvedSource.fileName || options.fileName || basename(resolvedSource.sourcePath);
+      const { stem, ext } = splitPublishableFileName(baseName);
+      const publicationStem = this.buildFilePublicationStem(options.blockId + '-' + stem);
+      const targetFileName = `${publicationStem}${ext}`;
+      const absPath = resolve(join(uploadDir, targetFileName));
+
+      await copyFile(resolvedSource.sourcePath, absPath);
+
+      const urlPath = `/uploads/${targetFileName}`;
+      return {
+        url: urlPath,
+        absPath,
+        fileName: baseName,
+      };
+    } catch (err) {
+      this.opts.log.warn({ err, url, sourcePath: resolvedSource.sourcePath }, '[OutboundDeliveryHook] local file publish failed');
+      return null;
+    } finally {
+      if (resolvedSource.cleanup) {
+        await unlink(resolvedSource.sourcePath).catch(() => {});
+      }
+    }
+  }
+
+  private async resolvePublishableLocalFile(
+    url: string,
+    fileName?: string,
+    threadMeta?: ThreadMeta,
+    content = '',
+  ): Promise<ResolvedPublishableFile | null> {
+    let sourcePath: string;
+    try {
+      sourcePath = normalizeLocalReferencePath(url);
+    } catch (err) {
+      this.opts.log.warn({ err, url }, '[OutboundDeliveryHook] invalid local file URL');
+      return null;
+    }
+
+    const direct = await this.tryResolveExistingFile(sourcePath);
+    if (direct) return { sourcePath: direct, ...(fileName ? { fileName } : {}) };
+
+    const roots = await this.artifactSearchRoots(threadMeta);
+    const baseName = fileName || basename(sourcePath);
+    const matched = await this.findFileByBasename(roots, baseName);
+    if (matched) return { sourcePath: matched, fileName: baseName };
+
+    const generatedArchive = await this.maybeCreateWorkspaceArchive(baseName, content, roots);
+    if (generatedArchive) return generatedArchive;
+
+    this.opts.log.warn({ sourcePath, baseName }, '[OutboundDeliveryHook] local file path check failed');
+    return null;
+  }
+
+  private async tryResolveExistingFile(sourcePath: string): Promise<string | null> {
+    try {
+      const sourceStats = await stat(sourcePath);
+      if (!sourceStats.isFile()) {
+        this.opts.log.warn({ sourcePath }, '[OutboundDeliveryHook] local file path is not a file');
+        return null;
+      }
+      return sourcePath;
+    } catch {
+      return null;
+    }
+  }
+
+  private async artifactSearchRoots(threadMeta?: ThreadMeta): Promise<string[]> {
+    const roots = threadMeta?.artifactSearchRoots ?? [];
+    const resolved = new Set<string>();
+    for (const root of roots) {
+      const path = resolve(String(root || ''));
+      try {
+        const info = await stat(path);
+        if (info.isDirectory() || info.isFile()) resolved.add(path);
+      } catch {
+        // Ignore stale runtime workspace records.
+      }
+    }
+    return [...resolved];
+  }
+
+  private async findFileByBasename(roots: readonly string[], fileName: string): Promise<string | null> {
+    const target = basename(fileName).toLowerCase();
+    if (!target) return null;
+    let visited = 0;
+    const queue = roots.map((root) => ({ root, path: root, depth: 0 }));
+    while (queue.length > 0 && visited < MAX_ARTIFACT_SEARCH_ENTRIES) {
+      const current = queue.shift()!;
+      visited++;
+      let info;
+      try {
+        info = await stat(current.path);
+      } catch {
+        continue;
+      }
+      if (info.isFile()) {
+        if (basename(current.path).toLowerCase() === target) return current.path;
+        continue;
+      }
+      if (!info.isDirectory() || current.depth > MAX_ARTIFACT_SEARCH_DEPTH) continue;
+      let entries;
+      try {
+        entries = await readdir(current.path, { withFileTypes: true });
+      } catch {
+        continue;
+      }
+      for (const entry of entries) {
+        if (visited + queue.length >= MAX_ARTIFACT_SEARCH_ENTRIES) break;
+        if (entry.isSymbolicLink()) continue;
+        if (entry.isDirectory() && EXCLUDED_ARTIFACT_DIRS.has(entry.name)) continue;
+        const child = join(current.path, entry.name);
+        if (!isPathWithin(current.root, child)) continue;
+        if (entry.isFile() && entry.name.toLowerCase() === target) return child;
+        if (entry.isDirectory()) queue.push({ root: current.root, path: child, depth: current.depth + 1 });
+      }
+    }
+    return null;
+  }
+
+  private async maybeCreateWorkspaceArchive(
+    requestedFileName: string,
+    content: string,
+    roots: readonly string[],
+  ): Promise<ResolvedPublishableFile | null> {
+    if (!isMaomiWorkspaceArchiveRequest(requestedFileName, content)) return null;
+    const workspaceRoot = await this.findMaomiWorkspaceRoot(roots);
+    if (!workspaceRoot) return null;
+    const fileName = archiveFileNameForRequest(requestedFileName);
+    const sourcePath = await this.createTarGzArchive(workspaceRoot, fileName);
+    return { sourcePath, fileName, cleanup: true };
+  }
+
+  private async findMaomiWorkspaceRoot(roots: readonly string[]): Promise<string | null> {
+    for (const root of roots) {
+      try {
+        const info = await stat(root);
+        if (info.isDirectory() && await hasMaomiWorkspaceMarker(root)) return root;
+      } catch {
+        // Continue with other roots.
+      }
+    }
+    for (const root of roots) {
+      const found = await this.findDirectoryWithMarker(root, '.clowder-root.json');
+      if (found) return found;
+    }
+    return null;
+  }
+
+  private async findDirectoryWithMarker(root: string, marker: string): Promise<string | null> {
+    let visited = 0;
+    const queue = [{ root, path: root, depth: 0 }];
+    while (queue.length > 0 && visited < MAX_ARTIFACT_SEARCH_ENTRIES) {
+      const current = queue.shift()!;
+      visited++;
+      let entries;
+      try {
+        entries = await readdir(current.path, { withFileTypes: true });
+      } catch {
+        continue;
+      }
+      if (entries.some((entry) => entry.isFile() && entry.name === marker)) return current.path;
+      if (current.depth >= MAX_ARTIFACT_SEARCH_DEPTH) continue;
+      for (const entry of entries) {
+        if (visited + queue.length >= MAX_ARTIFACT_SEARCH_ENTRIES) break;
+        if (!entry.isDirectory() || EXCLUDED_ARTIFACT_DIRS.has(entry.name)) continue;
+        const child = join(current.path, entry.name);
+        if (!isPathWithin(current.root, child)) continue;
+        queue.push({ root: current.root, path: child, depth: current.depth + 1 });
+      }
+    }
+    return null;
+  }
+
+  private async createTarGzArchive(root: string, requestedFileName: string): Promise<string> {
+    const files = await this.collectArchiveFiles(root);
+    const chunks: Buffer[] = [];
+    for (const file of files) {
+      const data = await readFile(file.absPath);
+      chunks.push(createTarHeader(file.relPath, data.length, file.mtimeSec));
+      chunks.push(data);
+      const padding = (512 - (data.length % 512)) % 512;
+      if (padding > 0) chunks.push(Buffer.alloc(padding));
+    }
+    chunks.push(Buffer.alloc(1024));
+
+    const archivePath = join(
+      tmpdir(),
+      `${sanitizeFilenameStem(stripArchiveExtension(requestedFileName))}-${randomBytes(6).toString('hex')}.tar.gz`,
+    );
+    await writeFile(archivePath, gzipSync(Buffer.concat(chunks)));
+    return archivePath;
+  }
+
+  private async collectArchiveFiles(root: string): Promise<Array<{ absPath: string; relPath: string; mtimeSec: number }>> {
+    const files: Array<{ absPath: string; relPath: string; mtimeSec: number }> = [];
+    let totalBytes = 0;
+    let visited = 0;
+    const queue = [root];
+    while (queue.length > 0 && visited < MAX_ARTIFACT_SEARCH_ENTRIES) {
+      const dir = queue.shift()!;
+      visited++;
+      let entries;
+      try {
+        entries = await readdir(dir, { withFileTypes: true });
+      } catch {
+        continue;
+      }
+      for (const entry of entries) {
+        if (visited + queue.length >= MAX_ARTIFACT_SEARCH_ENTRIES) break;
+        if (entry.isSymbolicLink()) continue;
+        if (entry.isDirectory() && EXCLUDED_ARTIFACT_DIRS.has(entry.name)) continue;
+        const child = join(dir, entry.name);
+        if (!isPathWithin(root, child)) continue;
+        if (entry.isDirectory()) {
+          queue.push(child);
+          continue;
+        }
+        if (!entry.isFile()) continue;
+        const info = await stat(child).catch(() => null);
+        if (!info?.isFile()) continue;
+        totalBytes += info.size;
+        if (totalBytes > MAX_WORKSPACE_ARCHIVE_BYTES) {
+          this.opts.log.warn({ root, totalBytes }, '[OutboundDeliveryHook] workspace archive skipped — too large');
+          return files;
+        }
+        const relPath = relative(root, child).split(sep).join('/');
+        if (!relPath || relPath.startsWith('../') || relPath.includes('/../')) continue;
+        files.push({ absPath: child, relPath, mtimeSec: Math.floor(info.mtimeMs / 1000) });
+      }
+    }
+    return files;
+  }
+
+  private buildFilePublicationStem(publicationKey: string): string {
+    const sanitized = sanitizeFilenameStem(publicationKey);
+    const stableSuffix = createHash('sha256').update(publicationKey).digest('hex').slice(0, 8);
+    return sanitizeFilenameStem(`${sanitized}-${stableSuffix}`);
+  }
+
+  private async publishLocalFileBlocks(
+    blocks: RichBlock[],
+    threadMeta?: ThreadMeta,
+    content?: string,
+  ): Promise<RichBlock[]> {
+    return Promise.all(
+      blocks.map(async (block) => {
+        if (block.kind !== 'file' || !('url' in block) || !block.url) return block;
+        const fileUrl = block.url as string;
+        if (
+          fileUrl.startsWith('/uploads/') ||
+          fileUrl.startsWith('/api/') ||
+          fileUrl.startsWith('https://')
+        ) {
+          return block;
+        }
+
+        const blockFileName = 'fileName' in block ? (block.fileName as string) : undefined;
+        const published = await this.publishLocalFileReference(fileUrl, {
+          blockId: block.id,
+          fileName: blockFileName,
+          threadMeta,
+          content,
+        });
+
+        if (published) {
+          this.opts.log.info(
+            { blockId: block.id, originalUrl: fileUrl, publishedUrl: published.url, absPath: published.absPath },
+            '[OutboundDeliveryHook] Published local file block'
+          );
+          let size = 'fileSize' in block ? block.fileSize : undefined;
+          if (size === undefined || size <= 0) {
+            try {
+              const fileStat = await stat(published.absPath);
+              size = fileStat.size;
+            } catch {}
+          }
+          return {
+            ...block,
+            url: published.url,
+            ...(published.fileName ? { fileName: published.fileName } : {}),
+            ...(size !== undefined ? { fileSize: size } : {}),
+          };
+        } else {
+          throw new Error(`file_delivery_failed: failed to publish local file ${fileUrl}`);
+        }
+      })
+    );
+  }
+
   private extractLocalImageReferences(content: string): string[] {
     const references = new Set<string>();
     const fileUrlPattern = /file:\/\/\/[^\s`"'<>)]*\.(?:png|jpe?g|gif|webp)\b/gi;
@@ -543,10 +966,119 @@ export class OutboundDeliveryHook {
     }
     return [...references];
   }
+
+  private extractLocalFileReferences(content: string): string[] {
+    const references = new Set<string>();
+    const fileUrlPattern = /file:\/\/\/[^\s`"'<>)]*\.(?:zip|tar|gz|rar|7z|pdf|docx?|xlsx?|pptx?|txt|csv|json|md|xml)\b/gi;
+    for (const match of content.matchAll(fileUrlPattern)) {
+      references.add(stripTrailingPunctuation(match[0]));
+    }
+
+    const absolutePathPattern = /(?:^|[\s`"'(（:：])((?:\/[^\s`"'<>)]*)+\.(?:zip|tar|gz|rar|7z|pdf|docx?|xlsx?|pptx?|txt|csv|json|md|xml))\b/gi;
+    for (const match of content.matchAll(absolutePathPattern)) {
+      references.add(stripTrailingPunctuation(match[1]));
+    }
+
+    const homePathPattern = /(?:^|[\s`"'(（:：])(~\/[^\s`"'<>)]*\.(?:zip|tar|gz|rar|7z|pdf|docx?|xlsx?|pptx?|txt|csv|json|md|xml))\b/gi;
+    for (const match of content.matchAll(homePathPattern)) {
+      references.add(stripTrailingPunctuation(match[1]));
+    }
+    return [...references];
+  }
 }
 
 function stripTrailingPunctuation(value: string): string {
   return value.replace(/[),.;，。；）]+$/g, '');
+}
+
+function isLocalPublishableReference(url: string): boolean {
+  return url.startsWith('file://') || url.startsWith('~/') || isAbsolute(url);
+}
+
+function normalizeLocalReferencePath(url: string): string {
+  if (url.startsWith('file://')) return fileURLToPath(url);
+  if (url.startsWith('~/')) return resolve(homedir(), url.slice(2));
+  return url;
+}
+
+function splitPublishableFileName(fileName: string): { stem: string; ext: string } {
+  const base = basename(fileName || 'file');
+  const lower = base.toLowerCase();
+  if (lower.endsWith('.tar.gz')) {
+    return {
+      stem: sanitizeFilenameStem(base.slice(0, -'.tar.gz'.length)),
+      ext: '.tar.gz',
+    };
+  }
+  const ext = extname(base);
+  return {
+    stem: sanitizeFilenameStem(ext ? basename(base, ext) : base),
+    ext: ext || '.bin',
+  };
+}
+
+function stripArchiveExtension(fileName: string): string {
+  const base = basename(fileName || 'archive');
+  const lower = base.toLowerCase();
+  if (lower.endsWith('.tar.gz')) return base.slice(0, -'.tar.gz'.length);
+  if (lower.endsWith('.zip')) return base.slice(0, -'.zip'.length);
+  if (lower.endsWith('.gz')) return base.slice(0, -'.gz'.length);
+  return extname(base) ? basename(base, extname(base)) : base;
+}
+
+function archiveFileNameForRequest(requestedFileName: string): string {
+  const stem = sanitizeFilenameStem(stripArchiveExtension(requestedFileName));
+  return `${stem || 'maomi_workspace'}.tar.gz`;
+}
+
+function isMaomiWorkspaceArchiveRequest(requestedFileName: string, content: string): boolean {
+  const base = basename(requestedFileName || '').toLowerCase();
+  const asksForMaomiWorkspace =
+    /maomi[_-]?workspace/.test(base) ||
+    /maomi\s+workspace/i.test(content) ||
+    /Maomi\s+Workspace/.test(content);
+  const asksForArchive = /\.(?:zip|tar\.gz|gz)$/i.test(base) || /打包|archive|package/i.test(content);
+  return asksForMaomiWorkspace && asksForArchive;
+}
+
+async function hasMaomiWorkspaceMarker(root: string): Promise<boolean> {
+  try {
+    const info = await stat(join(root, '.clowder-root.json'));
+    return info.isFile();
+  } catch {
+    return false;
+  }
+}
+
+function isPathWithin(root: string, candidate: string): boolean {
+  const resolvedRoot = resolve(root);
+  const resolvedCandidate = resolve(candidate);
+  return resolvedCandidate === resolvedRoot || resolvedCandidate.startsWith(`${resolvedRoot}${sep}`);
+}
+
+function octal(value: number, width: number): string {
+  return Math.max(0, value).toString(8).padStart(width - 1, '0').slice(-(width - 1)) + '\0';
+}
+
+function createTarHeader(name: string, size: number, mtimeSec: number): Buffer {
+  const normalizedName = name.replace(/\\/g, '/').slice(0, 100);
+  const header = Buffer.alloc(512, 0);
+  header.write(normalizedName, 0, 100, 'utf8');
+  header.write(octal(0o644, 8), 100, 8, 'ascii');
+  header.write(octal(0, 8), 108, 8, 'ascii');
+  header.write(octal(0, 8), 116, 8, 'ascii');
+  header.write(octal(size, 12), 124, 12, 'ascii');
+  header.write(octal(mtimeSec, 12), 136, 12, 'ascii');
+  header.fill(0x20, 148, 156);
+  header.write('0', 156, 1, 'ascii');
+  header.write('ustar\0', 257, 6, 'ascii');
+  header.write('00', 263, 2, 'ascii');
+  let checksum = 0;
+  for (const byte of header) checksum += byte;
+  header.write(checksum.toString(8).padStart(6, '0').slice(-6), 148, 6, 'ascii');
+  header[154] = 0;
+  header[155] = 0x20;
+  return header;
 }
 
 function imageMimeFromPath(filePath: string): SupportedImageMime | null {
