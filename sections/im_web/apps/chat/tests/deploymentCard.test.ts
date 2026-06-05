@@ -196,4 +196,14 @@ describe('deployment confirmation card', () => {
     expect(list.default).toContain("payload.field === 'target' ? fieldValue : existingTarget")
     expect(list.default).toContain("payload.field === 'environment' ? fieldValue : existingEnvironment")
   })
+
+  it('adds a coordinator deployment result summary when polling reaches a terminal state', async () => {
+    const list = await import('../src/components/MessageList.vue?raw')
+
+    expect(list.default).toContain('deploymentResultSummaryKeys')
+    expect(list.default).toContain('addDeploymentResultSummaryMessage')
+    expect(list.default).toContain('Coordinator / Deployment 结果汇总')
+    expect(list.default).toContain("connector: 'deployment-result'")
+    expect(list.default).toContain('addDeploymentResultSummaryMessage(msg, deploymentRequest)')
+  })
 })

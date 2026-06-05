@@ -72,6 +72,7 @@ const channelKey = computed(() => `${props.channelId}-${props.channelType}`);
 const deploymentActionKeys = new Set<string>();
 const deploymentFieldKeys = new Set<string>();
 const deploymentFieldQueues = new Map<string, Promise<void>>();
+const deploymentResultSummaryKeys = new Set<string>();
 const deploymentPollableStatuses = new Set(['confirmed', 'queued', 'running', 'submitting']);
 const deploymentTerminalStatuses = new Set(['succeeded', 'failed', 'cancelled', 'canceled']);
 const deploymentPollIntervalMs = 2500;
@@ -954,6 +955,56 @@ function findDeploymentCardMessage(deploymentRequestId: string) {
   return messages.value.find((msg) => getDeploymentRequestIdFromMessage(msg) === id) || null;
 }
 
+function addDeploymentResultSummaryMessage(sourceMessage: any, deploymentRequest: any) {
+  const deploymentRequestId = String(deploymentRequest?.id || '').trim();
+  if (!deploymentRequestId || deploymentResultSummaryKeys.has(deploymentRequestId)) return;
+  const status = String(deploymentRequest.status || '');
+  if (!['succeeded', 'failed', 'cancelled', 'canceled'].includes(status)) return;
+  deploymentResultSummaryKeys.add(deploymentRequestId);
+
+  const sourceContent = sourceMessage?.content || {};
+  const requestContext = sourceContent.deploymentRequest || {};
+  const previewUrl = String(deploymentRequest.previewUrl || '').trim();
+  const downloadUrl = String(deploymentRequest.downloadUrl || '').trim();
+  const failureReason = String(deploymentRequest.failureReason || '').trim();
+  const succeeded = status === 'succeeded';
+  const text = [
+    'Coordinator / Deployment 结果汇总',
+    '',
+    `- 部署状态：${succeeded ? '成功' : status === 'failed' ? '失败' : '已取消'}`,
+    `- 部署目标：${String(deploymentRequest.target || sourceContent.target || '未填写')}`,
+    `- 部署环境：${String(deploymentRequest.environment || sourceContent.environment || '未填写')}`,
+    previewUrl ? `- 预览链接：${previewUrl}` : '',
+    downloadUrl ? `- 源码下载：${downloadUrl}` : '',
+    failureReason ? `- 风险/失败原因：${failureReason}` : '- 风险提示：请在发布前复核页面内容、资源路径和移动端表现。',
+  ].filter(Boolean).join('\n');
+
+  const clientMsgNo = `deployment-summary-${deploymentRequestId}`;
+  messageStore.addMessage(props.channelId, props.channelType, {
+    messageID: clientMsgNo,
+    messageSeq: 0,
+    clientMsgNo,
+    fromUID: 'clowder_ai',
+    timestamp: Math.floor(Date.now() / 1000),
+    content: {
+      type: 1,
+      text,
+      content: text,
+      format: 'markdown',
+      markdown: true,
+      connectorId: 'im-web',
+      catId: String(sourceContent.catId || requestContext.targetCatIds?.[0] || 'coordinator'),
+      catDisplayName: String(sourceContent.catDisplayName || '协调者'),
+      source: {
+        connector: 'deployment-result',
+        deploymentRequestId,
+      },
+    },
+    isRevoked: false,
+    status: 'success',
+  }, { countUnread: false });
+}
+
 function enqueueDeploymentFieldUpdate(deploymentRequestId: string, task: () => Promise<void>) {
   const previous = deploymentFieldQueues.get(deploymentRequestId) || Promise.resolve();
   const next = previous
@@ -1006,6 +1057,7 @@ async function refreshDeploymentRequestCards(ids = pollingDeploymentRequestIds.v
           } else if (deploymentRequest.status === 'failed') {
             Message.error(deploymentRequest.failureReason || '部署失败');
           }
+          addDeploymentResultSummaryMessage(msg, deploymentRequest);
         }
       } catch (err) {
         console.warn('[MessageList] Failed to refresh deployment request', deploymentRequestId, err);
