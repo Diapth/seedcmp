@@ -1,5 +1,9 @@
 import { expect, test } from '@playwright/test';
+import type { Locator, Page } from '@playwright/test';
 import { login, sendChatMessage } from './helpers/v3-clowder';
+
+const terminalDeploymentStatusPattern = /部署成功|部署失败|已取消|部署已完成/;
+const actionableDeploymentStatusPattern = /需要补充信息|待确认/;
 
 function normalizeAgentMention(value: string) {
   const text = value.trim();
@@ -16,6 +20,109 @@ function buildDemoPrompt() {
 
   return process.env.TEST_ORCHESTRATOR_DEPLOYMENT_PROMPT ||
     `@协调者 ${teamText} 做一个“AgentHub 咖啡店活动页”静态页面，要求 Claude/Codex 至少一个真实执行，完成后部署到 preview 环境，最后在聊天里给我预览链接、源码下载链接、执行分工和风险说明。`;
+}
+
+async function deploymentCardText(card: Locator) {
+  return ((await card.textContent().catch(() => '')) || '').replace(/\s+/g, ' ').trim();
+}
+
+async function deploymentStatusText(card: Locator) {
+  return ((await card.locator('.deployment-status').textContent().catch(() => '')) || '').trim();
+}
+
+async function deploymentMetaValue(card: Locator, index: number) {
+  return ((await card.locator('.deployment-meta dd').nth(index).textContent().catch(() => '')) || '').trim();
+}
+
+async function findActionableDeploymentCardIndex(page: Page) {
+  const cards = page.locator('.deployment-card');
+  const count = await cards.count();
+  for (let index = count - 1; index >= 0; index -= 1) {
+    const card = cards.nth(index);
+    const status = await deploymentStatusText(card);
+    const text = await deploymentCardText(card);
+    if (terminalDeploymentStatusPattern.test(`${status} ${text}`)) continue;
+    if (actionableDeploymentStatusPattern.test(status) || /待确认目标|请先补充部署/.test(text)) {
+      return index;
+    }
+  }
+  return -1;
+}
+
+async function findConfirmableDeploymentCardIndex(page: Page, target: string) {
+  const cards = page.locator('.deployment-card');
+  const count = await cards.count();
+  for (let index = count - 1; index >= 0; index -= 1) {
+    const card = cards.nth(index);
+    const status = await deploymentStatusText(card);
+    const text = await deploymentCardText(card);
+    if (terminalDeploymentStatusPattern.test(`${status} ${text}`)) continue;
+    const selectedTarget = await deploymentMetaValue(card, 0);
+    const confirm = card.getByRole('button', { name: /确认/ });
+    const confirmDisabled = await confirm.isDisabled().catch(() => true);
+    const confirmLabel = (await confirm.getAttribute('aria-label').catch(() => '')) || '';
+    if (selectedTarget === target && !confirmDisabled && !/请先补充/.test(confirmLabel)) {
+      return index;
+    }
+  }
+  return -1;
+}
+
+async function waitForDeploymentCard(page: Page, cardsBefore: number) {
+  const cards = page.locator('.deployment-card');
+  let cardIndex = -1;
+
+  try {
+    await expect.poll(async () => {
+      if (await cards.count() <= cardsBefore) return -1;
+      cardIndex = await findActionableDeploymentCardIndex(page);
+      return cardIndex;
+    }, { timeout: 15000 }).toBeGreaterThanOrEqual(0);
+  } catch {
+    await expect.poll(async () => {
+      cardIndex = await findActionableDeploymentCardIndex(page);
+      return cardIndex;
+    }, { timeout: 45000 }).toBeGreaterThanOrEqual(0);
+  }
+
+  return cards.nth(cardIndex);
+}
+
+async function ensurePreviewEnvironment(card: Locator) {
+  const environment = (await deploymentMetaValue(card, 1)).toLowerCase();
+  if (environment === 'preview') return;
+
+  const previewOption = card.locator('.deployment-candidate', { hasText: /预览|preview/i }).first();
+  if (await previewOption.isVisible().catch(() => false)) {
+    await previewOption.click();
+    await expect.poll(async () => {
+      return (await deploymentMetaValue(card, 1)).toLowerCase();
+    }, { timeout: 30000 }).toBe('preview');
+  }
+}
+
+async function commitDeploymentTarget(page: Page, card: Locator, target: string) {
+  const activeCardIndex = await findActionableDeploymentCardIndex(page);
+  const editableCard = activeCardIndex >= 0 ? page.locator('.deployment-card').nth(activeCardIndex) : card;
+  const targetInput = editableCard.getByPlaceholder('输入部署目标');
+  await targetInput.fill(target);
+  await expect(targetInput).toHaveValue(target, { timeout: 5000 });
+
+  const applyTarget = editableCard.getByRole('button', { name: '应用' });
+  if (await applyTarget.isEnabled({ timeout: 5000 }).catch(() => false)) {
+    await applyTarget.click();
+  } else {
+    await targetInput.press('Enter');
+    await targetInput.blur();
+  }
+
+  let confirmableCardIndex = -1;
+  await expect.poll(async () => {
+    confirmableCardIndex = await findConfirmableDeploymentCardIndex(page, target);
+    return confirmableCardIndex;
+  }, { timeout: 45000 }).toBeGreaterThanOrEqual(0);
+
+  return page.locator('.deployment-card').nth(confirmableCardIndex);
 }
 
 test.describe('V3 orchestrator to deployment demo', () => {
@@ -41,37 +148,11 @@ test.describe('V3 orchestrator to deployment demo', () => {
 
     const cardsBefore = await page.locator('.deployment-card').count();
     await sendChatMessage(page, prompt);
-    await expect.poll(async () => {
-      const cards = page.locator('.deployment-card');
-      const count = await cards.count();
-      if (count > cardsBefore) return true;
-      if (count === 0) return false;
-
-      const status = (await cards.last().locator('.deployment-status').textContent().catch(() => '') || '').trim();
-      return /需要补充信息|待确认/.test(status);
-    }, { timeout: 60000 }).toBe(true);
-
-    const card = page.locator('.deployment-card').last();
+    let card = await waitForDeploymentCard(page, cardsBefore);
     await expect(card).toBeVisible({ timeout: 10000 });
 
-    const previewOption = card.locator('.deployment-candidate', { hasText: /预览|preview/i }).first();
-    if (await previewOption.isVisible().catch(() => false)) {
-      await previewOption.click();
-    }
-
-    const targetInput = card.getByPlaceholder('输入部署目标');
-    await targetInput.fill(target);
-    const applyTarget = card.getByRole('button', { name: '应用' });
-    if (await applyTarget.isEnabled().catch(() => false)) {
-      await applyTarget.click();
-    } else {
-      await targetInput.press('Enter');
-    }
-    await expect(card).toContainText(target, { timeout: 30000 });
-    await expect.poll(async () => {
-      const confirm = card.getByRole('button', { name: /确认/ });
-      return !(await confirm.isDisabled().catch(() => true));
-    }, { timeout: 30000 }).toBe(true);
+    await ensurePreviewEnvironment(card);
+    card = await commitDeploymentTarget(page, card, target);
 
     await card.getByRole('button', { name: /确认/ }).click();
     await expect(card).toContainText('部署成功', { timeout: 90000 });

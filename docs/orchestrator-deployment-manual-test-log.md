@@ -160,18 +160,18 @@ This file records the required real Web checks for the orchestrator and P2 deplo
 
 ### Stage 7
 
-- Login user:
-- OAuth platform:
-- OAuth status:
-- Cat name:
-- Cat alias:
+- Login user: 008618337488675
+- OAuth platform: Codex
+- OAuth status: local Codex account available through existing Clowder cat configuration
+- Cat name: xtz coordinator with dd group cat available
+- Cat alias: @xtz; prompt used @协调者, @xtz, and @dd
 - Conversation type: group
-- Group chat ID:
-- Thread ID:
+- Group chat ID: 16e006b0b84f40faaa77a271e69b5021
+- Thread ID: thread_mq1afgliuch3zzzg
 - Coordination ID:
-- Deployment request ID:
-- Prompt:
-- Screenshot paths:
-- Result:
+- Deployment request ID: deploy_e6eff95c-da30-4590-8dde-8435b8d14d17 for final screenshot; deploy_a73fbf0a-9dbb-4e7b-8078-62a7407093a7, deploy_13ad4ca6-0b2c-46b2-ae64-15672068edd0, and deploy_8779c7b9-b87d-4503-91e2-f9455ac1652a from post-commit smoke/hardening reruns
+- Prompt: @协调者 @xtz @dd 阶段7最终验收截图：请协调团队做一个“AgentHub 咖啡店活动页”静态页面，要求 Claude/Codex 至少一个真实执行，完成后部署到 preview 环境，最后在聊天里给我预览链接、源码下载链接、执行分工和风险说明。
+- Screenshot paths: docs/manual-test-artifacts/stage7/stage7-final-summary-preview.png
+- Result: passed
 - Failure reason:
-- Notes:
+- Notes: After the Stage 7 delivery-material commit and required stack restart, the final opt-in smoke initially exposed another browser-order edge case: the smoke selected `.deployment-card.last()` while the message list contained a fresh needs-target card above an older completed card. The smoke was patched to locate a non-terminal/actionable card by status/content, wait for the target input to settle, and re-resolve the confirmable card after the backend field update. The final targeted command `RUN_V3_CLOWDER_SMOKE=1 TEST_AGENT_A=xtz TEST_AGENT_B=dd TEST_DEPLOYMENT_TARGET=packages/api/qa-test-page.html corepack pnpm test:e2e -- tests-e2e/smoke-v3-orchestrator-deployment.spec.ts` passed after the patch. Final Web evidence used only the 3000 UI: the active Stage 7 deployment card was completed with target `packages/api/qa-test-page.html`, confirmed to preview, reached `部署成功`, opened the preview iframe, and appended a `Coordinator / Deployment 结果汇总` containing status, target, environment, preview URL, download URL, and risk note. The preview iframe rendered `Interactive QA Surface / 测试网页`; the final source package for `deploy_e6eff95c-da30-4590-8dde-8435b8d14d17` contains `qa-test-page.html`.
