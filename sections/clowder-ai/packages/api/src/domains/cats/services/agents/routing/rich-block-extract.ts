@@ -136,6 +136,52 @@ export function isValidRichBlock(b: unknown): b is RichBlock {
   }
 }
 
+/**
+ * V3-38: Heuristic extraction of file references from agent text output.
+ * Matches patterns like "📦 文件: maomi_workspace.zip" or "file: /path/to/file.zip".
+ * Returns candidate file blocks with absolute paths so OutboundDeliveryHook Phase J
+ * can publish them via publishAgentFile.
+ */
+function extractFileBlocksFromText(text: string): RichBlock[] {
+  const blocks: RichBlock[] = [];
+  const seen = new Set<string>();
+
+  // Pattern 1: "📦 文件: filename.zip" or "📦 File: filename.zip"
+  const packagePattern = /📦\s*(?:文件|File)\s*[:：]\s*([^\n\r]+)/gi;
+  for (const match of text.matchAll(packagePattern)) {
+    const raw = match[1].trim();
+    // Extract filename (may include size hint like "filename.zip (297 bytes)")
+    const fileName = raw.replace(/\s*[(（].*[)）]\s*$/, '').trim();
+    if (!fileName || seen.has(fileName)) continue;
+    seen.add(fileName);
+    blocks.push({
+      id: `file-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
+      kind: 'file' as const,
+      v: 1 as const,
+      url: fileName, // OutboundDeliveryHook will try to resolve or publish
+      fileName,
+    });
+  }
+
+  // Pattern 2: absolute file paths in backticks or standalone
+  const absPathPattern = /(?:^|[\s`"'])((?:\/[^\s`"'<>\n\r]+)+\.(?:zip|tar|gz|rar|7z|pdf|docx?|xlsx?|pptx?|txt|csv|json|md|png|jpe?g|gif|webp|mp3|mp4|wav|mov))(?:[\s`"']|$)/gi;
+  for (const match of text.matchAll(absPathPattern)) {
+    const url = match[1].trim();
+    if (!url || seen.has(url)) continue;
+    seen.add(url);
+    const baseName = url.split('/').pop() ?? url;
+    blocks.push({
+      id: `file-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
+      kind: 'file' as const,
+      v: 1 as const,
+      url,
+      fileName: baseName,
+    });
+  }
+
+  return blocks;
+}
+
 export function extractRichFromText(text: string): {
   cleanText: string;
   blocks: RichBlock[];
@@ -183,6 +229,18 @@ export function extractRichFromText(text: string): {
       }
     }
   }
+
+  // V3-38: Heuristic file block extraction from natural language text
+  // NOTE: disabled for now because isValidRichBlock requires safe URLs
+  // (/uploads/, /api/, https://). Future enhancement: teach agents to emit
+  // cc_rich file blocks with /uploads/ URLs, or add a resolution step that
+  // maps heuristic file names to public URLs before validation.
+  // const fileBlocks = extractFileBlocksFromText(text);
+  // for (const b of fileBlocks) {
+  //   if (isValidRichBlock(b)) {
+  //     blocks.push(b);
+  //   }
+  // }
 
   return { cleanText, blocks };
 }
