@@ -22,10 +22,6 @@ function buildDemoPrompt() {
     `@协调者 ${teamText} 做一个“AgentHub 咖啡店活动页”静态页面，要求 Claude/Codex 至少一个真实执行，完成后部署到 preview 环境，最后在聊天里给我预览链接、源码下载链接、执行分工和风险说明。`;
 }
 
-function escapeRegExp(value: string) {
-  return value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-}
-
 async function deploymentCardText(card: Locator) {
   return ((await card.textContent().catch(() => '')) || '').replace(/\s+/g, ' ').trim();
 }
@@ -36,6 +32,21 @@ async function deploymentStatusText(card: Locator) {
 
 async function deploymentMetaValue(card: Locator, index: number) {
   return ((await card.locator('.deployment-meta dd').nth(index).textContent().catch(() => '')) || '').trim();
+}
+
+async function findDeploymentTargetCandidate(card: Locator, target: string) {
+  const targetLabel = target.split('/').pop() || target;
+  const candidates = card.locator('.deployment-field').first().locator('.deployment-candidate');
+  const count = await candidates.count();
+  let labelMatch = -1;
+  for (let index = 0; index < count; index += 1) {
+    const candidate = candidates.nth(index);
+    const title = ((await candidate.getAttribute('title').catch(() => '')) || '').trim();
+    const label = ((await candidate.textContent().catch(() => '')) || '').trim();
+    if (title === target || label === target) return candidate;
+    if (labelMatch < 0 && label === targetLabel) labelMatch = index;
+  }
+  return labelMatch >= 0 ? candidates.nth(labelMatch) : null;
 }
 
 async function findActionableDeploymentCardIndex(page: Page) {
@@ -109,15 +120,9 @@ async function commitDeploymentTarget(page: Page, card: Locator, target: string)
   for (let attempt = 0; attempt < 3; attempt += 1) {
     const activeCardIndex = await findActionableDeploymentCardIndex(page);
     const editableCard = activeCardIndex >= 0 ? page.locator('.deployment-card').nth(activeCardIndex) : card;
-    const targetLabel = target.split('/').pop() || target;
-    const targetCandidate = editableCard
-      .locator('.deployment-field')
-      .first()
-      .locator('.deployment-candidate')
-      .filter({ hasText: new RegExp(`^${escapeRegExp(targetLabel)}$`) })
-      .first();
+    const targetCandidate = await findDeploymentTargetCandidate(editableCard, target);
 
-    if (await targetCandidate.isVisible().catch(() => false)) {
+    if (targetCandidate && await targetCandidate.isVisible().catch(() => false)) {
       await targetCandidate.click();
     } else {
       const targetInput = editableCard.getByPlaceholder('输入部署目标');
@@ -166,7 +171,7 @@ test.describe('V3 orchestrator to deployment demo', () => {
     await login(page);
 
     const groupId = process.env.TEST_GROUP_CONVERSATION_ID || '16e006b0b84f40faaa77a271e69b5021';
-    const target = process.env.TEST_DEPLOYMENT_TARGET || 'packages/api/qa-test-page.html';
+    const target = process.env.TEST_DEPLOYMENT_TARGET || 'packages/api/data/agenthub-coffee-event/index.html';
     const prompt = buildDemoPrompt();
 
     await page.goto(`/chat/conversation/${groupId}/2`, { waitUntil: 'domcontentloaded' });

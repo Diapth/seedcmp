@@ -136,12 +136,12 @@ OAuth 前置条件：
 - 优先使用 Claude Code OAuth 猫猫；本机没有 Claude 登录态时先运行 `claude login`。
 - Claude 不可用时使用 Codex OAuth 猫猫；本机没有 Codex 登录态时先运行 `codex login`。
 - 当前本地验收群里可用的 Codex OAuth 猫猫是 `xtz`，可用执行猫包含 `dd`。模板里的 `@协调者` 会作为协调意图，真实可连接猫以页面联系人/群成员为准。
-- 可直接部署的安全目标为 `packages/api/qa-test-page.html`，环境选择 `preview`。
+- 最终 Demo 部署目标为 `packages/api/data/agenthub-coffee-event/index.html`，环境选择 `preview`。如果该 AgentHub 产物尚未生成，可用 `packages/api/qa-test-page.html` 作为部署卡链路 fallback。
 
 常见故障处理：
 
 - 部署卡已出现但烟测等待“新卡”超时：复用已有 active card，补 target 后点击“应用”，再确认部署。
-- 确认按钮提示“请先补充部署目标”：在目标输入框填入 `packages/api/qa-test-page.html`，点击“应用”，确认环境为 `preview`。
+- 确认按钮提示“请先补充部署目标”：最终 Demo 填入 `packages/api/data/agenthub-coffee-event/index.html`，点击“应用”，确认环境为 `preview`；只验证部署卡链路时可改用 `packages/api/qa-test-page.html`。
 - 右侧预览空白：确认预览 URL 是 `http://127.0.0.1:3004/api/deployments/<id>/preview/`，并检查 Clowder API 是否通过 `bash scripts/start-im-clowder.sh start` 运行。
 - 下载按钮打开空白页：这是浏览器下载导航表现，使用对应 `download` URL 或检查卡片日志里的 source package 生成记录。
 - 猫猫没有回复：确认群成员里有在线 OAuth 猫猫；如果 `@协调者` 对应模板未连接，在 prompt 中同时 @ 当前在线猫，例如 `@协调者 @xtz`。
@@ -154,7 +154,7 @@ RUN_V3_CLOWDER_SMOKE=1 \
 TEST_GROUP_CONVERSATION_ID=16e006b0b84f40faaa77a271e69b5021 \
 TEST_AGENT_A=xtz \
 TEST_AGENT_B=dd \
-TEST_DEPLOYMENT_TARGET=packages/api/qa-test-page.html \
+TEST_DEPLOYMENT_TARGET=packages/api/data/agenthub-coffee-event/index.html \
 corepack pnpm test:e2e -- tests-e2e/smoke-v3-orchestrator-deployment.spec.ts
 ```
 
