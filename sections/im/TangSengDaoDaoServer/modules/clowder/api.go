@@ -65,6 +65,8 @@ func (c *Clowder) Route(r *wkhttp.WKHttp) {
 		auth.RouterGroup.PATCH("/conversation/deployment-request/:deploymentRequestId", auth.L.WKHttpHandler(c.conversationDeploymentRequestUpdate))
 		auth.GET("/conversation/deployment-request/active", c.conversationDeploymentRequestActive)
 		auth.POST("/conversation/deployment-action", c.conversationDeploymentAction)
+		auth.GET("/deployments/:deploymentId", c.proxyGetDeployment)
+		auth.GET("/deployments/:deploymentId/logs", c.proxyGetDeploymentLogs)
 		// Phase 2: Coordinator kickoff — proxy GET/dismiss to Clowder 3004.
 		// See sections/clowder-ai/packages/api/src/routes/coordinator-kickoff.ts.
 		auth.GET("/coordinator/kickoff/:coordinationId", c.getCoordinatorKickoff)
@@ -1163,6 +1165,24 @@ func (c *Clowder) conversationDeploymentRequestUpdate(ctx *wkhttp.Context) {
 
 func (c *Clowder) conversationDeploymentRequestActive(ctx *wkhttp.Context) {
 	c.proxyToClowder(ctx, http.MethodGet, "/api/connectors/im-web/deployment-requests/active", nil, "deployment_request_active_unavailable")
+}
+
+func (c *Clowder) proxyGetDeployment(ctx *wkhttp.Context) {
+	deploymentID := strings.TrimSpace(ctx.Param("deploymentId"))
+	if deploymentID == "" {
+		ctx.JSON(http.StatusBadRequest, map[string]string{"error": "deployment_id_required"})
+		return
+	}
+	c.proxyToClowder(ctx, http.MethodGet, "/api/deployments/"+url.PathEscape(deploymentID), nil, "deployment_unavailable")
+}
+
+func (c *Clowder) proxyGetDeploymentLogs(ctx *wkhttp.Context) {
+	deploymentID := strings.TrimSpace(ctx.Param("deploymentId"))
+	if deploymentID == "" {
+		ctx.JSON(http.StatusBadRequest, map[string]string{"error": "deployment_id_required"})
+		return
+	}
+	c.proxyToClowder(ctx, http.MethodGet, "/api/deployments/"+url.PathEscape(deploymentID)+"/logs", nil, "deployment_logs_unavailable")
 }
 
 func (c *Clowder) outbound(ctx *wkhttp.Context) {

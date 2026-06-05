@@ -99,6 +99,8 @@ import { createSummaryStore } from './domains/cats/services/stores/factories/Sum
 import { createTaskStore } from './domains/cats/services/stores/factories/TaskStoreFactory.js';
 import { createThreadStore } from './domains/cats/services/stores/factories/ThreadStoreFactory.js';
 import { createWorkflowSopStore } from './domains/cats/services/stores/factories/WorkflowSopStoreFactory.js';
+import { DeploymentExecutor } from './domains/deployments/DeploymentExecutor.js';
+import { createDeploymentJobStore } from './domains/deployments/DeploymentJobStore.js';
 import { createDeploymentRequestStore } from './domains/deployments/DeploymentRequestStore.js';
 import { RedisInvocationRecordStore } from './domains/cats/services/stores/redis/RedisInvocationRecordStore.js';
 import { RedisMessageStore } from './domains/cats/services/stores/redis/RedisMessageStore.js';
@@ -575,6 +577,27 @@ async function main(): Promise<void> {
   const draftStore = createDraftStore(redis);
   const readStateStore = createReadStateStore(redis);
   const deploymentRequestStore = createDeploymentRequestStore(redis);
+  const deploymentJobStore = createDeploymentJobStore(redis);
+  const deploymentDataDir = resolve(process.env.DEPLOYMENT_DATA_DIR ?? './data/deployments');
+  const deploymentDefaultRoot = findMonorepoRoot(process.cwd());
+  const deploymentPublicBaseUrl = process.env.DEPLOYMENT_PUBLIC_BASE_URL
+    ?? process.env.CAT_CAFE_API_URL
+    ?? `http://127.0.0.1:${PORT}`;
+  const deploymentExecutor = new DeploymentExecutor({
+    jobStore: deploymentJobStore,
+    deploymentsDir: deploymentDataDir,
+    allowedRoots: [
+      deploymentDefaultRoot,
+      process.cwd(),
+      maomiWorkspaceRoot.rootPath,
+      ...(process.env.CLOWDER_DEPLOYMENT_ALLOWED_ROOTS || '')
+        .split(',')
+        .map((root) => root.trim())
+        .filter(Boolean),
+    ],
+    defaultRoot: deploymentDefaultRoot,
+    publicBaseUrl: deploymentPublicBaseUrl,
+  });
   const coordinatorStore = createCoordinatorStore(redis);
   const { ExecutionDigestStore } = await import('./domains/projects/execution-digest-store.js');
   const executionDigestStore = new ExecutionDigestStore();
@@ -647,11 +670,11 @@ async function main(): Promise<void> {
   // F102: Memory services — SQLite-only
   // P1 fix: resolve paths relative to repo root, not CWD (which may be packages/api)
   const { existsSync } = await import('node:fs');
-  const { resolve } = await import('node:path');
-  const repoRoot = existsSync(resolve(process.cwd(), 'docs', 'features'))
+  const { resolve: resolvePath } = await import('node:path');
+  const repoRoot = existsSync(resolvePath(process.cwd(), 'docs', 'features'))
     ? process.cwd()
-    : existsSync(resolve(process.cwd(), '..', '..', 'docs', 'features'))
-      ? resolve(process.cwd(), '..', '..')
+    : existsSync(resolvePath(process.cwd(), '..', '..', 'docs', 'features'))
+      ? resolvePath(process.cwd(), '..', '..')
       : process.cwd();
 
   const { initRepoIdentity, isSameRepo } = await import('./utils/is-same-repo.js');
@@ -2321,8 +2344,15 @@ async function main(): Promise<void> {
   });
 
   // V3-29: IM Web deployment confirmation cards send structured actions.
+  const { deploymentRoutes } = await import('./routes/deployments.js');
+  await app.register(deploymentRoutes, { deploymentJobStore });
+
   const { connectorDeploymentActionRoutes } = await import('./routes/connector-deployment-action.js');
-  await app.register(connectorDeploymentActionRoutes, { deploymentRequestStore });
+  await app.register(connectorDeploymentActionRoutes, {
+    deploymentRequestStore,
+    deploymentJobStore,
+    deploymentExecutor,
+  });
 
   const { connectorDeploymentRequestRoutes } = await import('./routes/connector-deployment-requests.js');
   await app.register(connectorDeploymentRequestRoutes, { deploymentRequestStore });

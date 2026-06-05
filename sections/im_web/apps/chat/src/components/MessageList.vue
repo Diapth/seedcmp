@@ -955,7 +955,7 @@ async function handleDeploymentFieldUpdate(payload: { field: 'target' | 'environ
   if (!clientMsgNo || !deploymentRequestId || deploymentFieldKeys.has(actionKey)) return;
 
   const currentStatus = String(content.status || 'pending_confirmation');
-  if (['confirmed', 'running', 'cancelled', 'canceled', 'submitting'].includes(currentStatus)) return;
+  if (['confirmed', 'queued', 'running', 'succeeded', 'cancelled', 'canceled', 'submitting'].includes(currentStatus)) return;
 
   const previousStatus = currentStatus;
   const fieldValue = String(payload.value || '').trim();
@@ -994,7 +994,7 @@ async function handleDeploymentCardAction(payload: { action: 'confirm' | 'cancel
   if (!clientMsgNo || !deploymentRequestId || deploymentActionKeys.has(actionKey)) return;
 
   const currentStatus = String(content.status || 'pending_confirmation');
-  if (['confirmed', 'running', 'cancelled', 'canceled', 'submitting'].includes(currentStatus)) return;
+  if (['confirmed', 'queued', 'running', 'succeeded', 'cancelled', 'canceled', 'submitting'].includes(currentStatus)) return;
   const missingFields = Array.isArray(content.missingFields) ? content.missingFields : [];
   if (payload.action === 'confirm' && (currentStatus === 'needs_fields' || missingFields.length > 0)) {
     Message.warning(String(content.disabledReason || '请先补充部署目标和环境'));

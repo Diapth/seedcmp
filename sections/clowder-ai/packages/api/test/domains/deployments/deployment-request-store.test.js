@@ -43,14 +43,15 @@ describe('DeploymentRequestStore', () => {
 
     const confirmed = await store.confirm(created.id);
     assert.ok(confirmed);
-    assert.equal(confirmed.status, 'confirmed');
+    assert.equal(confirmed.status, 'queued');
 
     const afterConfirm = await store.listActiveByConversation({
       userId: 'test-user',
       channelId: 'channel-a',
       channelType: 1,
     });
-    assert.equal(afterConfirm.length, 0);
+    assert.equal(afterConfirm.length, 1);
+    assert.equal(afterConfirm[0].status, 'queued');
 
     const cancelled = await store.cancel(created.id);
     assert.ok(cancelled);

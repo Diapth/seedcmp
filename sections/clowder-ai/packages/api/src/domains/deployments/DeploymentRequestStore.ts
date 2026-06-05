@@ -1,11 +1,13 @@
 import { randomUUID } from 'node:crypto';
 import type { RedisClient } from '@cat-cafe/shared/utils';
+import type { DeploymentContainerPlan } from './DeploymentJobStore.js';
 
 export type DeploymentEnvironment = 'local' | 'preview' | 'testing' | 'staging' | 'production' | 'development';
 export type DeploymentRequestStatus =
   | 'needs_fields'
   | 'pending_confirmation'
   | 'confirmed'
+  | 'queued'
   | 'running'
   | 'succeeded'
   | 'failed'
@@ -46,6 +48,12 @@ export interface DeploymentRequest {
   environmentCandidates: DeploymentEnvironmentCandidate[];
   workspaceId?: string;
   workspacePath?: string;
+  deploymentJobId?: string;
+  previewUrl?: string;
+  downloadUrl?: string;
+  logsSummary?: string[];
+  failureReason?: string;
+  containerPlan?: DeploymentContainerPlan;
   createdAt: number;
   updatedAt: number;
 }
@@ -78,6 +86,16 @@ export interface UpdateDeploymentRequestInput {
   status?: DeploymentRequestStatus;
 }
 
+export interface UpdateDeploymentExecutionInput {
+  status?: DeploymentRequestStatus;
+  deploymentJobId?: string | null;
+  previewUrl?: string | null;
+  downloadUrl?: string | null;
+  logsSummary?: string[];
+  failureReason?: string | null;
+  containerPlan?: DeploymentContainerPlan | null;
+}
+
 export interface IDeploymentRequestStore {
   create(input: CreateDeploymentRequestInput): Promise<DeploymentRequest>;
   get(id: string): Promise<DeploymentRequest | null>;
@@ -92,6 +110,7 @@ export interface IDeploymentRequestStore {
     channelId: string;
     channelType: 1 | 2;
   }): Promise<DeploymentRequest[]>;
+  updateExecution(id: string, input: UpdateDeploymentExecutionInput): Promise<DeploymentRequest | null>;
   confirm(id: string): Promise<DeploymentRequest | null>;
   cancel(id: string): Promise<DeploymentRequest | null>;
 }
@@ -160,7 +179,21 @@ function mergeTargetCandidates(
 }
 
 function isActiveStatus(status: DeploymentRequestStatus): boolean {
-  return status === 'needs_fields' || status === 'pending_confirmation';
+  return status === 'needs_fields' || status === 'pending_confirmation' || status === 'queued' || status === 'running';
+}
+
+function applyNullableRequestField(
+  target: DeploymentRequest,
+  key: keyof DeploymentRequest,
+  value: unknown,
+): void {
+  if (value === undefined) return;
+  const mutable = target as unknown as Record<string, unknown>;
+  if (value === null) {
+    delete mutable[key];
+    return;
+  }
+  mutable[key] = value;
 }
 
 export class DeploymentRequestStore implements IDeploymentRequestStore {
@@ -246,10 +279,28 @@ export class DeploymentRequestStore implements IDeploymentRequestStore {
       .sort((a, b) => b.updatedAt - a.updatedAt);
   }
 
+  async updateExecution(id: string, input: UpdateDeploymentExecutionInput): Promise<DeploymentRequest | null> {
+    const existing = await this.get(id);
+    if (!existing) return null;
+    const updated: DeploymentRequest = {
+      ...existing,
+      ...(input.status ? { status: input.status } : {}),
+      ...(input.logsSummary ? { logsSummary: input.logsSummary } : existing.logsSummary ? { logsSummary: existing.logsSummary } : {}),
+      updatedAt: Date.now(),
+    };
+    applyNullableRequestField(updated, 'deploymentJobId', input.deploymentJobId);
+    applyNullableRequestField(updated, 'previewUrl', input.previewUrl);
+    applyNullableRequestField(updated, 'downloadUrl', input.downloadUrl);
+    applyNullableRequestField(updated, 'failureReason', input.failureReason);
+    applyNullableRequestField(updated, 'containerPlan', input.containerPlan);
+    await this.put(updated);
+    return updated;
+  }
+
   async confirm(id: string): Promise<DeploymentRequest | null> {
     const existing = await this.get(id);
     if (!existing) return null;
-    const status: DeploymentRequestStatus = existing.missingFields.length > 0 ? 'needs_fields' : 'confirmed';
+    const status: DeploymentRequestStatus = existing.missingFields.length > 0 ? 'needs_fields' : 'queued';
     const updated = { ...existing, status, updatedAt: Date.now() };
     await this.put(updated);
     return updated;

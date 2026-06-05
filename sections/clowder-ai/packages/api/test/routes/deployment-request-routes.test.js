@@ -1,33 +1,59 @@
 import assert from 'node:assert/strict';
+import { mkdtemp, mkdir, rm, writeFile } from 'node:fs/promises';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
 import { afterEach, beforeEach, describe, it } from 'node:test';
 
 import Fastify from 'fastify';
+import { DeploymentExecutor } from '../../dist/domains/deployments/DeploymentExecutor.js';
+import { DeploymentJobStore } from '../../dist/domains/deployments/DeploymentJobStore.js';
 import { DeploymentRequestStore } from '../../dist/domains/deployments/DeploymentRequestStore.js';
 import { connectorDeploymentActionRoutes } from '../../dist/routes/connector-deployment-action.js';
 import { connectorDeploymentRequestRoutes } from '../../dist/routes/connector-deployment-requests.js';
+import { deploymentRoutes } from '../../dist/routes/deployments.js';
 
 const HEADERS = {
   'content-type': 'application/json',
   'x-cat-cafe-user': 'test-user',
 };
 
-function buildApp() {
+function buildApp({ deploymentsDir, allowedRoots, publicBaseUrl }) {
   const deploymentRequestStore = new DeploymentRequestStore();
+  const deploymentJobStore = new DeploymentJobStore();
+  const deploymentExecutor = new DeploymentExecutor({
+    jobStore: deploymentJobStore,
+    deploymentsDir,
+    allowedRoots,
+    defaultRoot: allowedRoots[0],
+    publicBaseUrl,
+  });
   const app = Fastify();
   app.register(connectorDeploymentRequestRoutes, { deploymentRequestStore });
-  app.register(connectorDeploymentActionRoutes, { deploymentRequestStore });
-  return { app, deploymentRequestStore };
+  app.register(deploymentRoutes, { deploymentJobStore });
+  app.register(connectorDeploymentActionRoutes, { deploymentRequestStore, deploymentJobStore, deploymentExecutor });
+  return { app, deploymentRequestStore, deploymentJobStore };
 }
 
 describe('deployment request routes', () => {
   let app;
+  let tempRoot;
+  let workspaceDir;
 
-  beforeEach(() => {
-    ({ app } = buildApp());
+  beforeEach(async () => {
+    tempRoot = await mkdtemp(join(tmpdir(), 'cat-cafe-deployment-routes-'));
+    workspaceDir = join(tempRoot, 'workspace');
+    await mkdir(workspaceDir, { recursive: true });
+    await writeFile(join(workspaceDir, 'index.html'), '<!doctype html><title>部署阶段4验收</title>', 'utf-8');
+    ({ app } = buildApp({
+      deploymentsDir: join(tempRoot, 'deployments'),
+      allowedRoots: [tempRoot],
+      publicBaseUrl: 'http://api.test',
+    }));
   });
 
   afterEach(async () => {
     await app.close();
+    await rm(tempRoot, { recursive: true, force: true });
   });
 
   it('creates, patches, and hydrates the latest deployment request', async () => {
@@ -103,8 +129,9 @@ describe('deployment request routes', () => {
         channelId: 'channel-b',
         channelType: 1,
         originalText: '帮我部署婚礼',
-        target: '婚礼',
+        target: workspaceDir,
         environment: 'local',
+        workspacePath: workspaceDir,
       },
     });
     const requestId = JSON.parse(createRes.payload).deploymentRequest.id;
@@ -121,15 +148,43 @@ describe('deployment request routes', () => {
         actionId: 'confirm-1',
         cardMessageId: 'deployment-card-2',
         sourceMessageId: 'msg-2',
-        target: '婚礼',
+        target: workspaceDir,
         environment: 'local',
+        workspacePath: workspaceDir,
         missingFields: [],
       },
     });
     assert.equal(confirmRes.statusCode, 200);
     const confirmed = JSON.parse(confirmRes.payload);
-    assert.equal(confirmed.status, 'confirmed');
-    assert.equal(confirmed.deploymentRequest.status, 'confirmed');
+    assert.equal(confirmed.status, 'succeeded');
+    assert.equal(confirmed.deployment.status, 'succeeded');
+    assert.equal(confirmed.deploymentRequest.status, 'succeeded');
+    assert.match(confirmed.deploymentRequest.previewUrl, /^http:\/\/api\.test\/api\/deployments\/deploy_/);
+    assert.match(confirmed.deploymentRequest.downloadUrl, /^http:\/\/api\.test\/api\/deployments\/deploy_/);
+
+    const previewRes = await app.inject({
+      method: 'GET',
+      url: `/api/deployments/${encodeURIComponent(requestId)}/preview/`,
+      headers: HEADERS,
+    });
+    assert.equal(previewRes.statusCode, 200);
+    assert.match(previewRes.payload, /部署阶段4验收/);
+
+    const downloadRes = await app.inject({
+      method: 'GET',
+      url: `/api/deployments/${encodeURIComponent(requestId)}/download`,
+      headers: HEADERS,
+    });
+    assert.equal(downloadRes.statusCode, 200);
+    assert.equal(downloadRes.headers['content-type'], 'application/gzip');
+
+    const logsRes = await app.inject({
+      method: 'GET',
+      url: `/api/deployments/${encodeURIComponent(requestId)}/logs`,
+      headers: HEADERS,
+    });
+    assert.equal(logsRes.statusCode, 200);
+    assert.match(logsRes.payload, /Deployment executor started/);
 
     const latestAfterConfirm = await app.inject({
       method: 'GET',
@@ -137,7 +192,7 @@ describe('deployment request routes', () => {
       headers: HEADERS,
     });
     assert.equal(latestAfterConfirm.statusCode, 200);
-    assert.equal(JSON.parse(latestAfterConfirm.payload).deploymentRequest.status, 'confirmed');
+    assert.equal(JSON.parse(latestAfterConfirm.payload).deploymentRequest.status, 'succeeded');
 
     const cancelCreateRes = await app.inject({
       method: 'POST',

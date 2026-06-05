@@ -38,7 +38,8 @@ export const DEFAULT_DEPLOYMENT_ENVIRONMENT_CANDIDATES: ClowderDeploymentEnviron
 function deploymentStatusLabel(status: string) {
   if (status === 'needs_fields') return '需要补充信息';
   if (status === 'submitting') return '提交中';
-  if (status === 'confirmed' || status === 'running') return '已确认，等待执行';
+  if (status === 'confirmed' || status === 'queued') return '已排队';
+  if (status === 'running') return '部署中';
   if (status === 'succeeded') return '部署成功';
   if (status === 'failed') return '部署失败';
   if (status === 'cancelled' || status === 'canceled') return '已取消';
@@ -130,6 +131,12 @@ export function buildDeploymentCardMessage(
       workspacePath: deploymentRequest.workspacePath,
       status: deploymentRequest.status,
       deploymentRequestId: deploymentRequest.id,
+      deploymentJobId: deploymentRequest.deploymentJobId,
+      previewUrl: deploymentRequest.previewUrl,
+      downloadUrl: deploymentRequest.downloadUrl,
+      logsSummary: deploymentRequest.logsSummary,
+      failureReason: deploymentRequest.failureReason,
+      containerPlan: deploymentRequest.containerPlan,
       missingFields: deploymentRequest.missingFields,
       disabledReason,
       connectorId: 'im-web',

@@ -88,15 +88,20 @@ const deploymentStatus = computed(() => {
   const status = String(content.value.status || 'pending_confirmation');
   if (status === 'needs_fields') return '需要补充信息';
   if (status === 'submitting') return '提交中';
-  if (status === 'confirmed' || status === 'running') return '已确认，等待执行';
+  if (status === 'confirmed' || status === 'queued') return '已排队';
+  if (status === 'running') return '部署中';
+  if (status === 'succeeded') return '部署成功';
   if (status === 'cancelled' || status === 'canceled') return '已取消';
-  if (status === 'failed') return '确认失败，可重试';
+  if (status === 'failed') return '部署失败';
   return '待确认';
 });
+const deploymentPreviewUrl = computed(() => String(content.value.previewUrl || '').trim());
+const deploymentDownloadUrl = computed(() => String(content.value.downloadUrl || '').trim());
+const deploymentLogsSummary = computed(() => Array.isArray(content.value.logsSummary) ? content.value.logsSummary.slice(-3) : []);
 const deploymentMissingFields = computed(() => Array.isArray(content.value.missingFields) ? content.value.missingFields : []);
 const deploymentActionDisabled = computed(() => {
   const status = String(content.value.status || 'pending_confirmation');
-  return ['confirmed', 'running', 'cancelled', 'canceled', 'submitting'].includes(status);
+  return ['confirmed', 'queued', 'running', 'succeeded', 'cancelled', 'canceled', 'submitting'].includes(status);
 });
 const deploymentConfirmDisabled = computed(() => {
   return deploymentActionDisabled.value || deploymentMissingFields.value.length > 0 || String(content.value.status || '') === 'needs_fields';
@@ -235,6 +240,32 @@ function applyEnvironmentCandidate(candidate: DeploymentEnvironmentCandidate) {
       <p v-if="deploymentDisabledReason || content.error" class="deployment-hint">
         {{ content.error || deploymentDisabledReason }}
       </p>
+      <p v-if="content.failureReason && content.status === 'failed'" class="deployment-hint">
+        {{ content.failureReason }}
+      </p>
+      <div v-if="deploymentPreviewUrl || deploymentDownloadUrl" class="deployment-links">
+        <a
+          v-if="deploymentPreviewUrl"
+          class="deployment-link"
+          :href="deploymentPreviewUrl"
+          target="_blank"
+          rel="noopener noreferrer"
+        >
+          打开预览
+        </a>
+        <a
+          v-if="deploymentDownloadUrl"
+          class="deployment-link"
+          :href="deploymentDownloadUrl"
+          target="_blank"
+          rel="noopener noreferrer"
+        >
+          下载源码包
+        </a>
+      </div>
+      <ul v-if="deploymentLogsSummary.length > 0" class="deployment-log-list">
+        <li v-for="(line, index) in deploymentLogsSummary" :key="index">{{ line }}</li>
+      </ul>
       <div class="deployment-actions">
         <button
           type="button"
@@ -479,6 +510,45 @@ function applyEnvironmentCandidate(candidate: DeploymentEnvironmentCandidate) {
   color: #b45309;
   font-size: 12px;
   line-height: 18px;
+}
+
+.deployment-links {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.deployment-link {
+  min-height: 28px;
+  padding: 0 10px;
+  border: var(--border-hairline);
+  border-radius: var(--radius-sm);
+  color: var(--primary-color, #165dff);
+  font-size: 12px;
+  line-height: 26px;
+  text-decoration: none;
+}
+
+.deployment-link:hover {
+  background: rgba(22, 93, 255, 0.08);
+}
+
+.deployment-log-list {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  margin: 0;
+  padding: 8px 10px;
+  border-radius: var(--radius-sm);
+  background: var(--bg-secondary);
+  color: var(--text-secondary);
+  font-size: 11px;
+  line-height: 16px;
+  list-style: none;
+}
+
+.deployment-log-list li {
+  overflow-wrap: anywhere;
 }
 
 .deployment-btn {

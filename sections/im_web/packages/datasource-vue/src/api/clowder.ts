@@ -184,6 +184,7 @@ export type ClowderDeploymentRequestStatus =
   | 'needs_fields'
   | 'pending_confirmation'
   | 'confirmed'
+  | 'queued'
   | 'running'
   | 'succeeded'
   | 'failed'
@@ -224,6 +225,17 @@ export interface ClowderDeploymentRequest {
   environmentCandidates: ClowderDeploymentEnvironmentCandidate[];
   workspaceId?: string;
   workspacePath?: string;
+  deploymentJobId?: string;
+  previewUrl?: string;
+  downloadUrl?: string;
+  logsSummary?: string[];
+  failureReason?: string;
+  containerPlan?: {
+    dockerfilePath: string;
+    imageName: string;
+    executed: false;
+    reason: string;
+  };
   createdAt: number;
   updatedAt: number;
 }
@@ -279,7 +291,7 @@ export interface ClowderDeploymentActionResponse {
   ok: boolean;
   deploymentRequestId: string;
   action: 'confirm' | 'cancel';
-  status: 'confirmed' | 'cancelled' | 'needs_fields' | 'failed' | 'running';
+  status: 'queued' | 'running' | 'succeeded' | 'failed' | 'cancelled' | 'needs_fields';
   missingFields?: string[];
   message?: string;
   actionId?: string;

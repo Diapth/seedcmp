@@ -1,9 +1,11 @@
 import type { FastifyPluginAsync } from 'fastify';
 import { resolveHeaderUserId } from '../utils/request-identity.js';
 import { DEFAULT_ENVIRONMENT_CANDIDATES, type DeploymentEnvironment, type DeploymentRequest, type IDeploymentRequestStore } from '../domains/deployments/DeploymentRequestStore.js';
+import type { DeploymentExecutor } from '../domains/deployments/DeploymentExecutor.js';
+import type { DeploymentJob, IDeploymentJobStore } from '../domains/deployments/DeploymentJobStore.js';
 
 type DeploymentAction = 'confirm' | 'cancel';
-type DeploymentActionStatus = 'confirmed' | 'cancelled' | 'needs_fields' | 'failed' | 'running';
+type DeploymentActionStatus = 'queued' | 'running' | 'succeeded' | 'failed' | 'cancelled' | 'needs_fields';
 
 interface DeploymentActionRecord {
   deploymentRequestId: string;
@@ -23,6 +25,8 @@ interface DeploymentActionRecord {
 
 export interface ConnectorDeploymentActionRoutesOptions {
   deploymentRequestStore?: IDeploymentRequestStore;
+  deploymentJobStore?: IDeploymentJobStore;
+  deploymentExecutor?: DeploymentExecutor;
 }
 
 const deploymentActions = new Map<string, DeploymentActionRecord>();
@@ -65,6 +69,10 @@ function buildFallbackDeploymentRequest(body: Record<string, unknown>, actorUser
   };
 }
 
+function summarizeJobLogs(job: DeploymentJob | null | undefined): string[] {
+  return (job?.logs ?? []).slice(-5).map((entry) => entry.message);
+}
+
 export const connectorDeploymentActionRoutes: FastifyPluginAsync<ConnectorDeploymentActionRoutesOptions> = async (app, opts) => {
   app.post('/api/connectors/im-web/deployment-action', async (request, reply) => {
     const actorUserId = resolveHeaderUserId(request) || 'unknown';
@@ -75,6 +83,8 @@ export const connectorDeploymentActionRoutes: FastifyPluginAsync<ConnectorDeploy
     const channelId = String(body.channelId || '').trim();
     const channelType = Number(body.channelType);
     const deploymentRequestStore = opts.deploymentRequestStore;
+    const deploymentJobStore = opts.deploymentJobStore;
+    const deploymentExecutor = opts.deploymentExecutor;
 
     if (!deploymentRequestId) return reply.status(400).send({ error: 'deploymentRequestId is required' });
     if (action !== 'confirm' && action !== 'cancel') return reply.status(400).send({ error: 'action must be confirm or cancel' });
@@ -86,19 +96,22 @@ export const connectorDeploymentActionRoutes: FastifyPluginAsync<ConnectorDeploy
     const idempotencyKey = `${deploymentRequestId}:${action}:${actionId}`;
     const existing = deploymentActions.get(idempotencyKey);
     if (existing) {
-      return reply.send({ ok: true, duplicate: true, ...existing });
+      const deploymentRequest = deploymentRequestStore ? await deploymentRequestStore.get(deploymentRequestId) : null;
+      const deployment = deploymentJobStore ? await deploymentJobStore.get(deploymentRequestId) : null;
+      return reply.send({ ok: true, duplicate: true, ...existing, deploymentRequest, deployment });
     }
 
     const missingFields = missingDeploymentFields(body);
-    const status: DeploymentActionStatus = action === 'cancel'
+    let status: DeploymentActionStatus = action === 'cancel'
       ? 'cancelled'
       : missingFields.length > 0
         ? 'needs_fields'
-        : 'confirmed';
+        : 'queued';
 
     let deploymentRequest: DeploymentRequest | null = deploymentRequestStore
       ? await deploymentRequestStore.get(deploymentRequestId)
       : null;
+    let deployment: DeploymentJob | null = deploymentJobStore ? await deploymentJobStore.get(deploymentRequestId) : null;
 
     if (deploymentRequestStore && deploymentRequest) {
       const updatedDeploymentRequest = await deploymentRequestStore.updateFields(deploymentRequestId, {
@@ -139,8 +152,53 @@ export const connectorDeploymentActionRoutes: FastifyPluginAsync<ConnectorDeploy
           });
         }
         deploymentRequest = await deploymentRequestStore.confirm(deploymentRequestId) ?? deploymentRequest;
+        if (deploymentJobStore && deploymentExecutor && deploymentRequest.target && deploymentRequest.environment) {
+          deployment = await deploymentJobStore.createQueued({
+            deploymentRequestId,
+            userId: deploymentRequest.userId,
+            channelId: deploymentRequest.channelId,
+            channelType: deploymentRequest.channelType,
+            target: deploymentRequest.target,
+            environment: deploymentRequest.environment,
+            ...(deploymentRequest.workspaceId ? { workspaceId: deploymentRequest.workspaceId } : {}),
+            ...(deploymentRequest.workspacePath ? { workspacePath: deploymentRequest.workspacePath } : {}),
+          });
+          deploymentRequest = await deploymentRequestStore.updateExecution(deploymentRequestId, {
+            status: 'queued',
+            deploymentJobId: deployment.id,
+            logsSummary: summarizeJobLogs(deployment),
+            failureReason: null,
+            previewUrl: null,
+            downloadUrl: null,
+            containerPlan: null,
+          }) ?? deploymentRequest;
+          deployment = await deploymentExecutor.execute(deployment, deploymentRequest);
+          status = deployment.status;
+          deploymentRequest = await deploymentRequestStore.updateExecution(deploymentRequestId, {
+            status: deployment.status,
+            deploymentJobId: deployment.id,
+            previewUrl: deployment.previewUrl ?? null,
+            downloadUrl: deployment.downloadUrl ?? null,
+            logsSummary: summarizeJobLogs(deployment),
+            failureReason: deployment.failureReason ?? null,
+            containerPlan: deployment.containerPlan ?? null,
+          }) ?? deploymentRequest;
+        }
       } else {
         deploymentRequest = await deploymentRequestStore.cancel(deploymentRequestId) ?? deploymentRequest;
+        if (deploymentJobStore) {
+          const existingJob = await deploymentJobStore.get(deploymentRequestId);
+          if (existingJob && !['succeeded', 'failed', 'cancelled'].includes(existingJob.status)) {
+            await deploymentJobStore.appendLog(deploymentRequestId, 'warn', 'Deployment job cancelled by user');
+            deployment = await deploymentJobStore.update(deploymentRequestId, {
+              status: 'cancelled',
+              completedAt: Date.now(),
+              failureReason: 'Deployment cancelled by user',
+            });
+          } else {
+            deployment = existingJob;
+          }
+        }
       }
     }
 
@@ -169,6 +227,7 @@ export const connectorDeploymentActionRoutes: FastifyPluginAsync<ConnectorDeploy
       ok: true,
       ...record,
       deploymentRequest: deploymentRequest || buildFallbackDeploymentRequest(body, actorUserId, status),
+      deployment,
       message: status === 'needs_fields'
         ? 'Deployment action requires target/environment before confirmation'
         : 'Deployment action accepted',
