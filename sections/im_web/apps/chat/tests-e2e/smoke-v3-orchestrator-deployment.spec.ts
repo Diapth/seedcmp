@@ -22,6 +22,10 @@ function buildDemoPrompt() {
     `@协调者 ${teamText} 做一个“AgentHub 咖啡店活动页”静态页面，要求 Claude/Codex 至少一个真实执行，完成后部署到 preview 环境，最后在聊天里给我预览链接、源码下载链接、执行分工和风险说明。`;
 }
 
+function escapeRegExp(value: string) {
+  return value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+}
+
 async function deploymentCardText(card: Locator) {
   return ((await card.textContent().catch(() => '')) || '').replace(/\s+/g, ' ').trim();
 }
@@ -105,16 +109,28 @@ async function commitDeploymentTarget(page: Page, card: Locator, target: string)
   for (let attempt = 0; attempt < 3; attempt += 1) {
     const activeCardIndex = await findActionableDeploymentCardIndex(page);
     const editableCard = activeCardIndex >= 0 ? page.locator('.deployment-card').nth(activeCardIndex) : card;
-    const targetInput = editableCard.getByPlaceholder('输入部署目标');
-    await targetInput.fill(target);
-    await expect(targetInput).toHaveValue(target, { timeout: 5000 });
+    const targetLabel = target.split('/').pop() || target;
+    const targetCandidate = editableCard
+      .locator('.deployment-field')
+      .first()
+      .locator('.deployment-candidate')
+      .filter({ hasText: new RegExp(`^${escapeRegExp(targetLabel)}$`) })
+      .first();
 
-    const applyTarget = editableCard.getByRole('button', { name: '应用' });
-    if (await applyTarget.isEnabled({ timeout: 5000 }).catch(() => false)) {
-      await applyTarget.click();
+    if (await targetCandidate.isVisible().catch(() => false)) {
+      await targetCandidate.click();
     } else {
-      await targetInput.press('Enter');
-      await targetInput.blur();
+      const targetInput = editableCard.getByPlaceholder('输入部署目标');
+      await targetInput.fill(target);
+      await expect(targetInput).toHaveValue(target, { timeout: 5000 });
+
+      const applyTarget = editableCard.getByRole('button', { name: '应用' });
+      if (await applyTarget.isEnabled({ timeout: 5000 }).catch(() => false)) {
+        await applyTarget.click();
+      } else {
+        await targetInput.press('Enter');
+        await targetInput.blur();
+      }
     }
 
     await page.waitForTimeout(1000);
