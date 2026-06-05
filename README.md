@@ -137,6 +137,8 @@ Web 入口为 `http://127.0.0.1:3000`。推荐使用 `008618337488675` / `123456
 cd sections/im_web/apps/chat
 RUN_V3_CLOWDER_SMOKE=1 \
 TEST_GROUP_CONVERSATION_ID=16e006b0b84f40faaa77a271e69b5021 \
+TEST_AGENT_A=xtz \
+TEST_AGENT_B=dd \
 TEST_DEPLOYMENT_TARGET=packages/api/qa-test-page.html \
 corepack pnpm test:e2e -- tests-e2e/smoke-v3-orchestrator-deployment.spec.ts
 ```

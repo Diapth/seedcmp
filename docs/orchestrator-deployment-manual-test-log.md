@@ -142,21 +142,21 @@ This file records the required real Web checks for the orchestrator and P2 deplo
 
 ### Stage 6
 
-- Login user:
-- OAuth platform:
-- OAuth status:
-- Cat name:
-- Cat alias:
+- Login user: 008618337488675
+- OAuth platform: Codex
+- OAuth status: local Codex account available through existing Clowder cat configuration
+- Cat name: xtz coordinator with dd group cat available
+- Cat alias: @xtz; prompt used @协调者 and @dd
 - Conversation type: group
-- Group chat ID:
-- Thread ID:
-- Coordination ID:
-- Deployment request ID:
-- Prompt: @协调者 请协调团队做一个“AgentHub 咖啡店活动页”静态页面，要求 Claude/Codex 至少一个真实执行，完成后部署到 preview 环境，最后在聊天里给我预览链接、源码下载链接、执行分工和风险说明。
-- Screenshot paths:
-- Result:
+- Group chat ID: 16e006b0b84f40faaa77a271e69b5021
+- Thread ID: thread_mq1afgliuch3zzzg
+- Coordination ID: coord_9be5eb62-74b9-41ee-9291-5a6913a423f5
+- Deployment request ID: deploy_114b1dab-df82-4e78-9b4a-7a313af81261 for manual screenshots; deploy_2ed04740-0ca7-45f8-93e9-62403ba18a89 for final green smoke rerun
+- Prompt: @协调者 @xtz @dd 阶段6最终截图复验：请协调团队做一个“AgentHub 咖啡店活动页”静态页面，要求 Claude/Codex 至少一个真实执行，完成后部署到 preview 环境，最后在聊天里给我预览链接、源码下载链接、执行分工和风险说明。
+- Screenshot paths: docs/manual-test-artifacts/stage6/stage6-group-open.png; docs/manual-test-artifacts/stage6/stage6-prompt-sent.png; docs/manual-test-artifacts/stage6/stage6-card-created.png; docs/manual-test-artifacts/stage6/stage6-after-timeout-state.png; docs/manual-test-artifacts/stage6/stage6-final-active-card-before-target.png; docs/manual-test-artifacts/stage6/stage6-final-before-confirm.png; docs/manual-test-artifacts/stage6/stage6-final-summary.png; docs/manual-test-artifacts/stage6/stage6-final-preview-iframe.png
+- Result: passed
 - Failure reason:
-- Notes:
+- Notes: Restarted stack after Stage 6 code before validation. The first live run sent the required final prompt and produced a deployment card, but the initial browser wait incorrectly expected a new card count and timed out while the Web UI had already hydrated an active needs-fields card. The smoke was hardened to accept either a new deployment card or a reused active card, to honor TEST_AGENT_A/TEST_AGENT_B, and to commit target edits through the explicit `应用` button when needed. Final accepted Web pass used the same Stage 6 demo intent with explicit @xtz/@dd local cats. The chat produced coordinator/cat activity, active deployment request `deploy_114b1dab-df82-4e78-9b4a-7a313af81261`, preview environment, target `packages/api/qa-test-page.html`, and a successful confirm from the deployment card. The card reached `部署成功`, showed preview/download controls, and in-session chat appended exactly one `Coordinator / Deployment 结果汇总` message containing status, target, environment, preview URL, download URL, and risk note. Direct API checks for the final deployment returned preview HTTP 200 with rendered `Interactive QA Surface` content and download HTTP 200 with `application/gzip`; the preview iframe rendered inside the right dock. Source package contained `qa-test-page.html`. After the smoke patch, the opt-in Playwright smoke was rerun with `RUN_V3_CLOWDER_SMOKE=1 TEST_AGENT_A=xtz TEST_AGENT_B=dd TEST_DEPLOYMENT_TARGET=packages/api/qa-test-page.html` and passed, creating successful deployment `deploy_2ed04740-0ca7-45f8-93e9-62403ba18a89`. The earlier Stage 6 agent run also generated `data/agenthub-coffee-event/index.html` and registered `/uploads` artifacts, but final accepted deployment evidence uses the supported `/api/deployments/:id/preview/` route above.
 
 ### Stage 7
 
