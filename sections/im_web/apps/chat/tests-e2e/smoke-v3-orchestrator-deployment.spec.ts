@@ -102,18 +102,26 @@ async function ensurePreviewEnvironment(card: Locator) {
 }
 
 async function commitDeploymentTarget(page: Page, card: Locator, target: string) {
-  const activeCardIndex = await findActionableDeploymentCardIndex(page);
-  const editableCard = activeCardIndex >= 0 ? page.locator('.deployment-card').nth(activeCardIndex) : card;
-  const targetInput = editableCard.getByPlaceholder('输入部署目标');
-  await targetInput.fill(target);
-  await expect(targetInput).toHaveValue(target, { timeout: 5000 });
+  for (let attempt = 0; attempt < 3; attempt += 1) {
+    const activeCardIndex = await findActionableDeploymentCardIndex(page);
+    const editableCard = activeCardIndex >= 0 ? page.locator('.deployment-card').nth(activeCardIndex) : card;
+    const targetInput = editableCard.getByPlaceholder('输入部署目标');
+    await targetInput.fill(target);
+    await expect(targetInput).toHaveValue(target, { timeout: 5000 });
 
-  const applyTarget = editableCard.getByRole('button', { name: '应用' });
-  if (await applyTarget.isEnabled({ timeout: 5000 }).catch(() => false)) {
-    await applyTarget.click();
-  } else {
-    await targetInput.press('Enter');
-    await targetInput.blur();
+    const applyTarget = editableCard.getByRole('button', { name: '应用' });
+    if (await applyTarget.isEnabled({ timeout: 5000 }).catch(() => false)) {
+      await applyTarget.click();
+    } else {
+      await targetInput.press('Enter');
+      await targetInput.blur();
+    }
+
+    await page.waitForTimeout(1000);
+    const confirmableCardIndex = await findConfirmableDeploymentCardIndex(page, target);
+    if (confirmableCardIndex >= 0) {
+      return page.locator('.deployment-card').nth(confirmableCardIndex);
+    }
   }
 
   let confirmableCardIndex = -1;
