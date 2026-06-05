@@ -1,4 +1,4 @@
-import { isAbsolute, relative, resolve } from 'node:path';
+import { basename, isAbsolute, join, relative, resolve, sep } from 'node:path';
 import { getDefaultUploadDir } from '../../utils/upload-paths.js';
 import {
   classifyPath,
@@ -71,3 +71,26 @@ export function buildArtifactProvenance(input: BuildArtifactProvenanceInput): Ar
     ...(typeof input.size === 'number' && input.size > 0 ? { size: input.size } : {}),
   };
 }
+
+/** Default subdirectory a leaked deliverable is promoted into under the user workspace. */
+export const PROMOTION_INBOX_DIR = '_inbox';
+
+/**
+ * V3-39 §2.3: compute where a leaked deliverable (e.g. one the agent wrote to
+ * /tmp) should be copied so it settles durably under the user workspace.
+ * Returns null when promotion is unnecessary (source already inside the user
+ * workspace) or impossible (no user workspace root known).
+ */
+export function promotionTargetPath(
+  sourcePath: string,
+  userWorkspaceRoot: string | null | undefined,
+  fileName?: string,
+  inboxDir: string = PROMOTION_INBOX_DIR,
+): string | null {
+  if (!userWorkspaceRoot) return null;
+  const abs = resolve(sourcePath);
+  const root = resolve(userWorkspaceRoot);
+  if (abs === root || abs.startsWith(`${root}${sep}`)) return null;
+  return join(root, inboxDir, basename(fileName || abs));
+}
+

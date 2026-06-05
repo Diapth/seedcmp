@@ -1,13 +1,14 @@
 import { createHash, randomBytes } from 'node:crypto';
 import { copyFile, mkdir, readdir, readFile, stat, unlink, writeFile } from 'node:fs/promises';
 import { homedir, tmpdir } from 'node:os';
-import { basename, extname, isAbsolute, join, relative, resolve, sep } from 'node:path';
+import { basename, dirname, extname, isAbsolute, join, relative, resolve, sep } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { gzipSync } from 'node:zlib';
 import { type CatId, catRegistry, type RichBlock } from '@cat-cafe/shared';
 import type { FastifyBaseLogger } from 'fastify';
 import { publishGeneratedImage } from '../../domains/cats/services/agents/providers/generated-image-publication.js';
-import { buildArtifactProvenance, rootsFromEnv } from '../../domains/artifacts/artifact-provenance.js';
+import { buildArtifactProvenance, promotionTargetPath, rootsFromEnv } from '../../domains/artifacts/artifact-provenance.js';
+import { findLaunchedProjectRoot, resolveMaomiWorkspaceRoot } from '../../domains/maomi-workspaces/workspace-root.js';
 import { sanitizeFilenameStem, type SupportedImageMime } from '../../utils/image-storage.js';
 import { getDefaultUploadDir, resolveInternalRouteUrl } from '../../utils/upload-paths.js';
 import { ConnectorMessageFormatter, type MessageEnvelope, type MessageOrigin } from './ConnectorMessageFormatter.js';
@@ -648,6 +649,56 @@ export class OutboundDeliveryHook {
     return deliveries;
   }
 
+  private userWorkspaceRootResolved: string | null | undefined;
+
+  /**
+   * V3-39 §2.3: resolve the durable user workspace root used to promote leaked
+   * deliverables. Prefers env, else the default sibling maomi_workspace of the
+   * launched repo. Cached for the lifetime of the hook.
+   */
+  private async getUserWorkspaceRoot(): Promise<string | null> {
+    if (this.userWorkspaceRootResolved !== undefined) return this.userWorkspaceRootResolved;
+    const envRoot =
+      process.env.MAOMI_WORKSPACE_ROOT?.trim() || process.env.CLOWDER_USER_WORKSPACE_ROOT?.trim();
+    if (envRoot) {
+      this.userWorkspaceRootResolved = resolve(envRoot);
+      return this.userWorkspaceRootResolved;
+    }
+    try {
+      const root = await resolveMaomiWorkspaceRoot({ launchedProjectRoot: findLaunchedProjectRoot() });
+      this.userWorkspaceRootResolved = root.rootPath;
+    } catch (err) {
+      this.opts.log.warn({ err }, '[OutboundDeliveryHook] could not resolve user workspace root for promotion');
+      this.userWorkspaceRootResolved = null;
+    }
+    return this.userWorkspaceRootResolved;
+  }
+
+  private async promoteDeliverableToUserWorkspace(
+    sourcePath: string,
+    fileName: string,
+  ): Promise<string | null> {
+    if (process.env.CLOWDER_PROMOTE_DELIVERABLES === '0') return null;
+    const userRoot = await this.getUserWorkspaceRoot();
+    const target = promotionTargetPath(sourcePath, userRoot, fileName);
+    if (!target) return null;
+    try {
+      await mkdir(dirname(target), { recursive: true });
+      await copyFile(sourcePath, target);
+      this.opts.log.info(
+        { sourcePath: resolve(sourcePath), promotedTo: target },
+        '[OutboundDeliveryHook] promoted leaked deliverable into user workspace',
+      );
+      return target;
+    } catch (err) {
+      this.opts.log.warn(
+        { err, sourcePath, target },
+        '[OutboundDeliveryHook] deliverable promotion failed',
+      );
+      return null;
+    }
+  }
+
   private async publishLocalFileReference(
     url: string,
     options: {
@@ -677,11 +728,24 @@ export class OutboundDeliveryHook {
 
       await copyFile(resolvedSource.sourcePath, absPath);
 
+      // V3-39 §2.3: a deliverable the agent left outside the user workspace
+      // (e.g. /tmp/test-page.zip) is promoted into maomi_workspace so a durable
+      // user-owned copy exists alongside the web delivery. Transient archives we
+      // generated ourselves (cleanup=true) are already derived from the workspace.
+      const durableSourcePath = resolvedSource.cleanup
+        ? resolvedSource.sourcePath
+        : (await this.promoteDeliverableToUserWorkspace(resolvedSource.sourcePath, baseName)) ??
+          resolvedSource.sourcePath;
+
       const urlPath = `/uploads/${targetFileName}`;
+      const userWorkspaceRoot = await this.getUserWorkspaceRoot();
       const provenance = buildArtifactProvenance({
-        sourcePath: resolvedSource.sourcePath,
+        sourcePath: durableSourcePath,
         deliveryUrl: urlPath,
-        roots: rootsFromEnv(process.env),
+        roots: {
+          ...rootsFromEnv(process.env),
+          ...(userWorkspaceRoot ? { userWorkspaceRoot } : {}),
+        },
         ...(baseName ? { downloadName: baseName } : {}),
       });
       this.opts.log.info(
@@ -699,7 +763,7 @@ export class OutboundDeliveryHook {
         url: urlPath,
         absPath,
         fileName: baseName,
-        sourcePath: resolvedSource.sourcePath,
+        sourcePath: durableSourcePath,
       };
     } catch (err) {
       this.opts.log.warn({ err, url, sourcePath: resolvedSource.sourcePath }, '[OutboundDeliveryHook] local file publish failed');

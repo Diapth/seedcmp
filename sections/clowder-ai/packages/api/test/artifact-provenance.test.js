@@ -64,4 +64,25 @@ describe('artifact provenance (V3-39 §2.2)', () => {
     assert.equal(roots.userWorkspaceRoot, resolve('/tmp/maomi_workspace'));
     assert.equal(roots.deliveryRoot, resolve('/tmp/uploads'));
   });
+
+  it('promotionTargetPath targets the user workspace inbox for a leaked /tmp deliverable', async () => {
+    const { promotionTargetPath } = await import('../dist/domains/artifacts/artifact-provenance.js');
+
+    const userRoot = resolve('/home/u/Desktop/maomi_workspace');
+    const target = promotionTargetPath('/tmp/test-page.zip', userRoot);
+    assert.equal(target, `${userRoot}/_inbox/test-page.zip`);
+
+    // Honors an explicit download name over the source basename.
+    const named = promotionTargetPath('/tmp/abc123.zip', userRoot, 'wedding-site.zip');
+    assert.equal(named, `${userRoot}/_inbox/wedding-site.zip`);
+  });
+
+  it('promotionTargetPath returns null when source already lives in the user workspace or no root is known', async () => {
+    const { promotionTargetPath } = await import('../dist/domains/artifacts/artifact-provenance.js');
+
+    const userRoot = resolve('/home/u/Desktop/maomi_workspace');
+    assert.equal(promotionTargetPath(`${userRoot}/wedding/site.zip`, userRoot), null);
+    assert.equal(promotionTargetPath('/tmp/test-page.zip', null), null);
+    assert.equal(promotionTargetPath('/tmp/test-page.zip', ''), null);
+  });
 });
