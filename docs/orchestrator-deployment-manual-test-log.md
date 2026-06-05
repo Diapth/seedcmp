@@ -52,21 +52,21 @@ This file records the required real Web checks for the orchestrator and P2 deplo
 
 ### Stage 1
 
-- Login user:
-- OAuth platform:
-- OAuth status:
-- Cat name:
-- Cat alias:
+- Login user: 18337488675
+- OAuth platform: Codex
+- OAuth status: local Codex account available through existing Clowder cat configuration
+- Cat name: xtz
+- Cat alias: @xtz
 - Conversation type: group
-- Group chat ID:
-- Thread ID:
-- Coordination ID:
+- Group chat ID: 16e006b0b84f40faaa77a271e69b5021
+- Thread ID: thread_mq1afgliuch3zzzg
+- Coordination ID: coord_b9508358-ff94-4b99-bd91-6de5182b5eaf
 - Deployment request ID:
-- Prompt: @claude-orch 请把“做一个咖啡店首页并准备部署”的需求拆成任务，不要直接写代码，先给出分工。
-- Screenshot paths:
-- Result:
+- Prompt: @xtz 阶段1修复验收：请把“做一个咖啡店首页并准备部署”的需求拆成任务，不要直接写代码，先给出分工。
+- Screenshot paths: docs/manual-test-artifacts/stage1-fix-panel-before.png; docs/manual-test-artifacts/stage1-fix-prompt-sent.png; docs/manual-test-artifacts/stage1-fix-final-reply.png
+- Result: passed
 - Failure reason:
-- Notes:
+- Notes: Local configured coordinator-style cat is xtz rather than @claude-orch. Backend persisted a planning coordination with three initial subtasks and Web chat showed a real Clowder reply, not DeepSeek fallback.
 
 ### Stage 2
 
