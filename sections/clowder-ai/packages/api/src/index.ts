@@ -2983,6 +2983,7 @@ async function main(): Promise<void> {
     maomiWorkspaceStore,
     threadWorkspaceBindingStore,
     taskStore,
+    coordinatorStore,
     log: app.log,
     agentRegistry,
     catCreator: createImWebCatCreator(),

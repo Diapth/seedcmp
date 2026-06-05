@@ -20,6 +20,7 @@ import { isCatAvailable } from '../../config/cat-config-loader.js';
 import type { ConnectorWebhookHandler, WebhookHandleResult } from '../../routes/connector-webhooks.js';
 import type { IMaomiWorkspaceStore } from '../../domains/maomi-workspaces/MaomiWorkspaceStore.js';
 import type { IThreadWorkspaceBindingStore } from '../../domains/maomi-workspaces/ThreadWorkspaceBindingStore.js';
+import type { ICoordinatorStore } from '../../domains/cats/services/stores/ports/CoordinatorStore.js';
 import type { ITaskStore } from '../../domains/cats/services/stores/ports/TaskStore.js';
 import { findOrCreateArtifactTask } from '../../routes/thread-tasks.js';
 import { getDefaultUploadDir } from '../../utils/upload-paths.js';
@@ -185,6 +186,7 @@ export interface ConnectorGatewayDeps {
   readonly threadWorkspaceBindingStore?: IThreadWorkspaceBindingStore;
   /** V3-31: task store used to auto-register delivered files as thread artifacts. */
   readonly taskStore?: ITaskStore;
+  readonly coordinatorStore?: ICoordinatorStore;
   readonly log: FastifyBaseLogger;
   readonly frontendBaseUrl?: string | undefined;
   /** F142: agent service registry for /cats command */
@@ -434,6 +436,7 @@ export async function startConnectorGateway(
     adapters,
     mediaService,
     sttProvider,
+    coordinatorStore: deps.coordinatorStore,
   });
 
   if (hasImWeb) {

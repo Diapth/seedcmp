@@ -18,6 +18,7 @@
 import type { CatId, ConnectorSource, MessageContent } from '@cat-cafe/shared';
 import { catRegistry, createCatId, getConnectorDefinition } from '@cat-cafe/shared';
 import type { FastifyBaseLogger } from 'fastify';
+import type { ICoordinatorStore } from '../../domains/cats/services/stores/ports/CoordinatorStore.js';
 import { findMonorepoRoot } from '../../utils/monorepo-root.js';
 import type { ConnectorCommandLayer } from './ConnectorCommandLayer.js';
 import { type CardAction, ConnectorMessageFormatter, DEFAULT_QUICK_ACTIONS } from './ConnectorMessageFormatter.js';
@@ -28,6 +29,8 @@ import { parseMentions } from './mention-parser.js';
 import type { IOutboundAdapter } from './OutboundDeliveryHook.js';
 
 const COORDINATOR_CAT_ID = createCatId('coordinator');
+const COORDINATION_TRIGGER_RE =
+  /(协调|协调者|分工|拆分|拆解|协作|计划|规划|任务|子\s*agent|多\s*agent|实现并测试|部署|发布|预览|汇总|handoff|orchestrator|coordinator|\bpm\b)/i;
 
 /** Emit a connector_message socket event using the canonical protocol.
  *  All emit sites MUST use this to avoid protocol drift (旧/新 payload 不一致). */
@@ -141,6 +144,7 @@ export interface ConnectorRouterOptions {
         ): Promise<{ localUrl: string; absPath: string; mimeType: string }>;
       }
     | undefined;
+  readonly coordinatorStore?: ICoordinatorStore | undefined;
   readonly sttProvider?:
     | {
         transcribe(request: { audioPath: string; language?: string }): Promise<{ text: string }>;
@@ -486,6 +490,17 @@ export class ConnectorRouter {
         : {}),
     });
 
+    await this.maybeCreateCoordinationRecord({
+      connectorId,
+      externalChatId,
+      chatType,
+      text: resolvedText,
+      threadId: binding.threadId,
+      sourceMessageId: stored.id,
+      targetCatId,
+      explicitTargetCatIds,
+    });
+
     // 4. Broadcast to WebSocket
     emitConnectorMessage(socketManager, binding.threadId, {
       id: stored.id,
@@ -521,6 +536,97 @@ export class ConnectorRouter {
       threadId: binding.threadId,
       messageId: stored.id,
     };
+  }
+
+  private async maybeCreateCoordinationRecord(input: {
+    connectorId: string;
+    externalChatId: string;
+    chatType?: 'p2p' | 'group';
+    text: string;
+    threadId: string;
+    sourceMessageId: string;
+    targetCatId: CatId;
+    explicitTargetCatIds: readonly CatId[];
+  }): Promise<void> {
+    const store = this.opts.coordinatorStore;
+    if (!store || input.connectorId !== 'im-web' || input.chatType !== 'group') return;
+    if (!this.isCoordinatorStylePrompt(input.text, input.targetCatId)) return;
+
+    const targetCatIds = this.uniqueCatIds([input.targetCatId, ...input.explicitTargetCatIds]);
+    try {
+      const { coordination, created } = await store.create({
+        threadId: input.threadId,
+        sourceMessageId: input.sourceMessageId,
+        createdBy: this.opts.defaultUserId,
+        status: 'planning',
+        goal: this.stripLeadingMentions(input.text).slice(0, 500),
+        assumptions: [
+          'created_from_im_web_group_message',
+          `externalChatId:${input.externalChatId}`,
+          'initial_record_before_agent_plan',
+        ],
+        targetCatIds,
+        dispatchMode: targetCatIds.length > 1 ? 'mixed' : 'serial',
+        subtasks: [
+          {
+            title: '需求拆解与验收标准',
+            targetCatId: input.targetCatId,
+            status: 'doing',
+          },
+          {
+            title: '执行猫猫分工',
+            status: 'todo',
+          },
+          {
+            title: '部署准备与风险检查',
+            status: 'todo',
+          },
+        ],
+        idempotencyKey: `${input.connectorId}:${input.externalChatId}:${input.sourceMessageId}`,
+      });
+      this.opts.log.info(
+        { coordinationId: coordination.coordinationId, threadId: input.threadId, created },
+        '[ConnectorRouter] Coordination record prepared',
+      );
+    } catch (err) {
+      this.opts.log.warn({ err, threadId: input.threadId }, '[ConnectorRouter] Coordination record creation failed');
+    }
+  }
+
+  private isCoordinatorStylePrompt(text: string, targetCatId: CatId): boolean {
+    return this.isCoordinatorLikeCat(targetCatId) || COORDINATION_TRIGGER_RE.test(text);
+  }
+
+  private isCoordinatorLikeCat(catId: CatId): boolean {
+    if (catId === COORDINATOR_CAT_ID) return true;
+    const entry = catRegistry.tryGet(catId);
+    const config = entry?.config;
+    const haystack = [
+      config?.name,
+      config?.displayName,
+      config?.roleDescription,
+      config?.teamStrengths,
+      config?.personality,
+    ]
+      .filter(Boolean)
+      .join(' ');
+    return /(协调|调度|分工|拆解|PM|主\s*Agent|orchestrator|coordinator)/i.test(haystack);
+  }
+
+  private stripLeadingMentions(text: string): string {
+    return text.replace(/^\s*(?:@[\w\u4e00-\u9fff-]+[\s，,、]*)+/u, '').trim() || text.trim();
+  }
+
+  private uniqueCatIds(values: readonly CatId[]): CatId[] {
+    const out: CatId[] = [];
+    const seen = new Set<string>();
+    for (const value of values) {
+      const key = String(value || '').trim();
+      if (!key || seen.has(key)) continue;
+      seen.add(key);
+      out.push(value);
+    }
+    return out;
   }
 
   private normalizeExplicitTargetCatIds(routing?: {
