@@ -124,11 +124,27 @@ export function isValidRichBlock(b: unknown): b is RichBlock {
       if (typeof obj.fileName !== 'string' || (obj.fileName as string).trim().length === 0) return false;
       if ('mimeType' in obj && typeof obj.mimeType !== 'string') return false;
       if ('fileSize' in obj && typeof obj.fileSize !== 'number') return false;
-      // P0/P1 security: whitelist safe URL patterns to prevent file exfiltration + XSS
+      // P0/P1 security: allow /uploads/, /api/, https://, and absolute workspace paths
+      // (OutboundDeliveryHook Phase J will publish workspace files to uploads/).
+      // Reject known sensitive system paths to prevent exfiltration.
       const url = (obj.url as string).trim();
       if (url.includes('..')) return false; // path traversal
-      const isSafe = url.startsWith('/uploads/') || url.startsWith('/api/') || url.startsWith('https://');
-      if (!isSafe) return false;
+      const isSafe =
+        url.startsWith('/uploads/') ||
+        url.startsWith('/api/') ||
+        url.startsWith('https://') ||
+        url.startsWith('/tmp/');
+      // Also allow absolute paths under allowed workspace roots (checked at runtime)
+      const isWorkspacePath = url.startsWith('/home/') || url.startsWith('/Users/') || url.startsWith('/workspace/');
+      const isSensitive =
+        url.startsWith('/etc/') ||
+        url.startsWith('/proc/') ||
+        url.startsWith('/sys/') ||
+        url.startsWith('/dev/') ||
+        url.startsWith('/var/log/') ||
+        url.startsWith('/root/') ||
+        url.startsWith('/boot/');
+      if (!isSafe && !(isWorkspacePath && !isSensitive)) return false;
       return true;
     }
     default:
