@@ -67,10 +67,11 @@ export function buildAllowedWorkspaceDirs(
   projectRoot: string,
   runtimeRoot: string,
   existingAllowed?: string,
+  extraDirs?: readonly string[],
 ): string {
-  const ordered = [projectRoot, runtimeRoot];
+  const ordered = [projectRoot, runtimeRoot, ...(extraDirs ?? [])];
   if (existingAllowed?.trim()) {
     ordered.push(...existingAllowed.split(/[:,]/).map((item) => item.trim()).filter(Boolean));
   }
-  return [...new Set(ordered.map((item) => resolve(item)))].join(':');
+  return [...new Set(ordered.filter(Boolean).map((item) => resolve(item)))].join(':');
 }

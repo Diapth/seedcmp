@@ -70,6 +70,7 @@ import {
 import type { AgentPaneRegistry } from '../../../../terminal/agent-pane-registry.js';
 import type { TmuxGateway } from '../../../../terminal/tmux-gateway.js';
 import { resolveBootcampWorkspaceRoot } from '../../bootcamp/workspace-root.js';
+import { resolveMaomiWorkspaceRoot } from '../../../../maomi-workspaces/workspace-root.js';
 import { createPromptDigest } from '../../context/prompt-digest.js';
 import { AuditEventTypes, getEventAuditLog } from '../../orchestration/EventAuditLog.js';
 import { resolveDefaultClaudeMcpServerPath } from '../providers/ClaudeAgentService.js';
@@ -821,16 +822,40 @@ export async function* invokeSingleCat(deps: InvocationDeps, params: InvocationP
           callbackEnv.CLOWDER_PROJECT_RUNTIME_ROOT = projectRuntimeRoot.runtimeRoot;
           callbackEnv.CAT_CAFE_PROJECT_RUNTIME_ROOT = projectRuntimeRoot.runtimeRoot;
           callbackEnv.CAT_CAFE_PROJECT_ROOT = projectRuntimeRoot.projectRoot;
+          // V3-39: resolve the durable user workspace root so the cat can ALWAYS
+          // write deliverables into maomi_workspace (not /tmp / source repo),
+          // whether or not a workspace is explicitly bound to the thread.
+          let userWorkspaceRoot: string | undefined;
           if (activeMaomiWorkspace) {
             callbackEnv.MAOMI_WORKSPACE_ID = activeMaomiWorkspace.id;
-            callbackEnv.MAOMI_WORKSPACE_ROOT = activeMaomiWorkspace.rootPath;
-            callbackEnv.MAOMI_PROJECT_ROOT = activeMaomiWorkspace.rootPath;
+            userWorkspaceRoot = activeMaomiWorkspace.rootPath;
+          } else {
+            try {
+              const resolved = await resolveMaomiWorkspaceRoot({
+                launchedProjectRoot: workingProjectRoot ?? hostProjectRoot,
+              });
+              userWorkspaceRoot = resolved.rootPath;
+            } catch (err) {
+              log.warn({ err, threadId, invocationId }, 'failed to resolve default maomi workspace root');
+            }
+          }
+          if (userWorkspaceRoot) {
+            callbackEnv.MAOMI_WORKSPACE_ROOT = userWorkspaceRoot;
+            callbackEnv.MAOMI_PROJECT_ROOT = userWorkspaceRoot;
           }
           callbackEnv.CLOWDER_WORKSPACE_ID = registeredRuntimeWorkspace?.id ?? `${threadId}:${invocationId}`;
+          // V3-39 write-boundary: the cat-cafe file/shell MCP tools enforce
+          // ALLOWED_WORKSPACE_DIRS. Include (a) the current worktree root so the
+          // cat can write anywhere in its checkout, and (b) the durable user
+          // workspace so deliverables land in maomi_workspace instead of /tmp.
           callbackEnv.ALLOWED_WORKSPACE_DIRS = buildAllowedWorkspaceDirs(
             projectRuntimeRoot.projectRoot,
             projectRuntimeRoot.runtimeRoot,
             process.env.ALLOWED_WORKSPACE_DIRS,
+            [
+              ...(workingProjectRoot ? [workingProjectRoot] : []),
+              ...(userWorkspaceRoot ? [userWorkspaceRoot] : []),
+            ],
           );
         }
       } catch (err) {
