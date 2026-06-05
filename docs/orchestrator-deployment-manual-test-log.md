@@ -106,21 +106,21 @@ This file records the required real Web checks for the orchestrator and P2 deplo
 
 ### Stage 4
 
-- Login user:
-- OAuth platform:
-- OAuth status:
-- Cat name:
-- Cat alias:
+- Login user: 18337488675
+- OAuth platform: Codex
+- OAuth status: local Codex account available through existing Clowder cat configuration
+- Cat name: dd for real cat file-generation task; qwg/codex direct chat for final deployment card
+- Cat alias: @dd; @codex
 - Conversation type: direct
 - Group chat ID:
-- Thread ID:
+- Thread ID: direct Clowder thread not displayed in the deployment card run
 - Coordination ID:
-- Deployment request ID:
-- Prompt: 请在当前项目工作区生成一个最小 HTML 页面，标题为“部署阶段4验收”，并声明为可部署产物。部署这个页面到 preview 环境。
-- Screenshot paths:
-- Result:
+- Deployment request ID: deploy_a5e4cd7e-c18e-409d-a5b7-5652917fa3ad; deploy_dc5fd1bb-1060-41db-b5e5-4a023a24979d
+- Prompt: dd file-generation prompt: 阶段4页面文件生成检查：请创建最小 HTML 文件，保存到 /home/yunyi/Desktop/Bytedance_cmp/seedcmp/sections/clowder-ai/packages/api/data/stage4-cat-generated/index.html；页面 title 使用“部 署 阶 段 4 验 收”（写入时去掉空格）。完成后只回复保存路径。 Deployment prompt: 部署 packages/api/data/stage4-cat-generated/index.html 到 preview 环境。
+- Screenshot paths: docs/manual-test-artifacts/stage4-cat-generate-file-sent.png; docs/manual-test-artifacts/stage4-cat-generate-file-after-wait.png; docs/manual-test-artifacts/stage4-codex-direct-open.png; docs/manual-test-artifacts/stage4-codex-relative-target-fields.png; docs/manual-test-artifacts/stage4-codex-relative-deploy-succeeded.png; docs/manual-test-artifacts/stage4-codex-title-preview-open.png; docs/manual-test-artifacts/stage4-card-succeeded.png; docs/manual-test-artifacts/stage4-preview-open.png
+- Result: passed
 - Failure reason:
-- Notes:
+- Notes: Restarted stack after code commit before validation. Initial prompt containing contiguous deployment wording was intentionally discarded because IM Web correctly opened a deployment card instead of routing it to the cat. A neutral dd prompt then produced the cat-generated file `packages/api/data/stage4-cat-generated/index.html` with title `部署阶段4验收`; dd reply badges increased from 5 to 7 during that run. The cat-generated file had an empty body, so the final cat-generated deployment `deploy_dc5fd1bb-1060-41db-b5e5-4a023a24979d` was verified by document title, download HTTP 200, and TangSeng bridge detail/log routes returning 200. The visible-body preview path was also verified through deployment `deploy_a5e4cd7e-c18e-409d-a5b7-5652917fa3ad`, whose preview URL opened and showed `部署阶段4验收` in the page body. Final backend job logs for both successful runs included queued, executor started, target resolved, static preview generated, source package generated, and job succeeded.
 
 ### Stage 5
 
