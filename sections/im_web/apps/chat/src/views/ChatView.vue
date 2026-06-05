@@ -585,12 +585,17 @@ function startRightDockResize(event: MouseEvent) {
 
   .right-dock {
     position: absolute;
-    inset: 0;
+    top: 0;
+    right: 0;
+    bottom: var(--mobile-composer-reserve, clamp(176px, 28vh, 240px));
+    left: 0;
     z-index: 20;
     width: 100% !important;
     min-width: 0;
     max-width: none;
+    height: auto;
     border-left: 0;
+    border-bottom: var(--border-hairline);
   }
 
   .right-dock-resizer {

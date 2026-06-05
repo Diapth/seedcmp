@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, onMounted, watch, nextTick, computed } from 'vue';
+import { ref, onMounted, onBeforeUnmount, watch, nextTick, computed } from 'vue';
 import {
   buildClowderCatContactId,
   getClowderCatIdFromContactId,
@@ -14,6 +14,7 @@ import {
   isClowderPayload
 } from '@tsdaodao/base-vue/utils/clowderMessageIdentity';
 import { buildDeploymentCardMessage } from '../utils/deploymentRequestCard';
+import CoordinatorSummaryCard from './CoordinatorSummaryCard.vue';
 import {
   TextCell,
   ImageCell,
@@ -70,6 +71,32 @@ const editDialogText = ref('');
 const channelKey = computed(() => `${props.channelId}-${props.channelType}`);
 const deploymentActionKeys = new Set<string>();
 const deploymentFieldKeys = new Set<string>();
+const coordinatorActionKey = ref('');
+const coordinationHydrationIds = new Set<string>();
+
+interface CoordinatorSummarySubtaskView {
+  id: string;
+  title: string;
+  targetCatId?: string;
+  targetName?: string;
+  status: string;
+  result?: string;
+  failureReason?: string;
+  artifactRefs?: readonly string[];
+}
+
+interface CoordinatorSummaryView {
+  coordinationId?: string;
+  status: string;
+  goal?: string;
+  aggregateSummary?: string;
+  failureReason?: string;
+  conflict?: boolean;
+  targetCatIds?: readonly string[];
+  subtasks?: readonly CoordinatorSummarySubtaskView[];
+}
+
+const emptyCoordinatorSummary: CoordinatorSummaryView = { status: 'succeeded' };
 
 const messages = computed(() => {
   return messageStore.messages[channelKey.value] || [];
@@ -375,6 +402,232 @@ function buildMessageCopyText(msg: any): string {
   const body = String(content.text || content.content || '').trim();
   const transcript = visibleTranscriptText(msg).trim();
   return [body, transcript].filter(Boolean).join('\n\n');
+}
+
+function getMessageBodyText(msg: any): string {
+  const content = msg?.content || msg?.payload || {};
+  return String(content.text || content.content || content.markdown || '').trim();
+}
+
+function getMessageSource(msg: any): any {
+  const content = msg?.content || msg?.payload || {};
+  const metadata = content.metadata || {};
+  return content.source || content.connectorSource || metadata.source || msg?.source || msg?.extra?.source || {};
+}
+
+function getCoordinationContext(msg: any): any {
+  const content = msg?.content || msg?.payload || {};
+  const metadata = content.metadata || {};
+  return content.coordination || metadata.coordination || content.extra?.coordination || msg?.extra?.coordination;
+}
+
+function getCoordinationIdFromMessage(msg: any): string {
+  const text = getMessageBodyText(msg);
+  const coordination = getCoordinationContext(msg);
+  const explicit = String(
+    coordination?.coordinationId ||
+    coordination?.id ||
+    msg?.coordinationId ||
+    ''
+  ).trim();
+  if (explicit) return explicit;
+  const match = text.match(/\*\*Coordination\*\*:\s*([^\s]+)/i) || text.match(/\b(coord[-_][a-z0-9-]+)/i);
+  return String(match?.[1] || '').trim();
+}
+
+function isCoordinatorSummaryMessage(msg: any): boolean {
+  const text = getMessageBodyText(msg);
+  const source = getMessageSource(msg);
+  return Boolean(
+    text.includes('Coordinator / Multi-Mention') ||
+    text.includes('Coordinator / Multi-Mention 结果汇总') ||
+    source.connector === 'multi-mention-result' ||
+    source.label === 'Multi-Mention 结果' ||
+    getCoordinationContext(msg)
+  );
+}
+
+function maybeHydrateCoordination(coordinationId: string) {
+  if (!coordinationId || clowderStore.getCoordination(coordinationId) || coordinationHydrationIds.has(coordinationId)) {
+    return;
+  }
+  coordinationHydrationIds.add(coordinationId);
+  void clowderStore.loadCoordination(coordinationId)
+    .catch(() => undefined)
+    .finally(() => {
+      coordinationHydrationIds.delete(coordinationId);
+    });
+}
+
+function lookupAgentName(catId?: string) {
+  if (!catId) return '';
+  const groupCats = clowderStore.groupCatMemberships[props.channelId] || [];
+  const agent = [
+    ...(clowderStore.agentDirectories[channelKey.value]?.agents || []),
+    ...groupCats,
+    ...(clowderStore.connectedCatContacts || []),
+  ].find((item: any) => item.catId === catId || item.id === catId);
+  return String(agent?.displayName || (agent as any)?.name || catId);
+}
+
+function inferCoordinatorStatusFromText(text: string): string {
+  if (/失败|failed/i.test(text)) return 'failed';
+  if (/超时|timeout/i.test(text)) return 'partial';
+  return 'succeeded';
+}
+
+function extractQuestionFromCoordinatorText(text: string): string {
+  const match = text.match(/\*\*问题\*\*:\s*(.+)/);
+  return String(match?.[1] || '').trim();
+}
+
+function buildCoordinatorSummary(msg: any): CoordinatorSummaryView | null {
+  if (!isCoordinatorSummaryMessage(msg)) return null;
+  const text = getMessageBodyText(msg);
+  const coordinationId = getCoordinationIdFromMessage(msg);
+  if (coordinationId) maybeHydrateCoordination(coordinationId);
+  const coordination = coordinationId ? clowderStore.getCoordination(coordinationId) : undefined;
+  const source = getMessageSource(msg);
+  const targetCatIds = coordination?.targetCatIds ||
+    (Array.isArray(source?.meta?.targets) ? source.meta.targets.map((item: any) => String(item)) : []);
+
+  if (coordination) {
+    return {
+      coordinationId: coordination.coordinationId,
+      status: coordination.status,
+      goal: coordination.goal,
+      aggregateSummary: coordination.aggregateSummary || '',
+      failureReason: coordination.failureReason || '',
+      conflict: /冲突|conflict/i.test(`${coordination.aggregateSummary || ''}\n${coordination.failureReason || ''}`),
+      targetCatIds,
+      subtasks: coordination.subtasks.map((subtask) => ({
+        id: subtask.id,
+        title: subtask.title,
+        targetCatId: subtask.targetCatId,
+        targetName: lookupAgentName(subtask.targetCatId),
+        status: subtask.status,
+        result: subtask.result,
+        failureReason: subtask.failureReason,
+        artifactRefs: subtask.artifactRefs,
+      })),
+    };
+  }
+
+  return {
+    coordinationId: coordinationId || undefined,
+    status: inferCoordinatorStatusFromText(text),
+    goal: extractQuestionFromCoordinatorText(text),
+    aggregateSummary: '',
+    failureReason: '',
+    conflict: /冲突|conflict/i.test(text),
+    targetCatIds,
+    subtasks: targetCatIds.map((catId: string) => ({
+      id: `${coordinationId || getMessageStableKey(msg)}:${catId}`,
+      title: lookupAgentName(catId),
+      targetCatId: catId,
+      targetName: lookupAgentName(catId),
+      status: inferCoordinatorStatusFromText(text),
+    })),
+  };
+}
+
+function coordinatorBusyAction(summary: CoordinatorSummaryView): 'redispatch' | 'cancel' | '' {
+  const id = summary.coordinationId || '';
+  if (!id) return '';
+  if (coordinatorActionKey.value === `${id}:redispatch`) return 'redispatch';
+  if (coordinatorActionKey.value === `${id}:cancel`) return 'cancel';
+  return '';
+}
+
+function getMessageSearchText(msg: any): string {
+  const content = msg?.content || msg?.payload || {};
+  return [
+    getMessageStableKey(msg),
+    msg?.messageID,
+    msg?.clientMsgNo,
+    msg?.messageSeq,
+    getMessageBodyText(msg),
+    content.taskId,
+    content.coordinationId,
+  ].map((value) => String(value || '')).filter(Boolean).join('\n');
+}
+
+async function handleLocateMessageEvent(event: Event) {
+  const detail = (event as CustomEvent)?.detail || {};
+  const needles = [
+    detail.messageId,
+    detail.sourceMessageId,
+    detail.taskId,
+    detail.coordinationId,
+  ].map((value) => String(value || '').trim()).filter(Boolean);
+  if (!needles.length) return;
+
+  const index = renderableMessages.value.findIndex((message) => {
+    const searchable = getMessageSearchText(message);
+    return needles.some((needle) => searchable.includes(needle));
+  });
+  if (index < 0) {
+    Message.info('未找到对应聊天消息');
+    return;
+  }
+
+  historyWindowSize.value = Math.max(historyWindowSize.value, renderableMessages.value.length);
+  await nextTick();
+  const container = scrollContainer.value;
+  if (!container) return;
+  container.scrollTop = Math.max(0, index * estimatedRowHeight - 80);
+  scrollTop.value = container.scrollTop;
+  await nextTick();
+  const key = getMessageStableKey(renderableMessages.value[index]);
+  const rows = Array.from(container.querySelectorAll<HTMLElement>('[data-message-key]'));
+  const target = rows.find((row) => row.dataset.messageKey === key);
+  if (!target) return;
+  target.scrollIntoView({ block: 'center', behavior: 'smooth' });
+  target.classList.add('is-located');
+  window.setTimeout(() => target.classList.remove('is-located'), 1800);
+}
+
+async function handleCoordinatorSummaryRedispatch(summary: CoordinatorSummaryView) {
+  const coordinationId = String(summary.coordinationId || '').trim();
+  if (!coordinationId || coordinatorActionKey.value) return;
+  coordinatorActionKey.value = `${coordinationId}:redispatch`;
+  const text = `/dispatch ${coordinationId} 请协调者重新派发未完成或失败的子任务，并重新汇总当前结果。`;
+  try {
+    await messageStore.sendMessage(props.channelId, props.channelType, text);
+    await clowderStore.sendConversationMessage({
+      channelId: props.channelId,
+      channelType: props.channelType as 1 | 2,
+      directCatId: getClowderCatIdFromContactId(props.channelId),
+      targetCatIds: ['coordinator'],
+      promptContext: [
+        `Coordinator quick action: redispatch`,
+        `Coordination: ${coordinationId}`,
+        summary.goal ? `Goal: ${summary.goal}` : '',
+      ].filter(Boolean).join('\n'),
+    }, text);
+    window.setTimeout(() => {
+      void messageStore.syncMessages(props.channelId, props.channelType, { hydrateVisibleHistory: true });
+    }, 2500);
+    Message.success('已请求重新派发');
+  } catch (err: any) {
+    Message.error(err?.message || err?.msg || '重新派发失败');
+  } finally {
+    coordinatorActionKey.value = '';
+  }
+}
+
+async function handleCoordinatorSummaryCancel(summary: CoordinatorSummaryView) {
+  const coordinationId = String(summary.coordinationId || '').trim();
+  if (!coordinationId || coordinatorActionKey.value) return;
+  coordinatorActionKey.value = `${coordinationId}:cancel`;
+  try {
+    await clowderStore.cancelCoordination(coordinationId, 'cancelled from IM Web coordinator summary');
+    Message.success('已取消协调任务');
+  } catch (err: any) {
+    Message.error(err?.message || err?.msg || '取消协调任务失败');
+  } finally {
+    coordinatorActionKey.value = '';
+  }
 }
 
 function fallbackCopyText(text: string) {
@@ -794,13 +1047,26 @@ async function handleDeploymentCardAction(payload: { action: 'confirm' | 'cancel
     deploymentActionKeys.delete(actionKey);
   }
 }
+
+onMounted(() => {
+  window.addEventListener('clowder:locate-message', handleLocateMessageEvent);
+});
+
+onBeforeUnmount(() => {
+  window.removeEventListener('clowder:locate-message', handleLocateMessageEvent);
+});
 </script>
 
 <template>
   <div ref="scrollContainer" class="message-list" @scroll="handleScroll">
     <div v-if="topSpacerHeight > 0" class="history-spacer" :style="{ height: `${topSpacerHeight}px` }"></div>
 
-    <div v-for="item in visibleMessages" :key="item.msg.clientMsgNo || item.msg.messageID" class="message-row-wrapper">
+    <div
+      v-for="item in visibleMessages"
+      :key="item.msg.clientMsgNo || item.msg.messageID"
+      class="message-row-wrapper"
+      :data-message-key="getMessageStableKey(item.msg)"
+    >
       <TimeCell v-if="shouldShowTime(item.msg, item.index)" :timestamp="item.msg.timestamp" />
 
       <div
@@ -846,6 +1112,13 @@ async function handleDeploymentCardAction(payload: { action: 'confirm' | 'cancel
             :message="item.msg"
             :is-me="isMe(item.msg)"
             @preview-code="handleCodePreview"
+          />
+          <CoordinatorSummaryCard
+            v-if="buildCoordinatorSummary(item.msg)"
+            :summary="buildCoordinatorSummary(item.msg) || emptyCoordinatorSummary"
+            :busy-action="coordinatorBusyAction(buildCoordinatorSummary(item.msg) || emptyCoordinatorSummary)"
+            @redispatch="handleCoordinatorSummaryRedispatch"
+            @cancel="handleCoordinatorSummaryCancel"
           />
           <ImageCell
             v-else-if="item.msg.content?.type === 2"
@@ -966,6 +1239,15 @@ async function handleDeploymentCardAction(payload: { action: 'confirm' | 'cancel
   min-height: 24px;
   overflow-anchor: none;
   flex-shrink: 0;
+}
+
+.message-row-wrapper.is-located {
+  animation: located-message-pulse 1.6s ease;
+}
+
+@keyframes located-message-pulse {
+  0% { background-color: rgba(22, 93, 255, 0.16); }
+  100% { background-color: transparent; }
 }
 
 .history-spacer {

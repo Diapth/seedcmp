@@ -17,5 +17,7 @@ describe('right dock preview and Clowder layout', () => {
     expect(panel.default).toContain('min-width: 264px')
     expect(preview.default).not.toContain('<aside')
     expect(panel.default).not.toContain('<aside')
+    expect(chatView.default).toContain('bottom: var(--mobile-composer-reserve, clamp(176px, 28vh, 240px))')
+    expect(chatView.default).toContain('height: auto')
   })
 })

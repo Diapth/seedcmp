@@ -1,6 +1,12 @@
 <script setup lang="ts">
 import { computed, onMounted, onUnmounted, watch } from 'vue';
-import { useClowderStore, type ClowderAgent, type ClowderMaomiWorkspace, type ClowderThreadTask } from '@tsdaodao/datasource-vue';
+import {
+  useClowderStore,
+  type ClowderAgent,
+  type ClowderCoordinationSubtask,
+  type ClowderMaomiWorkspace,
+  type ClowderThreadTask,
+} from '@tsdaodao/datasource-vue';
 import CatWorkBadge from './CatWorkBadge.vue';
 
 defineOptions({ name: 'ProjectKanbanPanel' });
@@ -9,13 +15,28 @@ interface Props {
   threadId: string;
   agentDirectory?: ClowderAgent[];
   observedTaskIds?: string[];
+  coordinationSubtasks?: ClowderCoordinationSubtask[];
   activeWorkspace?: ClowderMaomiWorkspace;
 }
 
 const props = defineProps<Props>();
 
 type TaskStatus = 'todo' | 'doing' | 'blocked' | 'done';
-type TaskItem = ClowderThreadTask;
+interface TaskItem {
+  id: string;
+  title: string;
+  ownerCatId: string | null;
+  status: TaskStatus;
+  why?: string;
+  artifactRefs?: readonly string[];
+  coordinationId?: string;
+  workspaceId?: string;
+  workspaceRelativePath?: string;
+  createdAt: number;
+  updatedAt: number;
+  source: 'thread' | 'coordination';
+  originalStatus?: string;
+}
 
 const clowderStore = useClowderStore();
 let pollTimer: ReturnType<typeof setInterval> | null = null;
@@ -28,7 +49,7 @@ const SECTIONS: Array<{ key: TaskStatus; label: string; icon: string }> = [
 ];
 
 const loadState = computed(() => clowderStore.getThreadTasksState(props.threadId));
-const tasks = computed<TaskItem[]>(() => ('tasks' in loadState.value ? loadState.value.tasks : []));
+const tasks = computed<ClowderThreadTask[]>(() => ('tasks' in loadState.value ? loadState.value.tasks : []));
 const loading = computed(() => loadState.value.state === 'loading');
 const routeError = computed(() => loadState.value.state === 'route_failed' ? loadState.value : null);
 const mismatch = computed(() => loadState.value.state === 'thread_binding_mismatch' ? loadState.value : null);
@@ -38,6 +59,48 @@ const successEmpty = computed(() => loadState.value.state === 'success_empty');
 const createdTaskMissing = computed(() => diagnostics.value?.state === 'created_task_missing');
 const workspaceMismatchIds = computed(() => diagnostics.value?.workspaceMismatchedTaskIds || []);
 
+function normalizeStatus(status: string): TaskStatus {
+  if (status === 'doing' || status === 'done' || status === 'blocked' || status === 'todo') {
+    return status;
+  }
+  if (status === 'failed' || status === 'cancelled') return 'blocked';
+  return 'todo';
+}
+
+const kanbanItems = computed<TaskItem[]>(() => {
+  const threadItems = tasks.value.map((task) => ({
+    id: task.id,
+    title: task.title,
+    ownerCatId: task.ownerCatId,
+    status: normalizeStatus(task.status),
+    why: task.why,
+    artifactRefs: task.artifactRefs,
+    coordinationId: task.coordinationId,
+    workspaceId: task.workspaceId,
+    workspaceRelativePath: task.workspaceRelativePath,
+    createdAt: task.createdAt,
+    updatedAt: task.updatedAt,
+    source: 'thread' as const,
+    originalStatus: task.status,
+  }));
+  const knownIds = new Set(threadItems.map((task) => task.id));
+  const coordinationItems = (props.coordinationSubtasks || [])
+    .filter((subtask) => subtask.id && !knownIds.has(subtask.id))
+    .map((subtask) => ({
+      id: subtask.id,
+      title: subtask.title,
+      ownerCatId: subtask.targetCatId || null,
+      status: normalizeStatus(subtask.status),
+      why: subtask.description || subtask.failureReason || subtask.result,
+      artifactRefs: subtask.artifactRefs,
+      createdAt: subtask.createdAt,
+      updatedAt: subtask.updatedAt,
+      source: 'coordination' as const,
+      originalStatus: subtask.status,
+    }));
+  return [...threadItems, ...coordinationItems];
+});
+
 const tasksByStatus = computed(() => {
   const map: Record<TaskStatus, TaskItem[]> = {
     todo: [],
@@ -45,9 +108,8 @@ const tasksByStatus = computed(() => {
     blocked: [],
     done: [],
   };
-  for (const t of tasks.value) {
-    const status = (SECTIONS.find((s) => s.key === t.status) ? t.status : 'todo') as TaskStatus;
-    map[status].push(t);
+  for (const t of kanbanItems.value) {
+    map[t.status].push(t);
   }
   for (const status of SECTIONS) {
     map[status.key].sort((a, b) => a.updatedAt - b.updatedAt);
@@ -57,7 +119,7 @@ const tasksByStatus = computed(() => {
 
 const tasksByOwner = computed(() => {
   const map = new Map<string, TaskItem[]>();
-  for (const t of tasks.value) {
+  for (const t of kanbanItems.value) {
     if (!t.ownerCatId) continue;
     const list = map.get(t.ownerCatId) ?? [];
     list.push(t);
@@ -76,6 +138,15 @@ function lookupAgent(catId: string): ClowderAgent | undefined {
 function shortTaskId(taskId: string): string {
   const parts = taskId.split('-');
   return parts.length > 1 ? parts.slice(-2).join('-') : taskId.slice(-12);
+}
+
+function locateTask(task: TaskItem) {
+  window.dispatchEvent(new CustomEvent('clowder:locate-message', {
+    detail: {
+      taskId: task.id,
+      coordinationId: task.coordinationId,
+    },
+  }));
 }
 
 async function refresh() {
@@ -132,7 +203,7 @@ defineExpose({ refresh });
       </button>
     </div>
 
-    <p v-if="loading && tasks.length === 0" class="kanban-panel__empty">加载任务中…</p>
+    <p v-if="loading && kanbanItems.length === 0" class="kanban-panel__empty">加载任务中…</p>
     <p v-else-if="routeError" class="kanban-panel__error">
       任务查询失败<span v-if="routeError.status"> ({{ routeError.status }})</span>：{{ routeError.error }}
     </p>
@@ -156,7 +227,7 @@ defineExpose({ refresh });
       还没有任务。让协调者分配任务后,这里会显示各猫的工作状态。
     </p>
 
-    <div v-if="tasks.length > 0" class="kanban-panel__columns">
+    <div v-if="kanbanItems.length > 0" class="kanban-panel__columns">
       <section
         v-for="section in SECTIONS"
         :key="section.key"
@@ -172,25 +243,40 @@ defineExpose({ refresh });
             v-for="task in tasksByStatus[section.key]"
             :key="task.id"
             class="kanban-panel__task"
+            :data-task-source="task.source"
           >
-            <div class="kanban-panel__task-title">{{ task.title }}</div>
-            <div class="kanban-panel__task-id">#{{ shortTaskId(task.id) }}</div>
-            <div v-if="task.workspaceRelativePath || task.workspaceId" class="kanban-panel__task-workspace">
-              {{ task.workspaceRelativePath || task.workspaceId }}
-            </div>
-            <div v-if="task.why" class="kanban-panel__task-why">{{ task.why }}</div>
-            <div class="kanban-panel__task-owner">
-              <CatWorkBadge
-                v-if="task.ownerCatId && lookupAgent(task.ownerCatId)"
-                :cat="lookupAgent(task.ownerCatId)!"
-                :available="true"
-                :selected="false"
-                compact
-              />
-              <span v-else class="kanban-panel__owner-name">
-                {{ task.ownerCatId ? `@${task.ownerCatId}` : '未分配' }}
-              </span>
-            </div>
+            <button
+              type="button"
+              class="kanban-panel__task-button"
+              @click="locateTask(task)"
+            >
+              <div class="kanban-panel__task-title">{{ task.title }}</div>
+              <div class="kanban-panel__task-id">
+                #{{ shortTaskId(task.id) }}
+                <span v-if="task.originalStatus && task.originalStatus !== task.status">
+                  {{ task.originalStatus }}
+                </span>
+              </div>
+              <div v-if="task.workspaceRelativePath || task.workspaceId" class="kanban-panel__task-workspace">
+                {{ task.workspaceRelativePath || task.workspaceId }}
+              </div>
+              <div v-if="task.why" class="kanban-panel__task-why">{{ task.why }}</div>
+              <div v-if="task.artifactRefs?.length" class="kanban-panel__task-why">
+                artifacts: {{ task.artifactRefs.length }}
+              </div>
+              <div class="kanban-panel__task-owner">
+                <CatWorkBadge
+                  v-if="task.ownerCatId && lookupAgent(task.ownerCatId)"
+                  :cat="lookupAgent(task.ownerCatId)!"
+                  :available="true"
+                  :selected="false"
+                  compact
+                />
+                <span v-else class="kanban-panel__owner-name">
+                  {{ task.ownerCatId ? `@${task.ownerCatId}` : '未分配' }}
+                </span>
+              </div>
+            </button>
           </li>
         </ul>
       </section>
@@ -341,10 +427,22 @@ defineExpose({ refresh });
 }
 
 .kanban-panel__task {
-  padding: 6px 8px;
   background: var(--color-bg-1, #fdf8f3);
   border: 1px solid var(--color-border-2, #e5e0d8);
   border-radius: 6px;
+  overflow: hidden;
+}
+
+.kanban-panel__task-button {
+  display: block;
+  width: 100%;
+  min-width: 0;
+  padding: 6px 8px;
+  border: 0;
+  background: transparent;
+  color: inherit;
+  cursor: pointer;
+  text-align: left;
 }
 
 .kanban-panel__task-title {

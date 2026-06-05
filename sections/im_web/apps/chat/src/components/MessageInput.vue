@@ -66,6 +66,12 @@ const SYSTEM_ROBOT_ID = 'u_10000';
 const DEEPSEEK_AI_ROBOT_ID = 'deepseek_ai_robot';
 const CLOWDER_AI_ROBOT_ID = 'clowder_ai';
 const CLOWDER_COORDINATOR_CAT_ID = 'coordinator';
+const COORDINATOR_COMMANDS = [
+  { command: '/plan', label: '/plan', text: '/plan 请协调者拆解当前需求并给出分工。' },
+  { command: '/dispatch', label: '/dispatch', text: '/dispatch 请协调者派发上一轮计划中的待办任务。' },
+  { command: '/status', label: '/status', text: '/status' },
+  { command: '/cancel', label: '/cancel', text: '/cancel 请取消当前协调任务。' },
+];
 
 // Mention state
 const showMentionPopup = ref(false);
@@ -140,6 +146,24 @@ const groupAutoReplyMode = computed(() => {
   if (props.channelType !== 2) return 'mentions_only';
   return clowderStore.groupAutoReplyModes[props.channelId] || 'soft_mentions';
 });
+
+const coordinatorCommandQuery = computed(() => {
+  const text = inputText.value.trimStart();
+  if (!text.startsWith('/')) return '';
+  const token = text.split(/\s+/, 1)[0].toLowerCase();
+  return token;
+});
+
+const filteredCoordinatorCommands = computed(() => {
+  if (!coordinatorCommandQuery.value) return [];
+  return COORDINATOR_COMMANDS.filter(item => item.command.startsWith(coordinatorCommandQuery.value));
+});
+
+const showCoordinatorCommandMenu = computed(() =>
+  props.channelType === 2 &&
+  coordinatorCommandQuery.value.length > 0 &&
+  filteredCoordinatorCommands.value.length > 0
+);
 
 function getMemberUid(member: any): string {
   return String(member?.catContact?.id || member?.member_uid || member?.uid || '');
@@ -385,6 +409,8 @@ function matchesCatTargetToken(candidate: string, lookup: string) {
 function getCommandTargetCatIds(text: string) {
   const match = text.match(/^\/(ask|focus)\s+([^\s]+)/i);
   const lookup = normalizeCatTargetToken(match?.[2] || '');
+  const coordinatorCommand = text.match(/^\/(plan|dispatch|status|cancel)\b/i);
+  if (coordinatorCommand) return [CLOWDER_COORDINATOR_CAT_ID];
   if (!lookup) return [];
   return catMentionMembers.value
     .filter(member => {
@@ -896,6 +922,14 @@ async function insertMentionTrigger() {
   textareaRef.value?.focus();
 }
 
+async function selectCoordinatorCommand(commandText: string) {
+  inputText.value = commandText;
+  await nextTick();
+  const caretPos = inputText.value.length;
+  textareaRef.value?.setSelectionRange(caretPos, caretPos);
+  textareaRef.value?.focus();
+}
+
 async function openRobotMenu() {
   if (robotMenuState.value === 'ready') {
     robotMenuState.value = 'idle';
@@ -1135,6 +1169,18 @@ onBeforeUnmount(() => {
       </div>
     </div>
 
+    <div v-if="showCoordinatorCommandMenu" class="coordinator-command-panel">
+      <button
+        v-for="item in filteredCoordinatorCommands"
+        :key="item.command"
+        type="button"
+        class="coordinator-command-option"
+        @click="selectCoordinatorCommand(item.text)"
+      >
+        <span>{{ item.label }}</span>
+      </button>
+    </div>
+
     <!-- Reply target indicator bar -->
     <div v-if="messageStore.replyTarget" class="reply-preview-bar">
       <span class="reply-text">
@@ -1334,6 +1380,43 @@ onBeforeUnmount(() => {
   box-shadow: 0 -4px 12px rgba(0, 0, 0, 0.08);
   z-index: 3200;
   margin-bottom: 8px;
+}
+
+.coordinator-command-panel {
+  position: absolute;
+  bottom: 100%;
+  left: 16px;
+  width: min(280px, calc(100% - 32px));
+  max-height: 184px;
+  overflow-y: auto;
+  background-color: var(--bg-primary);
+  border: var(--border-hairline);
+  border-radius: var(--radius-sm);
+  box-shadow: 0 -4px 12px rgba(0, 0, 0, 0.08);
+  z-index: 3190;
+  margin-bottom: 8px;
+  padding: 6px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.coordinator-command-option {
+  min-height: 30px;
+  padding: 0 8px;
+  border: 0;
+  border-radius: var(--radius-sm);
+  background: transparent;
+  color: var(--text-primary);
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: flex-start;
+  font-size: 12px;
+}
+
+.coordinator-command-option:hover {
+  background-color: var(--bg-hover);
 }
 
 .mention-item {

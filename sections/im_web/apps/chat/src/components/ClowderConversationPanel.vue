@@ -1,6 +1,15 @@
 <script setup lang="ts">
 import { computed, onMounted, onUnmounted, ref, watch } from 'vue';
-import { useClowderStore, useMessageStore, type ClowderAgent, type ClowderChannelType, type ClowderGroupAutoReplyMode, type CoordinatorKickoff } from '@tsdaodao/datasource-vue';
+import {
+  useClowderStore,
+  useMessageStore,
+  type ClowderAgent,
+  type ClowderChannelType,
+  type ClowderCoordination,
+  type ClowderCoordinationSubtask,
+  type ClowderGroupAutoReplyMode,
+  type CoordinatorKickoff,
+} from '@tsdaodao/datasource-vue';
 import { useRouter } from 'vue-router';
 import CoordinatorKickoffCard from './CoordinatorKickoffCard.vue';
 import ProjectKanbanPanel from './ProjectKanbanPanel.vue';
@@ -22,10 +31,13 @@ const clowderStore = useClowderStore();
 const messageStore = useMessageStore();
 const router = useRouter();
 
-type SubTab = 'overview' | 'kanban' | 'artifacts';
+type SubTab = 'overview' | 'coordination' | 'kanban' | 'artifacts';
 type ProjectKanbanPanelExpose = { refresh: () => Promise<void> | void };
 const subTab = ref<SubTab>('overview');
 const kanbanPanelRef = ref<ProjectKanbanPanelExpose | null>(null);
+const coordinationLoading = ref(false);
+const coordinationActionId = ref('');
+const coordinationError = ref('');
 
 const stateTokens = 'ready disabled denied loading error';
 const KICKOFF_REFRESH_INTERVAL_MS = 30_000;
@@ -89,6 +101,16 @@ const activeWorkspace = computed(() => clowderStore.getActiveWorkspace(boundThre
 const workspaceBindingDiagnostics = computed(() =>
   boundThreadId.value ? clowderStore.getWorkspaceBinding(boundThreadId.value)?.diagnostics : undefined,
 );
+const threadCoordinations = computed<ClowderCoordination[]>(() => {
+  const threadId = boundThreadId.value;
+  if (!threadId) return [];
+  return [...clowderStore.getThreadCoordinations(threadId)].sort((a, b) => b.updatedAt - a.updatedAt);
+});
+const activeCoordination = computed<ClowderCoordination | null>(() => threadCoordinations.value[0] || null);
+const activeCoordinationSubtasks = computed<ClowderCoordinationSubtask[]>(() => activeCoordination.value?.subtasks || []);
+const coordinationRefreshToken = computed(() =>
+  threadCoordinations.value.map((item) => `${item.coordinationId}:${item.status}:${item.updatedAt}`).join('|'),
+);
 
 function textFromMessage(message: { content?: unknown }): string {
   const content = message.content;
@@ -142,6 +164,20 @@ async function refreshKanban() {
   });
 }
 
+async function refreshCoordinations() {
+  const threadId = boundThreadId.value;
+  if (!threadId) return;
+  coordinationLoading.value = true;
+  coordinationError.value = '';
+  try {
+    await clowderStore.loadThreadCoordinations(threadId);
+  } catch (err: any) {
+    coordinationError.value = err?.message || err?.msg || 'coordination_load_failed';
+  } finally {
+    coordinationLoading.value = false;
+  }
+}
+
 async function refresh() {
   if (!props.visible || !props.channelId) return;
   const health = await clowderStore.refreshStatus().catch(() => clowderStore.status);
@@ -149,11 +185,73 @@ async function refresh() {
   await clowderStore.loadConversation(conversationRef.value).catch(() => undefined);
   if (boundThreadId.value) {
     await clowderStore.loadWorkspaceBinding(boundThreadId.value).catch(() => undefined);
+    await refreshCoordinations();
   }
   if (props.channelType === 2) {
     await clowderStore.loadGroupCats(props.channelId).catch(() => undefined);
   }
   await clowderStore.loadAgentDirectory(conversationRef.value).catch(() => undefined);
+}
+
+function statusText(statusValue: string) {
+  const labels: Record<string, string> = {
+    planning: '规划中',
+    dispatching: '派发中',
+    running: '执行中',
+    aggregating: '汇总中',
+    succeeded: '已完成',
+    failed: '失败',
+    cancelled: '已取消',
+    todo: '待办',
+    doing: '进行中',
+    blocked: '阻塞',
+    done: '完成',
+  };
+  return labels[statusValue] || statusValue;
+}
+
+function statusTone(statusValue: string) {
+  if (['succeeded', 'done'].includes(statusValue)) return 'success';
+  if (['failed', 'blocked', 'cancelled'].includes(statusValue)) return 'danger';
+  if (['dispatching', 'running', 'aggregating', 'doing'].includes(statusValue)) return 'active';
+  return 'neutral';
+}
+
+function shortId(value: string) {
+  if (!value) return '';
+  return value.length > 18 ? `${value.slice(0, 8)}…${value.slice(-6)}` : value;
+}
+
+function lookupAgentName(catId?: string) {
+  if (!catId) return '未分配';
+  return agents.value.find((agent) => agent.catId === catId)?.displayName || `@${catId}`;
+}
+
+function canCancelCoordination(coordination?: ClowderCoordination | null) {
+  return Boolean(coordination && !['succeeded', 'failed', 'cancelled'].includes(coordination.status));
+}
+
+function locateCoordinationSubtask(subtask: ClowderCoordinationSubtask, coordination?: ClowderCoordination | null) {
+  window.dispatchEvent(new CustomEvent('clowder:locate-message', {
+    detail: {
+      taskId: subtask.id,
+      coordinationId: coordination?.coordinationId,
+      sourceMessageId: coordination?.sourceMessageId,
+    },
+  }));
+}
+
+async function handleCancelCoordination(coordination: ClowderCoordination) {
+  if (!canCancelCoordination(coordination) || coordinationActionId.value) return;
+  coordinationActionId.value = coordination.coordinationId;
+  coordinationError.value = '';
+  try {
+    await clowderStore.cancelCoordination(coordination.coordinationId, 'cancelled from IM Web coordination panel');
+  } catch (err: any) {
+    coordinationError.value = err?.message || err?.msg || 'coordination_cancel_failed';
+  } finally {
+    coordinationActionId.value = '';
+  }
 }
 
 async function handleFocus(catId: string) {
@@ -230,11 +328,13 @@ watch(() => [props.visible, props.channelId, props.channelType], refresh);
 
 watch(subTab, (next) => {
   if (next === 'kanban') void refreshKanban();
+  if (next === 'coordination') void refreshCoordinations();
 });
 
 watch(boundThreadId, () => {
   if (boundThreadId.value) void clowderStore.loadWorkspaceBinding(boundThreadId.value);
   if (subTab.value === 'kanban') void refreshKanban();
+  if (subTab.value === 'coordination') void refreshCoordinations();
 });
 
 watch(observedTaskIdsKey, () => {
@@ -247,6 +347,10 @@ watch(deliveryRefreshToken, (token) => {
   if (state === 'delivered' || state === 'failed' || state === 'skipped' || state === 'duplicate') {
     void refreshKanban();
   }
+});
+
+watch(coordinationRefreshToken, () => {
+  if (subTab.value === 'kanban') void refreshKanban();
 });
 </script>
 
@@ -270,6 +374,17 @@ watch(deliveryRefreshToken, (token) => {
         @click="subTab = 'overview'"
       >
         概览
+      </button>
+      <button
+        type="button"
+        class="panel-tab"
+        :class="{ active: subTab === 'coordination' }"
+        :aria-selected="subTab === 'coordination'"
+        role="tab"
+        :disabled="!boundThreadId"
+        @click="subTab = 'coordination'"
+      >
+        协调任务
       </button>
       <button
         type="button"
@@ -389,8 +504,101 @@ watch(deliveryRefreshToken, (token) => {
         :thread-id="boundThreadId"
         :agent-directory="agents"
         :observed-task-ids="observedTaskIds"
+        :coordination-subtasks="activeCoordinationSubtasks"
         :active-workspace="activeWorkspace"
       />
+    </div>
+
+    <div v-else-if="subTab === 'coordination' && boundThreadId" class="panel-body panel-body--scrollable">
+      <section class="coordination-pane">
+        <header class="coordination-head">
+          <div>
+            <div class="section-label">Current Coordination</div>
+            <h4>{{ activeCoordination ? shortId(activeCoordination.coordinationId) : '暂无协调任务' }}</h4>
+          </div>
+          <button
+            type="button"
+            class="coordination-refresh"
+            :disabled="coordinationLoading"
+            @click="refreshCoordinations"
+          >
+            {{ coordinationLoading ? '刷新中…' : '刷新' }}
+          </button>
+        </header>
+
+        <p v-if="coordinationError" class="error-text">{{ coordinationError }}</p>
+        <p v-else-if="coordinationLoading && !activeCoordination" class="muted">正在加载协调状态…</p>
+        <p v-else-if="!activeCoordination" class="muted">让协调者拆解并派发任务后，这里会显示状态、分工和结果。</p>
+
+        <template v-if="activeCoordination">
+          <div class="coordination-summary">
+            <span class="status-pill" :data-tone="statusTone(activeCoordination.status)">
+              {{ statusText(activeCoordination.status) }}
+            </span>
+            <span>{{ activeCoordination.dispatchMode }}</span>
+            <span>{{ activeCoordination.subtasks.length }} subtasks</span>
+          </div>
+          <p class="coordination-goal">{{ activeCoordination.goal }}</p>
+          <p v-if="activeCoordination.failureReason" class="error-text">
+            {{ activeCoordination.failureReason }}
+          </p>
+          <p v-if="activeCoordination.aggregateSummary" class="coordination-result">
+            {{ activeCoordination.aggregateSummary }}
+          </p>
+          <div v-if="activeCoordination.assumptions.length" class="coordination-notes">
+            <span v-for="assumption in activeCoordination.assumptions" :key="assumption">
+              {{ assumption }}
+            </span>
+          </div>
+          <div v-if="activeCoordination.targetCatIds.length" class="coordination-targets">
+            <span
+              v-for="catId in activeCoordination.targetCatIds"
+              :key="catId"
+              class="target-chip"
+            >
+              {{ lookupAgentName(catId) }}
+            </span>
+          </div>
+          <button
+            type="button"
+            class="coordination-cancel"
+            :disabled="!canCancelCoordination(activeCoordination) || coordinationActionId === activeCoordination.coordinationId"
+            @click="handleCancelCoordination(activeCoordination)"
+          >
+            {{ coordinationActionId === activeCoordination.coordinationId ? '取消中…' : '取消任务' }}
+          </button>
+
+          <ol class="coordination-subtasks">
+            <li
+              v-for="subtask in activeCoordination.subtasks"
+              :key="subtask.id"
+              class="coordination-subtask"
+            >
+              <button
+                type="button"
+                class="coordination-subtask-main"
+                @click="locateCoordinationSubtask(subtask, activeCoordination)"
+              >
+                <span class="coordination-subtask-title">{{ subtask.title }}</span>
+                <span class="coordination-subtask-meta">
+                  {{ lookupAgentName(subtask.targetCatId) }}
+                  <span class="status-pill" :data-tone="statusTone(subtask.status)">
+                    {{ statusText(subtask.status) }}
+                  </span>
+                </span>
+              </button>
+              <p v-if="subtask.description" class="coordination-subtask-text">{{ subtask.description }}</p>
+              <p v-if="subtask.result" class="coordination-subtask-text">{{ subtask.result }}</p>
+              <p v-if="subtask.failureReason" class="error-text">{{ subtask.failureReason }}</p>
+              <div v-if="subtask.artifactRefs.length" class="coordination-artifacts">
+                <span v-for="artifactRef in subtask.artifactRefs" :key="artifactRef">
+                  {{ artifactRef }}
+                </span>
+              </div>
+            </li>
+          </ol>
+        </template>
+      </section>
     </div>
 
     <div v-else-if="subTab === 'artifacts' && boundThreadId" class="panel-body panel-body--scrollable">
@@ -595,5 +803,158 @@ watch(deliveryRefreshToken, (token) => {
 .error-text {
   color: #b42318;
   font-size: 12px;
+}
+
+.coordination-pane {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.coordination-head,
+.coordination-summary,
+.coordination-targets,
+.coordination-subtask-meta,
+.coordination-artifacts,
+.coordination-notes {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.coordination-head {
+  justify-content: space-between;
+}
+
+.coordination-head h4 {
+  margin: 2px 0 0;
+  font-size: 14px;
+}
+
+.coordination-refresh,
+.coordination-cancel {
+  min-height: 30px;
+  padding: 0 10px;
+  border: var(--border-hairline);
+  border-radius: var(--radius-sm);
+  background: var(--bg-secondary);
+  color: var(--text-primary);
+  cursor: pointer;
+  font-size: 12px;
+}
+
+.coordination-cancel {
+  align-self: flex-start;
+  color: #b42318;
+}
+
+.coordination-refresh:disabled,
+.coordination-cancel:disabled {
+  cursor: not-allowed;
+  opacity: 0.58;
+}
+
+.coordination-summary,
+.coordination-targets,
+.coordination-artifacts,
+.coordination-notes {
+  flex-wrap: wrap;
+  color: var(--text-secondary);
+  font-size: 12px;
+}
+
+.coordination-goal,
+.coordination-result,
+.coordination-subtask-text {
+  margin: 0;
+  color: var(--text-primary);
+  font-size: 13px;
+  line-height: 1.5;
+  word-break: break-word;
+}
+
+.coordination-result {
+  color: var(--text-secondary);
+}
+
+.coordination-notes span,
+.coordination-artifacts span,
+.target-chip,
+.status-pill {
+  display: inline-flex;
+  align-items: center;
+  max-width: 100%;
+  min-height: 22px;
+  padding: 0 7px;
+  border-radius: var(--radius-sm);
+  background: var(--bg-secondary);
+  color: var(--text-secondary);
+  font-size: 11px;
+  line-height: 1;
+}
+
+.status-pill[data-tone='active'] {
+  background: rgba(22, 93, 255, 0.1);
+  color: var(--primary-color, #165dff);
+}
+
+.status-pill[data-tone='success'] {
+  background: rgba(22, 163, 74, 0.12);
+  color: #15803d;
+}
+
+.status-pill[data-tone='danger'] {
+  background: rgba(180, 35, 24, 0.1);
+  color: #b42318;
+}
+
+.coordination-subtasks {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.coordination-subtask {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 10px;
+  border: var(--border-hairline);
+  border-radius: var(--radius-sm);
+  background: var(--bg-secondary);
+}
+
+.coordination-subtask-main {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 8px;
+  width: 100%;
+  min-width: 0;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: inherit;
+  cursor: pointer;
+  text-align: left;
+}
+
+.coordination-subtask-title {
+  min-width: 0;
+  color: var(--text-primary);
+  font-size: 13px;
+  font-weight: 600;
+  overflow-wrap: anywhere;
+}
+
+.coordination-subtask-meta {
+  flex-shrink: 0;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  color: var(--text-secondary);
+  font-size: 11px;
 }
 </style>
