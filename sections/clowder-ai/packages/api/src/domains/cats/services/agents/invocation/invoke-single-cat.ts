@@ -2205,21 +2205,30 @@ export async function* invokeSingleCat(deps: InvocationDeps, params: InvocationP
         // V3-38: Before yielding done, scan workspace for generated files
         // and emit rich_block system_info so OutboundDeliveryHook Phase J
         // can publish them as file attachments.
-        if (msg.type === 'done' && registeredRuntimeWorkspace?.path) {
-          try {
-            const fileBlocks = await scanWorkspaceForFileBlocks(registeredRuntimeWorkspace.path);
-            for (const block of fileBlocks) {
-              for await (const out of streamProcessedOutputs({
-                type: 'system_info' as const,
-                catId,
-                content: JSON.stringify({ type: 'rich_block', block }),
-                timestamp: Date.now(),
-              })) {
-                yield out;
+        if (msg.type === 'done') {
+          const scanPaths = [
+            ...(registeredRuntimeWorkspace?.path ? [registeredRuntimeWorkspace.path] : []),
+            ...(workingDirectory ? [workingDirectory] : []),
+          ];
+          const seenPaths = new Set<string>();
+          for (const scanPath of scanPaths) {
+            if (seenPaths.has(scanPath)) continue;
+            seenPaths.add(scanPath);
+            try {
+              const fileBlocks = await scanWorkspaceForFileBlocks(scanPath);
+              for (const block of fileBlocks) {
+                for await (const out of streamProcessedOutputs({
+                  type: 'system_info' as const,
+                  catId,
+                  content: JSON.stringify({ type: 'rich_block', block }),
+                  timestamp: Date.now(),
+                })) {
+                  yield out;
+                }
               }
+            } catch {
+              /* best-effort: workspace scan failure must not break delivery */
             }
-          } catch {
-            /* best-effort: workspace scan failure must not break delivery */
           }
         }
 
