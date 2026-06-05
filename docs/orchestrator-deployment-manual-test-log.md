@@ -34,21 +34,21 @@ This file records the required real Web checks for the orchestrator and P2 deplo
 
 ### Stage 0
 
-- Login user:
-- OAuth platform:
-- OAuth status:
-- Cat name:
-- Cat alias:
-- Conversation type:
+- Login user: 008618337488675
+- OAuth platform: Codex
+- OAuth status: local Codex account available through existing Clowder cat configuration
+- Cat name: xtz
+- Cat alias: @xtz
+- Conversation type: direct
 - Group chat ID:
-- Thread ID:
+- Thread ID: thread_mq12o8watruxmdkm
 - Coordination ID:
 - Deployment request ID:
-- Prompt: 请回复“阶段0验收通过”，并说明你当前使用的运行平台。
-- Screenshot paths:
-- Result:
+- Prompt: 请只回复：阶段0验收通过；运行平台：Codex；标记：stage0-direct-recheck-1780699882509
+- Screenshot paths: docs/manual-test-artifacts/stage0-direct-recheck-reply.png; docs/manual-test-artifacts/stage0-cat-console.png; docs/manual-test-artifacts/stage0-cat-direct-chat.png; docs/manual-test-artifacts/stage0-login-chat.png; docs/manual-test-artifacts/stage0-prompt-sent.png; docs/manual-test-artifacts/stage0-reply.png
+- Result: passed
 - Failure reason:
-- Notes:
+- Notes: Original Stage 0 screenshots showed login, cat console, direct chat, and prompt send but did not prove a final cat reply. A direct补验 was run after the completion audit through `http://localhost:3000/chat/conversation/clowder_cat%3Axtz/1`; xtz replied with `阶段0验收通过；运行平台：Codex` and the unique marker above. The reply was a real Clowder cat message in direct chat, not DeepSeek fallback.
 
 ### Stage 1
 
