@@ -2292,6 +2292,10 @@ async function main(): Promise<void> {
     ...(threadStore ? { threadStore } : {}),
     maomiWorkspaceStore,
     threadWorkspaceBindingStore,
+    invocationRecordStore,
+    ...(process.env.CLOWDER_DEFAULT_OWNER_USER_ID || process.env.DEFAULT_OWNER_USER_ID
+      ? { defaultUserId: (process.env.CLOWDER_DEFAULT_OWNER_USER_ID || process.env.DEFAULT_OWNER_USER_ID) as string }
+      : {}),
     log: app.log,
   });
 
@@ -2973,6 +2977,7 @@ async function main(): Promise<void> {
     redis: redisClient ?? undefined,
     maomiWorkspaceStore,
     threadWorkspaceBindingStore,
+    taskStore,
     log: app.log,
     agentRegistry,
     catCreator: createImWebCatCreator(),

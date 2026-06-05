@@ -20,6 +20,8 @@ import { isCatAvailable } from '../../config/cat-config-loader.js';
 import type { ConnectorWebhookHandler, WebhookHandleResult } from '../../routes/connector-webhooks.js';
 import type { IMaomiWorkspaceStore } from '../../domains/maomi-workspaces/MaomiWorkspaceStore.js';
 import type { IThreadWorkspaceBindingStore } from '../../domains/maomi-workspaces/ThreadWorkspaceBindingStore.js';
+import type { ITaskStore } from '../../domains/cats/services/stores/ports/TaskStore.js';
+import { findOrCreateArtifactTask } from '../../routes/thread-tasks.js';
 import { getDefaultUploadDir } from '../../utils/upload-paths.js';
 import { deliverConnectorMessage } from '../email/deliver-connector-message.js';
 import { DingTalkAdapter } from './adapters/DingTalkAdapter.js';
@@ -181,6 +183,8 @@ export interface ConnectorGatewayDeps {
   readonly redis?: RedisClient | undefined;
   readonly maomiWorkspaceStore?: IMaomiWorkspaceStore;
   readonly threadWorkspaceBindingStore?: IThreadWorkspaceBindingStore;
+  /** V3-31: task store used to auto-register delivered files as thread artifacts. */
+  readonly taskStore?: ITaskStore;
   readonly log: FastifyBaseLogger;
   readonly frontendBaseUrl?: string | undefined;
   /** F142: agent service registry for /cats command */
@@ -1049,6 +1053,25 @@ export async function startConnectorGateway(
     log,
     mediaPathResolver,
     messageLookup,
+    ...(deps.taskStore
+      ? {
+          artifactRegistrar: async (record) => {
+            const taskStore = deps.taskStore!;
+            await findOrCreateArtifactTask(
+              taskStore,
+              record.threadId,
+              record.userId,
+              undefined,
+              record.ownerCatId ?? deps.defaultCatId,
+              record.absolutePath,
+              record.kind,
+              undefined,
+              undefined,
+              record.workspaceRelativePath,
+            );
+          },
+        }
+      : {}),
     resolveVoiceBlocks: async (blocks, catId) => {
       const { getVoiceBlockSynthesizer } = await import('../../domains/cats/services/tts/VoiceBlockSynthesizer.js');
       const synth = getVoiceBlockSynthesizer();

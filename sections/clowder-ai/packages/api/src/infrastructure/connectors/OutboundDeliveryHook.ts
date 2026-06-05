@@ -104,6 +104,19 @@ interface NativeFileMediaPayload {
   readonly absPath: string;
   readonly fileName: string;
   readonly size?: number;
+  /** V3-39 §2.2: durable source the delivery was published from. */
+  readonly sourcePath?: string;
+}
+
+/** V3-31: a delivered file the connector auto-registers as a thread artifact. */
+export interface DeliveredArtifactRecord {
+  readonly threadId: string;
+  readonly userId: string;
+  readonly ownerCatId?: string;
+  readonly absolutePath: string;
+  readonly fileName: string;
+  readonly kind: 'code' | 'doc' | 'image' | 'preview' | 'file' | 'patch' | 'workspace' | 'other';
+  readonly workspaceRelativePath?: string;
 }
 
 const MAX_ARTIFACT_SEARCH_ENTRIES = 1_500;
@@ -130,6 +143,12 @@ export interface OutboundDeliveryHookOptions {
     | undefined;
   /** Resolve audio blocks with text but no url (voiceMode frontend-only blocks) by synthesizing TTS. */
   readonly resolveVoiceBlocks?: ((blocks: RichBlock[], catId: string) => Promise<RichBlock[]>) | undefined;
+  /**
+   * V3-31: auto-register delivered files as thread artifacts so the 产物 panel
+   * is populated even when the cat never calls cat_cafe_declare_artifact.
+   * Best-effort: failures must never block delivery.
+   */
+  readonly artifactRegistrar?: ((record: DeliveredArtifactRecord) => Promise<void>) | undefined;
 }
 
 export class OutboundDeliveryHook {
@@ -524,6 +543,76 @@ export class OutboundDeliveryHook {
         }
       }),
     );
+
+    // V3-31: best-effort auto-register delivered files as thread artifacts so the
+    // 产物 panel reflects real output even when the cat skipped declare_artifact.
+    await this.registerDeliveredArtifacts(threadId, catId, bindings, textFileDeliveries, finalBlocks, content);
+  }
+
+  private async registerDeliveredArtifacts(
+    threadId: string,
+    catId: CatId | undefined,
+    bindings: ReadonlyArray<{ userId?: string }>,
+    textFileDeliveries: readonly NativeFileMediaPayload[],
+    finalBlocks: readonly RichBlock[],
+    content: string,
+  ): Promise<void> {
+    const register = this.opts.artifactRegistrar;
+    if (!register) return;
+    const userId = bindings.find((b) => b.userId)?.userId;
+    if (!userId) return;
+
+    const records = new Map<string, DeliveredArtifactRecord>();
+    const add = (absolutePath: string | undefined, fileName: string | undefined) => {
+      if (!absolutePath || !fileName) return;
+      const key = resolve(absolutePath);
+      if (records.has(key)) return;
+      records.set(key, {
+        threadId,
+        userId,
+        ...(catId ? { ownerCatId: catId } : {}),
+        absolutePath: key,
+        fileName,
+        kind: artifactKindFromName(fileName),
+      });
+    };
+
+    for (const delivery of textFileDeliveries) {
+      add(delivery.sourcePath ?? this.opts.mediaPathResolver?.(delivery.url), delivery.fileName);
+    }
+    for (const block of finalBlocks) {
+      if (block.kind !== 'file' || !('url' in block) || !block.url) continue;
+      const url = block.url as string;
+      const fileName = 'fileName' in block ? (block.fileName as string) : basename(url);
+      add(this.opts.mediaPathResolver?.(url), fileName);
+    }
+    // Source/web deliverables the cat names in text (e.g. a generated .html page)
+    // are not media-delivered, but should still surface as artifacts when they
+    // exist on disk — this is what the 产物 panel was missing.
+    for (const ref of extractArtifactReferencePaths(content)) {
+      let abs: string;
+      try {
+        abs = normalizeLocalReferencePath(ref);
+      } catch {
+        continue;
+      }
+      const key = resolve(abs);
+      if (records.has(key)) continue;
+      try {
+        if (!(await stat(key)).isFile()) continue;
+      } catch {
+        continue;
+      }
+      add(key, basename(key));
+    }
+
+    for (const record of records.values()) {
+      try {
+        await register(record);
+      } catch (err) {
+        this.opts.log.warn({ err, record }, '[OutboundDeliveryHook] artifact auto-register failed');
+      }
+    }
   }
 
   private async writeDataUriToTempFile(dataUri: string): Promise<string | null> {
@@ -644,6 +733,7 @@ export class OutboundDeliveryHook {
         absPath: publishedFile.absPath,
         fileName: publishedFile.fileName ?? basename(fileRef),
         ...(size > 0 ? { size } : {}),
+        ...(publishedFile.sourcePath ? { sourcePath: publishedFile.sourcePath } : {}),
       });
     }
     return deliveries;
@@ -1076,6 +1166,41 @@ export class OutboundDeliveryHook {
 
 function stripTrailingPunctuation(value: string): string {
   return value.replace(/[),.;，。；）]+$/g, '');
+}
+
+/** V3-31: map a delivered file name to an artifact kind for the 产物 panel. */
+function artifactKindFromName(fileName: string): DeliveredArtifactRecord['kind'] {
+  const lower = basename(fileName).toLowerCase();
+  if (/\.(?:png|jpe?g|gif|webp|svg)$/.test(lower)) return 'image';
+  if (/\.(?:md|pdf|docx?|txt|csv|rtf)$/.test(lower)) return 'doc';
+  if (/\.(?:html?|css|jsx?|tsx?|json|xml|py|go|rs|java|c|cpp|sh)$/.test(lower)) return 'code';
+  if (/\.(?:zip|tar\.gz|gz|tar|rar|7z)$/.test(lower)) return 'workspace';
+  if (/\.(?:patch|diff)$/.test(lower)) return 'patch';
+  return 'file';
+}
+
+/**
+ * V3-31: extract source/web/doc file paths the cat named in its reply so they
+ * can be auto-registered as artifacts. Broader than the media-delivery matcher
+ * (which intentionally excludes .html/.css/.js) — existence is verified by the
+ * caller before anything is registered.
+ */
+const ARTIFACT_REF_EXT =
+  '(?:html?|css|jsx?|tsx?|vue|py|go|rs|java|cpp?|cc|json|ya?ml|md|markdown|txt|pdf|docx?|pptx?|xlsx?|csv|zip|tar\\.gz|gz|rar|7z|svg|png|jpe?g|gif|webp)';
+
+function extractArtifactReferencePaths(content: string): string[] {
+  const refs = new Set<string>();
+  const patterns = [
+    new RegExp(`file:\\/\\/\\/[^\\s\`"'<>)]*\\.${ARTIFACT_REF_EXT}\\b`, 'gi'),
+    new RegExp(`(?:^|[\\s\`"'(（:：])((?:\\/[^\\s\`"'<>)]*)+\\.${ARTIFACT_REF_EXT})\\b`, 'gi'),
+    new RegExp(`(?:^|[\\s\`"'(（:：])(~\\/[^\\s\`"'<>)]*\\.${ARTIFACT_REF_EXT})\\b`, 'gi'),
+  ];
+  for (const re of patterns) {
+    for (const match of content.matchAll(re)) {
+      refs.add(stripTrailingPunctuation(match[1] ?? match[0]));
+    }
+  }
+  return [...refs];
 }
 
 function isLocalPublishableReference(url: string): boolean {

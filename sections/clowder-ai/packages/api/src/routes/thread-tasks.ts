@@ -26,12 +26,33 @@ import type { IThreadStore } from '../domains/cats/services/stores/ports/ThreadS
 import type { IMaomiWorkspaceStore } from '../domains/maomi-workspaces/MaomiWorkspaceStore.js';
 import type { IThreadWorkspaceBindingStore } from '../domains/maomi-workspaces/ThreadWorkspaceBindingStore.js';
 import { isUnderAllowedRoot, validateProjectPath } from '../utils/project-path.js';
+import { resolveUserId } from '../utils/request-identity.js';
+
+/** V3-31: minimal view of a running invocation used to synthesize live kanban cards. */
+export interface RunningInvocationView {
+  id: string;
+  targetCats: readonly string[];
+  createdAt: number;
+}
 
 export interface ThreadTasksRoutesOptions {
   taskStore: ITaskStore;
   threadStore?: IThreadStore;
   maomiWorkspaceStore?: IMaomiWorkspaceStore;
   threadWorkspaceBindingStore?: IThreadWorkspaceBindingStore;
+  /**
+   * V3-31: optional live-invocation source. When present, GET /tasks surfaces
+   * in-flight cat work as ephemeral "doing" cards so the kanban reflects real
+   * activity even when the cat never declared a task via MCP tools.
+   */
+  invocationRecordStore?: {
+    listRunningByThread(
+      threadId: string,
+      userId: string,
+    ): RunningInvocationView[] | Promise<RunningInvocationView[]>;
+  };
+  /** Fallback userId used to query live invocations when the request has no identity. */
+  defaultUserId?: string;
   log: {
     warn: (obj: object, msg?: string) => void;
     error: (obj: object, msg?: string) => void;
@@ -172,6 +193,44 @@ function isPathInsideRoot(child: string, root: string): boolean {
 
 export function isSupportedArtifactKind(kind: string): kind is ArtifactKind {
   return ['code', 'doc', 'image', 'preview', 'file', 'patch', 'workspace', 'other'].includes(kind);
+}
+
+/**
+ * V3-31: turn running invocations into ephemeral "doing" kanban cards.
+ * Skips cats that already have a real `doing` task so we never double-count,
+ * and dedups across overlapping invocations.
+ */
+export function buildLiveInvocationTasks(
+  records: readonly RunningInvocationView[],
+  threadId: string,
+  existingTasks: readonly TaskItem[],
+  now: number,
+): TaskItem[] {
+  const doingOwners = new Set<string>(
+    existingTasks.filter((t) => t.status === 'doing' && t.ownerCatId).map((t) => t.ownerCatId as string),
+  );
+  const live: TaskItem[] = [];
+  for (const rec of records) {
+    for (const rawCatId of rec.targetCats ?? []) {
+      const ownerCatId = createCatId(String(rawCatId));
+      if (doingOwners.has(ownerCatId)) continue;
+      doingOwners.add(ownerCatId);
+      live.push({
+        id: `live:${rec.id}:${ownerCatId}`,
+        kind: 'work',
+        threadId,
+        subjectKey: null,
+        title: '正在处理…',
+        ownerCatId,
+        status: 'doing',
+        why: '实时调用进行中（尚未声明任务）',
+        createdBy: 'system',
+        createdAt: rec.createdAt || now,
+        updatedAt: now,
+      });
+    }
+  }
+  return live;
 }
 
 export function serializeArtifactRef(
@@ -322,6 +381,25 @@ export const threadTasksRoutes: FastifyPluginAsync<ThreadTasksRoutesOptions> = a
       return reply.status(400).send({ error: 'threadId is required' });
     }
     const tasks = await Promise.resolve(opts.taskStore.listByThread(threadId));
+
+    // V3-31: merge ephemeral "doing" cards for in-flight invocations so the
+    // kanban reflects live cat work even without an explicit task declaration.
+    let liveTasks: TaskItem[] = [];
+    if (opts.invocationRecordStore) {
+      const userId = resolveUserId(request, opts.defaultUserId ? { defaultUserId: opts.defaultUserId } : undefined);
+      if (userId) {
+        try {
+          const running = await Promise.resolve(
+            opts.invocationRecordStore.listRunningByThread(threadId, userId),
+          );
+          liveTasks = buildLiveInvocationTasks(running, threadId, tasks, Date.now());
+        } catch (err) {
+          opts.log.warn({ err, threadId }, 'failed to load live invocations for kanban');
+        }
+      }
+    }
+    const mergedTasks = liveTasks.length > 0 ? [...tasks, ...liveTasks] : tasks;
+
     const binding = opts.threadWorkspaceBindingStore
       ? await opts.threadWorkspaceBindingStore.get(threadId)
       : null;
@@ -333,11 +411,11 @@ export const threadTasksRoutes: FastifyPluginAsync<ThreadTasksRoutesOptions> = a
     const diagnostics = await buildThreadTaskDiagnostics(
       opts.taskStore,
       threadId,
-      tasks,
+      mergedTasks,
       observedTaskIds,
       binding?.activeWorkspaceId ?? null,
     );
-    return reply.send({ threadId, tasks, diagnostics });
+    return reply.send({ threadId, tasks: mergedTasks, diagnostics });
   });
 
   // ----- Phase 4.5: POST /api/threads/:threadId/artifacts -----
