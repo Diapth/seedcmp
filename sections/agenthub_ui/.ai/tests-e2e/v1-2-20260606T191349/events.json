@@ -1,0 +1,222 @@
+[
+  {
+    "at": "2026-06-06T19:13:50.091Z",
+    "type": "run-start",
+    "agenthubBaseUrl": "http://localhost:5173",
+    "imWebBaseUrl": "http://localhost:3000",
+    "username": "008618337488675",
+    "conversationName": "qwq",
+    "messageText": "agenthub-imweb-live-20260606T191349"
+  },
+  {
+    "at": "2026-06-06T19:13:50.155Z",
+    "type": "console",
+    "page": "agenthub_ui",
+    "level": "debug",
+    "text": "[vite] connecting..."
+  },
+  {
+    "at": "2026-06-06T19:13:50.160Z",
+    "type": "websocket-open",
+    "page": "agenthub_ui",
+    "url": "ws://localhost:5173/?token=Yk_DDzKwGumy"
+  },
+  {
+    "at": "2026-06-06T19:13:50.167Z",
+    "type": "console",
+    "page": "agenthub_ui",
+    "level": "debug",
+    "text": "[vite] connected."
+  },
+  {
+    "at": "2026-06-06T19:13:50.192Z",
+    "type": "console",
+    "page": "agenthub_ui",
+    "level": "warning",
+    "text": "[vue-router]: importing from 'vue-router/dist/vue-router.esm-bundler.js' is deprecated. Use 'vue-router' directly."
+  },
+  {
+    "at": "2026-06-06T19:13:50.217Z",
+    "type": "console",
+    "page": "agenthub_ui",
+    "level": "log",
+    "text": "App Launch"
+  },
+  {
+    "at": "2026-06-06T19:13:50.220Z",
+    "type": "console",
+    "page": "agenthub_ui",
+    "level": "log",
+    "text": "App Show"
+  },
+  {
+    "at": "2026-06-06T19:13:50.527Z",
+    "type": "console",
+    "page": "agenthub_ui",
+    "level": "log",
+    "text": "UniApp运行环境"
+  },
+  {
+    "at": "2026-06-06T19:13:50.528Z",
+    "type": "console",
+    "page": "agenthub_ui",
+    "level": "log",
+    "text": "打开websocket成功"
+  },
+  {
+    "at": "2026-06-06T19:13:50.528Z",
+    "type": "console",
+    "page": "agenthub_ui",
+    "level": "log",
+    "text": "websocket SocketTask"
+  },
+  {
+    "at": "2026-06-06T19:13:50.533Z",
+    "type": "websocket-open",
+    "page": "agenthub_ui",
+    "url": "ws://0.0.0.0:5200/"
+  },
+  {
+    "at": "2026-06-06T19:13:50.534Z",
+    "type": "console",
+    "page": "agenthub_ui",
+    "level": "log",
+    "text": "onopen..."
+  },
+  {
+    "at": "2026-06-06T19:13:50.543Z",
+    "type": "console",
+    "page": "agenthub_ui",
+    "level": "log",
+    "text": "服务器协议版本: 5"
+  },
+  {
+    "at": "2026-06-06T19:13:50.543Z",
+    "type": "console",
+    "page": "agenthub_ui",
+    "level": "log",
+    "text": "成功连接到节点[1]"
+  },
+  {
+    "at": "2026-06-06T19:13:50.748Z",
+    "type": "agenthub-login-ok"
+  },
+  {
+    "at": "2026-06-06T19:13:50.775Z",
+    "type": "console",
+    "page": "im_web",
+    "level": "debug",
+    "text": "[vite] connecting..."
+  },
+  {
+    "at": "2026-06-06T19:13:50.780Z",
+    "type": "websocket-open",
+    "page": "im_web",
+    "url": "ws://localhost:3000/"
+  },
+  {
+    "at": "2026-06-06T19:13:50.784Z",
+    "type": "console",
+    "page": "im_web",
+    "level": "debug",
+    "text": "[vite] connected."
+  },
+  {
+    "at": "2026-06-06T19:13:51.066Z",
+    "type": "console",
+    "page": "im_web",
+    "level": "log",
+    "text": "web运行环境"
+  },
+  {
+    "at": "2026-06-06T19:13:51.066Z",
+    "type": "console",
+    "page": "im_web",
+    "level": "log",
+    "text": "使用原生websocket"
+  },
+  {
+    "at": "2026-06-06T19:13:51.066Z",
+    "type": "console",
+    "page": "im_web",
+    "level": "log",
+    "text": "websocket WebSocket"
+  },
+  {
+    "at": "2026-06-06T19:13:51.067Z",
+    "type": "websocket-open",
+    "page": "im_web",
+    "url": "ws://127.0.0.1:5200/"
+  },
+  {
+    "at": "2026-06-06T19:13:51.067Z",
+    "type": "console",
+    "page": "im_web",
+    "level": "log",
+    "text": "onopen..."
+  },
+  {
+    "at": "2026-06-06T19:13:51.079Z",
+    "type": "console",
+    "page": "im_web",
+    "level": "log",
+    "text": "服务器协议版本: 5"
+  },
+  {
+    "at": "2026-06-06T19:13:51.079Z",
+    "type": "console",
+    "page": "im_web",
+    "level": "log",
+    "text": "成功连接到节点[1]"
+  },
+  {
+    "at": "2026-06-06T19:13:51.082Z",
+    "type": "console",
+    "page": "im_web",
+    "level": "log",
+    "text": "[SDK] Connected successfully."
+  },
+  {
+    "at": "2026-06-06T19:13:51.203Z",
+    "type": "imweb-login-ok"
+  },
+  {
+    "at": "2026-06-06T19:13:51.252Z",
+    "type": "agenthub-conversation-selected",
+    "requestedName": "qwq",
+    "title": "qwq"
+  },
+  {
+    "at": "2026-06-06T19:13:51.474Z",
+    "type": "imweb-conversation-selected",
+    "channelId": "clowder_cat:codex",
+    "channelType": "1",
+    "text": "Q\nqwq\n03:10\nagenthub-imweb-live-20260606T191031"
+  },
+  {
+    "at": "2026-06-06T19:13:51.635Z",
+    "type": "agenthub-message-visible",
+    "messageText": "agenthub-imweb-live-20260606T191349"
+  },
+  {
+    "at": "2026-06-06T19:13:51.752Z",
+    "type": "console",
+    "page": "im_web",
+    "level": "log",
+    "text": "消息内容--> RecvPacket2"
+  },
+  {
+    "at": "2026-06-06T19:13:54.445Z",
+    "type": "imweb-message-received-without-refresh",
+    "messageText": "agenthub-imweb-live-20260606T191349"
+  },
+  {
+    "at": "2026-06-06T19:13:54.541Z",
+    "type": "run-pass",
+    "imWebConversation": {
+      "channelId": "clowder_cat:codex",
+      "channelType": "1",
+      "text": "Q\nqwq\n03:10\nagenthub-imweb-live-20260606T191031"
+    }
+  }
+]

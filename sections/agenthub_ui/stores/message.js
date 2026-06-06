@@ -116,13 +116,20 @@ export const useMessageStore = defineStore('message', {
       });
 
       try {
-        await sendSdkTextMessage({
+        const sent = await sendSdkTextMessage({
           channelId: conversationId,
           channelType,
           text,
           clientMsgNo,
           extra
         });
+        msg.status = 'success';
+        msg.clientSeq = sent?.clientSeq || msg.clientSeq;
+        msg.messageSeq = sent?.messageSeq || msg.messageSeq;
+        if (sent?.messageID) {
+          msg.id = String(sent.messageID);
+        }
+        delete this.pendingQueue[clientMsgNo];
         return msg;
       } catch (err) {
         msg.status = 'failed';

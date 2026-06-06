@@ -20,6 +20,15 @@ function hiddenKey(uid) {
   return `conversationHidden:${uid || 'anonymous'}`;
 }
 
+function isLocalOnlyDirectConversation(channelId, channelType) {
+  const id = String(channelId || '');
+  return toBackendChannelType(channelType) === 1 &&
+    (id === 'deepseek_ai_robot' ||
+      id === 'clowder_ai' ||
+      id.startsWith('clowder:') ||
+      id.startsWith('clowder_cat:'));
+}
+
 function mergeConversations(primary = [], secondary = []) {
   const merged = new Map();
   [...primary, ...secondary].forEach((item) => {
@@ -177,10 +186,25 @@ export const useConversationStore = defineStore('conversation', {
       });
     },
     setDraft(channelId, channelType, draftText) {
-      const conv = this.addOrUpdateConversation(channelId, channelType, { draft: draftText });
-      conv.draft = draftText;
-      this.persistDraft(channelId, channelType, draftText);
-      syncApi.updateConversationExtra(channelId, toBackendChannelType(channelType), { draft: draftText }).catch(() => undefined);
+      const backendType = toBackendChannelType(channelType);
+      const normalizedDraft = String(draftText || '');
+      const existing = this.getConversation(channelId, backendType) || this.conversations.find((c) => c.id === String(channelId));
+      const previousDraft = existing?.draft ?? this.getDraft(channelId, backendType) ?? '';
+      if (String(previousDraft || '') === normalizedDraft) {
+        return existing || null;
+      }
+
+      const conv = this.addOrUpdateConversation(channelId, backendType, { draft: normalizedDraft });
+      conv.draft = normalizedDraft;
+      this.persistDraft(channelId, backendType, normalizedDraft);
+      if (isLocalOnlyDirectConversation(channelId, backendType)) {
+        return conv;
+      }
+      if (normalizedDraft === '' && !previousDraft) {
+        return conv;
+      }
+      syncApi.updateConversationExtra(channelId, backendType, { draft: normalizedDraft }).catch(() => undefined);
+      return conv;
     },
     updateConversationDraft(id, draftText) {
       const conv = this.conversations.find((item) => item.id === id);

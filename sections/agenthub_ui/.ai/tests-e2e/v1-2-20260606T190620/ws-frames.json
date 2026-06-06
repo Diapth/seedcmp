@@ -1,0 +1,50 @@
+[
+  {
+    "at": "2026-06-06T19:06:21.026Z",
+    "page": "agenthub_ui",
+    "direction": "received",
+    "url": "ws://localhost:5173/?token=Yk_DDzKwGumy",
+    "size": 20,
+    "payload": "{\"type\":\"connected\"}"
+  },
+  {
+    "at": "2026-06-06T19:06:21.347Z",
+    "page": "agenthub_ui",
+    "direction": "sent",
+    "url": "ws://0.0.0.0:5200/",
+    "size": 168,
+    "payload": "\u0010�\u0001\u0005\u0001\u0000!c61b87ed187f38a3a99a7a715441797cW\u0000 edbb4e4566f840f4a6f14b9f9cf01c22\u0000 01aef87939124bad97bcab6c4d6d320f\u0000\u0000\u0001��T=!\u0000,yBGGefbN0IL9ilV9W0ooElqexBwxSTw7dfqrm5zJ3GU="
+  },
+  {
+    "at": "2026-06-06T19:06:21.349Z",
+    "page": "agenthub_ui",
+    "direction": "received",
+    "url": "ws://0.0.0.0:5200/",
+    "size": 84,
+    "payload": "!R\u0005\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0002\u0001\u0000,rheR5cX4x4xEmC0/czhQ0ND/DjQdzie74g7fvwW/ET8=\u0000\u0010etzi6YVQRzUFtITz\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0001"
+  },
+  {
+    "at": "2026-06-06T19:06:21.603Z",
+    "page": "im_web",
+    "direction": "received",
+    "url": "ws://localhost:3000/",
+    "size": 20,
+    "payload": "{\"type\":\"connected\"}"
+  },
+  {
+    "at": "2026-06-06T19:06:21.877Z",
+    "page": "im_web",
+    "direction": "sent",
+    "url": "ws://127.0.0.1:5200/",
+    "size": 168,
+    "payload": "\u0010�\u0001\u0005\u0001\u0000!34085d09660b93eaae510519028354d7W\u0000 edbb4e4566f840f4a6f14b9f9cf01c22\u0000 01aef87939124bad97bcab6c4d6d320f\u0000\u0000\u0001��T?4\u0000,aoGDE6LALJdRUYnIJ8qlmfuKRlj0XW7D7j0rIeFWIi4="
+  },
+  {
+    "at": "2026-06-06T19:06:21.880Z",
+    "page": "im_web",
+    "direction": "received",
+    "url": "ws://127.0.0.1:5200/",
+    "size": 84,
+    "payload": "!R\u0005\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0001\u0001\u0000,cTpgAnYS1VNrGxW8RB5dEV/bbKLh7I+miVsnmZUI0xM=\u0000\u0010zcgJJMseFaRIgjRa\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0001"
+  }
+]

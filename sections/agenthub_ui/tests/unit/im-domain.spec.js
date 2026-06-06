@@ -6,11 +6,20 @@ import { resetStorageForTests } from '../../utils/storage.js';
 import { resetRequestRuntimeForTests, setRequestAdapter } from '../../utils/request.js';
 import { createInboundMessage, toConversationItem } from '../../utils/im-mappers.js';
 
+const wkSdkMock = vi.hoisted(() => ({
+  sendTextMessage: vi.fn()
+}));
+
+vi.mock('@/utils/wk-sdk.js', () => ({
+  sendTextMessage: wkSdkMock.sendTextMessage
+}));
+
 describe('IM domain mapping and stores', () => {
   beforeEach(() => {
     setActivePinia(createPinia());
     resetStorageForTests();
     resetRequestRuntimeForTests();
+    wkSdkMock.sendTextMessage.mockReset();
   });
 
   it('maps backend conversations to the existing agenthub visual contract', () => {
@@ -235,5 +244,63 @@ describe('IM domain mapping and stores', () => {
 
     expect(conversationStore.conversations[0].draft).toBe('跨端草稿');
     expect(conversationStore.getDraft('friend-a', 1)).toBe('跨端草稿');
+  });
+
+  it('skips remote draft sync for unchanged empty drafts', async () => {
+    const adapter = vi.fn(async () => ({ status: 200, data: { code: 0, data: {} } }));
+    setRequestAdapter(adapter);
+    const conversationStore = useConversationStore();
+    conversationStore.addOrUpdateConversation('friend-a', 1, { name: '好友', draft: '' });
+
+    conversationStore.setDraft('friend-a', 1, '');
+    await Promise.resolve();
+
+    expect(adapter).not.toHaveBeenCalled();
+  });
+
+  it('keeps Clowder cat direct conversation drafts local', async () => {
+    const adapter = vi.fn(async () => ({ status: 200, data: { code: 0, data: {} } }));
+    setRequestAdapter(adapter);
+    const conversationStore = useConversationStore();
+    conversationStore.setCurrentUid('u-1');
+    conversationStore.addOrUpdateConversation('clowder_cat:codex', 1, { name: 'qwq' });
+
+    conversationStore.setDraft('clowder_cat:codex', 1, '本地草稿');
+    await Promise.resolve();
+
+    expect(conversationStore.getDraft('clowder_cat:codex', 1)).toBe('本地草稿');
+    expect(adapter).not.toHaveBeenCalled();
+  });
+
+  it('marks optimistic text sends successful and clears pending after SDK send resolves', async () => {
+    wkSdkMock.sendTextMessage.mockResolvedValue({
+      clientSeq: 42,
+      messageSeq: 108,
+      messageID: 'server-message-108'
+    });
+    const conversationStore = useConversationStore();
+    const messageStore = useMessageStore();
+    conversationStore.addOrUpdateConversation('clowder_cat:codex', 1, { name: 'qwq' });
+
+    const msg = await messageStore.sendMessage(
+      'clowder_cat:codex',
+      '真实发送',
+      { id: 'u-1', name: '我' },
+      'text'
+    );
+
+    expect(wkSdkMock.sendTextMessage).toHaveBeenCalledWith(expect.objectContaining({
+      channelId: 'clowder_cat:codex',
+      channelType: 1,
+      text: '真实发送',
+      clientMsgNo: msg.clientMsgNo
+    }));
+    expect(msg).toMatchObject({
+      id: 'server-message-108',
+      messageSeq: 108,
+      clientSeq: 42,
+      status: 'success'
+    });
+    expect(messageStore.pendingQueue[msg.clientMsgNo]).toBeUndefined();
   });
 });

@@ -7,7 +7,8 @@
     "dev:h5": "node scripts/run-uni.mjs -p h5",
     "build:h5": "node scripts/run-uni.mjs build -p h5",
     "test:unit": "node scripts/run-vitest.mjs",
-    "test:smoke": "node scripts/smoke-test.js"
+    "test:smoke": "node scripts/smoke-test.js",
+    "test:e2e:realtime": "node tests-e2e/agenthub-imweb-realtime.mjs"
   },
   "dependencies": {
     "@dcloudio/uni-app": "3.0.0-alpha-4010520240507001",

@@ -82,10 +82,21 @@ export async function sendTextMessage({ channelId, channelType, text, clientMsgN
   }
   const Channel = sdk.Channel || shared.Channel;
   const TextContent = sdk.MessageText || sdk.TextContent || null;
-  const channel = Channel ? new Channel(channelId, channelType) : { channelID: channelId, channelType };
-  const content = TextContent ? new TextContent(text) : { text, content: text, type: 'text' };
-  const message = { channel, content, clientMsgNo };
-  return chatManager.send(message);
+  const channel = shared.newChannel
+    ? shared.newChannel(channelId, channelType)
+    : Channel
+      ? new Channel(channelId, channelType)
+      : { channelID: channelId, channelType };
+  const content = shared.newMessageText
+    ? shared.newMessageText(text)
+    : TextContent
+      ? new TextContent(text)
+      : { text, content: text, type: 'text', encode: () => new Uint8Array() };
+  const sent = await chatManager.send(content, channel);
+  if (sent && clientMsgNo) {
+    sent.clientMsgNo = clientMsgNo;
+  }
+  return sent;
 }
 
 if (import.meta.hot) {
