@@ -63,6 +63,8 @@ func (c *Clowder) Route(r *wkhttp.WKHttp) {
 		auth.POST("/group/cats/sync", c.syncGroupCats)
 		auth.GET("/group/cats", c.groupCats)
 		auth.POST("/project-groups/ensure", c.ensureProjectGroup)
+		auth.GET("/project-groups/active", c.activeProjectGroup)
+		auth.POST("/project-groups/:bindingId/thread", c.updateProjectGroupThread)
 		auth.POST("/conversation/bind", c.bindConversation)
 		auth.POST("/conversation/focus", c.setFocus)
 		auth.POST("/conversation/focus/clear", c.clearFocus)
@@ -253,6 +255,10 @@ type projectGroupEnsureRequest struct {
 	CreatedBy           string   `json:"createdBy,omitempty"`
 }
 
+type projectGroupThreadUpdateRequest struct {
+	ProjectThreadID string `json:"projectThreadId"`
+}
+
 type ProjectGroupBinding struct {
 	ID                  string   `json:"id"`
 	UserID              string   `json:"userId"`
@@ -276,6 +282,10 @@ type projectGroupEnsureResponse struct {
 	Binding ProjectGroupBinding    `json:"binding"`
 	Group   map[string]interface{} `json:"group"`
 	Reused  bool                   `json:"reused"`
+}
+
+type projectGroupBindingResponse struct {
+	Binding ProjectGroupBinding `json:"binding"`
 }
 
 func (c *Clowder) conversation(ctx *wkhttp.Context) {
@@ -1000,6 +1010,61 @@ func (c *Clowder) ensureProjectGroup(ctx *wkhttp.Context) {
 	})
 }
 
+func (c *Clowder) activeProjectGroup(ctx *wkhttp.Context) {
+	userID := strings.TrimSpace(ctx.GetLoginUID())
+	if userID == "" {
+		ctx.JSON(http.StatusUnauthorized, map[string]string{"error": "login_required"})
+		return
+	}
+	pmChannelID := strings.TrimSpace(ctx.Query("pmDirectChannelId"))
+	rawChannelType := strings.TrimSpace(ctx.Query("pmDirectChannelType"))
+	if pmChannelID == "" || rawChannelType == "" {
+		ctx.JSON(http.StatusBadRequest, map[string]string{"error": "pm_direct_channel_required"})
+		return
+	}
+	parsedType, err := strconv.ParseUint(rawChannelType, 10, 8)
+	if err != nil || parsedType == 0 {
+		ctx.JSON(http.StatusBadRequest, map[string]string{"error": "pm_direct_channel_required"})
+		return
+	}
+	projectName := strings.TrimSpace(ctx.Query("projectName"))
+	binding, ok := c.findActiveProjectGroupBinding(userID, pmChannelID, uint8(parsedType), projectName)
+	if !ok {
+		ctx.JSON(http.StatusNotFound, map[string]string{"error": "active_project_group_not_found"})
+		return
+	}
+	ctx.JSON(http.StatusOK, projectGroupBindingResponse{Binding: binding})
+}
+
+func (c *Clowder) updateProjectGroupThread(ctx *wkhttp.Context) {
+	userID := strings.TrimSpace(ctx.GetLoginUID())
+	if userID == "" {
+		ctx.JSON(http.StatusUnauthorized, map[string]string{"error": "login_required"})
+		return
+	}
+	bindingID := strings.TrimSpace(ctx.Param("bindingId"))
+	if bindingID == "" {
+		ctx.JSON(http.StatusBadRequest, map[string]string{"error": "binding_id_required"})
+		return
+	}
+	var req projectGroupThreadUpdateRequest
+	if err := ctx.BindJSON(&req); err != nil {
+		ctx.JSON(http.StatusBadRequest, map[string]string{"error": "invalid_body"})
+		return
+	}
+	threadID := strings.TrimSpace(req.ProjectThreadID)
+	if threadID == "" {
+		ctx.JSON(http.StatusBadRequest, map[string]string{"error": "project_thread_id_required"})
+		return
+	}
+	binding, ok := c.updateProjectGroupBindingThread(bindingID, userID, threadID)
+	if !ok {
+		ctx.JSON(http.StatusNotFound, map[string]string{"error": "project_group_binding_not_found"})
+		return
+	}
+	ctx.JSON(http.StatusOK, projectGroupBindingResponse{Binding: binding})
+}
+
 func (c *Clowder) storeGroupCats(req groupCatSyncRequest) groupCatSyncResponse {
 	groupID := strings.TrimSpace(req.GroupID)
 	autoReplyMode := normalizeGroupAutoReplyMode(req.AutoReplyMode, req.ProactiveReplies)
@@ -1076,6 +1141,58 @@ func projectGroupResponse(groupNo string, groupName string, owner string) map[st
 		"status":   1,
 		"role":     1,
 	}
+}
+
+func (c *Clowder) findActiveProjectGroupBinding(userID string, pmChannelID string, pmChannelType uint8, projectName string) (ProjectGroupBinding, bool) {
+	c.projectGroupMu.RLock()
+	defer c.projectGroupMu.RUnlock()
+	if c.projectGroupBindings == nil {
+		return ProjectGroupBinding{}, false
+	}
+	trimmedUserID := strings.TrimSpace(userID)
+	trimmedPMChannelID := strings.TrimSpace(pmChannelID)
+	normalizedProjectName := normalizeProjectGroupName(projectName)
+	hasProjectName := strings.TrimSpace(projectName) != ""
+	var best ProjectGroupBinding
+	for _, binding := range c.projectGroupBindings {
+		if binding.Status != "active" {
+			continue
+		}
+		if strings.TrimSpace(binding.UserID) != trimmedUserID {
+			continue
+		}
+		if strings.TrimSpace(binding.PMDirectChannelID) != trimmedPMChannelID || binding.PMDirectChannelType != pmChannelType {
+			continue
+		}
+		if hasProjectName && normalizeProjectGroupName(binding.ProjectName) != normalizedProjectName {
+			continue
+		}
+		if best.ID == "" || binding.UpdatedAt > best.UpdatedAt {
+			best = binding
+		}
+	}
+	return best, best.ID != ""
+}
+
+func (c *Clowder) updateProjectGroupBindingThread(bindingID string, userID string, projectThreadID string) (ProjectGroupBinding, bool) {
+	c.projectGroupMu.Lock()
+	defer c.projectGroupMu.Unlock()
+	if c.projectGroupBindings == nil {
+		return ProjectGroupBinding{}, false
+	}
+	trimmedBindingID := strings.TrimSpace(bindingID)
+	trimmedUserID := strings.TrimSpace(userID)
+	trimmedThreadID := strings.TrimSpace(projectThreadID)
+	for key, binding := range c.projectGroupBindings {
+		if strings.TrimSpace(binding.ID) != trimmedBindingID || strings.TrimSpace(binding.UserID) != trimmedUserID {
+			continue
+		}
+		binding.ProjectThreadID = trimmedThreadID
+		binding.UpdatedAt = time.Now().UnixMilli()
+		c.projectGroupBindings[key] = binding
+		return binding, true
+	}
+	return ProjectGroupBinding{}, false
 }
 
 func (c *Clowder) findOrCreateProjectGroup(projectName string, userID string, pmMemberID string) (string, bool, error) {

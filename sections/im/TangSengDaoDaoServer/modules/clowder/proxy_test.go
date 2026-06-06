@@ -432,6 +432,74 @@ func TestProjectGroupBindingKeyScopesByUserDirectPMAndProject(t *testing.T) {
 	assert.Contains(t, left, "clowder_cat")
 }
 
+func TestFindActiveProjectGroupBindingReturnsLatestForDirect(t *testing.T) {
+	c := New(nil)
+	c.projectGroupBindings = map[string]ProjectGroupBinding{
+		"old": {
+			ID:                  "binding-old",
+			UserID:              "user-1",
+			ProjectName:         "婚礼",
+			PMDirectChannelID:   "clowder_cat:coordinator",
+			PMDirectChannelType: 1,
+			ProjectGroupNo:      "group-old",
+			UpdatedAt:           100,
+			Status:              "active",
+		},
+		"new": {
+			ID:                  "binding-new",
+			UserID:              "user-1",
+			ProjectName:         "todo",
+			PMDirectChannelID:   "clowder_cat:coordinator",
+			PMDirectChannelType: 1,
+			ProjectGroupNo:      "group-new",
+			UpdatedAt:           200,
+			Status:              "active",
+		},
+		"archived": {
+			ID:                  "binding-archived",
+			UserID:              "user-1",
+			ProjectName:         "later",
+			PMDirectChannelID:   "clowder_cat:coordinator",
+			PMDirectChannelType: 1,
+			ProjectGroupNo:      "group-archived",
+			UpdatedAt:           300,
+			Status:              "archived",
+		},
+	}
+
+	latest, ok := c.findActiveProjectGroupBinding("user-1", "clowder_cat:coordinator", 1, "")
+	require.True(t, ok)
+	assert.Equal(t, "binding-new", latest.ID)
+
+	named, ok := c.findActiveProjectGroupBinding("user-1", "clowder_cat:coordinator", 1, "婚礼")
+	require.True(t, ok)
+	assert.Equal(t, "binding-old", named.ID)
+}
+
+func TestUpdateProjectGroupBindingThreadPersistsThreadID(t *testing.T) {
+	c := New(nil)
+	key := projectGroupBindingKey("user-1", "clowder_cat:coordinator", 1, "婚礼")
+	c.projectGroupBindings = map[string]ProjectGroupBinding{
+		key: {
+			ID:                  "binding-1",
+			UserID:              "user-1",
+			ProjectName:         "婚礼",
+			PMDirectChannelID:   "clowder_cat:coordinator",
+			PMDirectChannelType: 1,
+			ProjectGroupNo:      "group-1",
+			UpdatedAt:           100,
+			Status:              "active",
+		},
+	}
+
+	updated, ok := c.updateProjectGroupBindingThread("binding-1", "user-1", "thread-project-1")
+
+	require.True(t, ok)
+	assert.Equal(t, "thread-project-1", updated.ProjectThreadID)
+	assert.Equal(t, "thread-project-1", c.projectGroupBindings[key].ProjectThreadID)
+	assert.Greater(t, c.projectGroupBindings[key].UpdatedAt, int64(100))
+}
+
 func TestProjectGroupRequiredMembersAlwaysIncludeUserAndPM(t *testing.T) {
 	members := projectGroupRequiredMemberUIDs("user-1", defaultPMMemberID, []string{"user-1", "helper-1", defaultPMMemberID})
 

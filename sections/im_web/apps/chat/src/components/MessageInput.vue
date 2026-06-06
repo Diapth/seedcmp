@@ -876,9 +876,26 @@ async function ensureProjectGroupForPMDirect(text: string, targetCatIds: string[
   return {
     channelId: groupNo,
     channelType: 2 as const,
+    bindingId: response.binding.id,
+    projectThreadId: response.binding.projectThreadId,
     projectName: groupName,
     targetCatIds: targetCatIds.length ? targetCatIds : [CLOWDER_COORDINATOR_CAT_ID]
   };
+}
+
+async function persistProjectGroupThreadFromRoute(
+  projectGroupRoute: { bindingId?: string; projectThreadId?: string } | null,
+  routeResponse: unknown
+) {
+  const bindingId = String(projectGroupRoute?.bindingId || '').trim();
+  const currentThreadId = String(projectGroupRoute?.projectThreadId || '').trim();
+  const routedThreadId = String((routeResponse as { threadId?: unknown })?.threadId || '').trim();
+  if (!bindingId || !routedThreadId || routedThreadId === currentThreadId) return;
+  try {
+    await clowderStore.updateProjectGroupBindingThread(bindingId, routedThreadId);
+  } catch (err) {
+    console.warn('[MessageInput] project group thread binding update failed', err);
+  }
 }
 
 async function sendClowderRouteMessage(
@@ -889,7 +906,7 @@ async function sendClowderRouteMessage(
   routeOverride?: { channelId: string; channelType: 1 | 2; targetCatIds?: string[] }
 ) {
   if (!routeOverride) {
-    await clowderStore.sendConversationMessage({
+    const response = await clowderStore.sendConversationMessage({
       channelId: props.channelId,
       channelType: props.channelType as 1 | 2,
       directCatId: getClowderCatIdFromContactId(props.channelId),
@@ -897,12 +914,12 @@ async function sendClowderRouteMessage(
       promptContext: buildClowderPromptContext(text, targetCatIds, triggerReason, replyTarget)
     }, text);
     scheduleClowderConversationSync(props.channelId, props.channelType);
-    return;
+    return response;
   }
   const routeChannelId = routeOverride?.channelId || props.channelId;
   const routeChannelType = routeOverride?.channelType || props.channelType as 1 | 2;
   const routeTargetCatIds = routeOverride?.targetCatIds || targetCatIds;
-  await clowderStore.sendConversationMessage({
+  const response = await clowderStore.sendConversationMessage({
     channelId: routeChannelId,
     channelType: routeChannelType,
     directCatId: routeChannelType === 1 ? getClowderCatIdFromContactId(routeChannelId) : undefined,
@@ -910,6 +927,7 @@ async function sendClowderRouteMessage(
     promptContext: buildClowderPromptContext(text, routeTargetCatIds, triggerReason, replyTarget)
   }, text);
   scheduleClowderConversationSync(routeChannelId, routeChannelType);
+  return response;
 }
 
 async function startVoiceRecording() {
@@ -1351,7 +1369,7 @@ async function handleSend() {
           )
           : await clowderStore.createDeploymentRequest(
             buildDeploymentRequestCreatePayload(resolvedIntent, text, sentMessage.clientMsgNo)
-          );
+        );
         addDeploymentConfirmationCard(
           deploymentRequest,
           text,
@@ -1361,7 +1379,8 @@ async function handleSend() {
           sentMessage.clientMsgNo
         );
         if (projectGroupRoute || (allowCurrentConversationRoute && shouldRouteDeploymentPromptToClowder(text, autoReplyDecision.shouldRoute))) {
-          await sendClowderRouteMessage(text, targetCatIds, autoReplyDecision.reason, replyTargetSnapshot, clowderRouteOverride);
+          const routeResponse = await sendClowderRouteMessage(text, targetCatIds, autoReplyDecision.reason, replyTargetSnapshot, clowderRouteOverride);
+          await persistProjectGroupThreadFromRoute(projectGroupRoute, routeResponse);
         }
       } catch (deploymentErr) {
         console.error('Failed to sync deployment request', deploymentErr);
@@ -1376,7 +1395,8 @@ async function handleSend() {
         autoReplyDecision.shouldRoute
       ))
     ) {
-      await sendClowderRouteMessage(text, targetCatIds, autoReplyDecision.reason, replyTargetSnapshot, clowderRouteOverride);
+      const routeResponse = await sendClowderRouteMessage(text, targetCatIds, autoReplyDecision.reason, replyTargetSnapshot, clowderRouteOverride);
+      await persistProjectGroupThreadFromRoute(projectGroupRoute, routeResponse);
     }
   } catch (err) {
     console.error('Failed to send message', err);

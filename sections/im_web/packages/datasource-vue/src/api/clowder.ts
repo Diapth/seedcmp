@@ -457,6 +457,14 @@ export interface ClowderEnsureProjectGroupResponse {
   reused?: boolean;
 }
 
+export interface ClowderProjectGroupBindingResponse {
+  binding: ClowderProjectGroupBinding;
+}
+
+export interface ClowderProjectGroupThreadUpdateRequest {
+  projectThreadId: string;
+}
+
 export interface ClowderThreadTask {
   id: string;
   kind?: string;
@@ -728,6 +736,21 @@ export const clowderApi = {
   async ensureProjectGroup(data: ClowderEnsureProjectGroupRequest) {
     const response = await apiClient.post<ClowderEnsureProjectGroupResponse>('clowder/project-groups/ensure', data);
     return unwrapApiData(response as unknown as ClowderEnsureProjectGroupResponse | { data?: ClowderEnsureProjectGroupResponse });
+  },
+  async getActiveProjectGroup(params: {
+    pmDirectChannelId: string;
+    pmDirectChannelType: ClowderChannelType;
+    projectName?: string;
+  }) {
+    const response = await apiClient.get<ClowderProjectGroupBindingResponse>('clowder/project-groups/active', { params });
+    return unwrapApiData(response as unknown as ClowderProjectGroupBindingResponse | { data?: ClowderProjectGroupBindingResponse });
+  },
+  async updateProjectGroupThread(bindingId: string, data: ClowderProjectGroupThreadUpdateRequest) {
+    const response = await apiClient.post<ClowderProjectGroupBindingResponse>(
+      `clowder/project-groups/${encodeURIComponent(bindingId)}/thread`,
+      data,
+    );
+    return unwrapApiData(response as unknown as ClowderProjectGroupBindingResponse | { data?: ClowderProjectGroupBindingResponse });
   },
   allowGroup(params: ClowderConversationRef) {
     return apiClient.post<IMConnectorPermission>('clowder/group/allow', params);

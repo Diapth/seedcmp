@@ -1,6 +1,8 @@
 <script setup lang="ts">
 import { computed, onMounted, onUnmounted, ref, watch } from 'vue';
 import {
+  getClowderCatIdFromContactId,
+  isClowderCatContactId,
   useClowderStore,
   useMessageStore,
   type ClowderAgent,
@@ -43,6 +45,7 @@ const stateTokens = 'ready disabled denied loading error';
 const KICKOFF_REFRESH_INTERVAL_MS = 30_000;
 const KICKOFF_MAX_AGE_MS = 30 * 60_000;
 const TASK_ID_PATTERN = /\b\d{16,}-\d{6,}-[0-9a-f]{8,}\b/gi;
+const CLOWDER_COORDINATOR_CAT_ID = 'coordinator';
 let kickoffRefreshTimer: ReturnType<typeof setInterval> | null = null;
 
 const conversationRef = computed(() => ({
@@ -50,10 +53,39 @@ const conversationRef = computed(() => ({
   channelType: props.channelType as ClowderChannelType,
 }));
 
-const conversation = computed(() => clowderStore.getConversation(props.channelId, props.channelType));
-const directory = computed(() => clowderStore.agentDirectories[`${props.channelId}-${props.channelType}`]);
+const isCoordinatorDirectConversation = computed(() =>
+  props.channelType === 1 &&
+  isClowderCatContactId(props.channelId) &&
+  getClowderCatIdFromContactId(props.channelId) === CLOWDER_COORDINATOR_CAT_ID,
+);
+const activeProjectGroupBinding = computed(() => {
+  if (!isCoordinatorDirectConversation.value) return undefined;
+  return clowderStore.getActiveProjectGroupBindingForDirect({
+    pmDirectChannelId: props.channelId,
+    pmDirectChannelType: props.channelType,
+  });
+});
+const executionConversationRef = computed(() => {
+  const groupNo = activeProjectGroupBinding.value?.projectGroupNo;
+  if (groupNo) {
+    return {
+      channelId: groupNo,
+      channelType: 2 as ClowderChannelType,
+    };
+  }
+  return conversationRef.value;
+});
+const currentConversation = computed(() => clowderStore.getConversation(props.channelId, props.channelType));
+const conversation = computed(() =>
+  clowderStore.getConversation(executionConversationRef.value.channelId, executionConversationRef.value.channelType) ||
+  currentConversation.value,
+);
+const directory = computed(() =>
+  clowderStore.agentDirectories[`${executionConversationRef.value.channelId}-${executionConversationRef.value.channelType}`] ||
+  clowderStore.agentDirectories[`${props.channelId}-${props.channelType}`],
+);
 const groupAgents = computed(() =>
-  props.channelType === 2 ? clowderStore.groupCatMemberships[props.channelId] || [] : [],
+  executionConversationRef.value.channelType === 2 ? clowderStore.groupCatMemberships[executionConversationRef.value.channelId] || [] : [],
 );
 
 const autoReplyModes: Array<{ value: ClowderGroupAutoReplyMode; label: string }> = [
@@ -93,10 +125,16 @@ const groupAutoReplyMode = computed<ClowderGroupAutoReplyMode>(() => {
 // The kickoff store keys on coordinationId, so for now we surface any
 // fresh kickoff to the user. Phase 6 will narrow to the channel mapping.
 const boundThreadId = computed<string | null>(() => {
+  if (activeProjectGroupBinding.value) {
+    return activeProjectGroupBinding.value.projectThreadId ||
+      clowderStore.getConversation(activeProjectGroupBinding.value.projectGroupNo, 2)?.binding?.threadId ||
+      null;
+  }
   const binding = conversation.value?.binding;
   if (!binding) return null;
   return binding.threadId || null;
 });
+const isUsingProjectGroupExecution = computed(() => Boolean(activeProjectGroupBinding.value));
 const activeWorkspace = computed(() => clowderStore.getActiveWorkspace(boundThreadId.value));
 const workspaceBindingDiagnostics = computed(() =>
   boundThreadId.value ? clowderStore.getWorkspaceBinding(boundThreadId.value)?.diagnostics : undefined,
@@ -131,7 +169,9 @@ function textFromMessage(message: { content?: unknown }): string {
 
 const observedTaskIds = computed(() => {
   const ids = new Set<string>();
-  const recent = messageStore.getChannelMessages(props.channelId, props.channelType).slice(-80);
+  const recent = messageStore
+    .getChannelMessages(executionConversationRef.value.channelId, executionConversationRef.value.channelType)
+    .slice(-80);
   for (const message of recent) {
     const text = textFromMessage(message);
     const matches = text.match(TASK_ID_PATTERN) || [];
@@ -183,14 +223,24 @@ async function refresh() {
   const health = await clowderStore.refreshStatus().catch(() => clowderStore.status);
   if (health.state === 'error' || health.reachable === false) return;
   await clowderStore.loadConversation(conversationRef.value).catch(() => undefined);
+  if (isCoordinatorDirectConversation.value) {
+    await clowderStore.loadActiveProjectGroupBindingForDirect({
+      pmDirectChannelId: props.channelId,
+      pmDirectChannelType: props.channelType as ClowderChannelType,
+    }).catch(() => undefined);
+  }
+  const executionRef = executionConversationRef.value;
+  if (executionRef.channelId !== props.channelId || Number(executionRef.channelType) !== Number(props.channelType)) {
+    await clowderStore.loadConversation(executionRef).catch(() => undefined);
+  }
   if (boundThreadId.value) {
     await clowderStore.loadWorkspaceBinding(boundThreadId.value).catch(() => undefined);
     await refreshCoordinations();
   }
-  if (props.channelType === 2) {
-    await clowderStore.loadGroupCats(props.channelId).catch(() => undefined);
+  if (executionRef.channelType === 2) {
+    await clowderStore.loadGroupCats(executionRef.channelId).catch(() => undefined);
   }
-  await clowderStore.loadAgentDirectory(conversationRef.value).catch(() => undefined);
+  await clowderStore.loadAgentDirectory(executionRef).catch(() => undefined);
 }
 
 function statusText(statusValue: string) {
@@ -316,6 +366,22 @@ async function handleKickoffCreated(threadId: string) {
   }
 }
 
+async function openProjectGroup() {
+  const binding = activeProjectGroupBinding.value;
+  if (!binding?.projectGroupNo) return;
+  try {
+    await router.push({
+      name: 'Conversation',
+      params: {
+        channelID: binding.projectGroupNo,
+        channelType: '2',
+      },
+    });
+  } catch (err) {
+    console.warn('[ClowderConversationPanel] project group push failed', err);
+  }
+}
+
 onMounted(() => {
   refresh();
   void refreshKickoffs();
@@ -420,12 +486,24 @@ watch(coordinationRefreshToken, () => {
 
     <div v-if="subTab === 'overview'" class="panel-body">
       <section class="panel-section">
-        <div class="section-label">Thread</div>
+        <div class="section-label">{{ isUsingProjectGroupExecution ? 'Project Thread' : 'Thread' }}</div>
         <div class="thread-id">{{ boundThreadId || 'Not bound' }}</div>
         <div v-if="statusReason" class="error-text">error: {{ statusReason }}</div>
         <div v-if="conversation?.lastDelivery" class="muted">
           Delivery: {{ conversation.lastDelivery.state }}
         </div>
+      </section>
+
+      <section v-if="activeProjectGroupBinding" class="panel-section">
+        <div class="section-label">Project Group</div>
+        <div class="workspace-summary">
+          <strong>{{ activeProjectGroupBinding.projectName }}</strong>
+          <span>{{ activeProjectGroupBinding.projectGroupNo }}</span>
+          <small>{{ activeProjectGroupBinding.projectThreadId ? 'execution bound' : 'waiting for project thread' }}</small>
+        </div>
+        <button type="button" class="project-group-link" @click="openProjectGroup">
+          打开项目群
+        </button>
       </section>
 
       <section class="panel-section">
@@ -678,6 +756,17 @@ watch(coordinationRefreshToken, () => {
 .panel-tab:disabled {
   opacity: 0.5;
   cursor: not-allowed;
+}
+
+.project-group-link {
+  width: fit-content;
+  border: var(--border-hairline);
+  border-radius: var(--radius-sm);
+  background: var(--bg-secondary);
+  color: var(--text-primary);
+  padding: 6px 10px;
+  font-size: 12px;
+  cursor: pointer;
 }
 
 .panel-body {

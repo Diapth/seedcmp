@@ -419,6 +419,72 @@ export const useClowderStore = defineStore('clowder', () => {
     return projectGroupBindings.value[projectGroupBindingKey(input)];
   }
 
+  function getActiveProjectGroupBindingForDirect(input: {
+    userId?: string | null;
+    pmDirectChannelId: string;
+    pmDirectChannelType: number;
+  }) {
+    const userId = String(input.userId || '').trim();
+    return Object.values(projectGroupBindings.value)
+      .filter(binding =>
+        binding.status === 'active' &&
+        (!userId || binding.userId === userId) &&
+        binding.pmDirectChannelId === input.pmDirectChannelId &&
+        Number(binding.pmDirectChannelType) === Number(input.pmDirectChannelType)
+      )
+      .sort((a, b) => Number(b.updatedAt || 0) - Number(a.updatedAt || 0))[0];
+  }
+
+  async function loadActiveProjectGroupBindingForDirect(input: {
+    pmDirectChannelId: string;
+    pmDirectChannelType: ClowderConversationRef['channelType'];
+    projectName?: string;
+  }) {
+    const pmDirectChannelId = String(input.pmDirectChannelId || '').trim();
+    if (!pmDirectChannelId || !input.pmDirectChannelType) return undefined;
+    loading.value = true;
+    error.value = undefined;
+    try {
+      const response = await clowderApi.getActiveProjectGroup({
+        pmDirectChannelId,
+        pmDirectChannelType: input.pmDirectChannelType,
+        projectName: input.projectName
+      });
+      if (response.binding) {
+        return setProjectGroupBinding(response.binding);
+      }
+      return undefined;
+    } catch (err: any) {
+      if (err?.response?.status === 404 || err?.status === 404) {
+        return undefined;
+      }
+      error.value = err instanceof Error ? err.message : 'Clowder project group binding unavailable';
+      throw err;
+    } finally {
+      loading.value = false;
+    }
+  }
+
+  async function updateProjectGroupBindingThread(bindingId: string, projectThreadId?: string) {
+    const trimmedId = String(bindingId || '').trim();
+    const trimmedThreadId = String(projectThreadId || '').trim();
+    if (!trimmedId || !trimmedThreadId) return undefined;
+    loading.value = true;
+    error.value = undefined;
+    try {
+      const response = await clowderApi.updateProjectGroupThread(trimmedId, { projectThreadId: trimmedThreadId });
+      if (response.binding) {
+        return setProjectGroupBinding(response.binding);
+      }
+      return undefined;
+    } catch (err) {
+      error.value = err instanceof Error ? err.message : 'Clowder project group thread update failed';
+      throw err;
+    } finally {
+      loading.value = false;
+    }
+  }
+
   async function ensureProjectGroup(input: ClowderEnsureProjectGroupRequest) {
     loading.value = true;
     error.value = undefined;
@@ -1691,6 +1757,9 @@ export const useClowderStore = defineStore('clowder', () => {
     getWorkspaceBinding,
     getActiveWorkspace,
     getProjectGroupBinding,
+    getActiveProjectGroupBindingForDirect,
+    loadActiveProjectGroupBindingForDirect,
+    updateProjectGroupBindingThread,
     ensureProjectGroup,
     loadWorkspaceRoot,
     loadWorkspaces,

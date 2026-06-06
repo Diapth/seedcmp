@@ -18,4 +18,31 @@ describe('Clowder PM project group helpers', () => {
     expect(resolveProjectGroupName('帮我拆解并执行这个需求', 'Maomi Workspace')).toBe('Maomi Workspace')
     expect(resolveProjectGroupName('@PM 请协调一下 todo 页面')).toBe('请协调一下 todo 页面')
   })
+
+  it('persists the routed project thread after PM direct kickoff is sent to the group', async () => {
+    const input = await import('../src/components/MessageInput.vue?raw')
+    const store = await import('../../../packages/datasource-vue/src/stores/clowderStore.ts?raw')
+    const api = await import('../../../packages/datasource-vue/src/api/clowder.ts?raw')
+
+    expect(input.default).toContain('persistProjectGroupThreadFromRoute')
+    expect(input.default).toContain('updateProjectGroupBindingThread(bindingId, routedThreadId)')
+    expect(input.default).toContain('bindingId: response.binding.id')
+    expect(store.default).toContain('updateProjectGroupBindingThread')
+    expect(api.default).toContain('project-groups/${encodeURIComponent(bindingId)}/thread')
+  })
+
+  it('lets PM direct clowder views resolve execution state from the active project group', async () => {
+    const panel = await import('../src/components/ClowderConversationPanel.vue?raw')
+    const store = await import('../../../packages/datasource-vue/src/stores/clowderStore.ts?raw')
+    const api = await import('../../../packages/datasource-vue/src/api/clowder.ts?raw')
+
+    expect(panel.default).toContain('activeProjectGroupBinding')
+    expect(panel.default).toContain('executionConversationRef')
+    expect(panel.default).toContain('projectThreadId')
+    expect(panel.default).toContain('loadActiveProjectGroupBindingForDirect')
+    expect(panel.default).toContain('Project Group')
+    expect(store.default).toContain('getActiveProjectGroupBindingForDirect')
+    expect(store.default).toContain('loadActiveProjectGroupBindingForDirect')
+    expect(api.default).toContain('clowder/project-groups/active')
+  })
 })

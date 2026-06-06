@@ -182,6 +182,15 @@ sections/clowder-ai/packages/mcp-server/src/tools/callback-tools.ts
 - Store/UI test: PM direct chat shows a handoff/link to the project group.
 - Browser smoke: ask PM to start a project, verify a new group named after the project appears, verify the user and agents are members, and verify agent messages land in that group.
 
+## Implementation Notes
+
+### Stage 3: Project Group Execution Thread Binding
+
+- `conversation/message` already returns the Clowder route response with `threadId`; `MessageInput.vue` now captures that response when a PM direct project kickoff is routed into the project group.
+- The bridge exposes `GET /v1/clowder/project-groups/active` and `POST /v1/clowder/project-groups/:bindingId/thread` so the project-group binding can persist the project execution `threadId` without re-sending the PM direct handoff message.
+- `ClowderConversationPanel.vue` resolves PM/coordinator direct views through the active project group binding. When a PM direct conversation has an active binding, coordination, Kanban, artifacts, workspace binding, agent directory, and observed task ids use the project group channel/thread instead of the PM direct thread.
+- The PM direct panel now shows the active project group and provides an entry to open the group conversation, while the PM direct chat remains the private feedback channel.
+
 ## Notes
 
 Do not solve this by only changing copy in the PM direct chat. The core requirement is a conversation topology change: PM/user direct chat is for coordination and feedback; project execution happens in a named group that includes the user and the relevant agents.
