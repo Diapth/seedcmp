@@ -10,7 +10,9 @@
 
 ## 1. 结论
 
-AgentHub UI V1 已完成真实后端接入、IM 会话/消息/群列表同步、Clowder/Agent/File/Settings 真实 API 化与 unavailable 兜底、业务 mock 与伪造成功路径清理，并通过单元测试、H5 构建和真实浏览器对照验收。
+AgentHub UI V1 的 V1-1/V1-2 主链路已完成真实后端接入、IM 会话/消息/群列表同步、业务 mock 与伪造成功路径清理，并通过单元测试、H5 构建和 agenthub_ui -> im_web 真实双端实时验收。
+
+V1-3 的 Clowder/Agent/File/Settings API 化与 unavailable 兜底已有代码与单测覆盖；完整 OAuth cat 创建、PM 项目群、Kanban/artifacts/deployment card 的真实 live 验收仍需单独执行，不能仅凭本报告判定 V1-3 全量完成。
 
 本轮验收重点确认：
 
@@ -19,6 +21,7 @@ AgentHub UI V1 已完成真实后端接入、IM 会话/消息/群列表同步、
 3. 会话列表来自真实 `conversation/sync`、`group/my`、`message/channel/sync`，与 im_web 关键会话对齐。
 4. 不再出现“未命名会话”和 1970 时间。
 5. H5 桌面与移动端截图无白屏、无明显遮挡、无主要文本溢出。
+6. agenthub_ui 发送真实文本消息后，im_web 无刷新收到同一消息。
 
 ## 2. 真实账号与运行环境
 
@@ -46,8 +49,11 @@ AgentHub UI V1 已完成真实后端接入、IM 会话/消息/群列表同步、
 - `utils/wk-sdk.js`：接入 `wukongimjssdk@1.3.5`，登录后初始化 WebSocket。
 - `stores/conversation.js`：真实 `conversation/sync`、群会话合并、草稿/隐藏持久化、置顶/免打扰/清未读接口。
 - `stores/message.js`：真实消息同步、发送、去重、撤回、编辑、reaction 基础能力。
+- `stores/message.js`：补齐非文本发送 unavailable、typing CMD、revoke by client msg no、reaction channel type。
 - `stores/group.js`：真实 `group/my`、群资料、群成员接口。
 - `stores/contact.js` / `stores/file.js`：真实好友/文件 API，后端不可用时不伪造成功。
+- `pages/contacts/add.vue` / `ContactUtilityPanel.vue`：添加好友搜索走真实 `user/search`，保留 `vercode` 并传给 `friend/apply`。
+- `MessageInput.vue` / `pages/files/index.vue` / QR 与下载入口：未接真实上传、下载、二维码能力时显式 unavailable。
 - `utils/im-mappers.js`：兼容真实 sync shape、秒级 timestamp、users/groups channel cache、群最新摘要。
 
 ### V1-3 Clowder 与功能完善
@@ -66,8 +72,8 @@ npm run test:unit
 
 结果：
 
-- Test Files：4 passed
-- Tests：17 passed
+- Test Files：7 passed
+- Tests：35 passed
 
 ```bash
 npm run build:h5
@@ -76,6 +82,18 @@ npm run build:h5
 结果：
 
 - `DONE Build complete.`
+
+```bash
+npm run test:e2e:realtime
+```
+
+结果：
+
+- Passed
+- Evidence：`.ai/tests-e2e/v1-2-20260606T194812/`
+- Message：`agenthub-imweb-live-20260606T194812`
+- Conversation：`qwq` / `clowder_cat:codex`
+- Browser diagnostics：pageerror 0、requestfailed 0、HTTP 4xx/5xx 0
 
 非阻断告警：
 
@@ -116,12 +134,28 @@ npm run build:h5
 - agenthub_ui console：WebSocket 打开并连接成功
 - im_web console：WebSocket 打开并连接成功
 
+### V1-2 双端实时消息
+
+- agenthub_ui：`http://localhost:5173`
+- im_web：`http://localhost:3000`
+- 目标会话：`qwq`
+- 发送端：agenthub_ui
+- 接收端：im_web
+- 结果：im_web 不刷新收到 `agenthub-imweb-live-20260606T194812`
+- 证据：
+  - `.ai/tests-e2e/v1-2-20260606T194812/events.json`
+  - `.ai/tests-e2e/v1-2-20260606T194812/ws-frames.json`
+  - `.ai/tests-e2e/v1-2-20260606T194812/01-agenthub-before-send.png`
+  - `.ai/tests-e2e/v1-2-20260606T194812/04-imweb-received-without-refresh.png`
+
 ## 6. 问题单状态
 
 - `001-real-backend-integration-gap.md`：Resolved
 - `002-uni-build-watcher-enospc.md`：Resolved
 - `003-wukongim-build-vcs-status.md`：Resolved
 - `004-conversation-sync-shape-and-group-gap.md`：Resolved
+- `005-wksdk-send-payload-and-clowder-draft-sync.md`：Resolved
+- `006-v1-2-business-mock-cleanup-and-im-actions.md`：Resolved for V1-2/unit/E2E scope
 
 ## 7. 残余风险
 
@@ -129,3 +163,4 @@ npm run build:h5
 2. 二维码登录、skill 上传等能力依赖后端能力，接不上时已显式 unavailable，没有伪造成功。
 3. Sass `@import` 与 uni alpha 告警不影响本轮构建，但后续升级 uni/Sass 时建议清理。
 4. Go VCS stamping 在本地 worktree 启动后端时需要 `GOFLAGS=-buildvcs=false`，已记录 issue。
+5. V1-3 OAuth cat 创建、PM 项目群、Kanban/artifacts/deployment card 仍缺少本轮 live H5 证据。

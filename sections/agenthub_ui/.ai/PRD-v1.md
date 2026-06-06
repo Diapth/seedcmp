@@ -31,9 +31,10 @@ V1 的核心目标不是做演示壳，而是把已经成型的 UI 接到真实 
 - 真实 IM credential：拉取 `users/{uid}/im`，初始化 WKSDK/WebSocket。
 - 真实会话：`conversation/sync` + `group/my` + `message/channel/sync` 合并。
 - 真实消息：消息同步、发送入口、实时入库、去重、撤回/编辑/reaction 基础接口。
+- IM 动作：typing、撤回、reaction、清未读必须走真实 SDK/API 或真实本地状态合并，不允许只改 UI。
 - 真实群：我的群、群资料、成员、建群/退出/解散接口。
 - 真实 Clowder：cat directory、capabilities、conversation binding、group cats、project group、deployment API。
-- 真实文件：文件列表、上传、预览入口、不可用状态。
+- 真实文件：文件列表、预览入口、不可用状态；未接入真实上传/下载时必须 explicit unavailable。
 - 设置：设备、二维码登录、skill 上传、通知状态；不可用时显式 unavailable。
 - 多端适配：H5 已验收；代码层使用 uni storage/request 抽象兼容 APP-PLUS。
 
@@ -41,6 +42,7 @@ V1 的核心目标不是做演示壳，而是把已经成型的 UI 接到真实 
 
 - Android 真机安装包验收不属于本轮已完成证据。
 - 后端未提供或本机不可用的 OAuth/二维码/skill 能力不做本地 mock。
+- 未接入真实上传、下载、二维码生成、联系人分组等能力时不展示伪造成功、伪造进度或可扫描占位码。
 - 本轮不重写视觉系统；保持现有 AgentHub UI 风格与 responsive layout。
 
 ## 4. 功能需求
@@ -81,12 +83,17 @@ V1 的核心目标不是做演示壳，而是把已经成型的 UI 接到真实 
 - pending 消息通过 client msg no 去重/合并。
 - direct/group channel key 必须稳定。
 - 消息时间使用毫秒时间。
+- typing 使用 WKSDK CMD。
+- 撤回必须支持服务端 message id 与 client msg no 匹配。
+- reaction 必须使用消息真实 channel type。
+- 清未读必须本地清零并向后端提交 read cursor。
 
 验收：
 
 - WebSocket console 显示成功连接。
 - 真实历史消息可作为会话摘要显示。
 - 单测覆盖实时入库去重与字段稳定性。
+- E2E 覆盖 agenthub_ui 发消息后 im_web 无刷新收到。
 
 ### FR-4 Clowder 与智能体
 
@@ -103,9 +110,11 @@ V1 的核心目标不是做演示壳，而是把已经成型的 UI 接到真实 
 
 ### FR-5 文件与设置
 
-- 文件列表、上传、预览走真实 file API。
+- 文件列表、预览走真实 file API。
+- 上传、下载未接入真实选择/下载能力时必须 explicit unavailable。
 - 设备列表/删除走真实 auth API。
 - 二维码登录与 skill 上传能接则接；接不上必须 unavailable。
+- 个人二维码、群二维码未接真实 token/二维码生成接口时必须 unavailable，不允许绘制占位二维码并提示成功。
 - 通知设置保留本地持久化。
 
 验收：
@@ -138,12 +147,14 @@ V1 的核心目标不是做演示壳，而是把已经成型的 UI 接到真实 
 
 1. `npm run test:unit` 通过。
 2. `npm run build:h5` 通过。
-3. 真实 H5 登录成功。
-4. agenthub_ui 与 im_web 对照关键会话一致。
-5. 项目群、PM、Clowder AI 会话可见。
-6. 无 `未命名会话` / `1970`。
-7. 浏览器无 pageerror、requestfailed、HTTP 4xx/5xx。
-8. 截图证据保存到 `issues/screenshots/`。
+3. `npm run test:e2e:realtime` 通过并保存截图、events、WS frames。
+4. 真实 H5 登录成功。
+5. agenthub_ui 与 im_web 对照关键会话一致。
+6. 项目群、PM、Clowder AI 会话可见。
+7. 无 `未命名会话` / `1970`。
+8. 浏览器无 pageerror、requestfailed、HTTP 4xx/5xx。
+9. 截图证据保存到 `issues/screenshots/` 或 `.ai/tests-e2e/`。
+10. V1-3 完成判定还必须提供 OAuth cat、PM 项目群、Kanban/artifacts/deployment card 的真实 live 证据。
 
 ## 7. 风险与后续
 
