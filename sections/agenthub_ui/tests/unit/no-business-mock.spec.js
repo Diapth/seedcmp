@@ -93,4 +93,12 @@ describe('business mock cleanup', () => {
     expect(bubble).toContain('DeploymentCard');
     expect(bubble).toContain("data.type === 'deployment'");
   });
+
+  it('defaults OAuth cat creation to backend-required provider account refs', () => {
+    const newAgent = read('pages/agents/new.vue');
+
+    expect(newAgent).toContain('defaultAccountRef');
+    expect(newAgent).toContain("accountRef: defaultAccountRef('claude-code')");
+    expect(newAgent).toContain("form.value.accountRef = defaultAccountRef(form.value.platform)");
+  });
 });

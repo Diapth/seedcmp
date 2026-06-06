@@ -4,15 +4,15 @@ import { clowderApi } from '@/api/clowder.js';
 function normalizeAgent(input = {}) {
   return {
     id: input.cat_id || input.catId || input.id || '',
-    name: input.name || input.display_name || '未命名智能体',
+    name: input.name || input.displayName || input.display_name || '未命名智能体',
     alias: input.alias || '',
     desc: input.desc || input.description || '',
     avatar: input.avatar || input.logo || '',
     status: input.status || 'unknown',
     creator: input.creator || input.created_by || '',
-    platform: input.platform || '',
-    accessMode: input.access_mode || input.accessMode || '',
-    model: input.model || '',
+    platform: input.platform || input.clientId || '',
+    accessMode: input.access_mode || input.accessMode || input.authType || '',
+    model: input.model || input.defaultModel || '',
     accountRef: input.account_ref || input.accountRef || '',
     apiKey: '',
     apiUrl: '',
@@ -23,6 +23,40 @@ function normalizeAgent(input = {}) {
     capabilityTags: input.capability_tags || input.capabilityTags || [],
     raw: input
   };
+}
+
+function normalizeCatPlatform(platform) {
+  const value = String(platform || '').trim().toLowerCase().replace(/_/g, '-');
+  if (value === 'openai' || value === 'codex') return 'codex';
+  if (value === 'anthropic' || value === 'claude' || value === 'claude-code') return 'claude-code';
+  return value;
+}
+
+function normalizeCatAuthType(accessMode) {
+  const value = String(accessMode || '').trim().toLowerCase();
+  if (value === 'api_key' || value === 'api-key' || value === 'apikey') return 'api-key';
+  if (value === 'oauth' || value === 'subscription') return 'oauth';
+  return value;
+}
+
+function createCatRequestPayload(payload = {}) {
+  const platform = normalizeCatPlatform(payload.clientId || payload.platform);
+  const data = {
+    name: payload.name,
+    alias: payload.alias,
+    roleTemplateId: payload.roleTemplateId || payload.roleTemplateID || payload.templateId || payload.roleTemplate,
+    clientId: platform,
+    platform,
+    authType: normalizeCatAuthType(payload.authType || payload.accessMode || payload.access_mode),
+    accountRef: payload.accountRef || payload.account_ref,
+    defaultModel: payload.defaultModel || payload.model || payload.customModel,
+    personality: payload.personality || payload.systemPrompt || payload.desc,
+    capabilities: payload.capabilities || payload.capabilityTags || []
+  };
+  return Object.fromEntries(Object.entries(data).filter(([, value]) => {
+    if (Array.isArray(value)) return value.length > 0;
+    return value !== undefined && value !== null && value !== '';
+  }));
 }
 
 function normalizeRoleTemplate(input = {}) {
@@ -168,17 +202,7 @@ export const useAgentStore = defineStore('agent', {
       }
     },
     async createAgent(payload) {
-      const response = await clowderApi.createCatAndConnect({
-        name: payload.name,
-        alias: payload.alias,
-        desc: payload.desc,
-        platform: payload.platform || 'claude-code',
-        access_mode: payload.accessMode || 'oauth',
-        model: payload.model,
-        account_ref: payload.accountRef,
-        system_prompt: payload.systemPrompt,
-        capability_tags: payload.capabilityTags || []
-      });
+      const response = await clowderApi.createCatAndConnect(createCatRequestPayload(payload));
       const data = response?.data || response || {};
       const agent = normalizeAgent(data.cat || data.agent || data);
       if (agent.id && !this.agents.some((item) => item.id === agent.id)) {

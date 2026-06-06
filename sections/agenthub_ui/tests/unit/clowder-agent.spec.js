@@ -135,6 +135,90 @@ describe('Clowder and agent stores', () => {
     expect(clowderStore.disabledReason).toContain('OAuth');
   });
 
+  it('creates OAuth cats with backend field names required by TangSeng', async () => {
+    setRequestAdapter(async ({ url, method, data }) => {
+      expect(method).toBe('POST');
+      expect(url).toContain('/clowder/cats');
+      expect(data).toMatchObject({
+        name: '验收猫',
+        alias: '@v13cat',
+        platform: 'claude-code',
+        clientId: 'claude-code',
+        authType: 'oauth',
+        accountRef: 'claude',
+        defaultModel: 'opus',
+        roleTemplateId: 'coordinator',
+        capabilities: ['项目拆解']
+      });
+      expect(data).not.toHaveProperty('access_mode');
+      expect(data).not.toHaveProperty('account_ref');
+      return {
+        status: 200,
+        data: {
+          code: 0,
+          data: {
+            agent: {
+              catId: 'cat-v13',
+              displayName: '验收猫',
+              aliases: ['@v13cat'],
+              connected: true
+            }
+          }
+        }
+      };
+    });
+
+    const agent = await useAgentStore().createAgent({
+      name: '验收猫',
+      alias: '@v13cat',
+      desc: 'V1-3 live cat',
+      platform: 'claude-code',
+      accessMode: 'oauth',
+      model: 'opus',
+      accountRef: 'claude',
+      roleTemplate: 'coordinator',
+      capabilityTags: ['项目拆解']
+    });
+
+    expect(agent).toMatchObject({ id: 'cat-v13', name: '验收猫' });
+  });
+
+  it('creates cats through the Clowder store with backend create-cat field names', async () => {
+    setRequestAdapter(async ({ url, method, data }) => {
+      expect(method).toBe('POST');
+      expect(url).toContain('/clowder/cats');
+      expect(data).toMatchObject({
+        name: 'Store Cat',
+        clientId: 'codex',
+        authType: 'oauth',
+        accountRef: 'codex',
+        defaultModel: 'gpt-5.5'
+      });
+      return {
+        status: 200,
+        data: {
+          code: 0,
+          data: {
+            agent: {
+              catId: 'cat-store',
+              displayName: 'Store Cat'
+            }
+          }
+        }
+      };
+    });
+
+    const cat = await useClowderStore().createCat({
+      name: 'Store Cat',
+      platform: 'codex',
+      accessMode: 'oauth',
+      model: 'gpt-5.5',
+      accountRef: 'codex'
+    });
+
+    expect(cat.catId).toBe('cat-store');
+  });
+
   it('stores project group bindings from wrapped backend responses', async () => {
     setRequestAdapter(async ({ url, method, data }) => {
       expect(method).toBe('POST');

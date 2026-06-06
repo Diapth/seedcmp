@@ -42,6 +42,40 @@ function deploymentId(request = {}, fallback = '') {
   return request.id || request.requestId || request.request_id || request.deploymentRequestId || request.deployment_request_id || fallback;
 }
 
+function normalizeCatPlatform(platform) {
+  const value = String(platform || '').trim().toLowerCase().replace(/_/g, '-');
+  if (value === 'openai' || value === 'codex') return 'codex';
+  if (value === 'anthropic' || value === 'claude' || value === 'claude-code') return 'claude-code';
+  return value;
+}
+
+function normalizeCatAuthType(accessMode) {
+  const value = String(accessMode || '').trim().toLowerCase();
+  if (value === 'api_key' || value === 'api-key' || value === 'apikey') return 'api-key';
+  if (value === 'oauth' || value === 'subscription') return 'oauth';
+  return value;
+}
+
+function createCatRequestPayload(payload = {}) {
+  const platform = normalizeCatPlatform(payload.clientId || payload.platform);
+  const data = {
+    name: payload.name,
+    alias: payload.alias,
+    roleTemplateId: payload.roleTemplateId || payload.roleTemplateID || payload.templateId || payload.roleTemplate,
+    clientId: platform,
+    platform,
+    authType: normalizeCatAuthType(payload.authType || payload.accessMode || payload.access_mode),
+    accountRef: payload.accountRef || payload.account_ref,
+    defaultModel: payload.defaultModel || payload.model || payload.customModel,
+    personality: payload.personality || payload.systemPrompt || payload.desc,
+    capabilities: payload.capabilities || payload.capabilityTags || []
+  };
+  return Object.fromEntries(Object.entries(data).filter(([, value]) => {
+    if (Array.isArray(value)) return value.length > 0;
+    return value !== undefined && value !== null && value !== '';
+  }));
+}
+
 export const useClowderStore = defineStore('clowder', {
   state: () => ({
     status: 'unknown',
@@ -82,21 +116,23 @@ export const useClowderStore = defineStore('clowder', {
       const response = await clowderApi.getCatDirectory(params);
       const data = unwrapData(response);
       const list = data.cats || data.agents || [];
-      this.agentDirectory = Object.fromEntries(list.map((cat) => [cat.cat_id || cat.id, cat]));
+      this.agentDirectory = Object.fromEntries(list.map((cat) => [cat.cat_id || cat.catId || cat.id, cat]));
       return list;
     },
     async createCat(payload) {
-      const response = await clowderApi.createCatAndConnect(payload);
+      const response = await clowderApi.createCatAndConnect(createCatRequestPayload(payload));
       const data = unwrapData(response);
       const cat = data.cat || data.agent || data;
-      if (cat?.cat_id || cat?.id) this.agentDirectory[cat.cat_id || cat.id] = cat;
+      const id = cat?.cat_id || cat?.catId || cat?.id;
+      if (id) this.agentDirectory[id] = cat;
       return cat;
     },
     async connectCat(catId) {
       const response = await clowderApi.connectCatContact({ catId });
       const data = unwrapData(response);
       const cat = data.cat || data.agent || data;
-      if (cat?.cat_id || cat?.id) this.agentDirectory[cat.cat_id || cat.id] = cat;
+      const id = cat?.cat_id || cat?.catId || cat?.id;
+      if (id) this.agentDirectory[id] = cat;
       return cat;
     },
     async disconnectCat(catId) {

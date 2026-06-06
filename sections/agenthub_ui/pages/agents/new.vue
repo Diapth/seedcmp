@@ -552,7 +552,7 @@ function createDefaultForm() {
     platform: 'claude-code',
     accessMode: 'oauth',
     model: '',
-    accountRef: '',
+    accountRef: defaultAccountRef('claude-code'),
     apiKey: '',
     apiUrl: '',
     customModel: '',
@@ -714,7 +714,14 @@ const canSubmit = computed(() => {
 });
 
 function onFormChange() {
+  form.value.accountRef = defaultAccountRef(form.value.platform);
   syncDefaultModel();
+}
+
+function defaultAccountRef(platform) {
+  if (platform === 'claude-code') return 'claude';
+  if (platform === 'codex') return 'codex';
+  return '';
 }
 
 function loadEditingAgent() {
