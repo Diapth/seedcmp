@@ -285,6 +285,7 @@ import { useConversationStore } from '@/stores/conversation';
 import { useMessageStore } from '@/stores/message';
 import { useContactStore } from '@/stores/contact';
 import { useAgentStore } from '@/stores/agent';
+import { storage } from '@/utils/storage.js';
 import AppShell from '@/components/layout/AppShell.vue';
 import MobilePageHeader from '@/components/layout/MobilePageHeader.vue';
 import ConversationList from '@/components/chat/ConversationList.vue';
@@ -421,24 +422,28 @@ const memberMenuItems = computed(() => {
   return [{ label: '@ 他', icon: 'at', action: 'mention' }];
 });
 
-onMounted(() => {
+onMounted(async () => {
   navStore.setActiveModule('chat');
-  
-  if (uni.getStorageSync('hide_notification_banner')) {
+
+  if (storage.get('hide_notification_banner')) {
     showNotificationBanner.value = false;
   }
   if (getNotificationPermissionState() === 'granted') {
     showNotificationBanner.value = false;
   }
   
-  const persistedId = uni.getStorageSync('active_conversation_id');
+  if (convStore.conversations.length === 0) {
+    await convStore.fetchConversations().catch(() => undefined);
+  }
+
+  const persistedId = storage.get('active_conversation_id');
   if (persistedId) {
     convStore.setActiveId(persistedId);
   }
 });
 
 function handleSelectConversation(id) {
-  uni.setStorageSync('active_conversation_id', id);
+  storage.set('active_conversation_id', id);
   convStore.setActiveId(id);
   closeFilePreview();
   closeMemberProfile();
@@ -859,7 +864,7 @@ function startDirectChat(member) {
   const conv = convStore.upsertDirectConversation(member);
   if (!conv) return;
   convStore.setActiveId(conv.id);
-  uni.setStorageSync('active_conversation_id', conv.id);
+  storage.set('active_conversation_id', conv.id);
   uni.showToast({ title: `已切换到 ${conv.name}`, icon: 'none' });
 }
 
@@ -938,7 +943,7 @@ function requestNotificationPermission() {
     if (status === 'granted') {
       uni.showToast({ title: '通知权限已开启', icon: 'success' });
       showNotificationBanner.value = false;
-      uni.setStorageSync('hide_notification_banner', true);
+      storage.set('hide_notification_banner', true);
       return;
     }
     const title = status === 'denied' ? '请在系统设置中开启通知权限' : '当前环境不支持系统通知';

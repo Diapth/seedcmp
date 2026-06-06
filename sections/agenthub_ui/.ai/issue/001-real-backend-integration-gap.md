@@ -23,7 +23,8 @@
 
 ## 验证
 
-- `npm run test:unit`：13 passed
+- `npm run test:unit`：17 passed
 - `npm run build:h5`：Build complete
-- `npm run test:smoke`
-- H5 浏览器截图：375x844、768x1024、1024x768、1440x900
+- 真实 H5 登录：`008618337488675` 登录 agenthub_ui 成功，WebSocket connected
+- agenthub_ui 与 im_web 对照：项目群、PM、Clowder AI 等关键会话一致；无 `未命名会话` / `1970`
+- H5 浏览器截图：`issues/screenshots/v1-final-agenthub-1440.png`、`issues/screenshots/v1-final-agenthub-375.png`、`issues/screenshots/v1-final-imweb-1440.png`

@@ -1,6 +1,14 @@
 import { defineStore } from 'pinia';
 import { groupApi } from '@/api/group.js';
 
+function parseGroupTime(value) {
+  if (!value) return Date.now();
+  const numeric = Number(value);
+  if (Number.isFinite(numeric) && numeric > 0) return numeric;
+  const parsed = Date.parse(String(value).replace(' ', 'T'));
+  return Number.isFinite(parsed) && parsed > 0 ? parsed : Date.now();
+}
+
 function normalizeGroup(input = {}) {
   return {
     id: input.group_no || input.groupNo || input.id || '',
@@ -9,7 +17,9 @@ function normalizeGroup(input = {}) {
     memberCount: Number(input.member_count || input.memberCount || 0),
     announcement: input.notice || input.announcement || '',
     creatorId: input.creator || input.creatorId || input.created_by || '',
-    createTime: Number(input.created_at || input.createTime || Date.now()),
+    createTime: parseGroupTime(input.createTime || input.created_at),
+    top: Number(input.top || input.stick || 0),
+    mute: Number(input.mute || 0),
     raw: input
   };
 }
@@ -29,7 +39,8 @@ export const useGroupStore = defineStore('group', {
     async fetchMyGroups() {
       const response = await groupApi.getMyGroups();
       const data = response?.data || response || {};
-      this.groups = (data.groups || data.items || []).map(normalizeGroup);
+      const list = Array.isArray(data) ? data : (data.groups || data.items || data.list || []);
+      this.groups = list.map(normalizeGroup).filter((group) => group.id);
       return this.groups;
     },
     async createGroup({ name, members }) {

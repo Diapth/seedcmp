@@ -264,6 +264,7 @@ import { useConversationStore } from '@/stores/conversation';
 import { useMessageStore } from '@/stores/message';
 import { useContactStore } from '@/stores/contact';
 import { useAgentStore } from '@/stores/agent';
+import { storage } from '@/utils/storage.js';
 import { useResponsiveLayout } from '@/composables/useResponsiveLayout';
 import AppShell from '@/components/layout/AppShell.vue';
 import MobilePageHeader from '@/components/layout/MobilePageHeader.vue';
@@ -433,16 +434,19 @@ const memberMenuItems = computed(() => {
   return [{ label: '@ 他', icon: 'at', action: 'mention' }];
 });
 
-onMounted(() => {
+onMounted(async () => {
   navStore.setActiveModule('chat');
   const pages = getCurrentPages();
   const currentPage = pages[pages.length - 1];
   const id = currentPage?.$page?.options?.id || '1';
   const atMemberId = currentPage?.$page?.options?.at;
+  if (convStore.conversations.length === 0) {
+    await convStore.fetchConversations().catch(() => undefined);
+  }
   convStore.setActiveId(id);
 
   // Restore persisted draft
-  const persistedDraft = uni.getStorageSync(`draft:${id}`);
+  const persistedDraft = storage.get(`draft:${id}`);
   if (persistedDraft && !convStore.conversations.find((c) => c.id === id)?.draft) {
     convStore.updateConversationDraft(id, persistedDraft);
   }
@@ -466,9 +470,9 @@ onBeforeUnmount(() => {
   if (convStore.activeId) {
     const conv = convStore.conversations.find((c) => c.id === convStore.activeId);
     if (conv?.draft) {
-      uni.setStorageSync(`draft:${convStore.activeId}`, conv.draft);
+      storage.set(`draft:${convStore.activeId}`, conv.draft);
     } else {
-      uni.removeStorageSync(`draft:${convStore.activeId}`);
+      storage.remove(`draft:${convStore.activeId}`);
     }
   }
 });
@@ -974,7 +978,7 @@ function startDirectChat(member) {
   const conv = convStore.upsertDirectConversation(member);
   if (!conv) return;
   convStore.setActiveId(conv.id);
-  uni.setStorageSync('active_conversation_id', conv.id);
+  storage.set('active_conversation_id', conv.id);
   if (!isDesktop.value) {
     uni.redirectTo({ url: `/pages/chat/detail?id=${conv.id}` });
   }

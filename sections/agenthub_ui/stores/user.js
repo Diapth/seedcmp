@@ -1,5 +1,6 @@
 import { defineStore } from 'pinia';
 import { userApi } from '@/api/user.js';
+import { storage } from '@/utils/storage.js';
 import { useAppStore } from './app.js';
 import { useAuthStore } from './auth.js';
 
@@ -37,6 +38,14 @@ export const useUserStore = defineStore('user', {
         return user;
       } catch (err) {
         this.lastError = err?.message || '获取用户信息失败';
+        const fallback = storage.get('auth.loginInfo') || useAppStore().currentUser;
+        if (fallback) {
+          const user = normalizeUser(fallback);
+          this.currentUser = user;
+          if (user.uid) this.userCache[user.uid] = user;
+          useAppStore().setCurrentUser(user, authStore.accessToken);
+          return user;
+        }
         throw err;
       } finally {
         this.loading = false;

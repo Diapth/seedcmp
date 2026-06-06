@@ -117,6 +117,7 @@
 <script setup>
 import { computed, ref, watch } from 'vue';
 import { useAuthStore } from '@/stores/auth';
+import { useConversationStore } from '@/stores/conversation';
 import { useImStore } from '@/stores/im';
 import { useSettingsStore } from '@/stores/settings';
 import { useUserStore } from '@/stores/user';
@@ -124,6 +125,7 @@ import { initSdk } from '@/utils/wk-sdk.js';
 import AppIcon from '@/components/common/AppIcon.vue';
 
 const authStore = useAuthStore();
+const conversationStore = useConversationStore();
 const userStore = useUserStore();
 const imStore = useImStore();
 const settingsStore = useSettingsStore();
@@ -180,6 +182,7 @@ async function handleLogin() {
     });
     await userStore.fetchMe().catch(() => undefined);
     await imStore.fetchImAddress(loginResult.uid).catch(() => undefined);
+    await conversationStore.fetchConversations().catch(() => undefined);
     if (imStore.wsAddr) {
       await initSdk({
         uid: loginResult.uid,

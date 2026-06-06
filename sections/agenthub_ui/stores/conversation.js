@@ -1,8 +1,9 @@
 import { defineStore } from 'pinia';
 import { syncApi } from '@/api/sync.js';
 import { storage } from '@/utils/storage.js';
-import { channelKey, toBackendChannelType, toConversationItem } from '@/utils/im-mappers.js';
+import { buildConversationChannelCache, channelKey, toBackendChannelType, toConversationItem, toGroupConversationInput } from '@/utils/im-mappers.js';
 import { useAuthStore } from './auth.js';
+import { useGroupStore } from './group.js';
 
 function sortConversations(list) {
   return [...list].sort((a, b) => {
@@ -17,6 +18,18 @@ function draftsKey(uid) {
 
 function hiddenKey(uid) {
   return `conversationHidden:${uid || 'anonymous'}`;
+}
+
+function mergeConversations(primary = [], secondary = []) {
+  const merged = new Map();
+  [...primary, ...secondary].forEach((item) => {
+    if (!item?.key) return;
+    const existing = merged.get(item.key);
+    if (!existing || Number(item.lastTime || 0) >= Number(existing.lastTime || 0)) {
+      merged.set(item.key, existing ? { ...existing, ...item } : item);
+    }
+  });
+  return Array.from(merged.values());
 }
 
 export const useConversationStore = defineStore('conversation', {
@@ -62,7 +75,10 @@ export const useConversationStore = defineStore('conversation', {
         const response = await syncApi.syncConversations({ msg_count: 30 });
         const data = response?.data || response || {};
         const list = data.conversations || data.conversation_list || [];
-        this.conversations = list.map((item) => toConversationItem(item));
+        const channelCache = buildConversationChannelCache(data);
+        const directConversations = list.map((item) => toConversationItem(item, channelCache));
+        const groupConversations = await this.fetchGroupConversations(channelCache);
+        this.conversations = mergeConversations(directConversations, groupConversations);
         this.restoreDrafts();
         return this.conversations;
       } catch (err) {
@@ -70,6 +86,33 @@ export const useConversationStore = defineStore('conversation', {
         throw err;
       } finally {
         this.loading = false;
+      }
+    },
+    async fetchGroupConversations(channelCache = {}) {
+      const groupStore = useGroupStore();
+      try {
+        const groups = await groupStore.fetchMyGroups();
+        const conversations = await Promise.all(groups.map(async (group) => {
+          let messages = [];
+          try {
+            const response = await syncApi.syncMessages({
+              channel_id: group.id,
+              channel_type: 2,
+              limit: 10,
+              start_message_seq: 0,
+              end_message_seq: 0,
+              pull_mode: 1
+            });
+            const data = response?.data || response || {};
+            messages = data.messages || [];
+          } catch {
+            messages = [];
+          }
+          return toConversationItem(toGroupConversationInput(group, messages), channelCache);
+        }));
+        return conversations;
+      } catch {
+        return [];
       }
     },
     addOrUpdateConversation(channelId, channelType = 1, patch = {}) {

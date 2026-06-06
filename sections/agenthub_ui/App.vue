@@ -3,6 +3,7 @@
 	import { storage } from '@/utils/storage.js';
 	import { initSdk } from '@/utils/wk-sdk.js';
 	import { useAuthStore } from '@/stores/auth.js';
+	import { useConversationStore } from '@/stores/conversation.js';
 	import { useImStore } from '@/stores/im.js';
 	import { useUserStore } from '@/stores/user.js';
 
@@ -18,6 +19,7 @@
 			// #endif
 			initSystemNotificationClickHandler();
 			const authStore = useAuthStore();
+			const conversationStore = useConversationStore();
 			const userStore = useUserStore();
 			const imStore = useImStore();
 			try {
@@ -28,6 +30,9 @@
 				});
 				await imStore.fetchImAddress().catch((err) => {
 					console.warn('[AUTH_BOOTSTRAP] fetchImAddress failed', err);
+				});
+				await conversationStore.fetchConversations().catch((err) => {
+					console.warn('[AUTH_BOOTSTRAP] fetchConversations failed', err);
 				});
 				if (imStore.wsAddr) {
 					await initSdk({
