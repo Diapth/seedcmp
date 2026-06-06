@@ -1,4 +1,4 @@
-import type { ReplyPreview, SchedulerMessageExtra } from '@cat-cafe/shared';
+import type { CoordinationContext, ReplyPreview, SchedulerMessageExtra } from '@cat-cafe/shared';
 
 /** Content block types matching backend MessageContent */
 export interface TextContent {
@@ -277,6 +277,8 @@ export interface ChatMessage {
     targetCats?: string[];
     /** Scheduler presentation metadata (hidden trigger / ephemeral lifecycle toast) */
     scheduler?: SchedulerMessageExtra['scheduler'];
+    /** PM/coordinator trace metadata for visible multi-agent workflows. */
+    coordination?: CoordinationContext;
     /** F118 AC-C3: Timeout diagnostics for enhanced error display */
     timeoutDiagnostics?: TimeoutDiagnostics;
     /** F070: Governance blocked data for actionable bootstrap card */
@@ -531,7 +533,7 @@ export interface QueueEntry {
   /** F175: dequeue priority */
   priority?: 'urgent' | 'normal';
   /** F175: source category for visual grouping */
-  sourceCategory?: 'ci' | 'review' | 'conflict' | 'scheduled' | 'a2a' | 'continuation';
+  sourceCategory?: 'ci' | 'review' | 'conflict' | 'scheduled' | 'a2a' | 'continuation' | 'coordination';
   /** Queue-internal dedup key for continuation work. */
   continuationKey?: string;
   /** F175: explicit dequeue position from drag-reorder */

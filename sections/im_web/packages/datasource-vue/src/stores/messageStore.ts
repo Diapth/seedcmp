@@ -5,6 +5,7 @@ import {
   getClowderCatDisplayNameFromHistory,
   getClowderCatDisplayNameFromPayload,
   isClowderPayload,
+  normalizeClowderCanonicalDisplayName,
   recoverClowderFileContentFromHistory,
   withClowderCatDisplayName
 } from '@tsdaodao/base-vue/utils/clowderMessageIdentity';
@@ -362,14 +363,14 @@ export const useMessageStore = defineStore('message', () => {
     }
 
     const catId = firstNonEmpty(incoming.catId, incoming.cat_id, local.catId, local.cat_id);
-    const catDisplayName = firstNonEmpty(
+    const catDisplayName = normalizeClowderCanonicalDisplayName(firstNonEmpty(
       incoming.catDisplayName,
       incoming.cat_display_name,
       getClowderCatDisplayNameFromPayload(incoming),
       local.catDisplayName,
       local.cat_display_name,
       getClowderCatDisplayNameFromPayload(local)
-    );
+    ), catId);
     const catAvatar = firstNonEmpty(
       incoming.catAvatar,
       incoming.cat_avatar,
@@ -391,8 +392,8 @@ export const useMessageStore = defineStore('message', () => {
       connector_id: incoming.connector_id || incoming.connectorId || local.connector_id || local.connectorId || CLOWDER_CONNECTOR_ID,
       catId: incoming.catId || incoming.cat_id || local.catId || local.cat_id,
       cat_id: incoming.cat_id || incoming.catId || local.cat_id || local.catId,
-      catDisplayName: incoming.catDisplayName || incoming.cat_display_name || local.catDisplayName || local.cat_display_name,
-      cat_display_name: incoming.cat_display_name || incoming.catDisplayName || local.cat_display_name || local.catDisplayName,
+      catDisplayName,
+      cat_display_name: catDisplayName,
       catAvatar: incoming.catAvatar || incoming.cat_avatar || local.catAvatar || local.cat_avatar,
       cat_avatar: incoming.cat_avatar || incoming.catAvatar || local.cat_avatar || local.catAvatar,
       avatar: incoming.avatar || local.avatar,
@@ -406,8 +407,8 @@ export const useMessageStore = defineStore('message', () => {
       next.cat_id = next.cat_id || catId;
     }
     if (catDisplayName) {
-      next.catDisplayName = next.catDisplayName || catDisplayName;
-      next.cat_display_name = next.cat_display_name || catDisplayName;
+      next.catDisplayName = catDisplayName;
+      next.cat_display_name = catDisplayName;
     }
     if (catAvatar) {
       next.catAvatar = next.catAvatar || catAvatar;
@@ -1296,7 +1297,7 @@ export const useMessageStore = defineStore('message', () => {
     text: string,
     options?: SendMessageOptions,
     retryClientMsgNo?: string
-  ) {
+  ): Promise<Message> {
     const version = resetVersion.value;
     const pending = buildPendingTextMessage(text, options, retryClientMsgNo);
     addMessage(channelId, channelType, pending);
@@ -1315,7 +1316,7 @@ export const useMessageStore = defineStore('message', () => {
       }
 
       const res = await WKSDK.shared().chatManager.send(textMsg, channel);
-      if (version !== resetVersion.value) return;
+      if (version !== resetVersion.value) return pending;
       if (res) {
         registerPendingAckAlias(res.clientSeq, pending.clientMsgNo);
         // Update the pending message in-place using our own clientMsgNo.
@@ -1330,6 +1331,8 @@ export const useMessageStore = defineStore('message', () => {
         });
         removePendingMessage(pending.clientMsgNo);
       }
+      clearReplyTargetAfterSuccessfulSend(options?.reply);
+      return pending;
     } catch (err) {
       sendingFromThisTab.delete(pending.clientMsgNo);
       addMessage(channelId, channelType, {
@@ -1747,6 +1750,29 @@ export const useMessageStore = defineStore('message', () => {
 
   function setReplyTarget(msg: Message | null) {
     replyTarget.value = msg;
+  }
+
+  function replyTargetKey(value: any) {
+    if (!value) return '';
+    return String(value.clientMsgNo || value.messageID || `${value.messageSeq || ''}:${value.fromUID || value.from_uid || ''}`);
+  }
+
+  function clearReplyTargetAfterSuccessfulSend(reply?: any) {
+    if (!reply || !replyTarget.value) return;
+    const active = replyTarget.value;
+    const activeKey = replyTargetKey(active);
+    const replyKey = replyTargetKey(reply);
+    if (activeKey && replyKey && activeKey === replyKey) {
+      replyTarget.value = null;
+      return;
+    }
+    if (
+      String(active.messageID || '') === String(reply.messageID || '') &&
+      Number(active.messageSeq || 0) === Number(reply.messageSeq || 0) &&
+      String(active.fromUID || '') === String(reply.fromUID || reply.from_uid || '')
+    ) {
+      replyTarget.value = null;
+    }
   }
 
   function reset() {

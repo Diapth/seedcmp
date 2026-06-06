@@ -1,5 +1,6 @@
 'use client';
 
+import type { TaskItem } from '@cat-cafe/shared';
 import { useState } from 'react';
 import { useChatStore } from '@/stores/chatStore';
 import { useTaskStore } from '@/stores/taskStore';
@@ -104,9 +105,115 @@ function handleStatusChange(taskId: string, newStatus: string) {
   });
 }
 
+function uniqueStrings(values: Iterable<string | null | undefined>): string[] {
+  const out: string[] = [];
+  const seen = new Set<string>();
+  for (const value of values) {
+    if (!value || seen.has(value)) continue;
+    seen.add(value);
+    out.push(value);
+  }
+  return out;
+}
+
+function coordinationGroups(tasks: TaskItem[]) {
+  const grouped = new Map<string, TaskItem[]>();
+  for (const task of tasks) {
+    if (!task.coordinationId) continue;
+    const existing = grouped.get(task.coordinationId);
+    if (existing) existing.push(task);
+    else grouped.set(task.coordinationId, [task]);
+  }
+  return Array.from(grouped.entries())
+    .map(([coordinationId, items]) => ({
+      coordinationId,
+      tasks: items.sort((a, b) => a.createdAt - b.createdAt || a.id.localeCompare(b.id)),
+      artifacts: uniqueStrings(items.flatMap((task) => task.artifactRefs ?? [])),
+      owners: uniqueStrings(items.map((task) => task.ownerCatId)),
+      activeCount: items.filter((task) => task.status === 'doing' || task.status === 'blocked').length,
+      doneCount: items.filter((task) => task.status === 'done').length,
+      updatedAt: Math.max(...items.map((task) => task.updatedAt)),
+    }))
+    .sort((a, b) => b.updatedAt - a.updatedAt || a.coordinationId.localeCompare(b.coordinationId));
+}
+
+function shortCoordinationId(id: string): string {
+  if (id.length <= 18) return id;
+  return `${id.slice(0, 10)}…${id.slice(-5)}`;
+}
+
+function CoordinationOverview({
+  groups,
+  onOpenArtifact,
+}: {
+  groups: ReturnType<typeof coordinationGroups>;
+  onOpenArtifact: (ref: string) => void;
+}) {
+  if (groups.length === 0) return null;
+
+  return (
+    <div className="border-b border-cafe bg-cafe-surface-elevated/40">
+      <div className="flex items-center gap-2 px-3 py-2">
+        <span className="text-xs font-semibold text-cafe-secondary">协作</span>
+        <span className="text-micro text-cafe-muted bg-cafe-surface rounded-full px-1.5 py-0.5">
+          {groups.length} 组
+        </span>
+      </div>
+      {groups.map((group) => {
+        const planTask = group.tasks[0];
+        return (
+          <div key={group.coordinationId} className="px-3 py-2 border-t border-cafe">
+            <div className="flex items-start gap-2">
+              <div className="flex-1 min-w-0">
+                <div className="flex items-center gap-1.5">
+                  <span className="text-micro font-semibold text-cafe-crosspost">PM</span>
+                  <span className="text-micro text-cafe-muted font-mono truncate">
+                    {shortCoordinationId(group.coordinationId)}
+                  </span>
+                </div>
+                {planTask && (
+                  <p className="text-xs font-medium text-cafe-secondary truncate mt-0.5">{planTask.title}</p>
+                )}
+              </div>
+              <span className="text-micro text-cafe-muted shrink-0">
+                {group.doneCount}/{group.tasks.length}
+              </span>
+            </div>
+            <div className="flex flex-wrap items-center gap-1.5 mt-1.5">
+              {group.activeCount > 0 && (
+                <span className="text-micro px-1.5 py-0.5 rounded bg-cafe-crosspost/10 text-cafe-crosspost">
+                  {group.activeCount} 执行中
+                </span>
+              )}
+              {group.owners.slice(0, 4).map((owner) => (
+                <span key={owner} className="text-micro px-1.5 py-0.5 rounded bg-cafe-surface text-cafe-muted">
+                  @{owner}
+                </span>
+              ))}
+              {group.artifacts.slice(0, 3).map((ref) => (
+                <button
+                  key={ref}
+                  type="button"
+                  onClick={() => onOpenArtifact(ref)}
+                  className="text-micro px-1.5 py-0.5 rounded bg-conn-blue-bg text-conn-blue-text hover:opacity-80"
+                  title={ref}
+                >
+                  产物
+                </button>
+              ))}
+            </div>
+          </div>
+        );
+      })}
+    </div>
+  );
+}
+
 export function TaskBoardPanel() {
   const tasks = useTaskStore((s) => s.tasks);
   const threadId = useChatStore((s) => s.currentThreadId);
+  const setWorkspaceOpenFile = useChatStore((s) => s.setWorkspaceOpenFile);
+  const setWorkspaceMode = useChatStore((s) => s.setWorkspaceMode);
   const [collapsed, setCollapsed] = useState<Record<SectionKey, boolean>>(getDefaultCollapsed);
   const [composerOpen, setComposerOpen] = useState(false);
 
@@ -126,6 +233,15 @@ export function TaskBoardPanel() {
     section,
     tasks: tasks.filter((t) => t.status === section.key),
   }));
+  const coordination = coordinationGroups(tasks);
+  const openArtifact = (ref: string) => {
+    if (/^https?:\/\//i.test(ref)) {
+      window.open(ref, '_blank', 'noopener,noreferrer');
+      return;
+    }
+    setWorkspaceMode('dev');
+    setWorkspaceOpenFile(ref, null, undefined, threadId);
+  };
 
   return (
     <div className="flex flex-col h-full bg-cafe-surface">
@@ -158,6 +274,8 @@ export function TaskBoardPanel() {
 
       {/* Composer */}
       {composerOpen && threadId && <TaskComposer threadId={threadId} onClose={() => setComposerOpen(false)} />}
+
+      <CoordinationOverview groups={coordination} onOpenArtifact={openArtifact} />
 
       {/* Content */}
       <div className="flex-1 min-h-0 overflow-y-auto py-1">

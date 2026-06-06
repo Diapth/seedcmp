@@ -11,6 +11,7 @@
  */
 
 import { randomUUID } from 'node:crypto';
+import type { CoordinationContext } from '@cat-cafe/shared';
 import { createModuleLogger } from '../../../../../infrastructure/logger.js';
 import type { CallerTraceContext } from '../../../../../infrastructure/telemetry/genai-semconv.js';
 
@@ -39,7 +40,9 @@ export interface QueueEntry {
   /** F175: queue-internal priority — urgent entries sort before normal in dequeue */
   priority: 'urgent' | 'normal';
   /** F175: origin category for visual grouping */
-  sourceCategory?: 'ci' | 'review' | 'conflict' | 'scheduled' | 'a2a' | 'continuation';
+  sourceCategory?: 'ci' | 'review' | 'conflict' | 'scheduled' | 'a2a' | 'continuation' | 'coordination';
+  /** Visible-PM context for coordinator-led entries. */
+  coordination?: CoordinationContext;
   /** Queue-internal dedup key for agent control-flow work. */
   continuationKey?: string;
   /** F175: user drag-reorder position — explicit values override priority in dequeue */
@@ -220,6 +223,7 @@ export class InvocationQueue {
       senderMeta: input.senderMeta,
       priority,
       sourceCategory: input.sourceCategory,
+      coordination: input.coordination,
       continuationKey: input.continuationKey,
       suggestedSkill: input.suggestedSkill,
       callerTraceContext: input.callerTraceContext,
@@ -678,9 +682,17 @@ export class InvocationQueue {
 
     const batch: QueueEntry[] = [{ ...first }];
     const firstTargetsSorted = sorted(first.targetCats);
+    const firstCategory = first.sourceCategory ?? null;
+    const firstCoordinationId = first.coordination?.id ?? null;
     for (let i = 1; i < queued.length; i++) {
       const e = queued[i]!;
-      if (e.source !== 'user' || e.intent !== first.intent || !arraysEqual(sorted(e.targetCats), firstTargetsSorted))
+      if (
+        e.source !== 'user' ||
+        e.intent !== first.intent ||
+        !arraysEqual(sorted(e.targetCats), firstTargetsSorted) ||
+        (e.sourceCategory ?? null) !== firstCategory ||
+        (e.coordination?.id ?? null) !== firstCoordinationId
+      )
         break;
       batch.push({ ...e });
     }

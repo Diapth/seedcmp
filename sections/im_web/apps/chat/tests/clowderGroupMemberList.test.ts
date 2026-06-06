@@ -16,8 +16,12 @@ describe('Clowder cat group members', () => {
     expect(source.default).toContain('isCurrentUserOwner')
     expect(source.default).toContain('clowder-cat-member')
     expect(source.default).toContain('猫猫成员')
-    expect(source.default).toContain('loadGroupCats(groupNo.value')
+    expect(source.default).toContain('watch(groupNo')
+    expect(source.default).toContain('loadGroupMemberState')
+    expect(source.default).toContain('loadGroupCats(targetGroupNo')
     expect(source.default).toContain('loadCatContactDirectory')
+    expect(source.default).toContain('cat-identity')
+    expect(source.default).toContain('{{ cat.catId }}')
   })
 
   it('group settings drawer includes Clowder cats in member summary and preview', async () => {

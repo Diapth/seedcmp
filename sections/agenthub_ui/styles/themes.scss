@@ -1,0 +1,101 @@
+/* Theme Variable Definitions */
+
+:root,
+.theme-light,
+.app-shell.light {
+  --color-bg-base: #faf8ff;
+  --color-bg-surface: #ffffff;
+  --color-bg-muted: #f3f3fe;
+  --color-bg-hover: #e7e7f3;
+
+  --color-text-primary: #191b23;
+  --color-text-secondary: #434655;
+  --color-text-muted: #737686;
+
+  --color-border: #e5e7eb;
+  --color-border-hover: #c3c6d7;
+
+  --color-primary: #004ac6;
+  --color-primary-hover: #003ea8;
+  --color-primary-light: #dbe1ff;
+  --color-primary-container: #2563eb;
+
+  --color-success: hsl(#{$color-success-h}, #{$color-success-s}, #{$color-success-l});
+  --color-warning: hsl(#{$color-warning-h}, #{$color-warning-s}, #{$color-warning-l});
+  --color-error: hsl(#{$color-error-h}, #{$color-error-s}, #{$color-error-l});
+
+  --color-glass-bg: rgba(255, 255, 255, 0.74);
+  --color-glass-border: rgba(195, 198, 215, 0.64);
+  --shadow-color: rgba(15, 23, 42, 0.08);
+
+  --qr-surface: #ffffff;
+  --input-surface: #ffffff;
+
+  /* Status badge palette (light) */
+  --status-online-fg: #166534;
+  --status-online-bg: #f0fdf4;
+  --status-online-dot: #22c55e;
+  --status-offline-fg: #475569;
+  --status-offline-bg: #f1f5f9;
+  --status-offline-dot: #94a3b8;
+  --status-busy-fg: #991b1b;
+  --status-busy-bg: #fef2f2;
+  --status-busy-dot: #ef4444;
+  --status-away-fg: #92400e;
+  --status-away-bg: #fffbeb;
+  --status-away-dot: #f59e0b;
+}
+
+.theme-dark,
+.app-shell.dark {
+  --color-bg-base: #0f172a;        /* slate-900 */
+  --color-bg-surface: #1e293b;     /* slate-800 */
+  --color-bg-muted: #334155;       /* slate-700 */
+  --color-bg-hover: #475569;       /* slate-600 */
+
+  --color-text-primary: #f8fafc;   /* slate-50 */
+  --color-text-secondary: #cbd5e1; /* slate-300 */
+  --color-text-muted: #64748b;     /* slate-500 */
+
+  --color-border: #475569;         /* slate-600 — distinguish from --color-bg-muted */
+  --color-border-hover: #64748b;   /* slate-500 */
+
+  --color-primary: hsl(#{$color-primary-h}, #{$color-primary-s}, calc(#{$color-primary-l} + 5%));
+  --color-primary-hover: hsl(#{$color-primary-h}, #{$color-primary-s}, calc(#{$color-primary-l} + 12%));
+  --color-primary-light: hsl(#{$color-primary-h}, #{$color-primary-s}, 15%);
+
+  --color-success: hsl(#{$color-success-h}, #{$color-success-s}, calc(#{$color-success-l} + 5%));
+  --color-warning: hsl(#{$color-warning-h}, #{$color-warning-s}, calc(#{$color-warning-l} + 5%));
+  --color-error: hsl(#{$color-error-h}, #{$color-error-s}, calc(#{$color-error-l} + 5%));
+
+  --color-glass-bg: rgba(30, 41, 59, 0.7);
+  --color-glass-border: rgba(51, 65, 85, 0.6);
+  --shadow-color: rgba(0, 0, 0, 0.3);
+
+  --qr-surface: #f1f5f9;           /* slate-100 — softer white in dark mode */
+  --input-surface: #1e293b;        /* slate-800 — match surface */
+
+  /* Status badge palette (dark) — higher contrast for accessibility */
+  --status-online-fg: #4ade80;
+  --status-online-bg: rgba(34, 197, 94, 0.12);
+  --status-online-dot: #22c55e;
+  --status-offline-fg: #cbd5e1;
+  --status-offline-bg: rgba(148, 163, 184, 0.12);
+  --status-offline-dot: #94a3b8;
+  --status-busy-fg: #f87171;
+  --status-busy-bg: rgba(239, 68, 68, 0.12);
+  --status-busy-dot: #ef4444;
+  --status-away-fg: #fbbf24;
+  --status-away-bg: rgba(245, 158, 11, 0.12);
+  --status-away-dot: #f59e0b;
+}
+
+/* Reduced Motion Override */
+@media (prefers-reduced-motion: reduce) {
+  * {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+}

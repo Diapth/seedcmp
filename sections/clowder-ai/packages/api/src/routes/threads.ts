@@ -29,6 +29,8 @@ import type {
   Thread,
   ThreadRoutingPolicyV1,
 } from '../domains/cats/services/stores/ports/ThreadStore.js';
+import type { IMaomiWorkspaceStore } from '../domains/maomi-workspaces/MaomiWorkspaceStore.js';
+import type { IThreadWorkspaceBindingStore } from '../domains/maomi-workspaces/ThreadWorkspaceBindingStore.js';
 import { createModuleLogger } from '../infrastructure/logger.js';
 import { validateProjectPath } from '../utils/project-path.js';
 import { resolveUserId } from '../utils/request-identity.js';
@@ -67,6 +69,8 @@ export interface ThreadsRoutesOptions {
   labelStore?: ILabelStore;
   /** F102: keep thread evidence search in sync after title-only updates */
   indexBuilder?: ThreadIndexBuilder;
+  maomiWorkspaceStore?: IMaomiWorkspaceStore;
+  threadWorkspaceBindingStore?: IThreadWorkspaceBindingStore;
 }
 
 /** F087: Bootcamp state Zod schema (F171 v2 flow) */
@@ -116,6 +120,8 @@ const createThreadSchema = z
     backlogItemId: z.string().min(1).max(100).optional(),
     /** F087: Initial bootcamp state */
     bootcampState: bootcampStateSchema.optional(),
+    workspaceId: z.string().min(1).optional(),
+    workspaceSlug: z.string().min(1).optional(),
   })
   .strict();
 
@@ -265,6 +271,8 @@ export const threadsRoutes: FastifyPluginAsync<ThreadsRoutesOptions> = async (ap
       pinned,
       backlogItemId,
       bootcampState,
+      workspaceId,
+      workspaceSlug,
     } = parseResult.data;
     const userId = resolveUserId(request, { fallbackUserId: legacyUserId });
     if (!userId) {
@@ -272,13 +280,30 @@ export const threadsRoutes: FastifyPluginAsync<ThreadsRoutesOptions> = async (ap
       return { error: 'Identity required (session cookie or X-Cat-Cafe-User header)' };
     }
 
-    const resolvedProjectPath = await resolveCreateThreadProjectPath(projectPath, bootcampState as BootcampStateV1);
+    const workspace = opts.maomiWorkspaceStore
+      ? workspaceId
+        ? await opts.maomiWorkspaceStore.get(workspaceId)
+        : workspaceSlug
+          ? await opts.maomiWorkspaceStore.findBySlug(userId, workspaceSlug)
+          : null
+      : null;
+    if ((workspaceId || workspaceSlug) && (!workspace || workspace.userId !== userId)) {
+      reply.status(404);
+      return { error: 'workspace not found', workspaceId: workspaceId ?? null, workspaceSlug: workspaceSlug ?? null };
+    }
+
+    const projectPathForCreate = workspace?.rootPath ?? projectPath;
+    const resolvedProjectPath = await resolveCreateThreadProjectPath(projectPathForCreate, bootcampState as BootcampStateV1);
     if (!resolvedProjectPath.ok) {
       reply.status(resolvedProjectPath.statusCode);
       return { error: resolvedProjectPath.error };
     }
 
     let thread: Thread = await threadStore.create(userId, title, resolvedProjectPath.projectPath);
+    if (workspace && opts.threadWorkspaceBindingStore) {
+      await opts.threadWorkspaceBindingStore.bind(thread.id, userId, workspace.id);
+      await opts.maomiWorkspaceStore?.linkThread(workspace.id, thread.id);
+    }
 
     // F32-b Phase 2: Set preferred cats if provided at creation time
     if (preferredCats && preferredCats.length > 0) {

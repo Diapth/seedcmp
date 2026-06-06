@@ -52,6 +52,7 @@ import {
   resolveCapabilityWriteSessionUserId,
 } from '../config/capabilities/capability-write-guards.js';
 import { isManagedSkill, readSkillsState } from '../config/governance/skills-state.js';
+import { probeLocalOAuthCapabilities } from '../config/local-oauth-config.js';
 import { validateProjectPath } from '../utils/project-path.js';
 import { resolveUserId } from '../utils/request-identity.js';
 import {
@@ -434,6 +435,9 @@ function buildCatFamilies(): CatFamily[] {
 // ────────── Route Plugin ──────────
 
 export const capabilitiesRoutes: FastifyPluginAsync = async (app) => {
+  // ── GET /api/local-auth/capabilities ──
+  app.get('/api/local-auth/capabilities', async () => probeLocalOAuthCapabilities());
+
   // ── GET /api/capabilities ──
   app.get('/api/capabilities', async (request, reply) => {
     const userId = resolveUserId(request);

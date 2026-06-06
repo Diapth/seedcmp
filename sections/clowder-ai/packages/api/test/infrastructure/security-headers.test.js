@@ -19,6 +19,7 @@ describe('F156 D-2: Security Headers', () => {
     app = Fastify();
     await app.register(securityHeadersPlugin);
     app.get('/api/test', async () => ({ ok: true }));
+    app.get('/api/deployments/deploy_test/preview/', async () => '<!doctype html><title>preview</title>');
     app.get('/health', async () => ({ status: 'ok' }));
     await app.ready();
   });
@@ -43,6 +44,13 @@ describe('F156 D-2: Security Headers', () => {
     const res = await app.inject({ method: 'GET', url: '/health' });
     assert.equal(res.headers['x-frame-options'], 'DENY');
     assert.ok(res.headers['content-security-policy']?.includes("frame-ancestors 'none'"));
+  });
+
+  it('allows deployment preview pages to be embedded by IM Web', async () => {
+    const res = await app.inject({ method: 'GET', url: '/api/deployments/deploy_test/preview/' });
+    assert.equal(res.statusCode, 200);
+    assert.equal(res.headers['x-frame-options'], undefined);
+    assert.equal(res.headers['content-security-policy'], undefined);
   });
 
   it('does not break response body', async () => {
@@ -229,5 +237,42 @@ describe('F156 D-6: Split-host API deployment', () => {
   it('still rejects unknown hosts', async () => {
     const res = await app.inject({ method: 'GET', url: '/api/test', headers: { host: 'evil.com' } });
     assert.equal(res.statusCode, 403);
+  });
+});
+
+describe('F156 D-6: Host allowlist follows CAT_CAFE_API_URL', () => {
+  let app;
+  let previousCatCafeApiUrl;
+  let previousNextPublicApiUrl;
+
+  before(async () => {
+    previousCatCafeApiUrl = process.env.CAT_CAFE_API_URL;
+    previousNextPublicApiUrl = process.env.NEXT_PUBLIC_API_URL;
+    process.env.CAT_CAFE_API_URL = 'http://172.18.58.156:3004';
+    delete process.env.NEXT_PUBLIC_API_URL;
+
+    app = Fastify();
+    await app.register(securityHeadersPlugin, {
+      allowedOrigins: ['http://localhost:3000'],
+    });
+    app.get('/uploads/demo.zip', async () => ({ ok: true }));
+    await app.ready();
+  });
+
+  after(async () => {
+    if (app) await app.close();
+    if (previousCatCafeApiUrl === undefined) delete process.env.CAT_CAFE_API_URL;
+    else process.env.CAT_CAFE_API_URL = previousCatCafeApiUrl;
+    if (previousNextPublicApiUrl === undefined) delete process.env.NEXT_PUBLIC_API_URL;
+    else process.env.NEXT_PUBLIC_API_URL = previousNextPublicApiUrl;
+  });
+
+  it('allows uploads requests addressed to the CAT_CAFE_API_URL host', async () => {
+    const res = await app.inject({
+      method: 'GET',
+      url: '/uploads/demo.zip',
+      headers: { host: '172.18.58.156:3004' },
+    });
+    assert.equal(res.statusCode, 200);
   });
 });

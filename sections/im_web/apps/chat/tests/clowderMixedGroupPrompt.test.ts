@@ -99,7 +99,7 @@ describe('Clowder mixed human and cat group prompt', () => {
     expect(source.default).toContain('Recent messages:')
     expect(source.default).toContain('messageStore.getChannelMessages(props.channelId, props.channelType)')
     expect(source.default).toContain('targetCatIds')
-    expect(source.default).toContain('promptContext: buildClowderPromptContext(text, targetCatIds, triggerReason)')
+    expect(source.default).toContain('promptContext: buildClowderPromptContext(text, targetCatIds, triggerReason, replyTarget)')
   })
 
   it('loads durable group cat membership back from the bridge', async () => {

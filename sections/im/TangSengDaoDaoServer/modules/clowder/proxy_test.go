@@ -106,22 +106,63 @@ func TestFetchAgentDirectoryUsesBridgeOwnerForClowderThreadAuth(t *testing.T) {
 }
 
 func TestFetchCatDirectoryUsesDirectHubAndKeepsExistingRagdoll(t *testing.T) {
-	var gotPath string
-	var gotUser string
+	gotPaths := []string{}
+	gotUsers := []string{}
 	upstream := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		gotPath = r.URL.RequestURI()
-		gotUser = r.Header.Get("x-cat-cafe-user")
+		gotPaths = append(gotPaths, r.URL.RequestURI())
+		gotUsers = append(gotUsers, r.Header.Get("x-cat-cafe-user"))
 		require.Equal(t, http.MethodGet, r.Method)
-		_ = json.NewEncoder(w).Encode(map[string]interface{}{
-			"agents": []map[string]interface{}{
-				{
-					"catId":           "opus",
-					"displayName":     "布偶猫",
-					"mentionPatterns": []string{"@opus", "@布偶猫"},
-					"available":       true,
+		switch r.URL.Path {
+		case "/api/connectors/im-web/agents":
+			_ = json.NewEncoder(w).Encode(map[string]interface{}{
+				"agents": []map[string]interface{}{
+					{
+						"catId":           "opus",
+						"displayName":     "布偶猫",
+						"mentionPatterns": []string{"@opus", "@布偶猫"},
+						"available":       true,
+					},
 				},
-			},
-		})
+			})
+		case "/api/cat-templates":
+			_ = json.NewEncoder(w).Encode(map[string]interface{}{
+				"templates": []map[string]interface{}{
+					{
+						"id":            "coordinator",
+						"name":          "协调者",
+						"nickname":      "PM",
+						"avatar":        "/avatars/keeper.png",
+						"personality":   "清晰、稳健",
+						"teamStrengths": "需求澄清、任务拆分",
+					},
+				},
+				"clientDefaults": map[string]interface{}{
+					"openai": map[string]interface{}{
+						"defaultModel": "gpt-5.4",
+						"models":       []string{"gpt-5.4"},
+					},
+				},
+				"skillCatalog": map[string]interface{}{
+					"codex": []map[string]interface{}{
+						{
+							"name":        "tdd",
+							"category":    "开发流程链",
+							"trigger":     "TDD",
+							"description": "测试驱动开发",
+						},
+					},
+					"claude": []map[string]interface{}{
+						{
+							"name":     "deep-research",
+							"category": "研究",
+							"trigger":  "deep research",
+						},
+					},
+				},
+			})
+		default:
+			http.NotFound(w, r)
+		}
 	}))
 	defer upstream.Close()
 
@@ -140,15 +181,99 @@ func TestFetchCatDirectoryUsesDirectHubAndKeepsExistingRagdoll(t *testing.T) {
 
 	require.NoError(t, err)
 	require.Len(t, directory.Agents, 1)
+	require.Len(t, directory.Templates, 1)
 	assert.Equal(t, "opus", directory.Agents[0].CatID)
+	assert.Equal(t, "coordinator", directory.Templates[0].RoleTemplateID)
+	assert.Equal(t, "协调者", directory.Templates[0].DisplayName)
+	require.Len(t, directory.SkillCatalog["codex"], 1)
+	assert.Equal(t, "tdd", directory.SkillCatalog["codex"][0].Name)
+	require.Len(t, directory.SkillCatalog["claude"], 1)
+	assert.Equal(t, "deep-research", directory.SkillCatalog["claude"][0].Name)
+	assert.Equal(t, "gpt-5.4", directory.ClientDefaults["openai"].DefaultModel)
 	assert.Equal(t, "布偶猫", directory.Agents[0].DisplayName)
 	assert.Equal(t, []string{"@opus", "@布偶猫"}, directory.Agents[0].MentionPatterns)
 	assert.True(t, directory.Agents[0].Connected)
 	assert.Equal(t, "existing", directory.Agents[0].Source)
-	assert.Contains(t, gotPath, "/api/connectors/im-web/agents?externalChatId=1%3A")
-	assert.Contains(t, gotPath, "leng_test_updated")
-	assert.NotContains(t, gotPath, "externalChatId=1%3Aclowder_ai&")
-	assert.Equal(t, "owner-1", gotUser)
+	require.Len(t, gotPaths, 2)
+	assert.Contains(t, gotPaths[0], "/api/connectors/im-web/agents?externalChatId=1%3A")
+	assert.Contains(t, gotPaths[0], "leng_test_updated")
+	assert.NotContains(t, gotPaths[0], "externalChatId=1%3Aclowder_ai&")
+	assert.Equal(t, "/api/cat-templates", gotPaths[1])
+	assert.Equal(t, []string{"owner-1", "owner-1"}, gotUsers)
+}
+
+func TestFetchCatDirectoryFallsBackToTemplateCandidatesWhenAgentDirectoryFails(t *testing.T) {
+	gotPaths := []string{}
+	gotUsers := []string{}
+	upstream := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		gotPaths = append(gotPaths, r.URL.RequestURI())
+		gotUsers = append(gotUsers, r.Header.Get("x-cat-cafe-user"))
+		require.Equal(t, http.MethodGet, r.Method)
+		switch r.URL.Path {
+		case "/api/connectors/im-web/agents":
+			http.Error(w, "agents unavailable", http.StatusBadGateway)
+		case "/api/cat-templates":
+			_ = json.NewEncoder(w).Encode(map[string]interface{}{
+				"templates": []map[string]interface{}{
+					{
+						"id":              "ragdoll",
+						"name":            "布偶猫",
+						"nickname":        "宪宪",
+						"avatar":          "/avatars/opus.png",
+						"roleDescription": "主架构师和核心开发者，擅长深度思考和系统设计",
+						"personality":     "温柔但有主见",
+						"teamStrengths":   "架构设计、写代码一把好手",
+					},
+					{
+						"id":              "maine-coon",
+						"name":            "Codex",
+						"nickname":        "Codex",
+						"avatar":          "/avatars/codex.png",
+						"roleDescription": "代码审查专家",
+						"personality":     "严谨认真",
+						"teamStrengths":   "Review、找 bug、coding 落地",
+					},
+				},
+			})
+		default:
+			http.NotFound(w, r)
+		}
+	}))
+	defer upstream.Close()
+
+	c := New(nil)
+	c.SetConfig(commonmodule.ClowderBridgeConfig{
+		Enabled:            true,
+		APIBaseURL:         upstream.URL,
+		ConnectorID:        "im-web",
+		ConnectorSecret:    "secret",
+		DefaultOwnerUserID: "owner-1",
+		RequestTimeout:     time.Second,
+		SignatureTolerance: time.Minute,
+	})
+
+	directory, err := c.fetchCatDirectory("leng_test_updated")
+
+	require.NoError(t, err)
+	require.Len(t, directory.Agents, 2)
+	require.Len(t, directory.Templates, 2)
+	assert.Equal(t, "ragdoll", directory.Agents[0].CatID)
+	assert.Equal(t, "ragdoll", directory.Templates[0].RoleTemplateID)
+	assert.Equal(t, "布偶猫", directory.Templates[0].DisplayName)
+	assert.True(t, directory.Templates[0].Cloneable)
+	assert.Equal(t, "role-template", directory.Templates[0].Source)
+	assert.Equal(t, "布偶猫", directory.Agents[0].DisplayName)
+	assert.Equal(t, []string{"@ragdoll", "@布偶猫", "@宪宪"}, directory.Agents[0].MentionPatterns)
+	assert.Equal(t, "架构设计、写代码一把好手", directory.Agents[0].CapabilitySummary)
+	assert.True(t, directory.Agents[0].Available)
+	assert.False(t, directory.Agents[0].Connected)
+	assert.Equal(t, "disconnected", directory.Agents[0].Source)
+	assert.Equal(t, "available", directory.Agents[0].AvailabilityState)
+	require.Len(t, gotPaths, 2)
+	assert.Contains(t, gotPaths[0], "/api/connectors/im-web/agents?externalChatId=1%3A")
+	assert.Contains(t, gotPaths[0], "leng_test_updated")
+	assert.Equal(t, "/api/cat-templates", gotPaths[1])
+	assert.Equal(t, []string{"owner-1", "owner-1"}, gotUsers)
 }
 
 func TestCatContactResponseFindsExistingCatByDisplayNameOrMention(t *testing.T) {
@@ -163,16 +288,87 @@ func TestCatContactResponseFindsExistingCatByDisplayNameOrMention(t *testing.T) 
 		},
 	}
 
-	byDisplay, ok := catContactResponse("布偶猫", directory, "existing")
+	byDisplay, ok := catContactResponse("布偶猫", directory.Agents, "existing")
 	require.True(t, ok)
 	assert.Equal(t, "opus", byDisplay.Agent.CatID)
 	assert.Equal(t, "布偶猫", byDisplay.Agent.DisplayName)
 	assert.True(t, byDisplay.Agent.Connected)
 	assert.True(t, byDisplay.Contact.Connected)
 
-	byMention, ok := catContactResponse("@布偶猫", directory, "existing")
+	byMention, ok := catContactResponse("@布偶猫", directory.Agents, "existing")
 	require.True(t, ok)
 	assert.Equal(t, "opus", byMention.Agent.CatID)
+}
+
+func TestDecorateCatContactKeepsDisconnectedTemplateCandidateUnconnected(t *testing.T) {
+	agent := decorateCatContact(ClowderAgent{
+		CatID:           "opus",
+		DisplayName:     "布偶猫",
+		MentionPatterns: []string{"@opus", "@布偶猫"},
+		Available:       false,
+		Source:          "disconnected",
+	}, "existing")
+
+	assert.False(t, agent.Connected)
+	assert.Equal(t, "unavailable", agent.AvailabilityState)
+	assert.Equal(t, "disconnected", agent.Source)
+}
+
+func TestDecorateCatDirectoryContactAllowsDisconnectedTemplateCandidateToBeAdded(t *testing.T) {
+	agent := decorateCatDirectoryContact(ClowderAgent{
+		CatID:           "opus",
+		DisplayName:     "布偶猫",
+		MentionPatterns: []string{"@opus", "@布偶猫"},
+		Available:       false,
+		Source:          "disconnected",
+	})
+
+	assert.True(t, agent.Available)
+	assert.False(t, agent.Connected)
+	assert.Equal(t, "available", agent.AvailabilityState)
+	assert.Equal(t, "disconnected", agent.Source)
+}
+
+func TestFetchLocalAuthCapabilitiesProxiesRedactedProbe(t *testing.T) {
+	var gotPath string
+	var gotUser string
+	upstream := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		gotPath = r.URL.RequestURI()
+		gotUser = r.Header.Get("x-cat-cafe-user")
+		require.Equal(t, http.MethodGet, r.Method)
+		_ = json.NewEncoder(w).Encode(map[string]interface{}{
+			"providers": []map[string]interface{}{
+				{
+					"provider":       "codex",
+					"authConfigured": true,
+					"configPresent":  true,
+					"configFiles": []map[string]interface{}{
+						{"path": "~/.codex/auth.json", "exists": true, "readable": true},
+					},
+				},
+			},
+		})
+	}))
+	defer upstream.Close()
+
+	c := New(nil)
+	c.SetConfig(commonmodule.ClowderBridgeConfig{
+		Enabled:            true,
+		APIBaseURL:         upstream.URL,
+		ConnectorID:        "im-web",
+		ConnectorSecret:    "secret",
+		DefaultOwnerUserID: "owner-1",
+		RequestTimeout:     time.Second,
+		SignatureTolerance: time.Minute,
+	})
+
+	statusCode, body, err := c.fetchLocalAuthCapabilities("im-user-1")
+
+	require.NoError(t, err)
+	assert.Equal(t, http.StatusOK, statusCode)
+	assert.Contains(t, string(body), `"provider":"codex"`)
+	assert.Equal(t, "/api/local-auth/capabilities", gotPath)
+	assert.Equal(t, "owner-1", gotUser)
 }
 
 func TestRouteTextForDirectCatUsesPlainMentionToAutoCreateThread(t *testing.T) {
@@ -192,6 +388,37 @@ func TestRouteTextForSingleGroupTargetUsesPlainMentionToAutoCreateThread(t *test
 
 	assert.True(t, strings.HasPrefix(text, "@opus "))
 	assert.Contains(t, text, "@布偶猫 帮我总结")
+}
+
+func TestSendInboundTextWithRoutingForwardsExplicitTargets(t *testing.T) {
+	var got InboundMessage
+	upstream := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		require.Equal(t, http.MethodPost, r.Method)
+		require.Equal(t, "/api/connectors/im-web/inbound", r.URL.Path)
+		require.NoError(t, json.NewDecoder(r.Body).Decode(&got))
+		_ = json.NewEncoder(w).Encode(RouteResponse{Kind: "routed", ThreadID: "thread-1", MessageID: "msg-1"})
+	}))
+	defer upstream.Close()
+
+	c := New(nil)
+	c.SetConfig(commonmodule.ClowderBridgeConfig{
+		Enabled:            true,
+		APIBaseURL:         upstream.URL,
+		ConnectorID:        "im-web",
+		ConnectorSecret:    "secret",
+		DefaultOwnerUserID: "owner-1",
+		RequestTimeout:     time.Second,
+		SignatureTolerance: time.Minute,
+	})
+
+	response, err := c.sendInboundTextWithRouting("group-1", 2, "user-1", "帮我拆任务", "coordinator", []string{"coordinator"}, "Group context")
+
+	require.NoError(t, err)
+	assert.Equal(t, "thread-1", response.ThreadID)
+	assert.Equal(t, "2:group-1", got.ExternalChatID)
+	assert.Equal(t, "coordinator", got.DirectCatID)
+	assert.Equal(t, []string{"coordinator"}, got.TargetCatIDs)
+	assert.Equal(t, "Group context", got.PromptContext)
 }
 
 func TestGroupCatMembershipStoreRoundTripsPromptAndCats(t *testing.T) {
@@ -221,12 +448,208 @@ func TestGroupCatMembershipStoreRoundTripsPromptAndCats(t *testing.T) {
 	assert.Equal(t, stored.Prompt, loaded.Prompt)
 }
 
+func TestProjectGroupBindingKeyScopesByUserDirectPMAndProject(t *testing.T) {
+	left := projectGroupBindingKey("user-1", "clowder_cat:coordinator", 1, " 婚礼 ")
+	right := projectGroupBindingKey("user-1", "clowder_cat:coordinator", 1, "婚礼")
+	otherUser := projectGroupBindingKey("user-2", "clowder_cat:coordinator", 1, "婚礼")
+	otherProject := projectGroupBindingKey("user-1", "clowder_cat:coordinator", 1, "todo")
+
+	assert.Equal(t, left, right)
+	assert.NotEqual(t, left, otherUser)
+	assert.NotEqual(t, left, otherProject)
+	assert.Contains(t, left, "clowder_cat")
+}
+
+func TestFindActiveProjectGroupBindingReturnsLatestForDirect(t *testing.T) {
+	c := New(nil)
+	c.projectGroupBindings = map[string]ProjectGroupBinding{
+		"old": {
+			ID:                  "binding-old",
+			UserID:              "user-1",
+			ProjectName:         "婚礼",
+			PMDirectChannelID:   "clowder_cat:coordinator",
+			PMDirectChannelType: 1,
+			ProjectGroupNo:      "group-old",
+			UpdatedAt:           100,
+			Status:              "active",
+		},
+		"new": {
+			ID:                  "binding-new",
+			UserID:              "user-1",
+			ProjectName:         "todo",
+			PMDirectChannelID:   "clowder_cat:coordinator",
+			PMDirectChannelType: 1,
+			ProjectGroupNo:      "group-new",
+			UpdatedAt:           200,
+			Status:              "active",
+		},
+		"archived": {
+			ID:                  "binding-archived",
+			UserID:              "user-1",
+			ProjectName:         "later",
+			PMDirectChannelID:   "clowder_cat:coordinator",
+			PMDirectChannelType: 1,
+			ProjectGroupNo:      "group-archived",
+			UpdatedAt:           300,
+			Status:              "archived",
+		},
+	}
+
+	latest, ok := c.findActiveProjectGroupBinding("user-1", "clowder_cat:coordinator", 1, "")
+	require.True(t, ok)
+	assert.Equal(t, "binding-new", latest.ID)
+
+	named, ok := c.findActiveProjectGroupBinding("user-1", "clowder_cat:coordinator", 1, "婚礼")
+	require.True(t, ok)
+	assert.Equal(t, "binding-old", named.ID)
+}
+
+func TestUpdateProjectGroupBindingThreadPersistsThreadID(t *testing.T) {
+	c := New(nil)
+	key := projectGroupBindingKey("user-1", "clowder_cat:coordinator", 1, "婚礼")
+	c.projectGroupBindings = map[string]ProjectGroupBinding{
+		key: {
+			ID:                  "binding-1",
+			UserID:              "user-1",
+			ProjectName:         "婚礼",
+			PMDirectChannelID:   "clowder_cat:coordinator",
+			PMDirectChannelType: 1,
+			ProjectGroupNo:      "group-1",
+			UpdatedAt:           100,
+			Status:              "active",
+		},
+	}
+
+	updated, ok := c.updateProjectGroupBindingThread("binding-1", "user-1", "thread-project-1")
+
+	require.True(t, ok)
+	assert.Equal(t, "thread-project-1", updated.ProjectThreadID)
+	assert.Equal(t, "thread-project-1", c.projectGroupBindings[key].ProjectThreadID)
+	assert.Greater(t, c.projectGroupBindings[key].UpdatedAt, int64(100))
+}
+
+func TestProjectGroupRequiredMembersAlwaysIncludeUserAndPM(t *testing.T) {
+	members := projectGroupRequiredMemberUIDs("user-1", defaultPMMemberID, []string{"user-1", "helper-1", defaultPMMemberID})
+
+	assert.Equal(t, []string{"user-1", defaultPMMemberID, "helper-1"}, members)
+}
+
+func TestNormalizeProjectGroupNameTrimsQuotesAndLength(t *testing.T) {
+	assert.Equal(t, "PM项目群验收", normalizeProjectGroupName("「PM项目群验收」"))
+	assert.Equal(t, "项目群聊", normalizeProjectGroupName(" "))
+	assert.Len(t, []rune(normalizeProjectGroupName("这是一个特别特别特别长的项目名称用于验证截断")), 20)
+}
+
+func TestDeleteCatFromUpstreamProxiesOwnerAndStatus(t *testing.T) {
+	var gotPath string
+	var gotUser string
+	var gotMethod string
+	upstream := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		gotPath = r.URL.RequestURI()
+		gotUser = r.Header.Get("x-cat-cafe-user")
+		gotMethod = r.Method
+		w.WriteHeader(http.StatusAccepted)
+		_ = json.NewEncoder(w).Encode(map[string]interface{}{
+			"deleted": true,
+			"id":      "opus",
+		})
+	}))
+	defer upstream.Close()
+
+	c := New(nil)
+	c.SetConfig(commonmodule.ClowderBridgeConfig{
+		Enabled:            true,
+		APIBaseURL:         upstream.URL,
+		ConnectorID:        "im-web",
+		ConnectorSecret:    "secret",
+		DefaultOwnerUserID: "owner-1",
+		RequestTimeout:     time.Second,
+		SignatureTolerance: time.Minute,
+	})
+
+	statusCode, body, err := c.deleteCatFromUpstream("opus", "im-user")
+
+	require.NoError(t, err)
+	assert.Equal(t, http.StatusAccepted, statusCode)
+	assert.Equal(t, http.MethodDelete, gotMethod)
+	assert.Equal(t, "/api/cats/opus", gotPath)
+	assert.Equal(t, "owner-1", gotUser)
+	assert.Contains(t, string(body), `"deleted":true`)
+}
+
+func TestDeleteCatFromUpstreamReturnsUpstreamErrorStatus(t *testing.T) {
+	upstream := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		require.Equal(t, http.MethodDelete, r.Method)
+		w.WriteHeader(http.StatusNotFound)
+		_ = json.NewEncoder(w).Encode(map[string]interface{}{
+			"error": "Cat not found",
+		})
+	}))
+	defer upstream.Close()
+
+	c := New(nil)
+	c.SetConfig(commonmodule.ClowderBridgeConfig{
+		Enabled:            true,
+		APIBaseURL:         upstream.URL,
+		ConnectorID:        "im-web",
+		ConnectorSecret:    "secret",
+		DefaultOwnerUserID: "owner-1",
+		RequestTimeout:     time.Second,
+		SignatureTolerance: time.Minute,
+	})
+
+	statusCode, body, err := c.deleteCatFromUpstream("missing-cat", "im-user")
+
+	require.NoError(t, err)
+	assert.Equal(t, http.StatusNotFound, statusCode)
+	assert.Contains(t, string(body), "Cat not found")
+}
+
+func TestPruneGroupCatStateRemovesDeletedCatAndClearsEmptyPrompt(t *testing.T) {
+	c := New(nil)
+	c.storeGroupCats(groupCatSyncRequest{
+		GroupID:   "group-1",
+		GroupName: "猫家庭",
+		CatIDs:    []string{"opus", "codex"},
+		Cats: []ClowderAgent{
+			{CatID: "opus", DisplayName: "布偶猫", MentionPatterns: []string{"@布偶猫"}, Available: true},
+			{CatID: "codex", DisplayName: "猫猫", MentionPatterns: []string{"@codex"}, Available: true},
+		},
+		Prompt: "Group: 猫家庭\nCats:\n- 布偶猫\n- 猫猫",
+	})
+	c.storeGroupCats(groupCatSyncRequest{
+		GroupID:   "group-empty",
+		GroupName: "只有布偶猫",
+		CatIDs:    []string{"opus"},
+		Cats: []ClowderAgent{
+			{CatID: "opus", DisplayName: "布偶猫", MentionPatterns: []string{"@布偶猫"}, Available: true},
+		},
+		Prompt: "Group: 只有布偶猫\nCats:\n- 布偶猫",
+	})
+
+	affected := c.pruneGroupCatState("opus")
+
+	assert.Equal(t, 2, affected)
+	groupOne, ok := c.loadGroupCats("group-1")
+	require.True(t, ok)
+	assert.Equal(t, []string{"codex"}, groupOne.CatIDs)
+	require.Len(t, groupOne.Cats, 1)
+	assert.Equal(t, "codex", groupOne.Cats[0].CatID)
+	assert.NotEmpty(t, groupOne.Prompt)
+
+	emptyGroup, ok := c.loadGroupCats("group-empty")
+	require.True(t, ok)
+	assert.Empty(t, emptyGroup.CatIDs)
+	assert.Empty(t, emptyGroup.Cats)
+	assert.Empty(t, emptyGroup.Prompt)
+}
+
 func TestBuildCreateCatCommandRequiresAndNormalizesClientPlatform(t *testing.T) {
 	command, ok := buildCreateCatCommand(createCatRequest{
-		Name:     "测试猫",
-		Alias:    "@testcat",
-		ClientID: "openai",
-		AuthType: "oauth",
+		Name:       "测试猫",
+		Alias:      "@testcat",
+		ClientID:   "openai",
+		AuthType:   "oauth",
 		AccountRef: "codex",
 	})
 
@@ -234,15 +657,17 @@ func TestBuildCreateCatCommandRequiresAndNormalizesClientPlatform(t *testing.T) 
 	assert.Equal(t, "/cats new 测试猫 @testcat --platform codex --auth oauth --account codex", command)
 
 	command, ok = buildCreateCatCommand(createCatRequest{
-		Name:     "Claude猫",
-		Alias:    "@claude-cat",
-		ClientID: "anthropic",
-		AuthType: "api_key",
-		AccountRef: "anthropic-prod",
+		Name:           "Claude猫",
+		Alias:          "@claude-cat",
+		RoleTemplateID: "ragdoll",
+		ClientID:       "anthropic",
+		AuthType:       "api_key",
+		AccountRef:     "anthropic-prod",
+		DefaultModel:   "claude-sonnet-4-6",
 	})
 
 	require.True(t, ok)
-	assert.Equal(t, "/cats new Claude猫 @claude-cat --platform claude-code --auth api-key --account anthropic-prod", command)
+	assert.Equal(t, "/cats new Claude猫 @claude-cat --platform claude-code --auth api-key --account anthropic-prod --model claude-sonnet-4-6 --role-template ragdoll", command)
 
 	_, ok = buildCreateCatCommand(createCatRequest{Name: "无平台猫"})
 	assert.False(t, ok)

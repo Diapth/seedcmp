@@ -1,5 +1,6 @@
 import { computed, ref } from 'vue';
 import { defineStore } from 'pinia';
+import { apiClient } from '@tsdaodao/base-vue';
 import {
   getClowderCatDisplayNameFromPayload,
   isClowderPayload,
@@ -12,12 +13,40 @@ import {
   type ClowderAgentDirectoryResponse,
   type ClowderCatContactResponse,
   type ClowderCatDirectoryResponse,
+  type ClowderClientDefaultModels,
+  type ClowderCatRoleTemplate,
   type ClowderCreateCatRequest,
+  type ClowderDeleteCatResponse,
+  type ClowderLocalOAuthCapabilitiesResponse,
+  type ClowderLocalOAuthConfigSummary,
+  type ClowderLocalOAuthProvider,
+  type ClowderPlatformModelOption,
+  type ClowderSkillCatalog,
+  type ClowderSkillEntry,
+  type ClowderSkillProvider,
   type ClowderConversationRef,
   type ClowderConversationStateResponse,
   type ClowderConnectionStatus,
+  type ClowderCoordination,
+  type ClowderCreateCoordinationRequest,
+  type ClowderCreateDeploymentRequest,
+  type ClowderDeploymentActionRequest,
+  type ClowderDeploymentActionResponse,
+  type ClowderDeploymentRequest,
+  type ClowderUpdateCoordinationRequest,
+  type ClowderUpdateDeploymentRequest,
   type ClowderGroupAutoReplyMode,
   type ClowderGroupCatStateResponse,
+  type ClowderEnsureProjectGroupRequest,
+  type ClowderMaomiWorkspace,
+  type ClowderProjectGroupBinding,
+  type ClowderThreadTask,
+  type ClowderThreadTaskDiagnostics,
+  type ClowderThreadTasksRequestOptions,
+  type ClowderThreadTasksResponse,
+  type ClowderWorkspaceBindingResponse,
+  type ClowderWorkspaceProposal,
+  type ClowderWorkspaceRootResponse,
   type IMConnectorPermission
 } from '../api/clowder';
 import {
@@ -27,6 +56,7 @@ import {
   type ClowderCatContact,
   type ClowderGroupPromptInput
 } from './clowderCatContacts';
+import type { CoordinatorKickoff } from './clowderTypes';
 
 function conversationKey(channelId: string, channelType: number) {
   return `${String(channelId)}-${Number(channelType)}`;
@@ -72,6 +102,22 @@ interface ClowderAgentDirectoryRuntimeState {
   preferred: ClowderAgent[];
   lastActive?: ClowderAgent;
 }
+
+export type ThreadTaskLoadState =
+  | { state: 'not_bound' }
+  | { state: 'loading'; threadId: string; tasks: ClowderThreadTask[]; diagnostics?: ClowderThreadTaskDiagnostics; lastRefreshAt?: number }
+  | { state: 'success'; threadId: string; tasks: ClowderThreadTask[]; diagnostics?: ClowderThreadTaskDiagnostics; lastRefreshAt: number }
+  | { state: 'success_empty'; threadId: string; tasks: ClowderThreadTask[]; diagnostics?: ClowderThreadTaskDiagnostics; lastRefreshAt: number }
+  | { state: 'route_failed'; threadId: string; tasks: ClowderThreadTask[]; status?: number; error: string; lastRefreshAt?: number }
+  | {
+      state: 'thread_binding_mismatch';
+      threadId: string;
+      tasks: ClowderThreadTask[];
+      expectedTaskId?: string;
+      actualThreadId?: string;
+      diagnostics: ClowderThreadTaskDiagnostics;
+      lastRefreshAt: number;
+    };
 
 function normalizeAgentDirectory(response: ClowderAgentDirectoryResponse): ClowderAgentDirectoryRuntimeState {
   const agents = response.agents || [];
@@ -166,7 +212,54 @@ function mergeClowderCatContacts(existing: ClowderCatContact[], additions: Clowd
 
 function normalizeGroupAutoReplyMode(mode?: string, proactiveReplies?: boolean): ClowderGroupAutoReplyMode {
   if (mode === 'off' || mode === 'mentions_only' || mode === 'soft_mentions') return mode;
-  return proactiveReplies === true ? 'soft_mentions' : 'mentions_only';
+  return proactiveReplies === false ? 'mentions_only' : 'soft_mentions';
+}
+
+function normalizeThreadTasksResponse(threadId: string, response: ClowderThreadTasksResponse): ClowderThreadTasksResponse {
+  const tasks = Array.isArray(response?.tasks) ? response.tasks : [];
+  return {
+    ...response,
+    threadId: response?.threadId || threadId,
+    tasks,
+    diagnostics: response?.diagnostics || {
+      state: tasks.length > 0 ? 'ok' : 'success_empty',
+      taskCount: tasks.length,
+      queryThreadId: response?.threadId || threadId,
+      activeWorkspaceId: undefined,
+      observedTaskIds: [],
+      missingTaskIds: [],
+      mismatchedTasks: [],
+      workspaceMismatchedTaskIds: []
+    }
+  };
+}
+
+function taskErrorMessage(err: unknown) {
+  const shaped = err as { msg?: string; message?: string; error?: { message?: string; msg?: string }; status?: number };
+  return shaped?.msg || shaped?.message || shaped?.error?.message || shaped?.error?.msg || '加载任务失败';
+}
+
+function taskErrorStatus(err: unknown) {
+  const shaped = err as { status?: number; error?: { response?: { status?: number } }; response?: { status?: number } };
+  return shaped?.status || shaped?.response?.status || shaped?.error?.response?.status;
+}
+
+const AGENT_DIRECTORY_CACHE_MS = 5_000;
+const CAT_DIRECTORY_CACHE_MS = 10_000;
+const ACTIVE_DEPLOYMENT_CACHE_MS = 5_000;
+const MISSING_ACTIVE_DEPLOYMENT_CACHE_MS = 15_000;
+
+function isFresh(cache: Map<string, number>, key: string, ttlMs: number) {
+  const loadedAt = cache.get(key);
+  return loadedAt !== undefined && Date.now() - loadedAt < ttlMs;
+}
+
+function catDirectoryRequestKey(params?: { query?: string; includeUnavailable?: boolean }) {
+  const query = String(params?.query || '').trim();
+  return JSON.stringify({
+    query,
+    includeUnavailable: params?.includeUnavailable === true
+  });
 }
 
 export const useClowderStore = defineStore('clowder', () => {
@@ -174,12 +267,38 @@ export const useClowderStore = defineStore('clowder', () => {
   const conversations = ref<Record<string, ClowderConversationStateResponse>>({});
   const agentDirectories = ref<Record<string, ClowderAgentDirectoryRuntimeState>>({});
   const catContactDirectory = ref<ClowderCatContact[]>([]);
+  const catRoleTemplates = ref<ClowderCatRoleTemplate[]>([]);
+  const platformModelOptions = ref<Record<string, ClowderPlatformModelOption[]>>({});
+  const catSkillCatalog = ref<ClowderSkillCatalog>({});
+  const localOAuthCapabilities = ref<Partial<Record<ClowderLocalOAuthProvider, ClowderLocalOAuthConfigSummary>>>({});
+  const localOAuthLoading = ref(false);
+  const localOAuthError = ref<string | undefined>();
   const connectedCatContacts = ref<ClowderCatContact[]>([]);
   const groupCatMemberships = ref<Record<string, ClowderCatContact[]>>({});
   const groupPrompts = ref<Record<string, string>>({});
   const groupAutoReplyModes = ref<Record<string, ClowderGroupAutoReplyMode>>({});
+  const projectGroupBindings = ref<Record<string, ClowderProjectGroupBinding>>({});
+  const threadTaskStates = ref<Record<string, ThreadTaskLoadState>>({});
+  const workspaceRoot = ref<ClowderWorkspaceRootResponse | undefined>();
+  const workspaces = ref<ClowderMaomiWorkspace[]>([]);
+  const workspaceBindings = ref<Record<string, ClowderWorkspaceBindingResponse>>({});
+  const workspaceLoading = ref(false);
+  const workspaceError = ref<string | undefined>();
+  const deploymentRequests = ref<Record<string, ClowderDeploymentRequest>>({});
+  const coordinations = ref<Record<string, ClowderCoordination>>({});
+  const threadCoordinationIds = ref<Record<string, string[]>>({});
+  // Phase 2.2: coordinator project group chat kickoff records (one per coordinationId).
+  // Surfaced as a "Create Project Group Chat?" card in ClowderConversationPanel.
+  const kickoffs = ref<Record<string, CoordinatorKickoff>>({});
   const loading = ref(false);
   const error = ref<string | undefined>();
+  const agentDirectoryRequests = new Map<string, Promise<ClowderAgentDirectoryRuntimeState>>();
+  const agentDirectoryLoadedAt = new Map<string, number>();
+  const catDirectoryRequests = new Map<string, Promise<ClowderCatContact[]>>();
+  const catDirectoryLoadedAt = new Map<string, number>();
+  const activeDeploymentRequests = new Map<string, Promise<ClowderDeploymentRequest | null>>();
+  const activeDeploymentLoadedAt = new Map<string, number>();
+  const missingActiveDeploymentUntil = new Map<string, number>();
 
   const isReady = computed(() => status.value.enabled && status.value.configured && status.value.reachable);
 
@@ -248,13 +367,326 @@ export const useClowderStore = defineStore('clowder', () => {
     return conversations.value[conversationKey(channelId, channelType)];
   }
 
-  async function loadAgentDirectory(refInput: ClowderConversationRef) {
+  function previousTasksForThread(threadId: string): ClowderThreadTask[] {
+    const current = threadTaskStates.value[threadId];
+    return current && 'tasks' in current ? current.tasks : [];
+  }
+
+  function getThreadTasksState(threadId?: string | null): ThreadTaskLoadState {
+    const trimmed = String(threadId || '').trim();
+    if (!trimmed) return { state: 'not_bound' };
+    return threadTaskStates.value[trimmed] || { state: 'loading', threadId: trimmed, tasks: [] };
+  }
+
+  function getWorkspaceBinding(threadId?: string | null) {
+    const trimmed = String(threadId || '').trim();
+    return trimmed ? workspaceBindings.value[trimmed] : undefined;
+  }
+
+  function getActiveWorkspace(threadId?: string | null) {
+    return getWorkspaceBinding(threadId)?.activeWorkspace || undefined;
+  }
+
+  function projectGroupBindingKey(input: {
+    userId?: string | null;
+    pmDirectChannelId: string;
+    pmDirectChannelType: number;
+    projectName: string;
+  }) {
+    return [
+      String(input.userId || '').trim(),
+      conversationKey(input.pmDirectChannelId, input.pmDirectChannelType),
+      String(input.projectName || '').trim().toLocaleLowerCase()
+    ].join('|');
+  }
+
+  function setProjectGroupBinding(binding: ClowderProjectGroupBinding) {
+    const key = projectGroupBindingKey({
+      userId: binding.userId,
+      pmDirectChannelId: binding.pmDirectChannelId,
+      pmDirectChannelType: binding.pmDirectChannelType,
+      projectName: binding.projectName
+    });
+    projectGroupBindings.value = {
+      ...projectGroupBindings.value,
+      [key]: binding
+    };
+    return binding;
+  }
+
+  function getProjectGroupBinding(input: {
+    userId?: string | null;
+    pmDirectChannelId: string;
+    pmDirectChannelType: number;
+    projectName: string;
+  }) {
+    return projectGroupBindings.value[projectGroupBindingKey(input)];
+  }
+
+  function getActiveProjectGroupBindingForDirect(input: {
+    userId?: string | null;
+    pmDirectChannelId: string;
+    pmDirectChannelType: number;
+  }) {
+    const userId = String(input.userId || '').trim();
+    return Object.values(projectGroupBindings.value)
+      .filter(binding =>
+        binding.status === 'active' &&
+        (!userId || binding.userId === userId) &&
+        binding.pmDirectChannelId === input.pmDirectChannelId &&
+        Number(binding.pmDirectChannelType) === Number(input.pmDirectChannelType)
+      )
+      .sort((a, b) => Number(b.updatedAt || 0) - Number(a.updatedAt || 0))[0];
+  }
+
+  async function loadActiveProjectGroupBindingForDirect(input: {
+    pmDirectChannelId: string;
+    pmDirectChannelType: ClowderConversationRef['channelType'];
+    projectName?: string;
+  }) {
+    const pmDirectChannelId = String(input.pmDirectChannelId || '').trim();
+    if (!pmDirectChannelId || !input.pmDirectChannelType) return undefined;
     loading.value = true;
     error.value = undefined;
     try {
+      const response = await clowderApi.getActiveProjectGroup({
+        pmDirectChannelId,
+        pmDirectChannelType: input.pmDirectChannelType,
+        projectName: input.projectName
+      });
+      if (response.binding) {
+        return setProjectGroupBinding(response.binding);
+      }
+      return undefined;
+    } catch (err: any) {
+      if (err?.response?.status === 404 || err?.status === 404) {
+        return undefined;
+      }
+      error.value = err instanceof Error ? err.message : 'Clowder project group binding unavailable';
+      throw err;
+    } finally {
+      loading.value = false;
+    }
+  }
+
+  async function updateProjectGroupBindingThread(bindingId: string, projectThreadId?: string) {
+    const trimmedId = String(bindingId || '').trim();
+    const trimmedThreadId = String(projectThreadId || '').trim();
+    if (!trimmedId || !trimmedThreadId) return undefined;
+    loading.value = true;
+    error.value = undefined;
+    try {
+      const response = await clowderApi.updateProjectGroupThread(trimmedId, { projectThreadId: trimmedThreadId });
+      if (response.binding) {
+        return setProjectGroupBinding(response.binding);
+      }
+      return undefined;
+    } catch (err) {
+      error.value = err instanceof Error ? err.message : 'Clowder project group thread update failed';
+      throw err;
+    } finally {
+      loading.value = false;
+    }
+  }
+
+  async function ensureProjectGroup(input: ClowderEnsureProjectGroupRequest) {
+    loading.value = true;
+    error.value = undefined;
+    try {
+      const response = await clowderApi.ensureProjectGroup(input);
+      if (response.binding) {
+        setProjectGroupBinding(response.binding);
+      }
+      return response;
+    } catch (err) {
+      error.value = err instanceof Error ? err.message : 'Clowder project group create failed';
+      throw err;
+    } finally {
+      loading.value = false;
+    }
+  }
+
+  async function loadWorkspaceRoot() {
+    workspaceLoading.value = true;
+    workspaceError.value = undefined;
+    try {
+      workspaceRoot.value = await clowderApi.getWorkspaceRoot();
+      return workspaceRoot.value;
+    } catch (err) {
+      workspaceError.value = err instanceof Error ? err.message : 'Maomi workspace root unavailable';
+      throw err;
+    } finally {
+      workspaceLoading.value = false;
+    }
+  }
+
+  async function loadWorkspaces() {
+    workspaceLoading.value = true;
+    workspaceError.value = undefined;
+    try {
+      const response = await clowderApi.listWorkspaces({ status: 'active' });
+      workspaces.value = response.workspaces || [];
+      return workspaces.value;
+    } catch (err) {
+      workspaceError.value = err instanceof Error ? err.message : 'Maomi workspaces unavailable';
+      throw err;
+    } finally {
+      workspaceLoading.value = false;
+    }
+  }
+
+  async function loadWorkspaceBinding(threadId: string) {
+    const trimmed = String(threadId || '').trim();
+    if (!trimmed) return undefined;
+    workspaceLoading.value = true;
+    workspaceError.value = undefined;
+    try {
+      const binding = await clowderApi.getWorkspaceBinding(trimmed);
+      workspaceBindings.value = { ...workspaceBindings.value, [trimmed]: binding };
+      return binding;
+    } catch (err) {
+      workspaceError.value = err instanceof Error ? err.message : 'Maomi workspace binding unavailable';
+      throw err;
+    } finally {
+      workspaceLoading.value = false;
+    }
+  }
+
+  async function proposeWorkspace(input: { intentText: string; threadId?: string }): Promise<ClowderWorkspaceProposal> {
+    const response = await clowderApi.proposeWorkspace(input);
+    return response.proposal;
+  }
+
+  async function createWorkspace(input: {
+    slug: string;
+    displayName: string;
+    sourceIntent?: string;
+    createdBy?: 'user' | 'coordinator' | 'cat' | 'system';
+    threadId?: string;
+  }) {
+    workspaceLoading.value = true;
+    workspaceError.value = undefined;
+    try {
+      const response = await clowderApi.createWorkspace(input);
+      const workspace = response.workspace;
+      workspaces.value = [
+        workspace,
+        ...workspaces.value.filter(item => item.workspaceId !== workspace.workspaceId && item.id !== workspace.id)
+      ];
+      if (input.threadId) {
+        await loadWorkspaceBinding(input.threadId);
+      }
+      return workspace;
+    } catch (err) {
+      workspaceError.value = err instanceof Error ? err.message : 'Maomi workspace create failed';
+      throw err;
+    } finally {
+      workspaceLoading.value = false;
+    }
+  }
+
+  async function setWorkspaceBinding(threadId: string, workspaceId: string | null) {
+    const trimmed = String(threadId || '').trim();
+    if (!trimmed) throw new Error('threadId is required');
+    workspaceLoading.value = true;
+    workspaceError.value = undefined;
+    try {
+      const binding = await clowderApi.setWorkspaceBinding(trimmed, { workspaceId });
+      workspaceBindings.value = { ...workspaceBindings.value, [trimmed]: binding };
+      return binding;
+    } catch (err) {
+      workspaceError.value = err instanceof Error ? err.message : 'Maomi workspace binding failed';
+      throw err;
+    } finally {
+      workspaceLoading.value = false;
+    }
+  }
+
+  async function fetchThreadTasks(
+    threadId: string,
+    options: ClowderThreadTasksRequestOptions = {}
+  ): Promise<ThreadTaskLoadState> {
+    const trimmed = String(threadId || '').trim();
+    if (!trimmed) return { state: 'not_bound' };
+
+    const previous = previousTasksForThread(trimmed);
+    const current = threadTaskStates.value[trimmed];
+    threadTaskStates.value[trimmed] = {
+      state: 'loading',
+      threadId: trimmed,
+      tasks: previous,
+      diagnostics: current && 'diagnostics' in current
+        ? current.diagnostics
+        : undefined,
+      lastRefreshAt: current && 'lastRefreshAt' in current
+        ? current.lastRefreshAt
+        : undefined
+    };
+
+    try {
+      const response = normalizeThreadTasksResponse(trimmed, await clowderApi.getThreadTasks(trimmed, options));
+      const now = Date.now();
+      const diagnostics = response.diagnostics;
+      let next: ThreadTaskLoadState;
+      if (diagnostics?.state === 'thread_binding_mismatch') {
+        const mismatch = diagnostics.mismatchedTasks[0];
+        next = {
+          state: 'thread_binding_mismatch',
+          threadId: response.threadId,
+          tasks: response.tasks,
+          expectedTaskId: mismatch?.taskId || options.expectedTaskId || options.observedTaskIds?.[0],
+          actualThreadId: mismatch?.actualThreadId,
+          diagnostics,
+          lastRefreshAt: now
+        };
+      } else if (response.tasks.length === 0) {
+        next = {
+          state: 'success_empty',
+          threadId: response.threadId,
+          tasks: [],
+          diagnostics,
+          lastRefreshAt: now
+        };
+      } else {
+        next = {
+          state: 'success',
+          threadId: response.threadId,
+          tasks: response.tasks,
+          diagnostics,
+          lastRefreshAt: now
+        };
+      }
+      threadTaskStates.value[trimmed] = next;
+      return next;
+    } catch (err) {
+      const next: ThreadTaskLoadState = {
+        state: 'route_failed',
+        threadId: trimmed,
+        tasks: previous,
+        status: taskErrorStatus(err),
+        error: taskErrorMessage(err),
+        lastRefreshAt: Date.now()
+      };
+      threadTaskStates.value[trimmed] = next;
+      return next;
+    }
+  }
+
+  async function loadAgentDirectory(refInput: ClowderConversationRef) {
+    const key = conversationKey(refInput.channelId, refInput.channelType);
+    const cached = agentDirectories.value[key];
+    if (cached && isFresh(agentDirectoryLoadedAt, key, AGENT_DIRECTORY_CACHE_MS)) {
+      return cached;
+    }
+    const existingRequest = agentDirectoryRequests.get(key);
+    if (existingRequest) return existingRequest;
+
+    loading.value = true;
+    error.value = undefined;
+    const request = (async () => {
       const directory = normalizeAgentDirectory(await clowderApi.getAgentDirectory(refInput) as unknown as ClowderAgentDirectoryResponse);
-      const key = conversationKey(refInput.channelId, refInput.channelType);
       agentDirectories.value[key] = directory;
+      agentDirectoryLoadedAt.set(key, Date.now());
       const current = conversations.value[key];
       conversations.value[key] = normalizeConversationState({
         status: current?.status || status.value,
@@ -266,10 +698,17 @@ export const useClowderStore = defineStore('clowder', () => {
         disabledReason: current?.disabledReason
       });
       return directory;
+    })();
+    agentDirectoryRequests.set(key, request);
+    try {
+      return await request;
     } catch (err) {
       error.value = err instanceof Error ? err.message : 'Clowder agent directory unavailable';
       throw err;
     } finally {
+      if (agentDirectoryRequests.get(key) === request) {
+        agentDirectoryRequests.delete(key);
+      }
       loading.value = false;
     }
   }
@@ -278,6 +717,189 @@ export const useClowderStore = defineStore('clowder', () => {
     return (response?.agents || []).map(agent => toClowderCatContact(agent, {
       connected: agent.connected === true
     }));
+  }
+
+  const fallbackClientDefaults: Record<string, ClowderClientDefaultModels> = {
+    openai: {
+      defaultModel: 'gpt-5.4',
+      models: ['gpt-5.5', 'gpt-5.4', 'gpt-5.4-mini', 'gpt-5.3-codex']
+    },
+    codex: {
+      defaultModel: 'gpt-5.4',
+      models: ['gpt-5.5', 'gpt-5.4', 'gpt-5.4-mini', 'gpt-5.3-codex']
+    },
+    anthropic: {
+      defaultModel: 'claude-sonnet-4-6',
+      models: ['claude-sonnet-4-6', 'claude-opus-4-6']
+    },
+    claude: {
+      defaultModel: 'claude-sonnet-4-6',
+      models: ['claude-sonnet-4-6', 'claude-opus-4-6']
+    }
+  };
+
+  function templateLogicalTokens(template: ClowderCatRoleTemplate) {
+    return [
+      template.logicalKey,
+      template.roleTemplateId,
+      template.catId,
+      ...(template.aliases || []),
+      ...(template.mentionPatterns || [])
+    ].map(value => normalizeLookupToken(String(value || ''))).filter(Boolean);
+  }
+
+  function templateLogicalKey(template: ClowderCatRoleTemplate) {
+    const explicit = String(template.logicalKey || template.roleTemplateId || '').trim();
+    if (explicit) return normalizeLookupToken(explicit);
+    const catId = String(template.catId || '').trim();
+    if (catId) return `cat:${normalizeLookupToken(catId)}`;
+    const platform = String((template as any).clientId || (template as any).platform || '').trim();
+    if (platform && template.displayName) {
+      return `${normalizeLookupToken(platform)}:${normalizeLookupToken(template.displayName)}`;
+    }
+    return normalizeLookupToken(template.displayName);
+  }
+
+  function uniqueTemplates(templates: ClowderCatRoleTemplate[]) {
+    const seen = new Set<string>();
+    const next: ClowderCatRoleTemplate[] = [];
+    for (const template of templates) {
+      const key = templateLogicalKey(template);
+      if (!key || seen.has(key)) continue;
+      seen.add(key);
+      for (const token of templateLogicalTokens(template)) {
+        seen.add(token);
+      }
+      next.push(template);
+    }
+    return next;
+  }
+
+  function roleTemplateFromAgent(agent: ClowderAgent): ClowderCatRoleTemplate {
+    return {
+      roleTemplateId: String(agent.catId),
+      catId: String(agent.catId),
+      logicalKey: String(agent.catId),
+      displayName: String(agent.displayName || agent.catId),
+      aliases: agent.aliases || [],
+      mentionPatterns: agent.mentionPatterns || [],
+      avatar: agent.avatar || '',
+      personalitySummary: agent.personalitySummary || '',
+      capabilitySummary: agent.capabilitySummary || '',
+      cloneable: agent.available !== false,
+      unavailableReason: agent.available === false ? agent.availabilityState || 'unavailable' : undefined,
+      source: agent.source || 'role-template'
+    };
+  }
+
+  function normalizeRoleTemplates(response?: ClowderCatDirectoryResponse, directory: ClowderCatContact[] = []) {
+    const explicitTemplates = (response?.templates || []).map(template => ({
+      ...template,
+      roleTemplateId: String(template.roleTemplateId || template.catId),
+      catId: String(template.catId || template.roleTemplateId),
+      logicalKey: String(template.logicalKey || template.roleTemplateId || template.catId),
+      displayName: String(template.displayName || template.catId || template.roleTemplateId),
+      aliases: template.aliases || [],
+      mentionPatterns: template.mentionPatterns || template.aliases || [],
+      cloneable: template.cloneable !== false,
+      source: template.source || 'role-template'
+    }));
+    // 如果 API 已返回 roleTemplates，不再混入 breeds 的 legacy candidates
+    if (explicitTemplates.length > 0) {
+      return uniqueTemplates(explicitTemplates);
+    }
+    const legacyTemplateCandidates = directory
+      .filter(cat => cat.source === 'disconnected')
+      .map(cat => ({
+        roleTemplateId: cat.catId,
+        catId: cat.catId,
+        logicalKey: cat.catId,
+        displayName: cat.displayName,
+        aliases: cat.aliases,
+        mentionPatterns: cat.mentionNames,
+        avatar: cat.avatar,
+        personalitySummary: cat.personalitySummary,
+        capabilitySummary: cat.capabilitySummary,
+        cloneable: cat.available !== false,
+        unavailableReason: cat.available === false ? cat.availabilityState : undefined,
+        source: cat.source
+      } satisfies ClowderCatRoleTemplate));
+    return uniqueTemplates([...explicitTemplates, ...legacyTemplateCandidates]);
+  }
+
+  function normalizePlatformKey(value: string) {
+    const normalized = String(value || '').trim().toLowerCase().replace(/_/g, '-');
+    if (normalized === 'codex') return 'openai';
+    if (normalized === 'claude' || normalized === 'claude-code') return 'anthropic';
+    return normalized;
+  }
+
+  function normalizePlatformModelOptions(defaults?: Record<string, ClowderClientDefaultModels>) {
+    const merged = { ...fallbackClientDefaults, ...(defaults || {}) };
+    const result: Record<string, ClowderPlatformModelOption[]> = {};
+    for (const [rawKey, entry] of Object.entries(merged)) {
+      const key = normalizePlatformKey(rawKey);
+      if (!key) continue;
+      const defaultModel = String(entry?.defaultModel || fallbackClientDefaults[key]?.defaultModel || '').trim();
+      const models = Array.from(new Set([
+        defaultModel,
+        ...(entry?.models || []),
+        ...(fallbackClientDefaults[key]?.models || [])
+      ].map(model => String(model || '').trim()).filter(Boolean)));
+      if (!models.length) continue;
+      result[key] = models.map(model => ({
+        id: model,
+        label: model,
+        default: model === defaultModel
+      }));
+    }
+    return result;
+  }
+
+  function normalizeSkillCatalog(catalog?: ClowderSkillCatalog) {
+    const result: ClowderSkillCatalog = {};
+    const providers: ClowderSkillProvider[] = ['codex', 'claude', 'gemini', 'kimi'];
+    for (const provider of providers) {
+      const skills = Array.isArray(catalog?.[provider]) ? catalog?.[provider] || [] : [];
+      result[provider] = skills
+        .map((skill): ClowderSkillEntry | undefined => {
+          const name = String(skill?.name || '').trim();
+          if (!name) return undefined;
+          const category = String(skill?.category || '').trim();
+          const trigger = String(skill?.trigger || '').trim();
+          const description = String(skill?.description || '').trim();
+          const requiresMcp = Array.isArray(skill?.requiresMcp)
+            ? skill.requiresMcp
+                .map(dep => ({
+                  id: String(dep?.id || '').trim(),
+                  status: String(dep?.status || '').trim()
+                }))
+                .filter(dep => dep.id)
+            : [];
+          return {
+            name,
+            ...(category ? { category } : {}),
+            ...(trigger ? { trigger } : {}),
+            ...(description ? { description } : {}),
+            mounted: skill?.mounted === true,
+            ...(requiresMcp.length > 0 ? { requiresMcp } : {})
+          };
+        })
+        .filter((skill): skill is ClowderSkillEntry => Boolean(skill));
+    }
+    return result;
+  }
+
+  function applyCatDirectoryRefresh(directory: ClowderCatContact[]) {
+    const directoryIds = new Set(directory.map(cat => cat.catId));
+    const retainedConnectedContacts = connectedCatContacts.value.filter(cat =>
+      directoryIds.has(cat.catId) || cat.source !== 'existing'
+    );
+    const connectedFromDirectory = directory.filter(cat => cat.connected);
+    const nextConnected = mergeClowderCatContacts(retainedConnectedContacts, connectedFromDirectory);
+    connectedCatContacts.value = nextConnected;
+    catContactDirectory.value = mergeClowderCatContacts(directory, nextConnected);
+    return catContactDirectory.value;
   }
 
   function upsertConnectedCatContact(contact: ClowderCatContact) {
@@ -294,6 +916,8 @@ export const useClowderStore = defineStore('clowder', () => {
     const directoryIdx = catContactDirectory.value.findIndex(item => item.catId === contact.catId);
     if (directoryIdx >= 0) {
       catContactDirectory.value[directoryIdx] = next;
+    } else {
+      catContactDirectory.value = mergeClowderCatContacts(catContactDirectory.value, [next]);
     }
     return next;
   }
@@ -307,18 +931,59 @@ export const useClowderStore = defineStore('clowder', () => {
   }
 
   async function loadCatContactDirectory(params?: { query?: string; includeUnavailable?: boolean }) {
+    const key = catDirectoryRequestKey(params);
+    if (isFresh(catDirectoryLoadedAt, key, CAT_DIRECTORY_CACHE_MS)) {
+      return catContactDirectory.value;
+    }
+    const existingRequest = catDirectoryRequests.get(key);
+    if (existingRequest) return existingRequest;
+
     loading.value = true;
     error.value = undefined;
+    const request = (async () => {
+      const response = await clowderApi.getCatDirectory(params) as unknown as ClowderCatDirectoryResponse;
+      const directory = normalizeCatDirectory(response);
+      catRoleTemplates.value = normalizeRoleTemplates(response, directory);
+      platformModelOptions.value = normalizePlatformModelOptions(response?.clientDefaults);
+      catSkillCatalog.value = normalizeSkillCatalog(response?.skillCatalog);
+      catDirectoryLoadedAt.set(key, Date.now());
+      return applyCatDirectoryRefresh(directory);
+    })();
+    catDirectoryRequests.set(key, request);
     try {
-      const directory = normalizeCatDirectory(await clowderApi.getCatDirectory(params) as unknown as ClowderCatDirectoryResponse);
-      catContactDirectory.value = directory;
-      connectedCatContacts.value = directory.filter(cat => cat.connected);
-      return directory;
+      return await request;
     } catch (err) {
       error.value = err instanceof Error ? err.message : 'Clowder cat directory unavailable';
       throw err;
     } finally {
+      if (catDirectoryRequests.get(key) === request) {
+        catDirectoryRequests.delete(key);
+      }
       loading.value = false;
+    }
+  }
+
+  async function loadLocalOAuthCapabilities() {
+    localOAuthLoading.value = true;
+    localOAuthError.value = undefined;
+    try {
+      const response = await clowderApi.getLocalAuthCapabilities() as unknown;
+      const payload = ((response as { data?: ClowderLocalOAuthCapabilitiesResponse }).data || response) as ClowderLocalOAuthCapabilitiesResponse;
+      const providers = Array.isArray(payload?.providers) ? payload.providers : [];
+      const next: Partial<Record<ClowderLocalOAuthProvider, ClowderLocalOAuthConfigSummary>> = {};
+      for (const provider of providers) {
+        const key = provider.provider;
+        if (key === 'codex' || key === 'claude') {
+          next[key] = provider;
+        }
+      }
+      localOAuthCapabilities.value = next;
+      return next;
+    } catch (err) {
+      localOAuthError.value = err instanceof Error ? err.message : '本机 OAuth 配置检查失败';
+      throw err;
+    } finally {
+      localOAuthLoading.value = false;
     }
   }
 
@@ -351,6 +1016,64 @@ export const useClowderStore = defineStore('clowder', () => {
       return upsertConnectedCatContact(contact);
     } catch (err) {
       error.value = err instanceof Error ? err.message : 'Clowder cat creation failed';
+      throw err;
+    } finally {
+      loading.value = false;
+    }
+  }
+
+  function catIdMatches(value: string | undefined | null, catId: string) {
+    return normalizeLookupToken(String(value || '')) === normalizeLookupToken(catId);
+  }
+
+  function pruneDeletedCatFromLocalState(catId: string) {
+    connectedCatContacts.value = connectedCatContacts.value.filter(cat => !catIdMatches(cat.catId, catId));
+    catContactDirectory.value = catContactDirectory.value.filter(cat => !catIdMatches(cat.catId, catId));
+
+    for (const [groupId, cats] of Object.entries(groupCatMemberships.value)) {
+      const nextCats = cats.filter(cat => !catIdMatches(cat.catId, catId));
+      if (nextCats.length === cats.length) continue;
+      groupCatMemberships.value[groupId] = nextCats;
+      if (nextCats.length > 0) {
+        buildCurrentGroupPrompt(groupId, groupId, nextCats, groupAutoReplyModes.value[groupId] || 'soft_mentions');
+      } else {
+        delete groupPrompts.value[groupId];
+      }
+    }
+
+    for (const [key, state] of Object.entries(conversations.value)) {
+      const nextAgents = (state.agents || []).filter(agent => !catIdMatches(agent.catId, catId));
+      const focusCatId = state.focusCatId && catIdMatches(state.focusCatId, catId) ? undefined : state.focusCatId;
+      if (nextAgents.length === (state.agents || []).length && focusCatId === state.focusCatId) continue;
+      conversations.value[key] = normalizeConversationState({
+        ...state,
+        agents: nextAgents,
+        focusCatId
+      });
+    }
+
+    for (const [key, directory] of Object.entries(agentDirectories.value)) {
+      const nextAgents = directory.agents.filter(agent => !catIdMatches(agent.catId, catId));
+      if (nextAgents.length === directory.agents.length) continue;
+      agentDirectories.value[key] = normalizeAgentDirectory({
+        agents: nextAgents
+      });
+    }
+  }
+
+  async function deleteCatContact(catId: string) {
+    const trimmed = String(catId || '').trim();
+    if (!trimmed) {
+      throw new Error('Clowder cat id is required');
+    }
+    loading.value = true;
+    error.value = undefined;
+    try {
+      const response = await clowderApi.deleteCatContact(trimmed) as unknown as ClowderDeleteCatResponse;
+      pruneDeletedCatFromLocalState(trimmed);
+      return response;
+    } catch (err) {
+      error.value = err instanceof Error ? err.message : 'Clowder cat delete failed';
       throw err;
     } finally {
       loading.value = false;
@@ -410,7 +1133,7 @@ export const useClowderStore = defineStore('clowder', () => {
     groupId: string,
     groupName: string,
     cats: ClowderCatContact[],
-    autoReplyMode: ClowderGroupAutoReplyMode = 'mentions_only'
+    autoReplyMode: ClowderGroupAutoReplyMode = 'soft_mentions'
   ) {
     const prompt = buildClowderGroupPrompt({
       groupId,
@@ -482,16 +1205,16 @@ export const useClowderStore = defineStore('clowder', () => {
 
   async function persistRecoveredGroupCats(groupId: string, groupName: string, cats: ClowderCatContact[]) {
     if (cats.length === 0) return;
-    const prompt = buildCurrentGroupPrompt(groupId, groupName || groupId, cats, 'mentions_only');
-    groupAutoReplyModes.value[groupId] = 'mentions_only';
+    const prompt = buildCurrentGroupPrompt(groupId, groupName || groupId, cats, 'soft_mentions');
+    groupAutoReplyModes.value[groupId] = 'soft_mentions';
     try {
       await clowderApi.syncGroupCats({
         groupId,
         groupName: groupName || groupId,
         catIds: cats.map(cat => cat.catId),
         cats: serializeGroupCatsForSync(cats),
-        proactiveReplies: false,
-        autoReplyMode: 'mentions_only',
+        proactiveReplies: true,
+        autoReplyMode: 'soft_mentions',
         prompt
       });
     } catch (e) {
@@ -521,9 +1244,9 @@ export const useClowderStore = defineStore('clowder', () => {
     if (conversationDirectoryCats.length === 0) {
       try {
         const directory = await clowderApi.getCatDirectory({ includeUnavailable: true }) as unknown as ClowderCatDirectoryResponse | undefined;
-        catContactDirectory.value = (directory?.agents || []).map(agent => toClowderCatContact(agent, {
+        applyCatDirectoryRefresh((directory?.agents || []).map(agent => toClowderCatContact(agent, {
           connected: agent.connected === true
-        }));
+        })));
       } catch (_err) {
         // The history recovery path can still fall back to its own directory lookup.
       }
@@ -554,15 +1277,15 @@ export const useClowderStore = defineStore('clowder', () => {
       ? current
       : [...current, contact];
     groupCatMemberships.value[groupId] = nextCats;
-    const nextPrompt = buildCurrentGroupPrompt(groupId, groupName || groupId, nextCats, 'mentions_only');
-    groupAutoReplyModes.value[groupId] = 'mentions_only';
+    const nextPrompt = buildCurrentGroupPrompt(groupId, groupName || groupId, nextCats, 'soft_mentions');
+    groupAutoReplyModes.value[groupId] = 'soft_mentions';
     await clowderApi.syncGroupCats({
       groupId,
       groupName: groupName || groupId,
       catIds: nextCats.map(cat => cat.catId),
       cats: serializeGroupCatsForSync(nextCats),
-      proactiveReplies: false,
-      autoReplyMode: 'mentions_only',
+      proactiveReplies: true,
+      autoReplyMode: 'soft_mentions',
       prompt: nextPrompt
     });
     return nextCats;
@@ -571,15 +1294,15 @@ export const useClowderStore = defineStore('clowder', () => {
   async function removeGroupCat(groupId: string, catId: string, groupName?: string) {
     const nextCats = (groupCatMemberships.value[groupId] || []).filter(cat => cat.catId !== catId);
     groupCatMemberships.value[groupId] = nextCats;
-    const nextPrompt = buildCurrentGroupPrompt(groupId, groupName || groupId, nextCats, 'mentions_only');
-    groupAutoReplyModes.value[groupId] = 'mentions_only';
+    const nextPrompt = buildCurrentGroupPrompt(groupId, groupName || groupId, nextCats, 'soft_mentions');
+    groupAutoReplyModes.value[groupId] = 'soft_mentions';
     await clowderApi.syncGroupCats({
       groupId,
       groupName: groupName || groupId,
       catIds: nextCats.map(cat => cat.catId),
       cats: serializeGroupCatsForSync(nextCats),
-      proactiveReplies: false,
-      autoReplyMode: 'mentions_only',
+      proactiveReplies: true,
+      autoReplyMode: 'soft_mentions',
       prompt: nextPrompt
     });
     return nextCats;
@@ -721,15 +1444,315 @@ export const useClowderStore = defineStore('clowder', () => {
     return clowderApi.sendConversationMessage({ ...refInput, text });
   }
 
+  async function sendDeploymentAction(input: ClowderDeploymentActionRequest): Promise<ClowderDeploymentActionResponse> {
+    const response = await clowderApi.sendDeploymentAction(input);
+    const deploymentRequest = (response as any)?.deploymentRequest as ClowderDeploymentRequest | undefined;
+    if (deploymentRequest) {
+      setDeploymentRequest(deploymentRequest);
+    }
+    return response as unknown as ClowderDeploymentActionResponse;
+  }
+
+  function deploymentRequestKey(channelId: string, channelType: number) {
+    return conversationKey(channelId, channelType);
+  }
+
+  function setDeploymentRequest(request: ClowderDeploymentRequest) {
+    const key = deploymentRequestKey(request.channelId, request.channelType);
+    missingActiveDeploymentUntil.delete(key);
+    activeDeploymentLoadedAt.set(key, Date.now());
+    deploymentRequests.value = {
+      ...deploymentRequests.value,
+      [key]: request,
+    };
+    return request;
+  }
+
+  function clearDeploymentRequest(channelId: string, channelType: number) {
+    const key = deploymentRequestKey(channelId, channelType);
+    activeDeploymentLoadedAt.delete(key);
+    if (!(key in deploymentRequests.value)) return;
+    const next = { ...deploymentRequests.value };
+    delete next[key];
+    deploymentRequests.value = next;
+  }
+
+  function getDeploymentRequest(channelId: string, channelType: number): ClowderDeploymentRequest | undefined {
+    return deploymentRequests.value[deploymentRequestKey(channelId, channelType)];
+  }
+
+  async function createDeploymentRequest(input: ClowderCreateDeploymentRequest): Promise<ClowderDeploymentRequest> {
+    const response = await clowderApi.createDeploymentRequest(input);
+    const deploymentRequest = response.deploymentRequest;
+    if (!deploymentRequest) {
+      throw new Error('Clowder deployment request create failed');
+    }
+    return setDeploymentRequest(deploymentRequest);
+  }
+
+  async function updateDeploymentRequestFields(
+    deploymentRequestId: string,
+    input: ClowderUpdateDeploymentRequest,
+  ): Promise<ClowderDeploymentRequest> {
+    const response = await clowderApi.updateDeploymentRequest(deploymentRequestId, input);
+    const deploymentRequest = response.deploymentRequest;
+    if (!deploymentRequest) {
+      throw new Error('Clowder deployment request update failed');
+    }
+    return setDeploymentRequest(deploymentRequest);
+  }
+
+  async function loadActiveDeploymentRequest(refInput: ClowderConversationRef): Promise<ClowderDeploymentRequest | null> {
+    const key = deploymentRequestKey(refInput.channelId, refInput.channelType);
+    const cached = deploymentRequests.value[key];
+    if (cached && isFresh(activeDeploymentLoadedAt, key, ACTIVE_DEPLOYMENT_CACHE_MS)) {
+      return cached;
+    }
+    if (!cached && Date.now() < (missingActiveDeploymentUntil.get(key) || 0)) {
+      return null;
+    }
+    const existingRequest = activeDeploymentRequests.get(key);
+    if (existingRequest) return existingRequest;
+
+    const request = (async () => {
+      const response = await clowderApi.getActiveDeploymentRequest(refInput);
+      const deploymentRequest = response?.deploymentRequest;
+      if (!deploymentRequest) {
+        clearDeploymentRequest(refInput.channelId, refInput.channelType);
+        missingActiveDeploymentUntil.set(key, Date.now() + MISSING_ACTIVE_DEPLOYMENT_CACHE_MS);
+        return null;
+      }
+      return setDeploymentRequest(deploymentRequest);
+    })();
+    activeDeploymentRequests.set(key, request);
+    try {
+      return await request;
+    } catch (err: any) {
+      const status = err?.response?.status || err?.status;
+      if (status === 404) {
+        clearDeploymentRequest(refInput.channelId, refInput.channelType);
+        missingActiveDeploymentUntil.set(key, Date.now() + MISSING_ACTIVE_DEPLOYMENT_CACHE_MS);
+        return null;
+      }
+      throw err;
+    } finally {
+      if (activeDeploymentRequests.get(key) === request) {
+        activeDeploymentRequests.delete(key);
+      }
+    }
+  }
+
+  async function loadDeploymentRequest(deploymentRequestId: string): Promise<ClowderDeploymentRequest | null> {
+    const trimmed = String(deploymentRequestId || '').trim();
+    if (!trimmed) return null;
+    try {
+      const response = await clowderApi.getDeploymentRequest(trimmed);
+      const deploymentRequest = response?.deploymentRequest;
+      if (!deploymentRequest) return null;
+      return setDeploymentRequest(deploymentRequest);
+    } catch (err: any) {
+      const status = err?.response?.status || err?.status;
+      if (status === 404) return null;
+      throw err;
+    }
+  }
+
+  function setCoordination(coordination: ClowderCoordination) {
+    coordinations.value = {
+      ...coordinations.value,
+      [coordination.coordinationId]: coordination,
+    };
+    const current = threadCoordinationIds.value[coordination.threadId] || [];
+    const nextIds = [coordination.coordinationId, ...current.filter(id => id !== coordination.coordinationId)];
+    threadCoordinationIds.value = {
+      ...threadCoordinationIds.value,
+      [coordination.threadId]: nextIds,
+    };
+    return coordination;
+  }
+
+  function getCoordination(coordinationId: string): ClowderCoordination | undefined {
+    return coordinations.value[coordinationId];
+  }
+
+  function getThreadCoordinations(threadId: string): ClowderCoordination[] {
+    return (threadCoordinationIds.value[threadId] || [])
+      .map(id => coordinations.value[id])
+      .filter((coordination): coordination is ClowderCoordination => !!coordination);
+  }
+
+  async function createCoordination(input: ClowderCreateCoordinationRequest): Promise<ClowderCoordination> {
+    const response = await clowderApi.createCoordination(input);
+    if (!response.coordination) {
+      throw new Error('Clowder coordination create failed');
+    }
+    return setCoordination(response.coordination);
+  }
+
+  async function updateCoordination(
+    coordinationId: string,
+    input: ClowderUpdateCoordinationRequest,
+  ): Promise<ClowderCoordination> {
+    const response = await clowderApi.updateCoordination(coordinationId, input);
+    if (!response.coordination) {
+      throw new Error('Clowder coordination update failed');
+    }
+    return setCoordination(response.coordination);
+  }
+
+  async function loadCoordination(coordinationId: string): Promise<ClowderCoordination | null> {
+    const trimmed = String(coordinationId || '').trim();
+    if (!trimmed) return null;
+    const response = await clowderApi.getCoordination(trimmed);
+    if (!response.coordination) return null;
+    return setCoordination(response.coordination);
+  }
+
+  async function loadThreadCoordinations(threadId: string): Promise<ClowderCoordination[]> {
+    const trimmed = String(threadId || '').trim();
+    if (!trimmed) return [];
+    const response = await clowderApi.listThreadCoordinations(trimmed);
+    const list = Array.isArray(response.coordinations) ? response.coordinations : [];
+    for (const coordination of list) {
+      setCoordination(coordination);
+    }
+    threadCoordinationIds.value = {
+      ...threadCoordinationIds.value,
+      [trimmed]: list.map(coordination => coordination.coordinationId),
+    };
+    return list;
+  }
+
+  async function cancelCoordination(coordinationId: string, reason?: string): Promise<ClowderCoordination> {
+    const response = await clowderApi.cancelCoordination(coordinationId, reason);
+    if (!response.coordination) {
+      throw new Error('Clowder coordination cancel failed');
+    }
+    return setCoordination(response.coordination);
+  }
+
+  // Phase 2.2: kickoff actions. kickoffs come from the Clowder API either
+  // pushed over WebSocket (`coordinator_kickoff`) or pulled on demand
+  // (`GET /v1/clowder/coordinator/kickoff/:id` — proxied through WuKongIM
+  // bridge to Clowder 3004). UI shows the card via `getKickoff(coordinationId)`;
+  // users dismiss via `dismissKickoff(id)`.
+
+  function setKickoff(kickoff: CoordinatorKickoff) {
+    kickoffs.value = { ...kickoffs.value, [kickoff.coordinationId]: kickoff };
+  }
+
+  function removeKickoff(coordinationId: string) {
+    if (!(coordinationId in kickoffs.value)) return;
+    const next = { ...kickoffs.value };
+    delete next[coordinationId];
+    kickoffs.value = next;
+  }
+
+  function getKickoff(coordinationId: string): CoordinatorKickoff | undefined {
+    return kickoffs.value[coordinationId];
+  }
+
+  async function loadKickoff(coordinationId: string): Promise<CoordinatorKickoff | null> {
+    const trimmed = String(coordinationId ?? '').trim();
+    if (!trimmed) return null;
+    try {
+      const response = await apiClient.get<{ kickoff?: CoordinatorKickoff } | CoordinatorKickoff>(
+        `clowder/coordinator/kickoff/${encodeURIComponent(trimmed)}`,
+      );
+      // Bridge may return the record directly or wrap in { kickoff }
+      const payload = response.data;
+      const data = (payload as { kickoff?: CoordinatorKickoff })?.kickoff
+        ?? (payload as CoordinatorKickoff);
+      if (!data || typeof data !== 'object' || !('coordinationId' in data)) {
+        removeKickoff(trimmed);
+        return null;
+      }
+      setKickoff(data);
+      return data;
+    } catch (err: unknown) {
+      const status = (err as { response?: { status?: number } })?.response?.status;
+      if (status === 404) {
+        removeKickoff(trimmed);
+        return null;
+      }
+      console.warn('[clowderStore] loadKickoff failed', err);
+      return null;
+    }
+  }
+
+  async function dismissKickoff(coordinationId: string): Promise<boolean> {
+    const trimmed = String(coordinationId ?? '').trim();
+    if (!trimmed) return false;
+    // Optimistic: remove locally first, then ask server.
+    const previous = kickoffs.value[trimmed];
+    removeKickoff(trimmed);
+    try {
+      await apiClient.post(
+        `clowder/coordinator/kickoff/${encodeURIComponent(trimmed)}/dismiss`,
+      );
+      return true;
+    } catch (err) {
+      console.warn('[clowderStore] dismissKickoff failed — rolling back local removal', err);
+      if (previous) setKickoff(previous);
+      return false;
+    }
+  }
+
+  /**
+   * Pull all recent kickoffs (since `maxAgeMs` ago) and merge into the local
+   * store. Used by ClowderConversationPanel on mount to surface a
+   * "Create Project Group Chat?" card without needing WS plumbing across
+   * the clowder-ai / im_web sub-project boundary.
+   */
+  async function loadRecentKickoffs(maxAgeMs = 60 * 60 * 1000): Promise<CoordinatorKickoff[]> {
+    try {
+      const response = await apiClient.get<{ kickoffs?: CoordinatorKickoff[] } | CoordinatorKickoff[]>(
+        `clowder/coordinator/kickoffs`,
+        { params: { maxAgeMs: String(maxAgeMs) } },
+      );
+      const payload = response.data;
+      const list = Array.isArray(payload)
+        ? payload
+        : (payload?.kickoffs ?? []);
+      if (!Array.isArray(list)) return [];
+      for (const k of list) {
+        if (k && typeof k === 'object' && 'coordinationId' in k) {
+          setKickoff(k);
+        }
+      }
+      return list;
+    } catch (err) {
+      console.warn('[clowderStore] loadRecentKickoffs failed', err);
+      return [];
+    }
+  }
+
   function reset() {
     status.value = defaultStatus();
     conversations.value = {};
     agentDirectories.value = {};
     catContactDirectory.value = [];
+    catRoleTemplates.value = [];
+    platformModelOptions.value = {};
+    catSkillCatalog.value = {};
+    localOAuthCapabilities.value = {};
+    localOAuthLoading.value = false;
+    localOAuthError.value = undefined;
     connectedCatContacts.value = [];
     groupCatMemberships.value = {};
     groupPrompts.value = {};
     groupAutoReplyModes.value = {};
+    projectGroupBindings.value = {};
+    threadTaskStates.value = {};
+    workspaceRoot.value = undefined;
+    workspaces.value = [];
+    workspaceBindings.value = {};
+    workspaceLoading.value = false;
+    workspaceError.value = undefined;
+    deploymentRequests.value = {};
+    coordinations.value = {};
+    threadCoordinationIds.value = {};
+    kickoffs.value = {};
     loading.value = false;
     error.value = undefined;
   }
@@ -748,13 +1771,58 @@ export const useClowderStore = defineStore('clowder', () => {
     loadCatContactDirectory,
     getConversation,
     catContactDirectory,
+    catRoleTemplates,
+    platformModelOptions,
+    catSkillCatalog,
+    localOAuthCapabilities,
+    localOAuthLoading,
+    localOAuthError,
+    loadLocalOAuthCapabilities,
     connectedCatContacts,
     groupCatMemberships,
     groupPrompts,
     groupAutoReplyModes,
+    projectGroupBindings,
+    threadTaskStates,
+    workspaceRoot,
+    workspaces,
+    workspaceBindings,
+    workspaceLoading,
+    workspaceError,
+    deploymentRequests,
+    coordinations,
+    threadCoordinationIds,
+    getDeploymentRequest,
+    getCoordination,
+    getThreadCoordinations,
+    getWorkspaceBinding,
+    getActiveWorkspace,
+    getProjectGroupBinding,
+    getActiveProjectGroupBindingForDirect,
+    loadActiveProjectGroupBindingForDirect,
+    updateProjectGroupBindingThread,
+    ensureProjectGroup,
+    loadWorkspaceRoot,
+    loadWorkspaces,
+    loadWorkspaceBinding,
+    proposeWorkspace,
+    createWorkspace,
+    setWorkspaceBinding,
+    getThreadTasksState,
+    fetchThreadTasks,
+    loadActiveDeploymentRequest,
+    loadDeploymentRequest,
+    createDeploymentRequest,
+    updateDeploymentRequestFields,
+    createCoordination,
+    updateCoordination,
+    loadCoordination,
+    loadThreadCoordinations,
+    cancelCoordination,
     getCatContactById,
     connectExistingCat,
     createCatAndConnect,
+    deleteCatContact,
     syncMixedGroupCats,
     loadGroupCats,
     addGroupCat,
@@ -765,6 +1833,16 @@ export const useClowderStore = defineStore('clowder', () => {
     setFocus,
     clearFocus,
     sendConversationMessage,
+    sendDeploymentAction,
+    setDeploymentRequest,
+    clearDeploymentRequest,
+    kickoffs,
+    setKickoff,
+    removeKickoff,
+    getKickoff,
+    loadKickoff,
+    loadRecentKickoffs,
+    dismissKickoff,
     reset
   };
 });

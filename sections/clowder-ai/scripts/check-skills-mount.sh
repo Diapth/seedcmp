@@ -9,16 +9,27 @@
 
 set -euo pipefail
 
-MAIN_REPO="$(git worktree list --porcelain | head -1 | sed 's/^worktree //')"
-WORKTREE_REPO="$(git rev-parse --show-toplevel)"
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+CAT_CAFE_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
+WORKTREE_REPO="${1:-$CAT_CAFE_ROOT}"
 SKILLS_SRC="$WORKTREE_REPO/cat-cafe-skills"
-[ -f "$SKILLS_SRC/manifest.yaml" ] || SKILLS_SRC="$MAIN_REPO/cat-cafe-skills"
-FALLBACK_SKILLS_SRC="$MAIN_REPO/cat-cafe-skills"
+[ -f "$SKILLS_SRC/manifest.yaml" ] || SKILLS_SRC="$CAT_CAFE_ROOT/cat-cafe-skills"
+FALLBACK_SKILLS_SRC="$CAT_CAFE_ROOT/cat-cafe-skills"
 BOOTSTRAP="$SKILLS_SRC/BOOTSTRAP.md"
-CLAUDE_SKILLS="$HOME/.claude/skills"
-CODEX_SKILLS="$HOME/.codex/skills"
-GEMINI_SKILLS="$HOME/.gemini/skills"
-KIMI_SKILLS="$HOME/.kimi/skills"
+home_root() {
+  local override="$1"
+  local fallback="$2"
+  if [ -n "$override" ]; then
+    printf '%s\n' "$override"
+  else
+    printf '%s\n' "$fallback"
+  fi
+}
+
+CLAUDE_SKILLS="$(home_root "${CLAUDE_HOME:-}" "$HOME/.claude")/skills"
+CODEX_SKILLS="$(home_root "${CODEX_HOME:-}" "$HOME/.codex")/skills"
+GEMINI_SKILLS="$(home_root "${GEMINI_HOME:-}" "$HOME/.gemini")/skills"
+KIMI_SKILLS="$(home_root "${KIMI_SHARE_DIR:-}" "$HOME/.kimi")/skills"
 PROJECT_CLAUDE_SKILLS="$WORKTREE_REPO/.claude/skills"
 PROJECT_CODEX_SKILLS="$WORKTREE_REPO/.codex/skills"
 PROJECT_GEMINI_SKILLS="$WORKTREE_REPO/.gemini/skills"
@@ -182,7 +193,7 @@ fi
 # ─── Part 3: Manifest Consistency Check (blocking) ───
 
 printf "\n${BOLD}Manifest 一致性校验（阻塞）${NC}\n\n"
-if node "$WORKTREE_REPO/scripts/check-skills-manifest.mjs" "$WORKTREE_REPO"; then
+if node "$CAT_CAFE_ROOT/scripts/check-skills-manifest.mjs" "$CAT_CAFE_ROOT"; then
   :
 else
   manifest_failures=$((manifest_failures + 1))
@@ -207,10 +218,10 @@ else
     printf "  ln -s %s %s/.gemini/skills\n" "$SKILLS_SRC" "$WORKTREE_REPO"
     printf "  ln -s %s %s/.kimi/skills\n" "$SKILLS_SRC" "$WORKTREE_REPO"
     printf "  # 或使用 HOME 级 per-skill fallback（兼容旧口径）\n"
-    printf "  ln -s %s/{skill-name} ~/.claude/skills/{skill-name}\n" "$SKILLS_SRC"
-    printf "  ln -s %s/{skill-name} ~/.codex/skills/{skill-name}\n" "$SKILLS_SRC"
-    printf "  ln -s %s/{skill-name} ~/.gemini/skills/{skill-name}\n" "$SKILLS_SRC"
-    printf "  ln -s %s/{skill-name} ~/.kimi/skills/{skill-name}\n\n" "$SKILLS_SRC"
+    printf "  ln -s %s/{skill-name} %s/{skill-name}\n" "$SKILLS_SRC" "$CLAUDE_SKILLS"
+    printf "  ln -s %s/{skill-name} %s/{skill-name}\n" "$SKILLS_SRC" "$CODEX_SKILLS"
+    printf "  ln -s %s/{skill-name} %s/{skill-name}\n" "$SKILLS_SRC" "$GEMINI_SKILLS"
+    printf "  ln -s %s/{skill-name} %s/{skill-name}\n\n" "$SKILLS_SRC" "$KIMI_SKILLS"
     printf "  * Claude 列同时覆盖 OpenCode（金渐层读取 ~/.claude/ 配置）\n\n"
   fi
   if [ "$reg_warnings" -gt 0 ]; then

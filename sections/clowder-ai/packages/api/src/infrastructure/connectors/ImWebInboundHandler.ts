@@ -22,6 +22,9 @@ interface ImWebInboundPayload {
   readonly clientMsgNo?: string;
   readonly text?: string;
   readonly timestamp?: number;
+  readonly directCatId?: string;
+  readonly targetCatIds?: string[];
+  readonly promptContext?: string;
   readonly sender?: {
     readonly id: string;
     readonly name?: string;
@@ -95,10 +98,22 @@ export class ImWebInboundHandler implements ConnectorWebhookHandler {
         : undefined,
       payload.chatType === 'group' ? 'group' : 'p2p',
       payload.chatName,
+      {
+        ...(payload.directCatId ? { directCatId: payload.directCatId } : {}),
+        ...(payload.targetCatIds ? { targetCatIds: payload.targetCatIds } : {}),
+        ...(payload.promptContext ? { promptContext: payload.promptContext } : {}),
+      },
     );
 
     if (result.kind === 'routed') return result;
     if (result.kind === 'skipped') return result;
+    if (result.kind === 'command' && result.threadId) {
+      return {
+        kind: 'routed',
+        threadId: result.threadId,
+        messageId: result.messageId ?? 'command',
+      };
+    }
     return { kind: 'processed', messageId: result.messageId };
   }
 

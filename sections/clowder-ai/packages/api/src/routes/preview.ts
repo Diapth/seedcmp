@@ -4,6 +4,11 @@ import { join } from 'node:path';
 import type { FastifyPluginAsync } from 'fastify';
 import { AuditEventTypes, getEventAuditLog } from '../domains/cats/services/index.js';
 import type { PortDiscoveryService } from '../domains/preview/port-discovery.js';
+import {
+  classifyLocalPreviewAttempt,
+  formatLocalPreviewHandoff,
+  type LocalPreviewAttemptInput,
+} from '../domains/preview/local-preview-status.js';
 import { validatePort } from '../domains/preview/port-validator.js';
 import { getDefaultUploadDir } from '../utils/upload-paths.js';
 
@@ -37,6 +42,14 @@ export const previewRoutes: FastifyPluginAsync<PreviewRouteOpts> = async (app, o
         .catch(() => {});
     }
     return result;
+  });
+
+  app.post<{ Body: LocalPreviewAttemptInput }>('/api/preview/local-status', async (req) => {
+    const previewStatus = classifyLocalPreviewAttempt(req.body || {});
+    return {
+      previewStatus,
+      handoff: formatLocalPreviewHandoff(previewStatus),
+    };
   });
 
   app.get<{ Querystring: { worktreeId?: string } }>('/api/preview/discovered', async (req) => {

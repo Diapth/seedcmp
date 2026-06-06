@@ -10,6 +10,7 @@ const SOURCE_CATEGORY_LABEL: Record<string, string> = {
   conflict: 'Conflict',
   scheduled: 'Scheduled',
   a2a: 'A2A',
+  coordination: 'PM',
 };
 
 export interface QueueEntryRowProps {

@@ -12,12 +12,17 @@
 
 import { existsSync } from 'node:fs';
 import { resolve } from 'node:path';
-import { type CatId, type ConnectorSource, catRegistry } from '@cat-cafe/shared';
+import { type CatId, type ConnectorSource, type MessageContent, catRegistry } from '@cat-cafe/shared';
 import type { RedisClient } from '@cat-cafe/shared/utils';
 import * as lark from '@larksuiteoapi/node-sdk';
 import type { FastifyBaseLogger } from 'fastify';
 import { isCatAvailable } from '../../config/cat-config-loader.js';
 import type { ConnectorWebhookHandler, WebhookHandleResult } from '../../routes/connector-webhooks.js';
+import type { IMaomiWorkspaceStore } from '../../domains/maomi-workspaces/MaomiWorkspaceStore.js';
+import type { IThreadWorkspaceBindingStore } from '../../domains/maomi-workspaces/ThreadWorkspaceBindingStore.js';
+import type { ICoordinatorStore } from '../../domains/cats/services/stores/ports/CoordinatorStore.js';
+import type { ITaskStore } from '../../domains/cats/services/stores/ports/TaskStore.js';
+import { findOrCreateArtifactTask } from '../../routes/thread-tasks.js';
 import { getDefaultUploadDir } from '../../utils/upload-paths.js';
 import { deliverConnectorMessage } from '../email/deliver-connector-message.js';
 import { DingTalkAdapter } from './adapters/DingTalkAdapter.js';
@@ -95,6 +100,8 @@ export interface ConnectorGatewayDeps {
       source: ConnectorSource;
       mentions: CatId[];
       timestamp: number;
+      extra?: { imWebRouting?: { promptContext?: string; targetCatIds?: string[] } };
+      contentBlocks?: readonly MessageContent[];
     }): Promise<{ id: string }>;
     getById?(id: string): Promise<{ source?: ConnectorSource } | null>;
     getByThreadBefore?(
@@ -142,6 +149,7 @@ export interface ConnectorGatewayDeps {
       threadId: string,
       state: { v: 1; connectorId: string; externalChatId: string; createdAt: number; lastCommandAt?: number } | null,
     ): void | Promise<void>;
+    updateProjectPath?(threadId: string, projectPath: string): void | Promise<void>;
     /** F142: participant activity for /cats and /status */
     getParticipantsWithActivity?(
       threadId: string,
@@ -174,6 +182,11 @@ export interface ConnectorGatewayDeps {
   readonly defaultUserId: string;
   readonly defaultCatId: CatId;
   readonly redis?: RedisClient | undefined;
+  readonly maomiWorkspaceStore?: IMaomiWorkspaceStore;
+  readonly threadWorkspaceBindingStore?: IThreadWorkspaceBindingStore;
+  /** V3-31: task store used to auto-register delivered files as thread artifacts. */
+  readonly taskStore?: ITaskStore;
+  readonly coordinatorStore?: ICoordinatorStore;
   readonly log: FastifyBaseLogger;
   readonly frontendBaseUrl?: string | undefined;
   /** F142: agent service registry for /cats command */
@@ -372,6 +385,8 @@ export async function startConnectorGateway(
     bindingStore,
     threadStore: deps.threadStore,
     ...(deps.backlogStore ? { backlogStore: deps.backlogStore } : {}),
+    ...(deps.maomiWorkspaceStore ? { maomiWorkspaceStore: deps.maomiWorkspaceStore } : {}),
+    ...(deps.threadWorkspaceBindingStore ? { threadWorkspaceBindingStore: deps.threadWorkspaceBindingStore } : {}),
     frontendBaseUrl: deps.frontendBaseUrl ?? 'http://localhost:3003',
     permissionStore,
     // F142: wire /cats and /status deps (threadStore has getParticipantsWithActivity at runtime)
@@ -421,6 +436,7 @@ export async function startConnectorGateway(
     adapters,
     mediaService,
     sttProvider,
+    coordinatorStore: deps.coordinatorStore,
   });
 
   if (hasImWeb) {
@@ -1040,6 +1056,25 @@ export async function startConnectorGateway(
     log,
     mediaPathResolver,
     messageLookup,
+    ...(deps.taskStore
+      ? {
+          artifactRegistrar: async (record) => {
+            const taskStore = deps.taskStore!;
+            await findOrCreateArtifactTask(
+              taskStore,
+              record.threadId,
+              record.userId,
+              undefined,
+              record.ownerCatId ?? deps.defaultCatId,
+              record.absolutePath,
+              record.kind,
+              undefined,
+              undefined,
+              record.workspaceRelativePath,
+            );
+          },
+        }
+      : {}),
     resolveVoiceBlocks: async (blocks, catId) => {
       const { getVoiceBlockSynthesizer } = await import('../../domains/cats/services/tts/VoiceBlockSynthesizer.js');
       const synth = getVoiceBlockSynthesizer();

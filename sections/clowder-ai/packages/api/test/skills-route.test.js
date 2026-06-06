@@ -4,9 +4,8 @@
  */
 
 import assert from 'node:assert/strict';
-import { execFileSync } from 'node:child_process';
 import { mkdir, rm, symlink } from 'node:fs/promises';
-import { join } from 'node:path';
+import { join, resolve } from 'node:path';
 import { describe, it } from 'node:test';
 import Fastify from 'fastify';
 import { writeCapabilitiesConfig } from '../dist/config/capabilities/capability-orchestrator.js';
@@ -188,14 +187,7 @@ describe('Skills Route', () => {
     const projectDir = join('/tmp', `skills-route-test-fallback-project-${Date.now()}`);
     const homeDir = join('/tmp', `skills-route-test-fallback-home-${Date.now()}`);
     const prevHome = process.env.HOME;
-    const mainRepo = execFileSync('git', ['worktree', 'list', '--porcelain'], {
-      cwd: process.cwd(),
-      encoding: 'utf8',
-    })
-      .split('\n')[0]
-      .replace(/^worktree\s+/, '')
-      .trim();
-    const mainSkillsDir = join(mainRepo, 'cat-cafe-skills');
+    const mainSkillsDir = resolve(process.cwd(), '..', '..', 'cat-cafe-skills');
 
     await Promise.all([
       mkdir(projectDir, { recursive: true }),

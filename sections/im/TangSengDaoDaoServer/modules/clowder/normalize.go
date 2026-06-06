@@ -2,7 +2,6 @@ package clowder
 
 import (
 	"encoding/json"
-	"fmt"
 )
 
 const ConnectorID = "im-web"
@@ -66,7 +65,7 @@ func NormalizeInboundMessage(raw RawIMMessage) (InboundMessage, error) {
 
 	msg := InboundMessage{
 		ConnectorID:    ConnectorID,
-		ExternalChatID: fmt.Sprintf("%d:%s", raw.ChannelType, raw.ChannelID),
+		ExternalChatID: externalChatIDForUser(raw.ChannelID, raw.ChannelType, raw.FromUID),
 		ChannelID:      raw.ChannelID,
 		ChannelType:    raw.ChannelType,
 		ChatType:       chatType(raw.ChannelType),

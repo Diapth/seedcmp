@@ -2,9 +2,11 @@ export type GroupCatAutoReplyMode = 'off' | 'mentions_only' | 'soft_mentions';
 
 export type GroupCatAutoReplyReason =
   | 'explicit_mention'
+  | 'default_coordinator'
   | 'soft_cat_keyword'
   | 'soft_cat_name'
   | 'reply_to_cat'
+  | 'reply_to_coordinator'
   | 'ambiguous_cat_keyword'
   | 'auto_reply_disabled'
   | 'no_available_cats'
@@ -37,6 +39,7 @@ export interface ResolveGroupCatAutoReplyInput {
   mode: GroupCatAutoReplyMode;
   cats: GroupCatAutoReplyCat[];
   explicitTargetCatIds?: string[];
+  defaultTargetCatId?: string;
   focusedCatId?: string;
   lastActiveCatId?: string;
   replyTarget?: any;
@@ -72,6 +75,12 @@ function findAvailableCat(cats: GroupCatAutoReplyCat[], catId?: string) {
   return cats.find(cat => normalizeToken(cat.catId) === normalized && cat.available !== false);
 }
 
+function catMatchesToken(cat: GroupCatAutoReplyCat, value?: string) {
+  const normalized = normalizeToken(value || '');
+  if (!normalized) return false;
+  return catTokens(cat).some(token => normalizeToken(token) === normalized);
+}
+
 function catMentionedByName(text: string, cat: GroupCatAutoReplyCat) {
   return catTokens(cat)
     .map(token => token.replace(/^@/, '').trim())
@@ -79,11 +88,83 @@ function catMentionedByName(text: string, cat: GroupCatAutoReplyCat) {
     .some(token => text.includes(token));
 }
 
-function getReplyTargetCatId(replyTarget: any) {
+function getReplyTargetCatId(replyTarget: any, cats: GroupCatAutoReplyCat[]) {
   const content = replyTarget?.content || replyTarget?.payload || {};
-  const connectorId = content.connectorId || content.connector_id;
-  if (connectorId !== 'im-web') return '';
-  return String(content.catId || content.cat_id || '').trim();
+  const metadata = content.metadata || {};
+  const connectorId = content.connectorId || content.connector_id || metadata.connectorId || metadata.connector_id;
+  const explicit = String(
+    replyTarget?.catId ||
+    replyTarget?.cat_id ||
+    content.catId ||
+    content.cat_id ||
+    content.agentId ||
+    content.agent_id ||
+    metadata.catId ||
+    metadata.cat_id ||
+    metadata.agentId ||
+    metadata.agent_id ||
+    ''
+  ).trim();
+  if (explicit) return explicit;
+
+  const fromUID = String(replyTarget?.fromUID || replyTarget?.from_uid || replyTarget?.from || '').trim();
+  if (fromUID.startsWith('clowder_cat:')) return fromUID.slice('clowder_cat:'.length);
+  if (fromUID.startsWith('clowder_cat_')) return fromUID.slice('clowder_cat_'.length);
+  if (fromUID.startsWith('clowder:')) return fromUID.slice('clowder:'.length);
+
+  const displayName = String(
+    content.catDisplayName ||
+    content.cat_display_name ||
+    content.catName ||
+    content.cat_name ||
+    metadata.catDisplayName ||
+    metadata.cat_display_name ||
+    metadata.catName ||
+    metadata.cat_name ||
+    ''
+  ).trim();
+  const matchedByName = cats.find(cat => catMatchesToken(cat, displayName));
+  if (matchedByName) return matchedByName.catId;
+
+  if (connectorId === 'im-web' && displayName) return displayName;
+  return '';
+}
+
+function isCoordinatorReplyTarget(replyTarget: any, catId?: string) {
+  const content = replyTarget?.content || replyTarget?.payload || {};
+  const metadata = content.metadata || {};
+  const candidates = [
+    catId,
+    replyTarget?.targetType,
+    replyTarget?.senderType,
+    content.targetType,
+    content.target_type,
+    content.senderType,
+    content.sender_type,
+    content.catDisplayName,
+    content.cat_display_name,
+    content.catName,
+    content.cat_name,
+    metadata.targetType,
+    metadata.target_type,
+    metadata.senderType,
+    metadata.sender_type,
+    metadata.catDisplayName,
+    metadata.cat_display_name,
+    replyTarget?.fromUID,
+    replyTarget?.from_uid,
+    replyTarget?.from
+  ].map(value => normalizeToken(String(value || '')));
+  return candidates.some(value => [
+    'coordinator',
+    'pm',
+    '协调者',
+    '主agent',
+    '主代理',
+    'clowder:coordinator',
+    'clowder_cat:coordinator',
+    'clowder_cat_coordinator'
+  ].includes(value));
 }
 
 function decision(reason: GroupCatAutoReplyReason, targetCatIds: string[] = []): GroupCatAutoReplyDecision {
@@ -173,13 +254,23 @@ export function resolveGroupCatAutoReplyTrigger(input: ResolveGroupCatAutoReplyI
   }
 
   const cats = availableCats(input.cats || []);
-  if (cats.length === 0) {
-    return decision('no_available_cats');
+  const defaultTargetCatId = String(input.defaultTargetCatId || '').trim();
+  const replyTargetCatId = getReplyTargetCatId(input.replyTarget, cats);
+  if (isCoordinatorReplyTarget(input.replyTarget, replyTargetCatId) && defaultTargetCatId) {
+    return decision('reply_to_coordinator', [defaultTargetCatId]);
   }
 
-  const replyCat = findAvailableCat(cats, getReplyTargetCatId(input.replyTarget));
+  const replyCat = findAvailableCat(cats, replyTargetCatId);
   if (replyCat) {
     return decision('reply_to_cat', [replyCat.catId]);
+  }
+
+  if (input.mode === 'soft_mentions' && defaultTargetCatId) {
+    return decision('default_coordinator', [defaultTargetCatId]);
+  }
+
+  if (cats.length === 0) {
+    return decision('no_available_cats');
   }
 
   const text = String(input.text || '').trim();

@@ -9,20 +9,36 @@ import { z } from 'zod';
 import { resolveCatTarget } from '../domains/cats/services/agents/routing/cat-target-resolver.js';
 import type { ITaskStore } from '../domains/cats/services/stores/ports/TaskStore.js';
 import type { IThreadStore } from '../domains/cats/services/stores/ports/ThreadStore.js';
+import type { IMaomiWorkspaceStore } from '../domains/maomi-workspaces/MaomiWorkspaceStore.js';
+import type { IThreadWorkspaceBindingStore } from '../domains/maomi-workspaces/ThreadWorkspaceBindingStore.js';
 import type { SocketManager } from '../infrastructure/websocket/index.js';
 import { requireCallbackAuth } from './callback-auth-prehandler.js';
 import { deriveCallbackActor, resolveScopedThreadId } from './callback-scope-helpers.js';
+import { appendArtifactRef, findOrCreateArtifactTask, isSupportedArtifactKind, type ArtifactKind } from './thread-tasks.js';
 
 const updateTaskSchema = z.object({
   taskId: z.string().min(1),
   status: z.enum(['todo', 'doing', 'blocked', 'done']).optional(),
   why: z.string().max(1000).optional(),
+  dependsOn: z.array(z.string().min(1)).optional(),
+  artifactRefs: z.array(z.string().min(1)).optional(),
 });
 
 const createTaskSchema = z.object({
   title: z.string().min(1).max(200),
   why: z.string().max(1000).optional().default(''),
   ownerCatId: z.string().min(1).optional(),
+  coordinationId: z.string().min(1).optional(),
+  dependsOn: z.array(z.string().min(1)).optional(),
+  artifactRefs: z.array(z.string().min(1)).optional(),
+});
+
+const declareArtifactSchema = z.object({
+  path: z.string().min(1),
+  kind: z.enum(['code', 'doc', 'image', 'preview', 'file', 'patch', 'workspace', 'other']).optional().default('other'),
+  description: z.string().max(1000).optional(),
+  taskId: z.string().min(1).optional(),
+  coordinationId: z.string().min(1).optional(),
 });
 
 const listTasksQuerySchema = z.object({
@@ -38,9 +54,17 @@ export function registerCallbackTaskRoutes(
     taskStore: ITaskStore;
     socketManager: SocketManager;
     threadStore?: IThreadStore;
+    maomiWorkspaceStore?: IMaomiWorkspaceStore;
+    threadWorkspaceBindingStore?: IThreadWorkspaceBindingStore;
   },
 ): void {
-  const { taskStore, socketManager, threadStore } = deps;
+  const { taskStore, socketManager, threadStore, maomiWorkspaceStore, threadWorkspaceBindingStore } = deps;
+
+  async function resolveActiveWorkspace(threadId: string) {
+    const binding = threadWorkspaceBindingStore ? await threadWorkspaceBindingStore.get(threadId) : null;
+    if (!binding?.activeWorkspaceId || !maomiWorkspaceStore) return null;
+    return maomiWorkspaceStore.get(binding.activeWorkspaceId);
+  }
 
   app.post('/api/callbacks/update-task', async (request, reply) => {
     const record = requireCallbackAuth(request, reply);
@@ -53,7 +77,7 @@ export function registerCallbackTaskRoutes(
       return { error: 'Invalid request body', details: parsed.error.issues };
     }
 
-    const { taskId, status, why } = parsed.data;
+    const { taskId, status, why, dependsOn, artifactRefs } = parsed.data;
 
     const existing = await taskStore.get(taskId);
     if (!existing) {
@@ -72,6 +96,8 @@ export function registerCallbackTaskRoutes(
     const updateData: Record<string, unknown> = {};
     if (status) updateData.status = status;
     if (why) updateData.why = why;
+    if (dependsOn) updateData.dependsOn = dependsOn;
+    if (artifactRefs) updateData.artifactRefs = artifactRefs;
 
     const updated = await taskStore.update(taskId, updateData);
     if (!updated) {
@@ -95,7 +121,8 @@ export function registerCallbackTaskRoutes(
       return { error: 'Invalid request body', details: parsed.error.issues };
     }
 
-    const { title, why, ownerCatId } = parsed.data;
+    const { title, why, ownerCatId, coordinationId, dependsOn, artifactRefs } = parsed.data;
+    const activeWorkspace = await resolveActiveWorkspace(actor.threadId);
 
     // F182 AC-C2: B class — validate ownerCatId is available (contract 400 on disabled)
     let resolvedOwnerCatId: CatId | null = null;
@@ -117,11 +144,94 @@ export function registerCallbackTaskRoutes(
       subjectKey: null,
       ownerCatId: resolvedOwnerCatId,
       userId: actor.userId,
+      coordinationId,
+      dependsOn,
+      artifactRefs,
+      ...(activeWorkspace ? { workspaceId: activeWorkspace.id } : {}),
     });
+    if (activeWorkspace) {
+      await maomiWorkspaceStore?.linkTask(activeWorkspace.id, task.id);
+    }
 
     socketManager.broadcastToRoom(`thread:${task.threadId}`, 'task_created', task);
     reply.status(201);
     return { status: 'ok', task };
+  });
+
+  app.post('/api/callbacks/declare-artifact', async (request, reply) => {
+    const record = requireCallbackAuth(request, reply);
+    if (!record) return;
+    const actor = deriveCallbackActor(record);
+
+    const parsed = declareArtifactSchema.safeParse(request.body);
+    if (!parsed.success) {
+      reply.status(400);
+      return { error: 'Invalid request body', details: parsed.error.issues };
+    }
+
+    const { path, description, taskId, coordinationId } = parsed.data;
+    const kind = parsed.data.kind as ArtifactKind;
+    if (!isSupportedArtifactKind(kind)) {
+      reply.status(400);
+      return { error: 'Unsupported artifact kind' };
+    }
+
+    let task;
+    const activeWorkspace = await resolveActiveWorkspace(actor.threadId);
+    const workspaceRelativePath = activeWorkspace && !path.startsWith('/') ? path : undefined;
+    if (taskId) {
+      const existing = await taskStore.get(taskId);
+      if (!existing) {
+        reply.status(404);
+        return { error: 'Task not found' };
+      }
+      if (existing.threadId !== actor.threadId) {
+        reply.status(403);
+        return { error: 'Task belongs to a different thread' };
+      }
+      if (existing.ownerCatId && existing.ownerCatId !== actor.catId) {
+        reply.status(403);
+        return { error: 'Task is owned by another cat' };
+      }
+      const refs = appendArtifactRef(existing.artifactRefs, path, kind, description);
+      task = await taskStore.update(existing.id, {
+        artifactRefs: refs,
+        ...(description ? { why: description } : {}),
+        ...(activeWorkspace ? { workspaceId: activeWorkspace.id } : {}),
+        ...(workspaceRelativePath ? { workspaceRelativePath } : {}),
+      });
+    } else {
+      task = await findOrCreateArtifactTask(
+        taskStore,
+        actor.threadId,
+        actor.userId,
+        coordinationId,
+        actor.catId,
+        path,
+        kind,
+        description,
+        activeWorkspace?.id,
+        workspaceRelativePath,
+      );
+    }
+    if (!task) {
+      reply.status(500);
+      return { error: 'Failed to declare artifact' };
+    }
+    if (activeWorkspace) {
+      await maomiWorkspaceStore?.linkTask(activeWorkspace.id, task.id);
+    }
+
+    socketManager.broadcastToRoom(`thread:${task.threadId}`, 'artifact_declared', {
+      threadId: task.threadId,
+      taskId: task.id,
+      ownerCatId: actor.catId,
+      path,
+      kind,
+      description,
+    });
+    socketManager.broadcastToRoom(`thread:${task.threadId}`, 'task_updated', task);
+    return { status: 'ok', task, artifact: { path, kind, description, ownerCatId: actor.catId, taskId: task.id } };
   });
 
   app.get('/api/callbacks/list-tasks', async (request, reply) => {

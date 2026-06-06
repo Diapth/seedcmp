@@ -1,9 +1,9 @@
 /**
  * Auto-populate catRegistry for tests.
  *
- * Loads breeds from cat-template.json directly (no catalog overlay) so the
- * registry is deterministic regardless of stale .cat-cafe/cat-catalog.json
- * files that other tests may create during their run.
+ * Seeds an isolated temp project with the repo template plus a dedicated
+ * runtime catalog fixture, so the registry is deterministic regardless of
+ * stale .cat-cafe/cat-catalog.json files other tests may create.
  *
  * Also redirects CAT_TEMPLATE_PATH to an isolated temp copy so that
  * getCachedConfig() → loadCatConfig() (used by getRoster(), getReviewPolicy(),
@@ -21,20 +21,21 @@ import { catRegistry } from '@cat-cafe/shared';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const TEMPLATE_PATH = resolve(__dirname, '../../../../cat-template.json');
+const RUNTIME_CATALOG_FIXTURE_PATH = resolve(__dirname, '../fixtures/runtime-cat-catalog.json');
 
-// Redirect CAT_TEMPLATE_PATH to a temp directory that has no .cat-cafe/ subdir.
-// This ensures loadCatConfig() (called by getCachedConfig → getRoster, etc.)
-// never finds stale cat-catalog.json files created by tests like
-// cat-account-binding, even after _resetCachedConfig() clears the cache.
+// Redirect CAT_TEMPLATE_PATH to a temp directory with an isolated runtime
+// catalog. This keeps default loadCatConfig() deterministic for tests while
+// preserving the real runtime resolution path (template + sibling catalog).
 const tmpDir = resolve(process.env.TMPDIR ?? '/tmp', `cat-cafe-test-template-${process.pid}`);
 mkdirSync(tmpDir, { recursive: true });
 cpSync(TEMPLATE_PATH, resolve(tmpDir, 'cat-template.json'));
+mkdirSync(resolve(tmpDir, '.cat-cafe'), { recursive: true });
+cpSync(RUNTIME_CATALOG_FIXTURE_PATH, resolve(tmpDir, '.cat-cafe', 'cat-catalog.json'));
 process.env.CAT_TEMPLATE_PATH = resolve(tmpDir, 'cat-template.json');
 
 async function registerAllCats() {
   const { loadCatConfig, toAllCatConfigs } = await import('../../dist/config/cat-config-loader.js');
-  // Pass explicit path → reads ONLY cat-template.json, skips catalog overlay.
-  const allConfigs = toAllCatConfigs(loadCatConfig(TEMPLATE_PATH));
+  const allConfigs = toAllCatConfigs(loadCatConfig());
   for (const [id, config] of Object.entries(allConfigs)) {
     if (!catRegistry.has(id)) {
       catRegistry.register(id, config);

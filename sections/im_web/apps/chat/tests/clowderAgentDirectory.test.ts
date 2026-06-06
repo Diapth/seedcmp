@@ -56,6 +56,40 @@ describe('clowder agent directory store', () => {
     expect(store.getConversation('group-clowder', 2)?.agents).toEqual(directory.agents)
   })
 
+  it('deduplicates concurrent and immediate repeated agent directory loads', async () => {
+    const { useClowderStore } = await import('../../../packages/datasource-vue/src/stores/clowderStore.ts')
+    const store = useClowderStore()
+
+    let resolveDirectory!: (value: unknown) => void
+    get.mockReturnValueOnce(new Promise(resolve => {
+      resolveDirectory = resolve
+    }))
+
+    const first = store.loadAgentDirectory({ channelId: 'group-clowder', channelType: 2 })
+    const second = store.loadAgentDirectory({ channelId: 'group-clowder', channelType: 2 })
+
+    expect(get).toHaveBeenCalledTimes(1)
+
+    resolveDirectory({
+      agents: [
+        {
+          catId: 'codex',
+          displayName: 'Codex',
+          mentionPatterns: ['@codex'],
+          available: true
+        }
+      ]
+    })
+
+    const [firstDirectory, secondDirectory] = await Promise.all([first, second])
+    expect(firstDirectory.agents.map(agent => agent.catId)).toEqual(['codex'])
+    expect(secondDirectory).toBe(firstDirectory)
+
+    const cached = await store.loadAgentDirectory({ channelId: 'group-clowder', channelType: 2 })
+    expect(get).toHaveBeenCalledTimes(1)
+    expect(cached).toStrictEqual(firstDirectory)
+  })
+
   it('sets and clears focus through store actions while updating preferred agents', async () => {
     const { useClowderStore } = await import('../../../packages/datasource-vue/src/stores/clowderStore.ts')
     const store = useClowderStore()

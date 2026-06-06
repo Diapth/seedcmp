@@ -4,6 +4,7 @@ import { catRegistry } from '@cat-cafe/shared';
 import { ConnectorRouter } from '../dist/infrastructure/connectors/ConnectorRouter.js';
 import { MemoryConnectorThreadBindingStore } from '../dist/infrastructure/connectors/ConnectorThreadBindingStore.js';
 import { InboundMessageDedup } from '../dist/infrastructure/connectors/InboundMessageDedup.js';
+import { InMemoryCoordinatorStore } from '../dist/domains/cats/services/stores/ports/CoordinatorStore.js';
 
 function noopLog() {
   const noop = () => {};
@@ -122,6 +123,21 @@ function ensureMentionRegistry() {
       defaultModel: 'test-model',
       mcpSupport: false,
       roleDescription: 'test role',
+      personality: 'test personality',
+    });
+  }
+  if (!catRegistry.tryGet('coordinator')) {
+    catRegistry.register('coordinator', {
+      id: 'coordinator',
+      name: 'coordinator',
+      displayName: '协调者',
+      avatar: '/avatars/coordinator.png',
+      color: { primary: '#7c3aed', secondary: '#ede9fe' },
+      mentionPatterns: ['@coordinator', '@协调者', '@pm'],
+      provider: 'openai',
+      defaultModel: 'test-model',
+      mcpSupport: false,
+      roleDescription: '主 Agent / PM，负责需求拆解、任务分工、调度和聚合',
       personality: 'test personality',
     });
   }
@@ -289,6 +305,43 @@ describe('ConnectorRouter', () => {
     // Must NOT have flat legacy fields
     assert.equal(data.messageId, undefined, 'legacy messageId must not exist');
     assert.equal(data.connectorId, undefined, 'legacy connectorId must not exist');
+  });
+
+  it('persists a coordination record for IM Web group coordinator prompts', async () => {
+    const coordinatorStore = new InMemoryCoordinatorStore();
+    const routerWithCoordination = new ConnectorRouter({
+      bindingStore,
+      dedup: new InboundMessageDedup(),
+      messageStore,
+      threadStore,
+      invokeTrigger: trigger,
+      socketManager,
+      defaultUserId: 'owner-1',
+      defaultCatId: 'opus',
+      log: noopLog(),
+      coordinatorStore,
+    });
+
+    const result = await routerWithCoordination.route(
+      'im-web',
+      '2:phase1-group',
+      '@coordinator 请拆分咖啡店首页并准备部署，先给出分工。',
+      'ext-coord-1',
+      undefined,
+      { id: 'owner-1', name: 'Owner' },
+      'group',
+      'Phase1验收群',
+    );
+
+    assert.equal(result.kind, 'routed');
+    const records = await coordinatorStore.listByThread(result.threadId);
+    assert.equal(records.length, 1);
+    assert.equal(records[0].threadId, result.threadId);
+    assert.equal(records[0].sourceMessageId, result.messageId);
+    assert.equal(records[0].status, 'planning');
+    assert.equal(records[0].createdBy, 'owner-1');
+    assert.deepEqual(records[0].targetCatIds, ['coordinator']);
+    assert.ok(records[0].subtasks.some((subtask) => subtask.title.includes('需求拆解')));
   });
 
   describe('command interception', () => {
@@ -492,6 +545,38 @@ describe('ConnectorRouter', () => {
       // Hub thread should be persisted in binding
       const binding = bindingStore.getByExternal('feishu', 'chat-hub-1');
       assert.equal(binding.hubThreadId, result.threadId);
+    });
+
+    it('returns conversation threadId for IM Web commands and keeps Hub as diagnostic metadata', async () => {
+      bindingStore.bind('im-web', '1:direct-chat', 'thread-old', 'owner-1');
+      const ctxRouter = new ConnectorRouter({
+        bindingStore,
+        dedup: new InboundMessageDedup(),
+        messageStore,
+        threadStore,
+        invokeTrigger: cmdTrigger,
+        socketManager,
+        defaultUserId: 'owner-1',
+        defaultCatId: 'opus',
+        log: noopLog(),
+        commandLayer: mockCommandLayer({
+          '/new': {
+            kind: 'new',
+            response: 'Created',
+            newActiveThreadId: 'thread-conversation-new',
+            contextThreadId: 'thread-conversation-new',
+          },
+        }),
+        adapters: new Map([['im-web', mockAdapter()]]),
+      });
+
+      const result = await ctxRouter.route('im-web', '1:direct-chat', '/new Wedding', 'ext-im-new-1');
+
+      assert.equal(result.kind, 'command');
+      assert.equal(result.threadId, 'thread-conversation-new');
+      assert.ok(result.hubThreadId);
+      assert.notEqual(result.hubThreadId, result.threadId);
+      assert.equal(bindingStore.getByExternal('im-web', '1:direct-chat').hubThreadId, result.hubThreadId);
     });
 
     it('broadcasts command exchange to Hub thread WebSocket (ISSUE-8 8A)', async () => {

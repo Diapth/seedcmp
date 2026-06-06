@@ -31,8 +31,18 @@ vi.mock('@/stores/taskStore', () => ({
 }));
 
 vi.mock('@/stores/chatStore', () => ({
-  useChatStore: (selector: (s: { currentThreadId: string | null }) => unknown) =>
-    selector({ currentThreadId: 'thread-1' }),
+  useChatStore: (
+    selector: (s: {
+      currentThreadId: string | null;
+      setWorkspaceOpenFile: (path: string, line: number | null, worktree?: string, threadId?: string | null) => void;
+      setWorkspaceMode: (mode: string) => void;
+    }) => unknown,
+  ) =>
+    selector({
+      currentThreadId: 'thread-1',
+      setWorkspaceOpenFile: vi.fn(),
+      setWorkspaceMode: vi.fn(),
+    }),
 }));
 
 vi.mock('../TaskComposer', () => ({
@@ -82,6 +92,34 @@ describe('TaskBoardPanel', () => {
     const { TaskBoardPanel } = await import('../TaskBoardPanel');
     const html = renderToStaticMarkup(<TaskBoardPanel />);
     expect(html).toContain('毛线球');
+  });
+
+  it('groups coordinated tasks in the collaboration overview', async () => {
+    mockTasks = [
+      ...makeTasks(),
+      {
+        ...makeTasks()[0],
+        id: 'pm-1',
+        title: 'PM plan',
+        coordinationId: 'coord-demo-123456',
+        artifactRefs: ['docs/demo.md'],
+        ownerCatId: 'coordinator' as TaskItem['ownerCatId'],
+      },
+      {
+        ...makeTasks()[1],
+        id: 'pm-2',
+        title: 'Build preview',
+        coordinationId: 'coord-demo-123456',
+        dependsOn: ['pm-1'],
+        ownerCatId: 'codex' as TaskItem['ownerCatId'],
+      },
+    ];
+    const { TaskBoardPanel } = await import('../TaskBoardPanel');
+    const html = renderToStaticMarkup(<TaskBoardPanel />);
+    expect(html).toContain('协作');
+    expect(html).toContain('PM plan');
+    expect(html).toContain('@coordinator');
+    expect(html).toContain('产物');
   });
 
   it('renders blocked section with red highlight', async () => {

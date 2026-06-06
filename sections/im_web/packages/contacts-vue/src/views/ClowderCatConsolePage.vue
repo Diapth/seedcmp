@@ -1,17 +1,21 @@
 <script setup lang="ts">
-import { computed, onMounted, reactive, ref } from 'vue';
+import { computed, onMounted, reactive, ref, watch } from 'vue';
 import { useRouter } from 'vue-router';
-import { ChannelAvatar } from '@tsdaodao/base-vue';
+import { AppDialog, ChannelAvatar } from '@tsdaodao/base-vue';
 import { useClowderStore, type ClowderCatContact } from '@tsdaodao/datasource-vue';
 
 const router = useRouter();
 const clowderStore = useClowderStore();
 const searchQuery = ref('');
 const feedback = ref('');
+const pendingDeleteCat = ref<ClowderCatContact | null>(null);
+const deleteConfirmInput = ref('');
+const deleteLoading = ref(false);
 
 const form = reactive({
   name: '',
   alias: '',
+  roleTemplateId: '',
   clientId: '' as '' | 'openai' | 'anthropic',
   authType: '' as '' | 'api_key' | 'oauth',
   accountRef: '',
@@ -20,14 +24,72 @@ const form = reactive({
   capabilitiesText: ''
 });
 
+const roleTemplateOptions = computed(() => clowderStore.catRoleTemplates);
+
+const selectedRoleTemplate = computed(() =>
+  roleTemplateOptions.value.find(template => template.roleTemplateId === form.roleTemplateId)
+);
+
+const modelOptions = computed(() => form.clientId
+  ? clowderStore.platformModelOptions[form.clientId] || []
+  : []);
+
+const recommendedModel = computed(() =>
+  modelOptions.value.find(model => model.default && !model.disabled)?.id ||
+  modelOptions.value.find(model => !model.disabled)?.id ||
+  '');
+
+const isOAuthAuth = computed(() => form.authType === 'oauth');
+
+const defaultOAuthAccountRef = computed(() => {
+  if (form.clientId === 'openai') return 'codex';
+  if (form.clientId === 'anthropic') return 'claude';
+  return '';
+});
+
+const selectedOAuthProvider = computed<'' | 'codex' | 'claude'>(() => {
+  if (form.clientId === 'openai') return 'codex';
+  if (form.clientId === 'anthropic') return 'claude';
+  return '';
+});
+
+const selectedProviderSkills = computed(() => {
+  const provider = selectedOAuthProvider.value;
+  return provider ? clowderStore.catSkillCatalog[provider] || [] : [];
+});
+
+const selectedOAuthConfig = computed(() => {
+  const provider = selectedOAuthProvider.value;
+  return provider ? clowderStore.localOAuthCapabilities[provider] : undefined;
+});
+
+const oauthConfigMissing = computed(() =>
+  isOAuthAuth.value &&
+  form.clientId !== '' &&
+  selectedOAuthConfig.value !== undefined &&
+  selectedOAuthConfig.value.authConfigured === false
+);
+
+const oauthProbeReady = computed(() =>
+  !isOAuthAuth.value ||
+  form.clientId === '' ||
+  (selectedOAuthConfig.value !== undefined && !clowderStore.localOAuthLoading)
+);
+
+const resolvedAccountRef = computed(() =>
+  isOAuthAuth.value ? defaultOAuthAccountRef.value : form.accountRef.trim()
+);
+
 const canCreate = computed(() => form.name.trim().length > 0 &&
   form.clientId !== '' &&
   form.authType !== '' &&
-  form.accountRef.trim().length > 0);
+  resolvedAccountRef.value.length > 0 &&
+  oauthProbeReady.value &&
+  !oauthConfigMissing.value);
 
 const availableCats = computed(() => {
   const query = searchQuery.value.trim().toLowerCase();
-  const cats = clowderStore.catContactDirectory;
+  const cats = clowderStore.catContactDirectory.filter(cat => cat.connected);
   if (!query) return cats;
   return cats.filter(cat => [
     cat.displayName,
@@ -38,8 +100,29 @@ const availableCats = computed(() => {
   ].some(value => String(value || '').toLowerCase().includes(query)));
 });
 
+const deleteConfirmMatches = computed(() => {
+  const cat = pendingDeleteCat.value;
+  if (!cat) return false;
+  const input = deleteConfirmInput.value.trim().toLowerCase();
+  return input === cat.catId.toLowerCase() || input === cat.displayName.toLowerCase();
+});
+
 onMounted(() => {
   loadDirectory();
+});
+
+watch(() => form.clientId, () => {
+  applyRecommendedModel();
+  loadLocalOAuthCapabilities();
+});
+
+watch(() => form.authType, () => {
+  applyRecommendedModel();
+  loadLocalOAuthCapabilities();
+});
+
+watch(modelOptions, () => {
+  applyRecommendedModel();
 });
 
 async function loadDirectory() {
@@ -55,6 +138,7 @@ async function loadDirectory() {
 function resetForm() {
   form.name = '';
   form.alias = '';
+  form.roleTemplateId = '';
   form.clientId = '';
   form.authType = '';
   form.accountRef = '';
@@ -64,17 +148,96 @@ function resetForm() {
   feedback.value = '';
 }
 
+function applyRecommendedModel() {
+  if (!form.clientId || isOAuthAuth.value) {
+    form.defaultModel = '';
+    return;
+  }
+  const current = modelOptions.value.find(model => model.id === form.defaultModel);
+  if (!current || current.disabled) {
+    form.defaultModel = recommendedModel.value;
+  }
+}
+
+function applyRoleTemplate() {
+  const template = selectedRoleTemplate.value;
+  if (!template) return;
+  if (!form.personality.trim()) form.personality = template.personalitySummary || '';
+  if (!form.capabilitiesText.trim()) form.capabilitiesText = template.capabilitySummary || '';
+}
+
+function oauthProviderLabel() {
+  if (selectedOAuthProvider.value === 'codex') return 'Codex';
+  if (selectedOAuthProvider.value === 'claude') return 'Claude Code';
+  return 'CLI';
+}
+
+function oauthLoginCommand() {
+  if (selectedOAuthProvider.value === 'codex') return 'codex login';
+  if (selectedOAuthProvider.value === 'claude') return 'claude login';
+  return 'CLI login';
+}
+
+function oauthStatusText() {
+  if (clowderStore.localOAuthLoading) return '正在检查本机 CLI 配置';
+  if (clowderStore.localOAuthError) return clowderStore.localOAuthError;
+  const config = selectedOAuthConfig.value;
+  if (!config) return '尚未完成本机配置检查';
+  if (config.authConfigured) return `已检测到 ${oauthProviderLabel()} 本机登录，创建时使用 CLI 默认配置`;
+  return config.diagnostics?.[0] || `未检测到本机登录，请先运行 ${oauthLoginCommand()}`;
+}
+
+function oauthConfigDetail() {
+  const config = selectedOAuthConfig.value;
+  if (!config || !config.authConfigured) return '';
+  return [
+    config.profile ? `配置档：${config.profile}` : '',
+    config.defaultModel ? `CLI 默认模型：${config.defaultModel}` : ''
+  ].filter(Boolean).join(' · ');
+}
+
+async function loadLocalOAuthCapabilities() {
+  if (!isOAuthAuth.value || !form.clientId) return;
+  await clowderStore.loadLocalOAuthCapabilities().catch(error => {
+    feedback.value = error instanceof Error ? error.message : '本机 OAuth 配置检查失败';
+  });
+}
+
 function openCat(cat: ClowderCatContact) {
   router.push(`/chat/conversation/${cat.directConversationId}/1`);
 }
 
-async function connectCat(cat: ClowderCatContact) {
+function requestDeleteCat(cat: ClowderCatContact) {
+  pendingDeleteCat.value = cat;
+  deleteConfirmInput.value = '';
   feedback.value = '';
-  const connected = await clowderStore.connectExistingCat(cat.catId).catch(error => {
-    feedback.value = error instanceof Error ? error.message : '添加猫猫联系人失败';
-    return undefined;
-  });
-  if (connected) openCat(connected);
+}
+
+function closeDeleteDialog() {
+  if (deleteLoading.value) return;
+  pendingDeleteCat.value = null;
+  deleteConfirmInput.value = '';
+}
+
+async function confirmDeleteCat() {
+  const cat = pendingDeleteCat.value;
+  if (!cat) return;
+  if (!deleteConfirmMatches.value) {
+    feedback.value = `请输入 ${cat.displayName} 或 ${cat.catId} 确认删除`;
+    return;
+  }
+  deleteLoading.value = true;
+  feedback.value = '';
+  try {
+    await clowderStore.deleteCatContact(cat.catId);
+    feedback.value = `已删除 ${cat.displayName}`;
+    pendingDeleteCat.value = null;
+    deleteConfirmInput.value = '';
+  } catch (error) {
+    feedback.value = error instanceof Error ? error.message : '删除猫猫失败';
+  } finally {
+    deleteLoading.value = false;
+  }
 }
 
 async function createCatAndConnect() {
@@ -90,10 +253,11 @@ async function createCatAndConnect() {
   const cat = await clowderStore.createCatAndConnect({
     name: form.name.trim(),
     alias: form.alias.trim() || undefined,
+    roleTemplateId: form.roleTemplateId || undefined,
     clientId,
     authType,
-    accountRef: form.accountRef.trim(),
-    defaultModel: form.defaultModel.trim() || undefined,
+    accountRef: resolvedAccountRef.value,
+    ...(!isOAuthAuth.value ? { defaultModel: form.defaultModel.trim() || undefined } : {}),
     personality: form.personality.trim() || undefined,
     capabilities: capabilities.length > 0 ? capabilities : undefined
   }).catch(error => {
@@ -131,6 +295,25 @@ function back() {
       <section class="console-section">
         <div class="section-title">猫猫设置</div>
         <label class="field">
+          <span>角色模板</span>
+          <select v-model="form.roleTemplateId" @change="applyRoleTemplate">
+            <option value="">选择 roleTemplates 角色模板</option>
+            <option
+              v-for="template in roleTemplateOptions"
+              :key="template.roleTemplateId"
+              :value="template.roleTemplateId"
+              :disabled="template.cloneable === false"
+            >
+              {{ template.displayName }} · {{ template.capabilitySummary || template.catId }}
+            </option>
+          </select>
+        </label>
+        <div v-if="selectedRoleTemplate" class="template-preview">
+          <span class="template-name">{{ selectedRoleTemplate.displayName }}</span>
+          <span>{{ selectedRoleTemplate.personalitySummary || '未声明性格设定' }}</span>
+          <span class="muted">{{ selectedRoleTemplate.capabilitySummary || '未声明能力标签' }}</span>
+        </div>
+        <label class="field">
           <span>名称</span>
           <input v-model="form.name" placeholder="例如：代码助手" />
         </label>
@@ -146,6 +329,24 @@ function back() {
             <option value="anthropic">Claude Code</option>
           </select>
         </label>
+        <div v-if="form.clientId" class="skill-preview">
+          <div class="skill-preview-title">
+            <span>{{ oauthProviderLabel() }} Skills</span>
+            <span class="skill-count">{{ selectedProviderSkills.length }}</span>
+          </div>
+          <div v-if="selectedProviderSkills.length > 0" class="skill-list">
+            <div
+              v-for="skill in selectedProviderSkills"
+              :key="skill.name"
+              class="skill-row"
+              :title="skill.description || skill.trigger || skill.category || skill.name"
+            >
+              <span class="skill-name">{{ skill.name }}</span>
+              <span class="skill-category">{{ skill.category || 'Skill' }}</span>
+            </div>
+          </div>
+          <span v-else class="muted">暂无已挂载 skill</span>
+        </div>
         <label class="field">
           <span>添加方式</span>
           <select v-model="form.authType">
@@ -154,16 +355,43 @@ function back() {
             <option value="oauth">OAuth 账号</option>
           </select>
         </label>
-        <label class="field">
+        <div
+          v-if="isOAuthAuth && form.clientId"
+          class="oauth-status"
+          :class="{ ready: selectedOAuthConfig?.authConfigured, missing: selectedOAuthConfig && !selectedOAuthConfig.authConfigured }"
+        >
+          <div class="oauth-status-title">
+            <span>{{ oauthProviderLabel() }} 本机 OAuth</span>
+            <span class="oauth-status-badge">
+              {{ selectedOAuthConfig?.authConfigured ? '已配置' : clowderStore.localOAuthLoading ? '检查中' : '需登录' }}
+            </span>
+          </div>
+          <span>{{ oauthStatusText() }}</span>
+          <span v-if="oauthConfigDetail()" class="muted">{{ oauthConfigDetail() }}</span>
+        </div>
+        <label v-if="!isOAuthAuth" class="field">
           <span>账号引用</span>
           <input
             v-model="form.accountRef"
-            :placeholder="form.authType === 'oauth' ? '例如：codex / claude' : '例如：openai-prod / anthropic-prod'"
+            placeholder="例如：openai-prod / anthropic-prod"
           />
         </label>
-        <label v-if="form.authType === 'api_key'" class="field">
+        <label v-if="form.clientId && !isOAuthAuth && modelOptions.length > 0" class="field">
           <span>默认模型</span>
-          <input v-model="form.defaultModel" placeholder="API Key 账号需要时填写，例如 gpt-4.1 或 claude-sonnet-4" />
+          <select v-model="form.defaultModel">
+            <option
+              v-for="model in modelOptions"
+              :key="model.id"
+              :value="model.id"
+              :disabled="model.disabled"
+            >
+              {{ model.label }}{{ model.default ? ' · 推荐' : '' }}{{ model.disabledReason ? ` · ${model.disabledReason}` : '' }}
+            </option>
+          </select>
+        </label>
+        <label v-else-if="form.clientId && !isOAuthAuth" class="field">
+          <span>默认模型</span>
+          <input v-model="form.defaultModel" placeholder="例如：gpt-5.4 或 claude-sonnet-4-6" />
         </label>
         <label class="field">
           <span>性格设定</span>
@@ -200,7 +428,7 @@ function back() {
           />
         </label>
         <div v-if="availableCats.length === 0" class="empty-state">
-          暂无可连接猫猫
+          暂无猫猫联系人
         </div>
         <div v-else class="cat-list">
           <div v-for="cat in availableCats" :key="cat.id" class="cat-row" :class="{ unavailable: !cat.available }">
@@ -216,25 +444,40 @@ function back() {
               <span class="cat-summary">{{ cat.personalitySummary || 'Clowder 联系人' }}</span>
               <span class="cat-summary muted">{{ cat.capabilitySummary || '暂未声明能力' }}</span>
             </div>
-            <button
-              v-if="cat.connected"
-              class="secondary-btn compact"
-              @click="openCat(cat)"
-            >
-              打开会话
-            </button>
-            <button
-              v-else
-              class="primary-btn compact"
-              :disabled="!cat.available || clowderStore.loading"
-              @click="connectCat(cat)"
-            >
-              添加到联系人
-            </button>
+            <div v-if="cat.connected" class="cat-actions">
+              <button
+                class="secondary-btn compact"
+                :disabled="deleteLoading || clowderStore.loading"
+                @click="openCat(cat)"
+              >
+                打开会话
+              </button>
+              <button
+                class="danger-btn compact"
+                :disabled="deleteLoading || clowderStore.loading"
+                @click="requestDeleteCat(cat)"
+              >
+                删除
+              </button>
+            </div>
           </div>
         </div>
       </section>
     </div>
+
+    <AppDialog
+      :visible="!!pendingDeleteCat"
+      title="删除猫猫"
+      :message="pendingDeleteCat ? `确认彻底删除 ${pendingDeleteCat.displayName}？历史消息会保留，但这只猫猫将不再作为联系人、群成员或 @ 路由目标出现。` : ''"
+      mode="input"
+      v-model="deleteConfirmInput"
+      :placeholder="pendingDeleteCat ? `输入 ${pendingDeleteCat.displayName} 或 ${pendingDeleteCat.catId}` : ''"
+      confirm-text="删除"
+      danger
+      :loading="deleteLoading"
+      @confirm="confirmDeleteCat"
+      @close="closeDeleteDialog"
+    />
   </div>
 </template>
 
@@ -335,6 +578,149 @@ function back() {
   font-size: 12px;
 }
 
+.template-preview {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  margin: -4px 0 12px;
+  padding: 10px;
+  border: var(--border-hairline);
+  border-radius: var(--radius-sm);
+  background-color: var(--bg-secondary);
+  color: var(--text-secondary);
+  font-size: 12px;
+  line-height: 1.45;
+}
+
+.template-name {
+  color: var(--text-primary);
+  font-weight: 600;
+}
+
+.skill-preview {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin: -2px 0 12px;
+  padding: 10px;
+  border: var(--border-hairline);
+  border-radius: var(--radius-sm);
+  background-color: var(--bg-secondary);
+}
+
+.skill-preview-title {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  color: var(--text-primary);
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.skill-count {
+  flex-shrink: 0;
+  min-width: 20px;
+  height: 18px;
+  border-radius: var(--radius-sm);
+  background-color: rgba(22, 93, 255, 0.08);
+  color: var(--primary-color, #165dff);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 10px;
+}
+
+.skill-list {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  max-height: 176px;
+  overflow: auto;
+}
+
+.skill-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(72px, 128px);
+  gap: 8px;
+  align-items: center;
+  min-height: 26px;
+  color: var(--text-secondary);
+  font-size: 12px;
+}
+
+.skill-name,
+.skill-category {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.skill-name {
+  color: var(--text-primary);
+  font-weight: 600;
+}
+
+.skill-category {
+  text-align: right;
+  color: var(--text-tertiary, var(--text-secondary));
+}
+
+.oauth-status {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+  margin: -2px 0 12px;
+  padding: 10px;
+  border: var(--border-hairline);
+  border-radius: var(--radius-sm);
+  background-color: var(--bg-secondary);
+  color: var(--text-secondary);
+  font-size: 12px;
+  line-height: 1.45;
+}
+
+.oauth-status.ready {
+  border-color: rgba(15, 118, 110, 0.25);
+}
+
+.oauth-status.missing {
+  border-color: rgba(161, 98, 7, 0.28);
+}
+
+.oauth-status-title {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  color: var(--text-primary);
+  font-weight: 600;
+}
+
+.oauth-status-badge {
+  flex-shrink: 0;
+  border-radius: var(--radius-sm);
+  padding: 1px 5px;
+  background-color: rgba(22, 93, 255, 0.08);
+  color: var(--primary-color, #165dff);
+  font-size: 10px;
+}
+
+.oauth-status.missing .oauth-status-badge {
+  background-color: rgba(161, 98, 7, 0.1);
+  color: #a16207;
+}
+
+.oauth-status.ready .oauth-status-badge {
+  background-color: rgba(15, 118, 110, 0.1);
+  color: #0f766e;
+}
+
+.muted {
+  color: var(--text-tertiary, var(--text-secondary));
+}
+
 .form-actions {
   display: flex;
   justify-content: flex-end;
@@ -378,6 +764,26 @@ function back() {
   height: 28px;
   padding: 0 10px;
   white-space: nowrap;
+}
+
+.cat-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.danger-btn {
+  border: none;
+  border-radius: var(--radius-sm);
+  background-color: #cf1322;
+  color: #ffffff;
+  cursor: pointer;
+  font-size: 13px;
+}
+
+.danger-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
 }
 
 .icon-btn {

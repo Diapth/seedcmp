@@ -72,3 +72,27 @@ export interface ClowderStreamEnvelope {
   content?: string;
   final?: boolean;
 }
+
+/**
+ * Mirror of `CoordinatorKickoff` in `packages/shared/src/types/coordination.ts`
+ * (sections/clowder-ai). One record per coordinationId, surfaced as a
+ * "Create Project Group Chat?" card. im_web and clowder-ai are separate
+ * submodules so we mirror the type rather than import across the boundary.
+ */
+export interface CoordinatorKickoff {
+  coordinationId: string;
+  messageId: string;
+  suggestedCats: readonly string[];
+  reason?: string;
+  workspaceProposal?: {
+    displayName: string;
+    slug: string;
+    rootPath: string;
+    relativePath: string;
+    sourceIntent: string;
+    confidence: number;
+    collision?: 'none' | 'existing_active' | 'existing_archived' | 'slug_taken';
+    existingWorkspaceId?: string;
+  };
+  createdAt: number;
+}

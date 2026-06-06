@@ -124,4 +124,110 @@ describe('im-web agent directory route', () => {
       ],
     );
   });
+
+  it('falls back to the global candidate directory when the bound thread belongs to another user', async () => {
+    const { threadStore, bindingStore } = createApp();
+    const { threadCatsRoutes } = await import('../dist/routes/thread-cats.js');
+    app = Fastify();
+    await app.register(threadCatsRoutes, {
+      threadStore,
+      bindingStore,
+      agentRegistry: { getAllEntries: () => new Map([['codex', {}]]) },
+      getCatDisplayName: (catId) => (catId === 'codex' ? 'Codex' : 'Opus'),
+      getAllCatIds: () => ['codex'],
+      isCatAvailable: () => true,
+      getDirectoryAgents: () => [
+        {
+          catId: 'codex',
+          displayName: 'Codex',
+          mentionPatterns: ['@codex'],
+          source: 'existing',
+        },
+        {
+          catId: 'opus',
+          displayName: '布偶猫',
+          mentionPatterns: ['@opus', '@布偶猫'],
+          source: 'disconnected',
+        },
+      ],
+    });
+    await app.ready();
+
+    const res = await app.inject({
+      method: 'GET',
+      url: '/api/connectors/im-web/agents?externalChatId=2%3Agroup-clowder',
+      headers: { 'x-cat-cafe-user': 'other-user' },
+    });
+
+    assert.equal(res.statusCode, 200);
+    const body = JSON.parse(res.body);
+    assert.equal(body.threadId, null);
+    assert.equal(body.permissionDenied, true);
+    assert.deepEqual(
+      body.agents.map((agent) => ({
+        catId: agent.catId,
+        displayName: agent.displayName,
+        available: agent.available,
+        source: agent.source,
+      })),
+      [
+        { catId: 'codex', displayName: 'Codex', available: true, source: 'existing' },
+        { catId: 'opus', displayName: '布偶猫', available: false, source: 'disconnected' },
+      ],
+    );
+  });
+
+  it('returns template candidate families even when the runtime cat registry is empty', async () => {
+    const { threadStore, bindingStore } = createApp();
+    const { threadCatsRoutes } = await import('../dist/routes/thread-cats.js');
+    app = Fastify();
+    await app.register(threadCatsRoutes, {
+      threadStore,
+      bindingStore,
+      agentRegistry: { getAllEntries: () => new Map() },
+      getCatDisplayName: (catId) => catId,
+      getAllCatIds: () => [],
+      isCatAvailable: () => true,
+      getDirectoryAgents: () => [
+        {
+          catId: 'opus',
+          displayName: '布偶猫',
+          mentionPatterns: ['@opus', '@布偶猫'],
+          personalitySummary: '温柔但有主见',
+          capabilitySummary: '架构设计',
+          source: 'disconnected',
+        },
+        {
+          catId: 'codex',
+          displayName: 'Codex',
+          mentionPatterns: ['@codex'],
+          personalitySummary: '严谨认真',
+          capabilitySummary: 'Review',
+          source: 'disconnected',
+        },
+      ],
+    });
+    await app.ready();
+
+    const res = await app.inject({
+      method: 'GET',
+      url: '/api/connectors/im-web/agents?externalChatId=1%3Aclowder_ai',
+      headers: { 'x-cat-cafe-user': 'owner-1' },
+    });
+
+    assert.equal(res.statusCode, 200);
+    const body = JSON.parse(res.body);
+    assert.deepEqual(
+      body.agents.map((agent) => ({
+        catId: agent.catId,
+        displayName: agent.displayName,
+        available: agent.available,
+        source: agent.source,
+      })),
+      [
+        { catId: 'opus', displayName: '布偶猫', available: false, source: 'disconnected' },
+        { catId: 'codex', displayName: 'Codex', available: false, source: 'disconnected' },
+      ],
+    );
+  });
 });

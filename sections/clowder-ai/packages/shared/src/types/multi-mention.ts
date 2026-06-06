@@ -33,6 +33,7 @@ export interface MultiMentionRequest {
   readonly question: string;
   readonly context?: string;
   readonly idempotencyKey?: string;
+  readonly coordinationId?: string;
   readonly timeoutMinutes: number;
   status: MultiMentionStatus;
   readonly createdAt: number;

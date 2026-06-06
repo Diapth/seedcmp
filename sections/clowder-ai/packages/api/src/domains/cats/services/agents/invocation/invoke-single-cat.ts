@@ -12,7 +12,7 @@
 import { execFileSync } from 'node:child_process';
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { rm } from 'node:fs/promises';
-import { dirname, resolve } from 'node:path';
+import { dirname, join, resolve } from 'node:path';
 import { type CatId, type ContextHealth, catRegistry, type MessageContent, type SessionRecord } from '@cat-cafe/shared';
 import { context, SpanStatusCode, trace } from '@opentelemetry/api';
 import {
@@ -23,6 +23,7 @@ import {
 import { resolveBoundAccountRefForCat } from '../../../../../config/cat-account-binding.js';
 import { isSessionChainEnabled } from '../../../../../config/cat-config-loader.js';
 import { getContextWindowFallback } from '../../../../../config/context-window-sizes.js';
+import { ensureProviderHomeSkillsSynced } from '../../../../../config/governance/provider-home-skill-sync.js';
 import { getSessionStrategy, shouldTakeAction } from '../../../../../config/session-strategy.js';
 import { assertSafeTestConfigRoot } from '../../../../../config/test-config-write-guard.js';
 import { capturePromptIfEnabled } from '../../../../../infrastructure/debug/prompt-capture-bridge.js';
@@ -60,10 +61,18 @@ import { resolveCliCommand } from '../../../../../utils/cli-resolve.js';
 import { DEFAULT_CLI_TIMEOUT_MS, resolveCliTimeoutMs } from '../../../../../utils/cli-timeout.js';
 import { findMonorepoRoot, isSameProject } from '../../../../../utils/monorepo-root.js';
 import { isUnderAllowedRoot } from '../../../../../utils/project-path.js';
+import { resolveMainRepoPath } from '../../../../../utils/skill-mount.js';
 import { tcpProbe } from '../../../../../utils/tcp-probe.js';
+import type { IRuntimeWorkspaceStore, RuntimeWorkspaceRecord } from '../../../../runtime-workspaces/RuntimeWorkspaceStore.js';
+import {
+  buildAllowedWorkspaceDirs,
+  type ProjectRuntimeRoot,
+  resolveProjectRuntimeRoot,
+} from '../../../../runtime-workspaces/project-runtime-root.js';
 import type { AgentPaneRegistry } from '../../../../terminal/agent-pane-registry.js';
 import type { TmuxGateway } from '../../../../terminal/tmux-gateway.js';
 import { resolveBootcampWorkspaceRoot } from '../../bootcamp/workspace-root.js';
+import { resolveMaomiWorkspaceRoot } from '../../../../maomi-workspaces/workspace-root.js';
 import { createPromptDigest } from '../../context/prompt-digest.js';
 import { AuditEventTypes, getEventAuditLog } from '../../orchestration/EventAuditLog.js';
 import { resolveDefaultClaudeMcpServerPath } from '../providers/ClaudeAgentService.js';
@@ -335,6 +344,12 @@ export interface InvocationDeps {
   readonly sessionChainStore?: ISessionChainStore;
   /** F211 Phase A2: runtime sidecar for provider runtime session metadata. */
   readonly runtimeSessionStore?: IRuntimeSessionStore;
+  /** V3-32: project-scoped runtime/workspace metadata ledger. */
+  readonly runtimeWorkspaceStore?: IRuntimeWorkspaceStore;
+  /** V3-37: user-visible Maomi project workspaces. */
+  readonly maomiWorkspaceStore?: import('../../../../maomi-workspaces/MaomiWorkspaceStore.js').IMaomiWorkspaceStore;
+  /** V3-37: active workspace binding per thread. */
+  readonly threadWorkspaceBindingStore?: import('../../../../maomi-workspaces/ThreadWorkspaceBindingStore.js').IThreadWorkspaceBindingStore;
   /** F24 Phase B: Session sealer for auto-seal when context threshold reached */
   readonly sessionSealer?: ISessionSealer;
   /** F24 Phase C: Transcript writer for event collection + flush on seal */
@@ -483,7 +498,21 @@ export async function* invokeSingleCat(deps: InvocationDeps, params: InvocationP
   let didComplete = false;
   let didResetRestoreFailures = false;
   let openCodeRuntimeConfigPath: string | undefined;
-  const hostProjectRoot = findMonorepoRoot(process.cwd());
+  const hostProjectRoot = await resolveMainRepoPath();
+  try {
+    const skillsSource = resolve(hostProjectRoot, 'cat-cafe-skills');
+    if (existsSync(resolve(skillsSource, 'manifest.yaml'))) {
+      const result = await ensureProviderHomeSkillsSynced(skillsSource);
+      if (result.skippedExisting.length > 0) {
+        log.warn(
+          { skippedExisting: result.skippedExisting, providerDirs: result.providerDirs },
+          'provider HOME skill sync skipped existing user skill paths',
+        );
+      }
+    }
+  } catch (err) {
+    log.warn({ err, hostProjectRoot }, 'provider HOME skill sync failed');
+  }
 
   // === CAT_INVOKED 审计 (fire-and-forget, 缅因猫 review P2-3) ===
   auditLog
@@ -739,12 +768,28 @@ export async function* invokeSingleCat(deps: InvocationDeps, params: InvocationP
 
     // Resolve workingDirectory from thread's projectPath
     let workingDirectory: string | undefined;
+    let activeMaomiWorkspace:
+      | import('../../../../maomi-workspaces/MaomiWorkspaceStore.js').MaomiWorkspace
+      | null = null;
     let bootcampWorkspaceError: Error | undefined;
     if (threadStore) {
       try {
         const thread = await preflightRace(Promise.resolve(threadStore.get(threadId)), 'threadStore.get', signal);
         if (thread?.createdAt) threadCreatedAt = thread.createdAt;
-        if (thread?.projectPath && thread.projectPath !== 'default') {
+        const binding = deps.threadWorkspaceBindingStore
+          ? await preflightRace(Promise.resolve(deps.threadWorkspaceBindingStore.get(threadId)), 'threadWorkspaceBindingStore.get', signal)
+          : null;
+        if (binding?.activeWorkspaceId && deps.maomiWorkspaceStore) {
+          activeMaomiWorkspace = await preflightRace(
+            Promise.resolve(deps.maomiWorkspaceStore.get(binding.activeWorkspaceId)),
+            'maomiWorkspaceStore.get',
+            signal,
+          );
+          if (activeMaomiWorkspace && isUnderAllowedRoot(activeMaomiWorkspace.rootPath)) {
+            workingDirectory = activeMaomiWorkspace.rootPath;
+          }
+        }
+        if (!workingDirectory && thread?.projectPath && thread.projectPath !== 'default') {
           // F101: Game threads use virtual projectPaths (e.g. 'games/werewolf') for
           // categorization only — they are not real filesystem directories. Skip them
           // to avoid triggering the F070 governance gate on a non-existent path.
@@ -767,6 +812,72 @@ export async function* invokeSingleCat(deps: InvocationDeps, params: InvocationP
       throw bootcampWorkspaceError;
     }
     const workingProjectRoot = workingDirectory ? findMonorepoRoot(workingDirectory) : undefined;
+    let projectRuntimeRoot: ProjectRuntimeRoot | null = null;
+    let registeredRuntimeWorkspace: RuntimeWorkspaceRecord | null = null;
+    if (workingDirectory) {
+      try {
+        projectRuntimeRoot = await resolveProjectRuntimeRoot({ projectPath: workingDirectory });
+        if (projectRuntimeRoot) {
+          const workspacePath = join(
+            projectRuntimeRoot.runtimeRoot,
+            'workspaces',
+            threadId.replace(/[^a-zA-Z0-9_.-]+/g, '-'),
+            invocationId,
+          );
+          registeredRuntimeWorkspace = await deps.runtimeWorkspaceStore?.register({
+            type: 'agent_workspace',
+            projectRoot: projectRuntimeRoot.projectRoot,
+            runtimeRoot: projectRuntimeRoot.runtimeRoot,
+            path: workspacePath,
+            threadId,
+            invocationId,
+            ownerCatId: catId,
+            dirtyStatus: 'unknown',
+            cleanupPolicy: 'manual_required',
+          }) ?? null;
+          callbackEnv.CLOWDER_PROJECT_RUNTIME_ROOT = projectRuntimeRoot.runtimeRoot;
+          callbackEnv.CAT_CAFE_PROJECT_RUNTIME_ROOT = projectRuntimeRoot.runtimeRoot;
+          callbackEnv.CAT_CAFE_PROJECT_ROOT = projectRuntimeRoot.projectRoot;
+          // V3-39: resolve the durable user workspace root so the cat can ALWAYS
+          // write deliverables into maomi_workspace (not /tmp / source repo),
+          // whether or not a workspace is explicitly bound to the thread.
+          let userWorkspaceRoot: string | undefined;
+          if (activeMaomiWorkspace) {
+            callbackEnv.MAOMI_WORKSPACE_ID = activeMaomiWorkspace.id;
+            userWorkspaceRoot = activeMaomiWorkspace.rootPath;
+          } else {
+            try {
+              const resolved = await resolveMaomiWorkspaceRoot({
+                launchedProjectRoot: workingProjectRoot ?? hostProjectRoot,
+              });
+              userWorkspaceRoot = resolved.rootPath;
+            } catch (err) {
+              log.warn({ err, threadId, invocationId }, 'failed to resolve default maomi workspace root');
+            }
+          }
+          if (userWorkspaceRoot) {
+            callbackEnv.MAOMI_WORKSPACE_ROOT = userWorkspaceRoot;
+            callbackEnv.MAOMI_PROJECT_ROOT = userWorkspaceRoot;
+          }
+          callbackEnv.CLOWDER_WORKSPACE_ID = registeredRuntimeWorkspace?.id ?? `${threadId}:${invocationId}`;
+          // V3-39 write-boundary: the cat-cafe file/shell MCP tools enforce
+          // ALLOWED_WORKSPACE_DIRS. Include (a) the current worktree root so the
+          // cat can write anywhere in its checkout, and (b) the durable user
+          // workspace so deliverables land in maomi_workspace instead of /tmp.
+          callbackEnv.ALLOWED_WORKSPACE_DIRS = buildAllowedWorkspaceDirs(
+            projectRuntimeRoot.projectRoot,
+            projectRuntimeRoot.runtimeRoot,
+            process.env.ALLOWED_WORKSPACE_DIRS,
+            [
+              ...(workingProjectRoot ? [workingProjectRoot] : []),
+              ...(userWorkspaceRoot ? [userWorkspaceRoot] : []),
+            ],
+          );
+        }
+      } catch (err) {
+        log.warn({ err, workingDirectory, threadId, invocationId }, 'failed to resolve/register project runtime workspace');
+      }
+    }
 
     // Shared-state preflight — covers ALL cats (Claude/Codex/Gemini), vendor-agnostic.
     // Three-layer defense model (shared-rules §14):
@@ -1232,7 +1343,21 @@ export async function* invokeSingleCat(deps: InvocationDeps, params: InvocationP
 
     // Prepend staticIdentity to prompt when injection is needed
     // F070-P2: missionPrefix (dispatch context) is prepended for external projects
-    const promptWithMission = missionPrefix ? `${missionPrefix}\n\n${prompt}` : prompt;
+    const runtimeWorkspaceHint = projectRuntimeRoot
+      ? [
+          '[Project runtime workspace policy]',
+          activeMaomiWorkspace
+            ? `Active Maomi workspace: ${activeMaomiWorkspace.displayName} (${activeMaomiWorkspace.relativePath}, workspaceId=${activeMaomiWorkspace.id})`
+            : '',
+          `Bound project root: ${projectRuntimeRoot.projectRoot}`,
+          `Project runtime root: ${projectRuntimeRoot.runtimeRoot}`,
+          registeredRuntimeWorkspace
+            ? `Registered agent workspace: ${registeredRuntimeWorkspace.path} (workspaceId=${registeredRuntimeWorkspace.id})`
+            : 'Registered agent workspace: unavailable; keep project runtime output under the project runtime root.',
+          'Use the bound project root for canonical edits. If you need an isolated checkout, QA copy, patch staging, cache, or generated workspace output, place it under CLOWDER_PROJECT_RUNTIME_ROOT and declare resulting artifacts instead of writing project-specific work under /tmp.',
+        ].filter(Boolean).join('\n')
+      : '';
+    const promptWithMission = [missionPrefix, runtimeWorkspaceHint, prompt].filter(Boolean).join('\n\n');
 
     let effectivePrompt =
       injectSystemPrompt && params.systemPrompt

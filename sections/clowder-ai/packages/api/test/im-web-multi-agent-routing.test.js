@@ -168,7 +168,7 @@ describe('im-web multi-agent routing', () => {
     assert.ok(adapterReplies[0].content.includes('codex'));
   });
 
-  it('falls back to the last active participant when no mention is present', async () => {
+  it('routes no-mention IM Web messages to the coordinator instead of the last active participant', async () => {
     const { router, triggerCalls } = createHarness({
       participants: [
         { catId: 'opus', lastMessageAt: 100, messageCount: 1 },
@@ -179,6 +179,6 @@ describe('im-web multi-agent routing', () => {
     await router.route('im-web', '2:group-clowder', 'follow up without explicit mention', 'm-fallback');
 
     assert.equal(triggerCalls.length, 1);
-    assert.equal(triggerCalls[0][1], 'codex');
+    assert.equal(triggerCalls[0][1], 'coordinator');
   });
 });

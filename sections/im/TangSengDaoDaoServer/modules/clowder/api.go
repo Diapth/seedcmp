@@ -1,6 +1,7 @@
 package clowder
 
 import (
+	"bytes"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -17,25 +18,30 @@ import (
 	"github.com/TangSengDaoDao/TangSengDaoDaoServerLib/common"
 	"github.com/TangSengDaoDao/TangSengDaoDaoServerLib/config"
 	"github.com/TangSengDaoDao/TangSengDaoDaoServerLib/pkg/log"
+	"github.com/TangSengDaoDao/TangSengDaoDaoServerLib/pkg/util"
 	"github.com/TangSengDaoDao/TangSengDaoDaoServerLib/pkg/wkhttp"
 )
 
 type Clowder struct {
-	ctx           *config.Context
-	groupCatsMu   sync.RWMutex
-	groupCatState map[string]groupCatSyncResponse
+	ctx                  *config.Context
+	groupCatsMu          sync.RWMutex
+	groupCatState        map[string]groupCatSyncResponse
+	projectGroupMu       sync.RWMutex
+	projectGroupBindings map[string]ProjectGroupBinding
 	log.Log
 	config commonmodule.ClowderBridgeConfig
 }
 
 const clowderAIDirectChannelID = "clowder_ai"
+const defaultPMMemberID = "clowder_cat:coordinator"
 
 func New(ctx *config.Context) *Clowder {
 	return &Clowder{
-		ctx:           ctx,
-		groupCatState: map[string]groupCatSyncResponse{},
-		Log:           log.NewTLog("clowder"),
-		config:        commonmodule.ClowderBridgeConfigFromEnv(),
+		ctx:                  ctx,
+		groupCatState:        map[string]groupCatSyncResponse{},
+		projectGroupBindings: map[string]ProjectGroupBinding{},
+		Log:                  log.NewTLog("clowder"),
+		config:               commonmodule.ClowderBridgeConfigFromEnv(),
 	}
 }
 
@@ -50,14 +56,58 @@ func (c *Clowder) Route(r *wkhttp.WKHttp) {
 		auth.GET("/conversation", c.conversation)
 		auth.GET("/conversation/agents", c.agentDirectory)
 		auth.GET("/cats", c.catDirectory)
+		auth.GET("/local-auth/capabilities", c.localAuthCapabilities)
 		auth.POST("/cats/connect", c.connectCatContact)
 		auth.POST("/cats", c.createCatAndConnect)
+		auth.DELETE("/cats/:catId", c.deleteCatContact)
 		auth.POST("/group/cats/sync", c.syncGroupCats)
 		auth.GET("/group/cats", c.groupCats)
+		auth.POST("/project-groups/ensure", c.ensureProjectGroup)
+		auth.GET("/project-groups/active", c.activeProjectGroup)
+		auth.POST("/project-groups/:bindingId/thread", c.updateProjectGroupThread)
 		auth.POST("/conversation/bind", c.bindConversation)
 		auth.POST("/conversation/focus", c.setFocus)
 		auth.POST("/conversation/focus/clear", c.clearFocus)
 		auth.POST("/conversation/message", c.conversationMessage)
+		auth.POST("/conversation/deployment-request", c.conversationDeploymentRequest)
+		auth.RouterGroup.PATCH("/conversation/deployment-request/:deploymentRequestId", auth.L.WKHttpHandler(c.conversationDeploymentRequestUpdate))
+		auth.GET("/conversation/deployment-request/active", c.conversationDeploymentRequestActive)
+		auth.GET("/conversation/deployment-request/:deploymentRequestId", c.conversationDeploymentRequestDetail)
+		auth.POST("/conversation/deployment-action", c.conversationDeploymentAction)
+		auth.GET("/deployments/:deploymentId", c.proxyGetDeployment)
+		auth.GET("/deployments/:deploymentId/logs", c.proxyGetDeploymentLogs)
+		// Phase 2: Coordinator kickoff — proxy GET/dismiss to Clowder 3004.
+		// See sections/clowder-ai/packages/api/src/routes/coordinator-kickoff.ts.
+		auth.GET("/coordinator/kickoff/:coordinationId", c.getCoordinatorKickoff)
+		auth.GET("/coordinator/kickoffs", c.listCoordinatorKickoffs)
+		auth.POST("/coordinator/kickoff/:coordinationId/dismiss", c.dismissCoordinatorKickoff)
+		auth.POST("/coordinator/coordination", c.proxyCreateCoordination)
+		auth.GET("/coordinator/coordination/:coordinationId", c.proxyGetCoordination)
+		auth.RouterGroup.PATCH("/coordinator/coordination/:coordinationId", auth.L.WKHttpHandler(c.proxyPatchCoordination))
+		auth.POST("/coordinator/coordination/:coordinationId/cancel", c.proxyCancelCoordination)
+		// Phase 4.2: Workspace path validation — read-only preview of the
+		// rules enforced by `POST /api/threads` in Clowder 3004.
+		auth.GET("/workspace/validate", c.validateWorkspacePath)
+		// Phase 4.5 + 5.2: thread tasks + artifacts REST.
+		// We don't know the threadId prefix here, so we proxy the
+		// `/v1/clowder/thread/...` shape to `/api/threads/...` upstream.
+		auth.GET("/thread/:threadId/tasks", c.proxyThreadTasks)
+		auth.GET("/thread/:threadId/coordinations", c.proxyThreadCoordinations)
+		auth.GET("/thread/:threadId/artifacts", c.proxyThreadArtifacts)
+		auth.POST("/thread/:threadId/artifacts", c.proxyPostThreadArtifact)
+		auth.GET("/thread/:threadId/workspaces", c.proxyThreadWorkspaces)
+		auth.GET("/thread/:threadId/workspace-binding", c.proxyGetThreadWorkspaceBinding)
+		auth.PUT("/thread/:threadId/workspace-binding", c.proxyPutThreadWorkspaceBinding)
+		// V3-37: user-visible Maomi project workspaces.
+		auth.GET("/maomi-workspaces/root", c.proxyMaomiWorkspaceRoot)
+		auth.POST("/maomi-workspaces/propose", c.proxyPostMaomiWorkspacePropose)
+		auth.POST("/maomi-workspaces", c.proxyPostMaomiWorkspace)
+		auth.GET("/maomi-workspaces", c.proxyListMaomiWorkspaces)
+		auth.GET("/maomi-workspaces/:workspaceId", c.proxyGetMaomiWorkspace)
+		auth.POST("/maomi-workspaces/:workspaceId/archive", c.proxyArchiveMaomiWorkspace)
+		// im_web creates new project group threads via
+		// POST /v1/threads (handled by the bridge below).
+		auth.POST("/threads", c.proxyCreateThread)
 	}
 
 	r.POST("/api/im-web/clowder/outbound", c.outbound)
@@ -101,6 +151,62 @@ type ClowderAgent struct {
 	Preferred          bool     `json:"preferred,omitempty"`
 }
 
+type CatDirectoryResponse struct {
+	Agents         []ClowderAgent                  `json:"agents"`
+	Templates      []ClowderCatTemplate            `json:"templates,omitempty"`
+	ClientDefaults map[string]ClowderClientDefault `json:"clientDefaults,omitempty"`
+	SkillCatalog   map[string][]ClowderSkill       `json:"skillCatalog,omitempty"`
+}
+
+type ClowderCatTemplate struct {
+	RoleTemplateID     string   `json:"roleTemplateId"`
+	CatID              string   `json:"catId"`
+	DisplayName        string   `json:"displayName"`
+	Aliases            []string `json:"aliases,omitempty"`
+	MentionPatterns    []string `json:"mentionPatterns,omitempty"`
+	Avatar             string   `json:"avatar,omitempty"`
+	PersonalitySummary string   `json:"personalitySummary,omitempty"`
+	CapabilitySummary  string   `json:"capabilitySummary,omitempty"`
+	Cloneable          bool     `json:"cloneable"`
+	UnavailableReason  string   `json:"unavailableReason,omitempty"`
+	Source             string   `json:"source,omitempty"`
+}
+
+type catTemplatesResponse struct {
+	Templates      []catTemplate                   `json:"templates"`
+	ClientDefaults map[string]ClowderClientDefault `json:"clientDefaults,omitempty"`
+	SkillCatalog   map[string][]ClowderSkill       `json:"skillCatalog,omitempty"`
+}
+
+type ClowderClientDefault struct {
+	DefaultModel string   `json:"defaultModel,omitempty"`
+	Models       []string `json:"models,omitempty"`
+}
+
+type ClowderSkill struct {
+	Name        string                      `json:"name"`
+	Category    string                      `json:"category,omitempty"`
+	Trigger     string                      `json:"trigger,omitempty"`
+	Description string                      `json:"description,omitempty"`
+	Mounted     bool                        `json:"mounted"`
+	RequiresMCP []ClowderSkillMCPDependency `json:"requiresMcp,omitempty"`
+}
+
+type ClowderSkillMCPDependency struct {
+	ID     string `json:"id"`
+	Status string `json:"status"`
+}
+
+type catTemplate struct {
+	ID              string `json:"id"`
+	Name            string `json:"name"`
+	Nickname        string `json:"nickname,omitempty"`
+	Avatar          string `json:"avatar,omitempty"`
+	RoleDescription string `json:"roleDescription,omitempty"`
+	Personality     string `json:"personality,omitempty"`
+	TeamStrengths   string `json:"teamStrengths,omitempty"`
+}
+
 type conversationRefRequest struct {
 	ChannelID     string   `json:"channelId"`
 	ChannelType   uint8    `json:"channelType"`
@@ -118,15 +224,16 @@ type catContactRequest struct {
 }
 
 type createCatRequest struct {
-	Name         string   `json:"name"`
-	Alias        string   `json:"alias,omitempty"`
-	ClientID     string   `json:"clientId,omitempty"`
-	Platform     string   `json:"platform,omitempty"`
-	AuthType     string   `json:"authType,omitempty"`
-	AccountRef   string   `json:"accountRef,omitempty"`
-	DefaultModel string   `json:"defaultModel,omitempty"`
-	Personality  string   `json:"personality,omitempty"`
-	Capabilities []string `json:"capabilities,omitempty"`
+	Name           string   `json:"name"`
+	Alias          string   `json:"alias,omitempty"`
+	RoleTemplateID string   `json:"roleTemplateId,omitempty"`
+	ClientID       string   `json:"clientId,omitempty"`
+	Platform       string   `json:"platform,omitempty"`
+	AuthType       string   `json:"authType,omitempty"`
+	AccountRef     string   `json:"accountRef,omitempty"`
+	DefaultModel   string   `json:"defaultModel,omitempty"`
+	Personality    string   `json:"personality,omitempty"`
+	Capabilities   []string `json:"capabilities,omitempty"`
 }
 
 type catContactEnvelope struct {
@@ -155,6 +262,53 @@ type groupCatSyncResponse struct {
 	Prompt           string         `json:"prompt"`
 	ProactiveReplies bool           `json:"proactiveReplies,omitempty"`
 	AutoReplyMode    string         `json:"autoReplyMode,omitempty"`
+}
+
+type projectGroupEnsureRequest struct {
+	ProjectName         string   `json:"projectName"`
+	WorkspaceID         string   `json:"workspaceId,omitempty"`
+	PMDirectChannelID   string   `json:"pmDirectChannelId"`
+	PMDirectChannelType uint8    `json:"pmDirectChannelType"`
+	PMDirectThreadID    string   `json:"pmDirectThreadId,omitempty"`
+	ProjectThreadID     string   `json:"projectThreadId,omitempty"`
+	PMMemberID          string   `json:"pmMemberId,omitempty"`
+	PMDisplayName       string   `json:"pmDisplayName,omitempty"`
+	UserMemberIDs       []string `json:"userMemberIds,omitempty"`
+	CatMemberIDs        []string `json:"catMemberIds,omitempty"`
+	CreatedBy           string   `json:"createdBy,omitempty"`
+}
+
+type projectGroupThreadUpdateRequest struct {
+	ProjectThreadID string `json:"projectThreadId"`
+}
+
+type ProjectGroupBinding struct {
+	ID                  string   `json:"id"`
+	UserID              string   `json:"userId"`
+	ProjectName         string   `json:"projectName"`
+	WorkspaceID         string   `json:"workspaceId,omitempty"`
+	PMDirectChannelID   string   `json:"pmDirectChannelId"`
+	PMDirectChannelType uint8    `json:"pmDirectChannelType"`
+	PMDirectThreadID    string   `json:"pmDirectThreadId,omitempty"`
+	ProjectGroupNo      string   `json:"projectGroupNo"`
+	ProjectThreadID     string   `json:"projectThreadId,omitempty"`
+	PMMemberID          string   `json:"pmMemberId"`
+	UserMemberIDs       []string `json:"userMemberIds"`
+	CatMemberIDs        []string `json:"catMemberIds"`
+	CreatedBy           string   `json:"createdBy"`
+	CreatedAt           int64    `json:"createdAt"`
+	UpdatedAt           int64    `json:"updatedAt"`
+	Status              string   `json:"status"`
+}
+
+type projectGroupEnsureResponse struct {
+	Binding ProjectGroupBinding    `json:"binding"`
+	Group   map[string]interface{} `json:"group"`
+	Reused  bool                   `json:"reused"`
+}
+
+type projectGroupBindingResponse struct {
+	Binding ProjectGroupBinding `json:"binding"`
 }
 
 func (c *Clowder) conversation(ctx *wkhttp.Context) {
@@ -192,6 +346,492 @@ func (c *Clowder) catDirectory(ctx *wkhttp.Context) {
 	ctx.JSON(http.StatusOK, directory)
 }
 
+func (c *Clowder) localAuthCapabilities(ctx *wkhttp.Context) {
+	statusCode, body, err := c.fetchLocalAuthCapabilities(ctx.GetLoginUID())
+	if err != nil {
+		ctx.JSON(http.StatusBadGateway, map[string]string{"error": "local_auth_capabilities_unavailable", "message": err.Error()})
+		return
+	}
+	ctx.Data(statusCode, "application/json; charset=utf-8", body)
+}
+
+// getCoordinatorKickoff proxies `GET /api/coordinator/kickoff/:coordinationId`
+// from the Clowder 3004 backend. Used by im_web to pull the latest kickoff
+// emitted by the coordinator (the primary signal is the WebSocket event
+// `coordinator_kickoff`; this REST route is a fallback / refresh path).
+func (c *Clowder) getCoordinatorKickoff(ctx *wkhttp.Context) {
+	coordinationID := strings.TrimSpace(ctx.Param("coordinationId"))
+	if coordinationID == "" {
+		ctx.JSON(http.StatusBadRequest, map[string]string{"error": "coordination_id_required"})
+		return
+	}
+	if !c.config.IsConfigured() {
+		ctx.JSON(http.StatusBadGateway, map[string]string{"error": "clowder_bridge_not_configured"})
+		return
+	}
+	endpoint := strings.TrimRight(c.config.APIBaseURL, "/") +
+		"/api/coordinator/kickoff/" + url.PathEscape(coordinationID)
+
+	req, err := http.NewRequest(http.MethodGet, endpoint, nil)
+	if err != nil {
+		ctx.JSON(http.StatusInternalServerError, map[string]string{"error": "build_request_failed", "message": err.Error()})
+		return
+	}
+	c.applyDirectoryUserHeader(req, ctx.GetLoginUID())
+
+	res, err := c.httpClient().Do(req)
+	if err != nil {
+		ctx.JSON(http.StatusBadGateway, map[string]string{"error": "kickoff_unavailable", "message": err.Error()})
+		return
+	}
+	defer res.Body.Close()
+
+	body, _ := io.ReadAll(res.Body)
+	ctx.Data(res.StatusCode, "application/json; charset=utf-8", body)
+}
+
+// dismissCoordinatorKickoff proxies
+// `POST /api/coordinator/kickoff/:coordinationId/dismiss` to Clowder 3004.
+// Called when the user clicks "稍后再说" on the im_web kickoff card.
+func (c *Clowder) dismissCoordinatorKickoff(ctx *wkhttp.Context) {
+	coordinationID := strings.TrimSpace(ctx.Param("coordinationId"))
+	if coordinationID == "" {
+		ctx.JSON(http.StatusBadRequest, map[string]string{"error": "coordination_id_required"})
+		return
+	}
+	if !c.config.IsConfigured() {
+		ctx.JSON(http.StatusBadGateway, map[string]string{"error": "clowder_bridge_not_configured"})
+		return
+	}
+	endpoint := strings.TrimRight(c.config.APIBaseURL, "/") +
+		"/api/coordinator/kickoff/" + url.PathEscape(coordinationID) + "/dismiss"
+
+	req, err := http.NewRequest(http.MethodPost, endpoint, nil)
+	if err != nil {
+		ctx.JSON(http.StatusInternalServerError, map[string]string{"error": "build_request_failed", "message": err.Error()})
+		return
+	}
+	c.applyDirectoryUserHeader(req, ctx.GetLoginUID())
+
+	res, err := c.httpClient().Do(req)
+	if err != nil {
+		ctx.JSON(http.StatusBadGateway, map[string]string{"error": "kickoff_dismiss_unavailable", "message": err.Error()})
+		return
+	}
+	defer res.Body.Close()
+
+	body, _ := io.ReadAll(res.Body)
+	ctx.Data(res.StatusCode, "application/json; charset=utf-8", body)
+}
+
+// listCoordinatorKickoffs proxies
+// `GET /api/coordinator/kickoffs?userId=...&maxAgeMs=...` to Clowder 3004.
+// im_web polls this on panel mount to surface recent kickoffs without
+// requiring WS plumbing across the two sub-projects.
+func (c *Clowder) listCoordinatorKickoffs(ctx *wkhttp.Context) {
+	if !c.config.IsConfigured() {
+		ctx.JSON(http.StatusBadGateway, map[string]string{"error": "clowder_bridge_not_configured"})
+		return
+	}
+	endpoint := strings.TrimRight(c.config.APIBaseURL, "/") + "/api/coordinator/kickoffs"
+
+	req, err := http.NewRequest(http.MethodGet, endpoint, nil)
+	if err != nil {
+		ctx.JSON(http.StatusInternalServerError, map[string]string{"error": "build_request_failed", "message": err.Error()})
+		return
+	}
+	// Forward caller identity so the upstream can scope the listing.
+	c.applyDirectoryUserHeader(req, ctx.GetLoginUID())
+	if userID := strings.TrimSpace(ctx.Query("userId")); userID != "" {
+		q := req.URL.Query()
+		q.Set("userId", userID)
+		if maxAge := strings.TrimSpace(ctx.Query("maxAgeMs")); maxAge != "" {
+			q.Set("maxAgeMs", maxAge)
+		}
+		req.URL.RawQuery = q.Encode()
+	}
+
+	res, err := c.httpClient().Do(req)
+	if err != nil {
+		ctx.JSON(http.StatusBadGateway, map[string]string{"error": "kickoff_list_unavailable", "message": err.Error()})
+		return
+	}
+	defer res.Body.Close()
+
+	body, _ := io.ReadAll(res.Body)
+	ctx.Data(res.StatusCode, "application/json; charset=utf-8", body)
+}
+
+// validateWorkspacePath proxies `GET /api/workspace/validate?path=...` to
+// Clowder 3004. The upstream already validates the same way it does for
+// `POST /api/threads`; this is a read-only preview so the im_web
+// CoordinatorKickoffCard can show a friendly error before the user submits.
+func (c *Clowder) validateWorkspacePath(ctx *wkhttp.Context) {
+	if !c.config.IsConfigured() {
+		ctx.JSON(http.StatusBadGateway, map[string]string{"error": "clowder_bridge_not_configured"})
+		return
+	}
+	endpoint := strings.TrimRight(c.config.APIBaseURL, "/") + "/api/workspace/validate"
+
+	req, err := http.NewRequest(http.MethodGet, endpoint, nil)
+	if err != nil {
+		ctx.JSON(http.StatusInternalServerError, map[string]string{"error": "build_request_failed", "message": err.Error()})
+		return
+	}
+	c.applyDirectoryUserHeader(req, ctx.GetLoginUID())
+	if rawPath := strings.TrimSpace(ctx.Query("path")); rawPath != "" {
+		q := req.URL.Query()
+		q.Set("path", rawPath)
+		req.URL.RawQuery = q.Encode()
+	}
+
+	res, err := c.httpClient().Do(req)
+	if err != nil {
+		ctx.JSON(http.StatusBadGateway, map[string]string{"error": "workspace_validate_unavailable", "message": err.Error()})
+		return
+	}
+	defer res.Body.Close()
+
+	body, _ := io.ReadAll(res.Body)
+	ctx.Data(res.StatusCode, "application/json; charset=utf-8", body)
+}
+
+// proxyThreadTasks proxies `GET /api/threads/:threadId/tasks` (Phase 5) to
+// Clowder 3004. Used by the im_web ProjectKanbanPanel.
+func (c *Clowder) proxyThreadTasks(ctx *wkhttp.Context) {
+	threadID := strings.TrimSpace(ctx.Param("threadId"))
+	if threadID == "" {
+		ctx.JSON(http.StatusBadRequest, map[string]string{"error": "thread_id_required"})
+		return
+	}
+	if !c.config.IsConfigured() {
+		ctx.JSON(http.StatusBadGateway, map[string]string{"error": "clowder_bridge_not_configured"})
+		return
+	}
+	endpoint := strings.TrimRight(c.config.APIBaseURL, "/") +
+		"/api/threads/" + url.PathEscape(threadID) + "/tasks"
+	if rawQuery := strings.TrimSpace(ctx.Request.URL.RawQuery); rawQuery != "" {
+		endpoint += "?" + rawQuery
+	}
+
+	req, err := http.NewRequest(http.MethodGet, endpoint, nil)
+	if err != nil {
+		ctx.JSON(http.StatusInternalServerError, map[string]string{"error": "build_request_failed", "message": err.Error()})
+		return
+	}
+	c.applyDirectoryUserHeader(req, ctx.GetLoginUID())
+
+	res, err := c.httpClient().Do(req)
+	if err != nil {
+		ctx.JSON(http.StatusBadGateway, map[string]string{"error": "thread_tasks_unavailable", "message": err.Error()})
+		return
+	}
+	defer res.Body.Close()
+
+	body, _ := io.ReadAll(res.Body)
+	ctx.Data(res.StatusCode, "application/json; charset=utf-8", body)
+}
+
+// proxyThreadArtifacts proxies `GET /api/threads/:threadId/artifacts`
+// (Phase 4.6) to Clowder 3004.
+func (c *Clowder) proxyThreadArtifacts(ctx *wkhttp.Context) {
+	threadID := strings.TrimSpace(ctx.Param("threadId"))
+	if threadID == "" {
+		ctx.JSON(http.StatusBadRequest, map[string]string{"error": "thread_id_required"})
+		return
+	}
+	if !c.config.IsConfigured() {
+		ctx.JSON(http.StatusBadGateway, map[string]string{"error": "clowder_bridge_not_configured"})
+		return
+	}
+	endpoint := strings.TrimRight(c.config.APIBaseURL, "/") +
+		"/api/threads/" + url.PathEscape(threadID) + "/artifacts"
+
+	req, err := http.NewRequest(http.MethodGet, endpoint, nil)
+	if err != nil {
+		ctx.JSON(http.StatusInternalServerError, map[string]string{"error": "build_request_failed", "message": err.Error()})
+		return
+	}
+	c.applyDirectoryUserHeader(req, ctx.GetLoginUID())
+
+	res, err := c.httpClient().Do(req)
+	if err != nil {
+		ctx.JSON(http.StatusBadGateway, map[string]string{"error": "thread_artifacts_unavailable", "message": err.Error()})
+		return
+	}
+	defer res.Body.Close()
+
+	body, _ := io.ReadAll(res.Body)
+	ctx.Data(res.StatusCode, "application/json; charset=utf-8", body)
+}
+
+// proxyPostThreadArtifact proxies `POST /api/threads/:threadId/artifacts`
+// (Phase 4.5 declareArtifact) to Clowder 3004. The bridge forwards the
+// caller's JSON body verbatim and adds the standard user header so the
+// upstream can scope the operation.
+func (c *Clowder) proxyPostThreadArtifact(ctx *wkhttp.Context) {
+	threadID := strings.TrimSpace(ctx.Param("threadId"))
+	if threadID == "" {
+		ctx.JSON(http.StatusBadRequest, map[string]string{"error": "thread_id_required"})
+		return
+	}
+	if !c.config.IsConfigured() {
+		ctx.JSON(http.StatusBadGateway, map[string]string{"error": "clowder_bridge_not_configured"})
+		return
+	}
+	body, err := io.ReadAll(ctx.Request.Body)
+	if err != nil {
+		ctx.JSON(http.StatusBadRequest, map[string]string{"error": "invalid_body", "message": err.Error()})
+		return
+	}
+	endpoint := strings.TrimRight(c.config.APIBaseURL, "/") +
+		"/api/threads/" + url.PathEscape(threadID) + "/artifacts"
+
+	req, err := http.NewRequest(http.MethodPost, endpoint, bytes.NewReader(body))
+	if err != nil {
+		ctx.JSON(http.StatusInternalServerError, map[string]string{"error": "build_request_failed", "message": err.Error()})
+		return
+	}
+	req.Header.Set("Content-Type", "application/json")
+	c.applyDirectoryUserHeader(req, ctx.GetLoginUID())
+
+	res, err := c.httpClient().Do(req)
+	if err != nil {
+		ctx.JSON(http.StatusBadGateway, map[string]string{"error": "thread_artifact_create_unavailable", "message": err.Error()})
+		return
+	}
+	defer res.Body.Close()
+
+	respBody, _ := io.ReadAll(res.Body)
+	ctx.Data(res.StatusCode, "application/json; charset=utf-8", respBody)
+}
+
+// proxyThreadWorkspaces proxies `GET /api/threads/:threadId/workspaces`
+// (V3-32 runtime workspace ledger) to Clowder 3004.
+func (c *Clowder) proxyThreadWorkspaces(ctx *wkhttp.Context) {
+	threadID := strings.TrimSpace(ctx.Param("threadId"))
+	if threadID == "" {
+		ctx.JSON(http.StatusBadRequest, map[string]string{"error": "thread_id_required"})
+		return
+	}
+	if !c.config.IsConfigured() {
+		ctx.JSON(http.StatusBadGateway, map[string]string{"error": "clowder_bridge_not_configured"})
+		return
+	}
+	endpoint := strings.TrimRight(c.config.APIBaseURL, "/") +
+		"/api/threads/" + url.PathEscape(threadID) + "/workspaces"
+
+	req, err := http.NewRequest(http.MethodGet, endpoint, nil)
+	if err != nil {
+		ctx.JSON(http.StatusInternalServerError, map[string]string{"error": "build_request_failed", "message": err.Error()})
+		return
+	}
+	c.applyDirectoryUserHeader(req, ctx.GetLoginUID())
+
+	res, err := c.httpClient().Do(req)
+	if err != nil {
+		ctx.JSON(http.StatusBadGateway, map[string]string{"error": "thread_workspaces_unavailable", "message": err.Error()})
+		return
+	}
+	defer res.Body.Close()
+
+	body, _ := io.ReadAll(res.Body)
+	ctx.Data(res.StatusCode, "application/json; charset=utf-8", body)
+}
+
+func (c *Clowder) proxyToClowder(ctx *wkhttp.Context, method string, upstreamPath string, body io.Reader, unavailableCode string) {
+	if !c.config.IsConfigured() {
+		ctx.JSON(http.StatusBadGateway, map[string]string{"error": "clowder_bridge_not_configured"})
+		return
+	}
+	endpoint := strings.TrimRight(c.config.APIBaseURL, "/") + upstreamPath
+	if method == http.MethodGet {
+		if rawQuery := strings.TrimSpace(ctx.Request.URL.RawQuery); rawQuery != "" {
+			endpoint += "?" + rawQuery
+		}
+	}
+	req, err := http.NewRequest(method, endpoint, body)
+	if err != nil {
+		ctx.JSON(http.StatusInternalServerError, map[string]string{"error": "build_request_failed", "message": err.Error()})
+		return
+	}
+	if method != http.MethodGet {
+		req.Header.Set("Content-Type", "application/json")
+	}
+	c.applyDirectoryUserHeader(req, ctx.GetLoginUID())
+
+	res, err := c.httpClient().Do(req)
+	if err != nil {
+		ctx.JSON(http.StatusBadGateway, map[string]string{"error": unavailableCode, "message": err.Error()})
+		return
+	}
+	defer res.Body.Close()
+
+	respBody, _ := io.ReadAll(res.Body)
+	ctx.Data(res.StatusCode, "application/json; charset=utf-8", respBody)
+}
+
+func (c *Clowder) readJSONBody(ctx *wkhttp.Context) ([]byte, bool) {
+	body, err := io.ReadAll(ctx.Request.Body)
+	if err != nil {
+		ctx.JSON(http.StatusBadRequest, map[string]string{"error": "invalid_body", "message": err.Error()})
+		return nil, false
+	}
+	return body, true
+}
+
+func (c *Clowder) proxyMaomiWorkspaceRoot(ctx *wkhttp.Context) {
+	c.proxyToClowder(ctx, http.MethodGet, "/api/maomi-workspaces/root", nil, "maomi_workspace_root_unavailable")
+}
+
+func (c *Clowder) proxyPostMaomiWorkspacePropose(ctx *wkhttp.Context) {
+	body, ok := c.readJSONBody(ctx)
+	if !ok {
+		return
+	}
+	c.proxyToClowder(ctx, http.MethodPost, "/api/maomi-workspaces/propose", bytes.NewReader(body), "maomi_workspace_propose_unavailable")
+}
+
+func (c *Clowder) proxyPostMaomiWorkspace(ctx *wkhttp.Context) {
+	body, ok := c.readJSONBody(ctx)
+	if !ok {
+		return
+	}
+	c.proxyToClowder(ctx, http.MethodPost, "/api/maomi-workspaces", bytes.NewReader(body), "maomi_workspace_create_unavailable")
+}
+
+func (c *Clowder) proxyListMaomiWorkspaces(ctx *wkhttp.Context) {
+	c.proxyToClowder(ctx, http.MethodGet, "/api/maomi-workspaces", nil, "maomi_workspace_list_unavailable")
+}
+
+func (c *Clowder) proxyGetMaomiWorkspace(ctx *wkhttp.Context) {
+	workspaceID := strings.TrimSpace(ctx.Param("workspaceId"))
+	if workspaceID == "" {
+		ctx.JSON(http.StatusBadRequest, map[string]string{"error": "workspace_id_required"})
+		return
+	}
+	c.proxyToClowder(ctx, http.MethodGet, "/api/maomi-workspaces/"+url.PathEscape(workspaceID), nil, "maomi_workspace_get_unavailable")
+}
+
+func (c *Clowder) proxyArchiveMaomiWorkspace(ctx *wkhttp.Context) {
+	workspaceID := strings.TrimSpace(ctx.Param("workspaceId"))
+	if workspaceID == "" {
+		ctx.JSON(http.StatusBadRequest, map[string]string{"error": "workspace_id_required"})
+		return
+	}
+	c.proxyToClowder(ctx, http.MethodPost, "/api/maomi-workspaces/"+url.PathEscape(workspaceID)+"/archive", nil, "maomi_workspace_archive_unavailable")
+}
+
+func (c *Clowder) proxyCreateCoordination(ctx *wkhttp.Context) {
+	body, ok := c.readJSONBody(ctx)
+	if !ok {
+		return
+	}
+	c.proxyToClowder(ctx, http.MethodPost, "/api/coordinator/coordination", bytes.NewReader(body), "coordination_create_unavailable")
+}
+
+func (c *Clowder) proxyGetCoordination(ctx *wkhttp.Context) {
+	coordinationID := strings.TrimSpace(ctx.Param("coordinationId"))
+	if coordinationID == "" {
+		ctx.JSON(http.StatusBadRequest, map[string]string{"error": "coordination_id_required"})
+		return
+	}
+	c.proxyToClowder(ctx, http.MethodGet, "/api/coordinator/coordination/"+url.PathEscape(coordinationID), nil, "coordination_unavailable")
+}
+
+func (c *Clowder) proxyPatchCoordination(ctx *wkhttp.Context) {
+	coordinationID := strings.TrimSpace(ctx.Param("coordinationId"))
+	if coordinationID == "" {
+		ctx.JSON(http.StatusBadRequest, map[string]string{"error": "coordination_id_required"})
+		return
+	}
+	body, ok := c.readJSONBody(ctx)
+	if !ok {
+		return
+	}
+	c.proxyToClowder(ctx, http.MethodPatch, "/api/coordinator/coordination/"+url.PathEscape(coordinationID), bytes.NewReader(body), "coordination_update_unavailable")
+}
+
+func (c *Clowder) proxyCancelCoordination(ctx *wkhttp.Context) {
+	coordinationID := strings.TrimSpace(ctx.Param("coordinationId"))
+	if coordinationID == "" {
+		ctx.JSON(http.StatusBadRequest, map[string]string{"error": "coordination_id_required"})
+		return
+	}
+	body, ok := c.readJSONBody(ctx)
+	if !ok {
+		return
+	}
+	c.proxyToClowder(ctx, http.MethodPost, "/api/coordinator/coordination/"+url.PathEscape(coordinationID)+"/cancel", bytes.NewReader(body), "coordination_cancel_unavailable")
+}
+
+func (c *Clowder) proxyThreadCoordinations(ctx *wkhttp.Context) {
+	threadID := strings.TrimSpace(ctx.Param("threadId"))
+	if threadID == "" {
+		ctx.JSON(http.StatusBadRequest, map[string]string{"error": "thread_id_required"})
+		return
+	}
+	c.proxyToClowder(ctx, http.MethodGet, "/api/threads/"+url.PathEscape(threadID)+"/coordinations", nil, "thread_coordinations_unavailable")
+}
+
+func (c *Clowder) proxyGetThreadWorkspaceBinding(ctx *wkhttp.Context) {
+	threadID := strings.TrimSpace(ctx.Param("threadId"))
+	if threadID == "" {
+		ctx.JSON(http.StatusBadRequest, map[string]string{"error": "thread_id_required"})
+		return
+	}
+	c.proxyToClowder(ctx, http.MethodGet, "/api/threads/"+url.PathEscape(threadID)+"/workspace-binding", nil, "thread_workspace_binding_unavailable")
+}
+
+func (c *Clowder) proxyPutThreadWorkspaceBinding(ctx *wkhttp.Context) {
+	threadID := strings.TrimSpace(ctx.Param("threadId"))
+	if threadID == "" {
+		ctx.JSON(http.StatusBadRequest, map[string]string{"error": "thread_id_required"})
+		return
+	}
+	body, ok := c.readJSONBody(ctx)
+	if !ok {
+		return
+	}
+	c.proxyToClowder(ctx, http.MethodPut, "/api/threads/"+url.PathEscape(threadID)+"/workspace-binding", bytes.NewReader(body), "thread_workspace_binding_update_unavailable")
+}
+
+// proxyCreateThread proxies `POST /api/threads` to Clowder 3004. im_web's
+// CoordinatorKickoffCard calls this through the bridge so a project group
+// thread can be created from im_web without depending on the clowder-ai
+// web UI. The result includes a thread.id which the front-end uses to
+// navigate within im_web (not to the clowder-ai web /thread/:id page).
+func (c *Clowder) proxyCreateThread(ctx *wkhttp.Context) {
+	if !c.config.IsConfigured() {
+		ctx.JSON(http.StatusBadGateway, map[string]string{"error": "clowder_bridge_not_configured"})
+		return
+	}
+	body, err := io.ReadAll(ctx.Request.Body)
+	if err != nil {
+		ctx.JSON(http.StatusBadRequest, map[string]string{"error": "invalid_body", "message": err.Error()})
+		return
+	}
+	endpoint := strings.TrimRight(c.config.APIBaseURL, "/") + "/api/threads"
+
+	req, err := http.NewRequest(http.MethodPost, endpoint, bytes.NewReader(body))
+	if err != nil {
+		ctx.JSON(http.StatusInternalServerError, map[string]string{"error": "build_request_failed", "message": err.Error()})
+		return
+	}
+	req.Header.Set("Content-Type", "application/json")
+	c.applyDirectoryUserHeader(req, ctx.GetLoginUID())
+
+	res, err := c.httpClient().Do(req)
+	if err != nil {
+		ctx.JSON(http.StatusBadGateway, map[string]string{"error": "thread_create_unavailable", "message": err.Error()})
+		return
+	}
+	defer res.Body.Close()
+
+	respBody, _ := io.ReadAll(res.Body)
+	ctx.Data(res.StatusCode, "application/json; charset=utf-8", respBody)
+}
+
 func (c *Clowder) connectCatContact(ctx *wkhttp.Context) {
 	var req catContactRequest
 	if err := ctx.BindJSON(&req); err != nil {
@@ -207,7 +847,7 @@ func (c *Clowder) connectCatContact(ctx *wkhttp.Context) {
 		ctx.JSON(http.StatusBadGateway, map[string]string{"error": "cat_directory_unavailable", "message": err.Error()})
 		return
 	}
-	response, ok := catContactResponse(req.CatID, directory, "existing")
+	response, ok := catContactResponse(req.CatID, directory.Agents, "existing")
 	if !ok {
 		ctx.JSON(http.StatusNotFound, map[string]string{"error": "cat_not_found"})
 		return
@@ -237,32 +877,33 @@ func (c *Clowder) createCatAndConnect(ctx *wkhttp.Context) {
 		return
 	}
 	if directory, err := c.fetchCatDirectory(ctx.GetLoginUID()); err == nil {
-		if response, ok := catContactResponse(name, directory, "runtime-created"); ok {
+		if response, ok := catContactResponse(name, directory.Agents, "runtime-created"); ok {
 			ctx.JSON(http.StatusOK, response)
 			return
 		}
-		if response, ok := catContactResponse(alias, directory, "runtime-created"); ok {
+		if response, ok := catContactResponse(alias, directory.Agents, "runtime-created"); ok {
 			ctx.JSON(http.StatusOK, response)
 			return
-		}
-	}
-	if _, err := c.sendCommand(clowderAIDirectChannelID, 1, ctx.GetLoginUID(), "/new IM Web 猫猫联系人"); err == nil {
-		if _, err := c.sendCommand(clowderAIDirectChannelID, 1, ctx.GetLoginUID(), createCommand); err != nil {
-			ctx.JSON(http.StatusBadGateway, map[string]string{"error": "cat_create_failed", "message": err.Error()})
-			return
-		}
-		if directory, err := c.fetchCatDirectory(ctx.GetLoginUID()); err == nil {
-			if response, ok := catContactResponse(name, directory, "runtime-created"); ok {
-				ctx.JSON(http.StatusOK, response)
-				return
-			}
-			if response, ok := catContactResponse(alias, directory, "runtime-created"); ok {
-				ctx.JSON(http.StatusOK, response)
-				return
-			}
 		}
 	}
 	ctx.JSON(http.StatusOK, fallbackCreatedCatResponse(req, alias))
+}
+
+func (c *Clowder) deleteCatContact(ctx *wkhttp.Context) {
+	catID := strings.TrimSpace(ctx.Param("catId"))
+	if catID == "" {
+		ctx.JSON(http.StatusBadRequest, map[string]string{"error": "cat_required"})
+		return
+	}
+	statusCode, body, err := c.deleteCatFromUpstream(catID, ctx.GetLoginUID())
+	if err != nil {
+		ctx.JSON(http.StatusBadGateway, map[string]string{"error": "cat_delete_unavailable", "message": err.Error()})
+		return
+	}
+	if statusCode >= 200 && statusCode < 300 {
+		c.pruneGroupCatState(catID)
+	}
+	ctx.Data(statusCode, "application/json; charset=utf-8", body)
 }
 
 func (c *Clowder) syncGroupCats(ctx *wkhttp.Context) {
@@ -294,6 +935,157 @@ func (c *Clowder) groupCats(ctx *wkhttp.Context) {
 		Cats:    []ClowderAgent{},
 		Prompt:  "",
 	})
+}
+
+func (c *Clowder) ensureProjectGroup(ctx *wkhttp.Context) {
+	var req projectGroupEnsureRequest
+	if err := ctx.BindJSON(&req); err != nil {
+		ctx.JSON(http.StatusBadRequest, map[string]string{"error": "invalid_body"})
+		return
+	}
+	userID := strings.TrimSpace(ctx.GetLoginUID())
+	if userID == "" {
+		ctx.JSON(http.StatusUnauthorized, map[string]string{"error": "login_required"})
+		return
+	}
+	if c.ctx == nil {
+		ctx.JSON(http.StatusServiceUnavailable, map[string]string{"error": "im_context_unavailable"})
+		return
+	}
+	projectName := normalizeProjectGroupName(req.ProjectName)
+	pmChannelID := strings.TrimSpace(req.PMDirectChannelID)
+	if pmChannelID == "" || req.PMDirectChannelType == 0 {
+		ctx.JSON(http.StatusBadRequest, map[string]string{"error": "pm_direct_channel_required"})
+		return
+	}
+	pmMemberID := strings.TrimSpace(req.PMMemberID)
+	if pmMemberID == "" {
+		pmMemberID = defaultPMMemberID
+	}
+	pmDisplayName := strings.TrimSpace(req.PMDisplayName)
+	if pmDisplayName == "" {
+		pmDisplayName = "PM / 协调者"
+	}
+	key := projectGroupBindingKey(userID, pmChannelID, req.PMDirectChannelType, projectName)
+
+	c.projectGroupMu.Lock()
+	defer c.projectGroupMu.Unlock()
+	if c.projectGroupBindings == nil {
+		c.projectGroupBindings = map[string]ProjectGroupBinding{}
+	}
+	if binding, ok := c.projectGroupBindings[key]; ok && binding.Status == "active" {
+		binding.UpdatedAt = time.Now().UnixMilli()
+		if req.ProjectThreadID != "" {
+			binding.ProjectThreadID = strings.TrimSpace(req.ProjectThreadID)
+		}
+		c.projectGroupBindings[key] = binding
+		_ = c.ensureVirtualClowderUser(pmMemberID, pmDisplayName)
+		_ = c.ensureProjectGroupMembers(binding.ProjectGroupNo, userID, pmMemberID)
+		_ = c.sendProjectGroupHandoff(userID, req, binding, true)
+		ctx.JSON(http.StatusOK, projectGroupEnsureResponse{
+			Binding: binding,
+			Group:   projectGroupResponse(binding.ProjectGroupNo, binding.ProjectName, userID),
+			Reused:  true,
+		})
+		return
+	}
+
+	if err := c.ensureVirtualClowderUser(pmMemberID, pmDisplayName); err != nil {
+		ctx.JSON(http.StatusBadGateway, map[string]string{"error": "pm_member_prepare_failed", "message": err.Error()})
+		return
+	}
+
+	groupNo, reused, err := c.findOrCreateProjectGroup(projectName, userID, pmMemberID)
+	if err != nil {
+		ctx.JSON(http.StatusBadGateway, map[string]string{"error": "project_group_create_failed", "message": err.Error()})
+		return
+	}
+
+	now := time.Now().UnixMilli()
+	binding := ProjectGroupBinding{
+		ID:                  util.GenerUUID(),
+		UserID:              userID,
+		ProjectName:         projectName,
+		WorkspaceID:         strings.TrimSpace(req.WorkspaceID),
+		PMDirectChannelID:   pmChannelID,
+		PMDirectChannelType: req.PMDirectChannelType,
+		PMDirectThreadID:    strings.TrimSpace(req.PMDirectThreadID),
+		ProjectGroupNo:      groupNo,
+		ProjectThreadID:     strings.TrimSpace(req.ProjectThreadID),
+		PMMemberID:          pmMemberID,
+		UserMemberIDs:       projectGroupRequiredMemberUIDs(userID, pmMemberID, req.UserMemberIDs),
+		CatMemberIDs:        cleanStringList(req.CatMemberIDs),
+		CreatedBy:           "pm",
+		CreatedAt:           now,
+		UpdatedAt:           now,
+		Status:              "active",
+	}
+	if strings.TrimSpace(req.CreatedBy) != "" {
+		binding.CreatedBy = strings.TrimSpace(req.CreatedBy)
+	}
+	c.projectGroupBindings[key] = binding
+	_ = c.sendProjectGroupHandoff(userID, req, binding, reused)
+
+	ctx.JSON(http.StatusOK, projectGroupEnsureResponse{
+		Binding: binding,
+		Group:   projectGroupResponse(groupNo, projectName, userID),
+		Reused:  reused,
+	})
+}
+
+func (c *Clowder) activeProjectGroup(ctx *wkhttp.Context) {
+	userID := strings.TrimSpace(ctx.GetLoginUID())
+	if userID == "" {
+		ctx.JSON(http.StatusUnauthorized, map[string]string{"error": "login_required"})
+		return
+	}
+	pmChannelID := strings.TrimSpace(ctx.Query("pmDirectChannelId"))
+	rawChannelType := strings.TrimSpace(ctx.Query("pmDirectChannelType"))
+	if pmChannelID == "" || rawChannelType == "" {
+		ctx.JSON(http.StatusBadRequest, map[string]string{"error": "pm_direct_channel_required"})
+		return
+	}
+	parsedType, err := strconv.ParseUint(rawChannelType, 10, 8)
+	if err != nil || parsedType == 0 {
+		ctx.JSON(http.StatusBadRequest, map[string]string{"error": "pm_direct_channel_required"})
+		return
+	}
+	projectName := strings.TrimSpace(ctx.Query("projectName"))
+	binding, ok := c.findActiveProjectGroupBinding(userID, pmChannelID, uint8(parsedType), projectName)
+	if !ok {
+		ctx.JSON(http.StatusNotFound, map[string]string{"error": "active_project_group_not_found"})
+		return
+	}
+	ctx.JSON(http.StatusOK, projectGroupBindingResponse{Binding: binding})
+}
+
+func (c *Clowder) updateProjectGroupThread(ctx *wkhttp.Context) {
+	userID := strings.TrimSpace(ctx.GetLoginUID())
+	if userID == "" {
+		ctx.JSON(http.StatusUnauthorized, map[string]string{"error": "login_required"})
+		return
+	}
+	bindingID := strings.TrimSpace(ctx.Param("bindingId"))
+	if bindingID == "" {
+		ctx.JSON(http.StatusBadRequest, map[string]string{"error": "binding_id_required"})
+		return
+	}
+	var req projectGroupThreadUpdateRequest
+	if err := ctx.BindJSON(&req); err != nil {
+		ctx.JSON(http.StatusBadRequest, map[string]string{"error": "invalid_body"})
+		return
+	}
+	threadID := strings.TrimSpace(req.ProjectThreadID)
+	if threadID == "" {
+		ctx.JSON(http.StatusBadRequest, map[string]string{"error": "project_thread_id_required"})
+		return
+	}
+	binding, ok := c.updateProjectGroupBindingThread(bindingID, userID, threadID)
+	if !ok {
+		ctx.JSON(http.StatusNotFound, map[string]string{"error": "project_group_binding_not_found"})
+		return
+	}
+	ctx.JSON(http.StatusOK, projectGroupBindingResponse{Binding: binding})
 }
 
 func (c *Clowder) storeGroupCats(req groupCatSyncRequest) groupCatSyncResponse {
@@ -339,6 +1131,397 @@ func (c *Clowder) loadGroupCats(groupID string) (groupCatSyncResponse, bool) {
 	return response, ok
 }
 
+func normalizeProjectGroupName(value string) string {
+	trimmed := strings.Trim(strings.TrimSpace(value), "「」『』“”\"'")
+	if trimmed == "" {
+		return "项目群聊"
+	}
+	runes := []rune(trimmed)
+	if len(runes) > 20 {
+		return string(runes[:20])
+	}
+	return trimmed
+}
+
+func projectGroupBindingKey(userID string, pmChannelID string, pmChannelType uint8, projectName string) string {
+	return strings.ToLower(strings.Join([]string{
+		strings.TrimSpace(userID),
+		externalChatIDForUser(pmChannelID, pmChannelType, userID),
+		normalizeProjectGroupName(projectName),
+	}, "|"))
+}
+
+func projectGroupRequiredMemberUIDs(userID string, pmMemberID string, extraUserIDs []string) []string {
+	return cleanStringList(append([]string{userID, pmMemberID}, extraUserIDs...))
+}
+
+func projectGroupResponse(groupNo string, groupName string, owner string) map[string]interface{} {
+	return map[string]interface{}{
+		"group_no": groupNo,
+		"name":     groupName,
+		"owner":    owner,
+		"creator":  owner,
+		"status":   1,
+		"role":     1,
+	}
+}
+
+func (c *Clowder) findActiveProjectGroupBinding(userID string, pmChannelID string, pmChannelType uint8, projectName string) (ProjectGroupBinding, bool) {
+	c.projectGroupMu.RLock()
+	defer c.projectGroupMu.RUnlock()
+	if c.projectGroupBindings == nil {
+		return ProjectGroupBinding{}, false
+	}
+	trimmedUserID := strings.TrimSpace(userID)
+	trimmedPMChannelID := strings.TrimSpace(pmChannelID)
+	normalizedProjectName := normalizeProjectGroupName(projectName)
+	hasProjectName := strings.TrimSpace(projectName) != ""
+	var best ProjectGroupBinding
+	for _, binding := range c.projectGroupBindings {
+		if binding.Status != "active" {
+			continue
+		}
+		if strings.TrimSpace(binding.UserID) != trimmedUserID {
+			continue
+		}
+		if strings.TrimSpace(binding.PMDirectChannelID) != trimmedPMChannelID || binding.PMDirectChannelType != pmChannelType {
+			continue
+		}
+		if hasProjectName && normalizeProjectGroupName(binding.ProjectName) != normalizedProjectName {
+			continue
+		}
+		if best.ID == "" || binding.UpdatedAt > best.UpdatedAt {
+			best = binding
+		}
+	}
+	return best, best.ID != ""
+}
+
+func (c *Clowder) updateProjectGroupBindingThread(bindingID string, userID string, projectThreadID string) (ProjectGroupBinding, bool) {
+	c.projectGroupMu.Lock()
+	defer c.projectGroupMu.Unlock()
+	if c.projectGroupBindings == nil {
+		return ProjectGroupBinding{}, false
+	}
+	trimmedBindingID := strings.TrimSpace(bindingID)
+	trimmedUserID := strings.TrimSpace(userID)
+	trimmedThreadID := strings.TrimSpace(projectThreadID)
+	for key, binding := range c.projectGroupBindings {
+		if strings.TrimSpace(binding.ID) != trimmedBindingID || strings.TrimSpace(binding.UserID) != trimmedUserID {
+			continue
+		}
+		binding.ProjectThreadID = trimmedThreadID
+		binding.UpdatedAt = time.Now().UnixMilli()
+		c.projectGroupBindings[key] = binding
+		return binding, true
+	}
+	return ProjectGroupBinding{}, false
+}
+
+func (c *Clowder) findOrCreateProjectGroup(projectName string, userID string, pmMemberID string) (string, bool, error) {
+	if existing, ok, err := c.findExistingProjectGroup(projectName, userID); err != nil {
+		return "", false, err
+	} else if ok {
+		if err := c.ensureProjectGroupMembers(existing, userID, pmMemberID); err != nil {
+			return "", true, err
+		}
+		return existing, true, nil
+	}
+	groupNo, err := c.createProjectGroup(projectName, userID, pmMemberID)
+	return groupNo, false, err
+}
+
+func (c *Clowder) findExistingProjectGroup(projectName string, userID string) (string, bool, error) {
+	if c.ctx == nil {
+		return "", false, fmt.Errorf("im context unavailable")
+	}
+	type row struct {
+		GroupNo string `db:"group_no"`
+	}
+	rows := make([]row, 0, 1)
+	_, err := c.ctx.DB().
+		Select("g.group_no").
+		From("`group` g").
+		Join("group_member", "g.group_no=group_member.group_no").
+		Where("g.name=? and g.status=1 and group_member.uid=? and group_member.is_deleted=0 and group_member.status=1", projectName, userID).
+		Limit(1).
+		Load(&rows)
+	if err != nil {
+		return "", false, err
+	}
+	if len(rows) == 0 || strings.TrimSpace(rows[0].GroupNo) == "" {
+		return "", false, nil
+	}
+	return strings.TrimSpace(rows[0].GroupNo), true, nil
+}
+
+func (c *Clowder) createProjectGroup(projectName string, userID string, pmMemberID string) (string, error) {
+	if c.ctx == nil {
+		return "", fmt.Errorf("im context unavailable")
+	}
+	groupNo := util.GenerUUID()
+	version := c.ctx.GenSeq(common.GroupSeqKey)
+	memberUIDs := projectGroupRequiredMemberUIDs(userID, pmMemberID, nil)
+
+	tx, err := c.ctx.DB().Begin()
+	if err != nil {
+		return "", err
+	}
+	defer func() {
+		if err := recover(); err != nil {
+			tx.RollbackUnlessCommitted()
+			panic(err)
+		}
+	}()
+
+	_, err = tx.InsertBySql(
+		"insert into `group` (group_no,name,creator,status,version,allow_view_history_msg) values(?,?,?,?,?,?)",
+		groupNo,
+		projectName,
+		userID,
+		1,
+		version,
+		int(common.GroupAllowViewHistoryMsgEnabled),
+	).Exec()
+	if err != nil {
+		tx.RollbackUnlessCommitted()
+		return "", err
+	}
+
+	for _, uid := range memberUIDs {
+		memberVersion := c.ctx.GenSeq(common.GroupMemberSeqKey)
+		role := 0
+		robot := 0
+		if uid == userID {
+			role = 1
+		} else if uid == pmMemberID {
+			role = 2
+			robot = 1
+		}
+		_, err = tx.InsertBySql(
+			"insert into group_member (group_no,uid,role,version,status,vercode,robot,invite_uid) values(?,?,?,?,?,?,?,?)",
+			groupNo,
+			uid,
+			role,
+			memberVersion,
+			int(common.GroupMemberStatusNormal),
+			fmt.Sprintf("%s@%d", util.GenerUUID(), common.GroupMember),
+			robot,
+			userID,
+		).Exec()
+		if err != nil {
+			tx.RollbackUnlessCommitted()
+			return "", err
+		}
+	}
+
+	if err := c.ctx.IMCreateOrUpdateChannel(&config.ChannelCreateReq{
+		ChannelID:   groupNo,
+		ChannelType: common.ChannelTypeGroup.Uint8(),
+		Subscribers: memberUIDs,
+	}); err != nil {
+		tx.RollbackUnlessCommitted()
+		return "", err
+	}
+
+	if err := tx.Commit(); err != nil {
+		tx.RollbackUnlessCommitted()
+		return "", err
+	}
+	return groupNo, nil
+}
+
+func (c *Clowder) ensureProjectGroupMembers(groupNo string, userID string, pmMemberID string) error {
+	memberUIDs := projectGroupRequiredMemberUIDs(userID, pmMemberID, nil)
+	existing := make([]string, 0, len(memberUIDs))
+	_, err := c.ctx.DB().
+		Select("uid").
+		From("group_member").
+		Where("group_no=? and uid in ? and is_deleted=0 and status=1", groupNo, memberUIDs).
+		Load(&existing)
+	if err != nil {
+		return err
+	}
+	existingSet := map[string]bool{}
+	for _, uid := range existing {
+		existingSet[strings.TrimSpace(uid)] = true
+	}
+	missing := make([]string, 0)
+	for _, uid := range memberUIDs {
+		if !existingSet[uid] {
+			missing = append(missing, uid)
+		}
+	}
+	if len(missing) == 0 {
+		return nil
+	}
+	tx, err := c.ctx.DB().Begin()
+	if err != nil {
+		return err
+	}
+	for _, uid := range missing {
+		role := 0
+		robot := 0
+		if uid == pmMemberID {
+			role = 2
+			robot = 1
+		}
+		_, err = tx.InsertBySql(
+			"insert into group_member (group_no,uid,role,version,status,vercode,robot,invite_uid) values(?,?,?,?,?,?,?,?)",
+			groupNo,
+			uid,
+			role,
+			c.ctx.GenSeq(common.GroupMemberSeqKey),
+			int(common.GroupMemberStatusNormal),
+			fmt.Sprintf("%s@%d", util.GenerUUID(), common.GroupMember),
+			robot,
+			userID,
+		).Exec()
+		if err != nil {
+			tx.RollbackUnlessCommitted()
+			return err
+		}
+	}
+	if err := c.ctx.IMAddSubscriber(&config.SubscriberAddReq{
+		ChannelID:   groupNo,
+		ChannelType: common.ChannelTypeGroup.Uint8(),
+		Subscribers: missing,
+	}); err != nil {
+		tx.RollbackUnlessCommitted()
+		return err
+	}
+	if err := tx.Commit(); err != nil {
+		tx.RollbackUnlessCommitted()
+		return err
+	}
+	return nil
+}
+
+func (c *Clowder) sendProjectGroupHandoff(userID string, req projectGroupEnsureRequest, binding ProjectGroupBinding, reused bool) error {
+	if c.ctx == nil {
+		return fmt.Errorf("im context unavailable")
+	}
+	verb := "已创建"
+	if reused {
+		verb = "会继续使用"
+	}
+	content := fmt.Sprintf("我%s项目群「%s」，你和相关猫猫都在里面。后续执行会在项目群里进行，我会在这里同步关键进度和等你反馈。", verb, binding.ProjectName)
+	msgReq, err := BuildOutboundMessageWithDefaultRecipient(OutboundPayload{
+		ConnectorID:    ConnectorID,
+		ExternalChatID: externalChatIDForUser(req.PMDirectChannelID, req.PMDirectChannelType, userID),
+		ThreadID:       binding.PMDirectThreadID,
+		CatID:          "coordinator",
+		CatDisplayName: "PM",
+		Content:        content,
+		Format:         "markdown",
+		Metadata: map[string]interface{}{
+			"project_group_no":   binding.ProjectGroupNo,
+			"project_group_name": binding.ProjectName,
+			"project_binding_id": binding.ID,
+			"project_handoff":    true,
+			"reused":             reused,
+		},
+	}, userID)
+	if err != nil {
+		return err
+	}
+	if isClowderVirtualSenderUID(msgReq.FromUID) {
+		if err := c.ensureVirtualClowderUser(msgReq.FromUID, "PM"); err != nil {
+			return err
+		}
+	}
+	return c.ctx.SendMessage(msgReq)
+}
+
+func (c *Clowder) deleteCatFromUpstream(catID string, userID string) (int, []byte, error) {
+	if !c.config.IsConfigured() {
+		return 0, nil, fmt.Errorf("clowder bridge is not configured")
+	}
+	trimmed := strings.TrimSpace(catID)
+	if trimmed == "" {
+		return 0, nil, fmt.Errorf("cat is required")
+	}
+	endpoint := strings.TrimRight(c.config.APIBaseURL, "/") + "/api/cats/" + url.PathEscape(trimmed)
+	req, err := http.NewRequest(http.MethodDelete, endpoint, nil)
+	if err != nil {
+		return 0, nil, err
+	}
+	c.applyDirectoryUserHeader(req, userID)
+
+	res, err := c.httpClient().Do(req)
+	if err != nil {
+		return 0, nil, err
+	}
+	defer res.Body.Close()
+	body, _ := io.ReadAll(res.Body)
+	return res.StatusCode, body, nil
+}
+
+func (c *Clowder) fetchLocalAuthCapabilities(userID string) (int, []byte, error) {
+	if !c.config.IsConfigured() {
+		return 0, nil, fmt.Errorf("clowder bridge is not configured")
+	}
+	endpoint := strings.TrimRight(c.config.APIBaseURL, "/") + "/api/local-auth/capabilities"
+	req, err := http.NewRequest(http.MethodGet, endpoint, nil)
+	if err != nil {
+		return 0, nil, err
+	}
+	c.applyDirectoryUserHeader(req, userID)
+
+	res, err := c.httpClient().Do(req)
+	if err != nil {
+		return 0, nil, err
+	}
+	defer res.Body.Close()
+	body, readErr := io.ReadAll(res.Body)
+	if readErr != nil {
+		return 0, nil, readErr
+	}
+	return res.StatusCode, body, nil
+}
+
+func (c *Clowder) pruneGroupCatState(catID string) int {
+	needle := normalizeCatLookup(catID)
+	if needle == "" {
+		return 0
+	}
+	affected := 0
+	c.groupCatsMu.Lock()
+	defer c.groupCatsMu.Unlock()
+	for groupID, state := range c.groupCatState {
+		nextIDs := make([]string, 0, len(state.CatIDs))
+		removed := false
+		for _, id := range state.CatIDs {
+			if normalizeCatLookup(id) == needle {
+				removed = true
+				continue
+			}
+			nextIDs = append(nextIDs, id)
+		}
+
+		nextCats := make([]ClowderAgent, 0, len(state.Cats))
+		for _, cat := range state.Cats {
+			if normalizeCatLookup(cat.CatID) == needle {
+				removed = true
+				continue
+			}
+			nextCats = append(nextCats, cat)
+		}
+
+		if !removed {
+			continue
+		}
+		state.CatIDs = nextIDs
+		state.Cats = nextCats
+		if len(nextIDs) == 0 && len(nextCats) == 0 {
+			state.Prompt = ""
+		}
+		c.groupCatState[groupID] = state
+		affected++
+	}
+	return affected
+}
+
 func decorateGroupCats(cats []ClowderAgent) []ClowderAgent {
 	decorated := make([]ClowderAgent, 0, len(cats))
 	for _, cat := range cats {
@@ -366,12 +1549,25 @@ func (c *Clowder) bindConversation(ctx *wkhttp.Context) {
 		ctx.JSON(http.StatusBadGateway, map[string]string{"error": "bind_failed", "message": err.Error()})
 		return
 	}
+	threadID := strings.TrimSpace(response.ThreadID)
+	if threadID == "" {
+		directory, err := c.fetchAgentDirectory(req.ChannelID, req.ChannelType, ctx.GetLoginUID())
+		if err != nil {
+			ctx.JSON(http.StatusBadGateway, map[string]string{"error": "bind_lookup_failed", "message": err.Error()})
+			return
+		}
+		threadID = strings.TrimSpace(directory.ThreadID)
+	}
+	if threadID == "" {
+		ctx.JSON(http.StatusBadGateway, map[string]string{"error": "bind_thread_missing"})
+		return
+	}
 	ctx.JSON(http.StatusOK, IMConnectorBinding{
 		ConnectorID:    ConnectorID,
 		ExternalChatID: externalChatIDForUser(req.ChannelID, req.ChannelType, ctx.GetLoginUID()),
 		ChannelID:      req.ChannelID,
 		ChannelType:    req.ChannelType,
-		ThreadID:       response.ThreadID,
+		ThreadID:       threadID,
 		UserID:         ctx.GetLoginUID(),
 		Status:         BindingStatusActive,
 	})
@@ -437,6 +1633,103 @@ func (c *Clowder) conversationMessage(ctx *wkhttp.Context) {
 		return
 	}
 	ctx.JSON(http.StatusOK, response)
+}
+
+// conversationDeploymentAction proxies structured deployment approvals from
+// IM Web to Clowder. Deployment card clicks must not be downgraded to natural
+// language chat messages because approvals need idempotency and audit fields.
+func (c *Clowder) conversationDeploymentAction(ctx *wkhttp.Context) {
+	if !c.config.IsConfigured() {
+		ctx.JSON(http.StatusBadGateway, map[string]string{"error": "clowder_bridge_not_configured"})
+		return
+	}
+	body, err := io.ReadAll(ctx.Request.Body)
+	if err != nil {
+		ctx.JSON(http.StatusBadRequest, map[string]string{"error": "invalid_body", "message": err.Error()})
+		return
+	}
+	endpoint := strings.TrimRight(c.config.APIBaseURL, "/") + "/api/connectors/im-web/deployment-action"
+	req, err := http.NewRequest(http.MethodPost, endpoint, bytes.NewReader(body))
+	if err != nil {
+		ctx.JSON(http.StatusInternalServerError, map[string]string{"error": "build_request_failed", "message": err.Error()})
+		return
+	}
+	req.Header.Set("Content-Type", "application/json")
+	c.applyDirectoryUserHeader(req, ctx.GetLoginUID())
+
+	res, err := c.httpClient().Do(req)
+	if err != nil {
+		ctx.JSON(http.StatusBadGateway, map[string]string{"error": "deployment_action_unavailable", "message": err.Error()})
+		return
+	}
+	defer res.Body.Close()
+
+	respBody, _ := io.ReadAll(res.Body)
+	ctx.Data(res.StatusCode, "application/json; charset=utf-8", respBody)
+}
+
+func (c *Clowder) conversationDeploymentRequest(ctx *wkhttp.Context) {
+	body, ok := c.readJSONBody(ctx)
+	if !ok {
+		return
+	}
+	c.proxyToClowder(ctx, http.MethodPost, "/api/connectors/im-web/deployment-requests", bytes.NewReader(body), "deployment_request_unavailable")
+}
+
+func (c *Clowder) conversationDeploymentRequestUpdate(ctx *wkhttp.Context) {
+	deploymentRequestID := strings.TrimSpace(ctx.Param("deploymentRequestId"))
+	if deploymentRequestID == "" {
+		ctx.JSON(http.StatusBadRequest, map[string]string{"error": "deployment_request_id_required"})
+		return
+	}
+	body, ok := c.readJSONBody(ctx)
+	if !ok {
+		return
+	}
+	c.proxyToClowder(
+		ctx,
+		http.MethodPatch,
+		"/api/connectors/im-web/deployment-requests/"+url.PathEscape(deploymentRequestID),
+		bytes.NewReader(body),
+		"deployment_request_update_unavailable",
+	)
+}
+
+func (c *Clowder) conversationDeploymentRequestActive(ctx *wkhttp.Context) {
+	c.proxyToClowder(ctx, http.MethodGet, "/api/connectors/im-web/deployment-requests/active", nil, "deployment_request_active_unavailable")
+}
+
+func (c *Clowder) conversationDeploymentRequestDetail(ctx *wkhttp.Context) {
+	deploymentRequestID := strings.TrimSpace(ctx.Param("deploymentRequestId"))
+	if deploymentRequestID == "" {
+		ctx.JSON(http.StatusBadRequest, map[string]string{"error": "deployment_request_id_required"})
+		return
+	}
+	c.proxyToClowder(
+		ctx,
+		http.MethodGet,
+		"/api/connectors/im-web/deployment-requests/"+url.PathEscape(deploymentRequestID),
+		nil,
+		"deployment_request_unavailable",
+	)
+}
+
+func (c *Clowder) proxyGetDeployment(ctx *wkhttp.Context) {
+	deploymentID := strings.TrimSpace(ctx.Param("deploymentId"))
+	if deploymentID == "" {
+		ctx.JSON(http.StatusBadRequest, map[string]string{"error": "deployment_id_required"})
+		return
+	}
+	c.proxyToClowder(ctx, http.MethodGet, "/api/deployments/"+url.PathEscape(deploymentID), nil, "deployment_unavailable")
+}
+
+func (c *Clowder) proxyGetDeploymentLogs(ctx *wkhttp.Context) {
+	deploymentID := strings.TrimSpace(ctx.Param("deploymentId"))
+	if deploymentID == "" {
+		ctx.JSON(http.StatusBadRequest, map[string]string{"error": "deployment_id_required"})
+		return
+	}
+	c.proxyToClowder(ctx, http.MethodGet, "/api/deployments/"+url.PathEscape(deploymentID)+"/logs", nil, "deployment_logs_unavailable")
 }
 
 func (c *Clowder) outbound(ctx *wkhttp.Context) {
@@ -519,12 +1812,17 @@ func (c *Clowder) queryConversationRef(ctx *wkhttp.Context) (string, uint8, bool
 }
 
 func (c *Clowder) fetchAgentDirectory(channelID string, channelType uint8, userID string) (AgentDirectoryResponse, error) {
+	directory, _, err := c.fetchAgentDirectoryWithTemplateResponse(channelID, channelType, userID)
+	return directory, err
+}
+
+func (c *Clowder) fetchAgentDirectoryWithTemplateResponse(channelID string, channelType uint8, userID string) (AgentDirectoryResponse, *catTemplatesResponse, error) {
 	if !c.config.IsConfigured() {
-		return AgentDirectoryResponse{}, fmt.Errorf("clowder bridge is not configured")
+		return AgentDirectoryResponse{}, nil, fmt.Errorf("clowder bridge is not configured")
 	}
 	endpoint, err := url.Parse(strings.TrimRight(c.config.APIBaseURL, "/") + "/api/connectors/im-web/agents")
 	if err != nil {
-		return AgentDirectoryResponse{}, err
+		return AgentDirectoryResponse{}, nil, err
 	}
 	query := endpoint.Query()
 	query.Set("externalChatId", externalChatIDForUser(channelID, channelType, userID))
@@ -532,8 +1830,105 @@ func (c *Clowder) fetchAgentDirectory(channelID string, channelType uint8, userI
 
 	req, err := http.NewRequest(http.MethodGet, endpoint.String(), nil)
 	if err != nil {
-		return AgentDirectoryResponse{}, err
+		return AgentDirectoryResponse{}, nil, err
 	}
+	c.applyDirectoryUserHeader(req, userID)
+
+	res, err := c.httpClient().Do(req)
+	if err != nil {
+		return c.fallbackAgentDirectoryWithTemplateResponse(userID, err)
+	}
+	defer res.Body.Close()
+	if res.StatusCode < 200 || res.StatusCode >= 300 {
+		return c.fallbackAgentDirectoryWithTemplateResponse(userID, fmt.Errorf("clowder agents failed: %s", res.Status))
+	}
+
+	var directory AgentDirectoryResponse
+	if err := json.NewDecoder(res.Body).Decode(&directory); err != nil {
+		return c.fallbackAgentDirectoryWithTemplateResponse(userID, err)
+	}
+	if directory.Agents == nil {
+		directory.Agents = []ClowderAgent{}
+	}
+	if len(directory.Agents) == 0 {
+		if fallback, templateResponse, fallbackErr := c.fetchTemplateCandidateDirectoryWithResponse(userID); fallbackErr == nil && len(fallback.Agents) > 0 {
+			return fallback, &templateResponse, nil
+		}
+	}
+	return directory, nil, nil
+}
+
+func (c *Clowder) fallbackAgentDirectory(userID string, cause error) (AgentDirectoryResponse, error) {
+	fallback, _, fallbackErr := c.fallbackAgentDirectoryWithTemplateResponse(userID, cause)
+	return fallback, fallbackErr
+}
+
+func (c *Clowder) fallbackAgentDirectoryWithTemplateResponse(userID string, cause error) (AgentDirectoryResponse, *catTemplatesResponse, error) {
+	fallback, templateResponse, fallbackErr := c.fetchTemplateCandidateDirectoryWithResponse(userID)
+	if fallbackErr == nil && len(fallback.Agents) > 0 {
+		return fallback, &templateResponse, nil
+	}
+	if cause != nil {
+		return AgentDirectoryResponse{}, nil, cause
+	}
+	return fallback, nil, fallbackErr
+}
+
+func (c *Clowder) fetchTemplateCandidateDirectory(userID string) (AgentDirectoryResponse, error) {
+	directory, _, err := c.fetchTemplateCandidateDirectoryWithResponse(userID)
+	return directory, err
+}
+
+func (c *Clowder) fetchTemplateCandidateDirectoryWithResponse(userID string) (AgentDirectoryResponse, catTemplatesResponse, error) {
+	templateResponse, err := c.fetchCatTemplates(userID)
+	if err != nil {
+		return AgentDirectoryResponse{}, catTemplatesResponse{}, err
+	}
+
+	agents := make([]ClowderAgent, 0, len(templateResponse.Templates))
+	for _, template := range templateResponse.Templates {
+		if agent, ok := catTemplateCandidateAgent(template); ok {
+			agents = append(agents, agent)
+		}
+	}
+	return AgentDirectoryResponse{Agents: agents}, templateResponse, nil
+}
+
+func (c *Clowder) fetchCatTemplates(userID string) (catTemplatesResponse, error) {
+	if !c.config.IsConfigured() {
+		return catTemplatesResponse{}, fmt.Errorf("clowder bridge is not configured")
+	}
+	endpoint, err := url.Parse(strings.TrimRight(c.config.APIBaseURL, "/") + "/api/cat-templates")
+	if err != nil {
+		return catTemplatesResponse{}, err
+	}
+
+	req, err := http.NewRequest(http.MethodGet, endpoint.String(), nil)
+	if err != nil {
+		return catTemplatesResponse{}, err
+	}
+	c.applyDirectoryUserHeader(req, userID)
+
+	res, err := c.httpClient().Do(req)
+	if err != nil {
+		return catTemplatesResponse{}, err
+	}
+	defer res.Body.Close()
+	if res.StatusCode < 200 || res.StatusCode >= 300 {
+		return catTemplatesResponse{}, fmt.Errorf("clowder cat templates failed: %s", res.Status)
+	}
+
+	var response catTemplatesResponse
+	if err := json.NewDecoder(res.Body).Decode(&response); err != nil {
+		return catTemplatesResponse{}, err
+	}
+	if response.Templates == nil {
+		response.Templates = []catTemplate{}
+	}
+	return response, nil
+}
+
+func (c *Clowder) applyDirectoryUserHeader(req *http.Request, userID string) {
 	directoryUserID := strings.TrimSpace(c.config.DefaultOwnerUserID)
 	if directoryUserID == "" {
 		directoryUserID = strings.TrimSpace(userID)
@@ -541,35 +1936,169 @@ func (c *Clowder) fetchAgentDirectory(channelID string, channelType uint8, userI
 	if directoryUserID != "" {
 		req.Header.Set("x-cat-cafe-user", directoryUserID)
 	}
-
-	res, err := c.httpClient().Do(req)
-	if err != nil {
-		return AgentDirectoryResponse{}, err
-	}
-	defer res.Body.Close()
-	if res.StatusCode < 200 || res.StatusCode >= 300 {
-		return AgentDirectoryResponse{}, fmt.Errorf("clowder agents failed: %s", res.Status)
-	}
-
-	var directory AgentDirectoryResponse
-	if err := json.NewDecoder(res.Body).Decode(&directory); err != nil {
-		return AgentDirectoryResponse{}, err
-	}
-	if directory.Agents == nil {
-		directory.Agents = []ClowderAgent{}
-	}
-	return directory, nil
 }
 
-func (c *Clowder) fetchCatDirectory(userID string) (AgentDirectoryResponse, error) {
-	directory, err := c.fetchAgentDirectory(clowderAIDirectChannelID, 1, userID)
+func catTemplateCandidateAgent(template catTemplate) (ClowderAgent, bool) {
+	catID := strings.TrimSpace(template.ID)
+	if catID == "" {
+		return ClowderAgent{}, false
+	}
+	displayName := strings.TrimSpace(template.Name)
+	if displayName == "" {
+		displayName = catID
+	}
+	mentionPatterns := templateCandidateMentions(catID, displayName, template.Nickname)
+	capabilitySummary := strings.TrimSpace(template.TeamStrengths)
+	if capabilitySummary == "" {
+		capabilitySummary = strings.TrimSpace(template.RoleDescription)
+	}
+	return ClowderAgent{
+		CatID:              catID,
+		DisplayName:        displayName,
+		Aliases:            mentionPatterns,
+		MentionPatterns:    mentionPatterns,
+		Avatar:             strings.TrimSpace(template.Avatar),
+		PersonalitySummary: strings.TrimSpace(template.Personality),
+		CapabilitySummary:  capabilitySummary,
+		Available:          false,
+		AvailabilityState:  "unavailable",
+		Source:             "disconnected",
+		Connected:          false,
+	}, true
+}
+
+func catRoleTemplateCandidate(template catTemplate) (ClowderCatTemplate, bool) {
+	agent, ok := catTemplateCandidateAgent(template)
+	if !ok {
+		return ClowderCatTemplate{}, false
+	}
+	return ClowderCatTemplate{
+		RoleTemplateID:     agent.CatID,
+		CatID:              agent.CatID,
+		DisplayName:        agent.DisplayName,
+		Aliases:            agent.Aliases,
+		MentionPatterns:    agent.MentionPatterns,
+		Avatar:             agent.Avatar,
+		PersonalitySummary: agent.PersonalitySummary,
+		CapabilitySummary:  agent.CapabilitySummary,
+		Cloneable:          true,
+		Source:             "role-template",
+	}, true
+}
+
+func catRoleTemplatesFromTemplates(templates []catTemplate) []ClowderCatTemplate {
+	result := make([]ClowderCatTemplate, 0, len(templates))
+	seen := map[string]bool{}
+	for _, template := range templates {
+		candidate, ok := catRoleTemplateCandidate(template)
+		if !ok {
+			continue
+		}
+		key := strings.ToLower(candidate.RoleTemplateID)
+		if seen[key] {
+			continue
+		}
+		seen[key] = true
+		result = append(result, candidate)
+	}
+	return result
+}
+
+func catRoleTemplateFromAgent(agent ClowderAgent) (ClowderCatTemplate, bool) {
+	catID := strings.TrimSpace(agent.CatID)
+	if catID == "" {
+		return ClowderCatTemplate{}, false
+	}
+	displayName := strings.TrimSpace(agent.DisplayName)
+	if displayName == "" {
+		displayName = catID
+	}
+	return ClowderCatTemplate{
+		RoleTemplateID:     catID,
+		CatID:              catID,
+		DisplayName:        displayName,
+		Aliases:            agent.Aliases,
+		MentionPatterns:    agent.MentionPatterns,
+		Avatar:             agent.Avatar,
+		PersonalitySummary: agent.PersonalitySummary,
+		CapabilitySummary:  agent.CapabilitySummary,
+		Cloneable:          true,
+		Source:             "role-template",
+	}, true
+}
+
+func catRoleTemplatesFromFallbackAgents(agents []ClowderAgent) []ClowderCatTemplate {
+	result := make([]ClowderCatTemplate, 0, len(agents))
+	seen := map[string]bool{}
+	for _, agent := range agents {
+		if agent.Source != "disconnected" {
+			return []ClowderCatTemplate{}
+		}
+		candidate, ok := catRoleTemplateFromAgent(agent)
+		if !ok {
+			continue
+		}
+		key := strings.ToLower(candidate.RoleTemplateID)
+		if seen[key] {
+			continue
+		}
+		seen[key] = true
+		result = append(result, candidate)
+	}
+	return result
+}
+
+func templateCandidateMentions(values ...string) []string {
+	mentions := make([]string, 0, len(values))
+	seen := map[string]bool{}
+	for _, value := range values {
+		trimmed := strings.TrimPrefix(strings.TrimSpace(value), "@")
+		if trimmed == "" {
+			continue
+		}
+		mention := "@" + trimmed
+		key := strings.ToLower(mention)
+		if seen[key] {
+			continue
+		}
+		seen[key] = true
+		mentions = append(mentions, mention)
+	}
+	return mentions
+}
+
+func (c *Clowder) fetchCatDirectory(userID string) (CatDirectoryResponse, error) {
+	directory, templateResponse, err := c.fetchAgentDirectoryWithTemplateResponse(clowderAIDirectChannelID, 1, userID)
 	if err != nil {
-		return AgentDirectoryResponse{}, err
+		return CatDirectoryResponse{}, err
 	}
 	for idx := range directory.Agents {
-		directory.Agents[idx] = decorateCatContact(directory.Agents[idx], "existing")
+		directory.Agents[idx] = decorateCatDirectoryContact(directory.Agents[idx])
 	}
-	return directory, nil
+	templates := catRoleTemplatesFromFallbackAgents(directory.Agents)
+	if len(templates) == 0 {
+		if templateResponse == nil {
+			rawTemplates, templateErr := c.fetchCatTemplates(userID)
+			if templateErr == nil {
+				templateResponse = &rawTemplates
+			}
+		}
+		if templateResponse != nil {
+			templates = catRoleTemplatesFromTemplates(templateResponse.Templates)
+		}
+	}
+	clientDefaults := map[string]ClowderClientDefault(nil)
+	skillCatalog := map[string][]ClowderSkill(nil)
+	if templateResponse != nil {
+		clientDefaults = templateResponse.ClientDefaults
+		skillCatalog = templateResponse.SkillCatalog
+	}
+	return CatDirectoryResponse{
+		Agents:         directory.Agents,
+		Templates:      templates,
+		ClientDefaults: clientDefaults,
+		SkillCatalog:   skillCatalog,
+	}, nil
 }
 
 func (c *Clowder) sendCommand(channelID string, channelType uint8, userID string, text string) (RouteResponse, error) {
@@ -600,13 +2129,13 @@ func (c *Clowder) sendInboundTextWithRouting(channelID string, channelType uint8
 	})
 }
 
-func catContactResponse(catID string, directory AgentDirectoryResponse, source string) (catContactEnvelope, bool) {
+func catContactResponse(catID string, agents []ClowderAgent, source string) (catContactEnvelope, bool) {
 	needle := strings.TrimSpace(catID)
 	if needle == "" {
 		return catContactEnvelope{}, false
 	}
 	normalizedNeedle := normalizeCatLookup(needle)
-	for _, agent := range directory.Agents {
+	for _, agent := range agents {
 		if normalizeCatLookup(agent.CatID) == normalizedNeedle ||
 			normalizeCatLookup(agent.DisplayName) == normalizedNeedle ||
 			containsNormalized(agent.MentionPatterns, normalizedNeedle) ||
@@ -641,7 +2170,19 @@ func decorateCatContact(agent ClowderAgent, source string) ClowderAgent {
 	if agent.Source == "" {
 		agent.Source = source
 	}
-	agent.Connected = true
+	if !agent.Connected {
+		agent.Connected = agent.Available && agent.Source != "disconnected" && agent.Source != "stale"
+	}
+	return agent
+}
+
+func decorateCatDirectoryContact(agent ClowderAgent) ClowderAgent {
+	agent = decorateCatContact(agent, "existing")
+	if agent.Source == "disconnected" {
+		agent.Available = true
+		agent.AvailabilityState = "available"
+		agent.Connected = false
+	}
 	return agent
 }
 
@@ -739,6 +2280,9 @@ func buildCreateCatCommand(req createCatRequest) (string, bool) {
 	command := "/cats new " + name + " " + alias + " --platform " + platform + " --auth " + authType + " --account " + accountRef
 	if model := strings.TrimSpace(req.DefaultModel); model != "" {
 		command += " --model " + model
+	}
+	if roleTemplateID := strings.TrimSpace(req.RoleTemplateID); roleTemplateID != "" {
+		command += " --role-template " + roleTemplateID
 	}
 	return command, true
 }

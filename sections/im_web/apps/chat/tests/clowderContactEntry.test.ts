@@ -58,6 +58,7 @@ describe('Clowder AI fixed contact entry', () => {
     expect(contactList.default).toContain('handleConnectCat')
     expect(contactList.default).toContain('handleConfigureClowderCats')
     expect(contactList.default).toContain('Clowder 猫猫')
+    expect(contactList.default).toContain("cat.source !== 'disconnected'")
     expect(contactList.default).toContain('clowder-cat-contact')
     expect(contactList.default).toContain('cat.personalitySummary')
     expect(contactList.default).toContain('cat.capabilitySummary')

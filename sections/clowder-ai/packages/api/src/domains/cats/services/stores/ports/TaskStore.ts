@@ -106,6 +106,11 @@ export class TaskStore implements ITaskStore {
       updatedAt: now,
       automationState: input.automationState,
       userId: input.userId,
+      coordinationId: input.coordinationId,
+      dependsOn: input.dependsOn,
+      artifactRefs: input.artifactRefs,
+      workspaceId: input.workspaceId,
+      workspaceRelativePath: input.workspaceRelativePath,
     };
 
     this.tasks.set(task.id, task);
@@ -145,6 +150,11 @@ export class TaskStore implements ITaskStore {
           why: input.why,
           userId: input.userId ?? existing.userId,
           automationState: input.automationState ?? existing.automationState,
+          coordinationId: input.coordinationId ?? existing.coordinationId,
+          dependsOn: input.dependsOn ?? existing.dependsOn,
+          artifactRefs: input.artifactRefs ?? existing.artifactRefs,
+          workspaceId: input.workspaceId ?? existing.workspaceId,
+          workspaceRelativePath: input.workspaceRelativePath ?? existing.workspaceRelativePath,
           updatedAt: Date.now(),
         };
         this.tasks.set(existingId, updated);
@@ -202,6 +212,10 @@ export class TaskStore implements ITaskStore {
       ...(input.status !== undefined ? { status: input.status } : {}),
       ...(input.why !== undefined ? { why: input.why } : {}),
       ...(input.automationState !== undefined ? { automationState: input.automationState } : {}),
+      ...(input.dependsOn !== undefined ? { dependsOn: input.dependsOn } : {}),
+      ...(input.artifactRefs !== undefined ? { artifactRefs: input.artifactRefs } : {}),
+      ...(input.workspaceId !== undefined ? { workspaceId: input.workspaceId } : {}),
+      ...(input.workspaceRelativePath !== undefined ? { workspaceRelativePath: input.workspaceRelativePath } : {}),
       updatedAt: Date.now(),
     };
 

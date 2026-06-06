@@ -1,0 +1,28 @@
+[
+  {
+    "name": "desktop",
+    "viewport": "1440x900",
+    "bodyScrollWidth": 1440,
+    "editUrl": "http://localhost:5173/#/pages/agents/new?id=codex",
+    "inputValues": [
+      "Codex",
+      "codex",
+      "openai-prod",
+      "https://api.deepseek.com/v1"
+    ],
+    "passed": true
+  },
+  {
+    "name": "mobile",
+    "viewport": "375x844",
+    "bodyScrollWidth": 375,
+    "editUrl": "http://localhost:5173/#/pages/agents/new?id=codex",
+    "inputValues": [
+      "Codex",
+      "codex",
+      "openai-prod",
+      "https://api.deepseek.com/v1"
+    ],
+    "passed": true
+  }
+]

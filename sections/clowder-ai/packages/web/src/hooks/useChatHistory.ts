@@ -1,6 +1,6 @@
 'use client';
 
-import type { ReplyPreview, SchedulerMessageExtra } from '@cat-cafe/shared';
+import type { CoordinationContext, ReplyPreview, SchedulerMessageExtra } from '@cat-cafe/shared';
 import { useCallback, useEffect, useLayoutEffect, useRef } from 'react';
 import { getBubbleInvocationId, shouldForceReplaceHydrationForCachedMessages } from '@/debug/bubbleIdentity';
 import { recordDebugEvent } from '@/debug/invocationEventDebug';
@@ -160,6 +160,7 @@ function mergeMessageExtra(
   const stream = preferred?.stream ?? fallback?.stream;
   const targetCats = preferred?.targetCats ?? fallback?.targetCats;
   const scheduler = preferred?.scheduler ?? fallback?.scheduler;
+  const coordination = preferred?.coordination ?? fallback?.coordination;
   const timeoutDiagnostics = preferred?.timeoutDiagnostics ?? fallback?.timeoutDiagnostics;
   const governanceBlocked = preferred?.governanceBlocked ?? fallback?.governanceBlocked;
   const systemKind = preferred?.systemKind ?? fallback?.systemKind;
@@ -169,6 +170,7 @@ function mergeMessageExtra(
     !stream &&
     !targetCats &&
     !scheduler &&
+    !coordination &&
     !timeoutDiagnostics &&
     !governanceBlocked &&
     !systemKind
@@ -181,6 +183,7 @@ function mergeMessageExtra(
     ...(stream ? { stream } : {}),
     ...(targetCats ? { targetCats } : {}),
     ...(scheduler ? { scheduler } : {}),
+    ...(coordination ? { coordination } : {}),
     ...(timeoutDiagnostics ? { timeoutDiagnostics } : {}),
     ...(governanceBlocked ? { governanceBlocked } : {}),
     ...(systemKind ? { systemKind } : {}),
@@ -641,6 +644,7 @@ export function useChatHistory(threadId: string) {
               crossPost?: { sourceThreadId: string; sourceInvocationId?: string };
               stream?: { invocationId?: string };
               scheduler?: SchedulerMessageExtra['scheduler'];
+              coordination?: CoordinationContext;
               systemKind?: 'a2a_routing';
             };
             timestamp: number;
@@ -673,13 +677,19 @@ export function useChatHistory(threadId: string) {
               ...(m.metadata ? { metadata: m.metadata } : {}),
               ...(m.origin ? { origin: m.origin } : {}),
               ...(m.thinking ? { thinking: m.thinking } : {}),
-              ...(m.extra?.rich || m.extra?.crossPost || m.extra?.stream || m.extra?.scheduler || m.extra?.systemKind
+              ...(m.extra?.rich ||
+              m.extra?.crossPost ||
+              m.extra?.stream ||
+              m.extra?.scheduler ||
+              m.extra?.coordination ||
+              m.extra?.systemKind
                 ? {
                     extra: {
                       ...(m.extra.rich ? { rich: m.extra.rich } : {}),
                       ...(m.extra.crossPost ? { crossPost: m.extra.crossPost } : {}),
                       ...(m.extra.stream ? { stream: m.extra.stream } : {}),
                       ...(m.extra.scheduler ? { scheduler: m.extra.scheduler } : {}),
+                      ...(m.extra.coordination ? { coordination: m.extra.coordination } : {}),
                       ...(m.extra.systemKind ? { systemKind: m.extra.systemKind } : {}),
                     },
                   }

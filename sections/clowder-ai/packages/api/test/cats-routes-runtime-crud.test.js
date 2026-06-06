@@ -6,6 +6,7 @@ import { after, afterEach, beforeEach, describe, it } from 'node:test';
 import { fileURLToPath } from 'node:url';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
+const RUNTIME_CATALOG_FIXTURE_PATH = join(__dirname, 'fixtures', 'runtime-cat-catalog.json');
 
 import { catRegistry, createCatId } from '@cat-cafe/shared';
 import './helpers/setup-cat-registry.js';
@@ -92,7 +93,11 @@ const BUILTIN_ACCOUNT_IDS = {
 function seedCatalogFromTemplate(projectRoot, templatePath) {
   const tpl = templatePath || join(projectRoot, 'cat-template.json');
   const template = JSON.parse(readFileSync(tpl, 'utf-8'));
-  for (const breed of template.breeds || []) {
+  const seedSource =
+    Array.isArray(template.breeds) && template.breeds.length > 0
+      ? template
+      : JSON.parse(readFileSync(RUNTIME_CATALOG_FIXTURE_PATH, 'utf-8'));
+  for (const breed of seedSource.breeds || []) {
     for (const variant of breed.variants || []) {
       if (!variant.accountRef && variant.clientId && BUILTIN_ACCOUNT_IDS[variant.clientId]) {
         variant.accountRef = BUILTIN_ACCOUNT_IDS[variant.clientId];
@@ -101,7 +106,7 @@ function seedCatalogFromTemplate(projectRoot, templatePath) {
   }
   const catCafeDir = join(projectRoot, '.cat-cafe');
   mkdirSync(catCafeDir, { recursive: true });
-  writeFileSync(join(catCafeDir, 'cat-catalog.json'), `${JSON.stringify(template, null, 2)}\n`, 'utf-8');
+  writeFileSync(join(catCafeDir, 'cat-catalog.json'), `${JSON.stringify(seedSource, null, 2)}\n`, 'utf-8');
 }
 
 function createProjectRoot() {
@@ -188,6 +193,7 @@ describe('cats routes runtime CRUD', { concurrency: false }, () => {
         personality: '利落',
         teamStrengths: '精确点改',
         caution: '不会自动跑测试',
+        restrictions: ['禁止跳过测试'],
         strengths: ['precision', 'speed'],
         sessionChain: true,
         clientId: 'openai',
@@ -221,6 +227,7 @@ describe('cats routes runtime CRUD', { concurrency: false }, () => {
         mentionPatterns: ['@runtime-spark', '@运行时火花'],
         teamStrengths: '精确点改 + 快速修复',
         caution: '',
+        restrictions: ['禁止跳过测试', '禁止无证据交付'],
         strengths: ['precision', 'speed', 'surgical-edits'],
         sessionChain: false,
         contextBudget: {
@@ -243,6 +250,7 @@ describe('cats routes runtime CRUD', { concurrency: false }, () => {
     assert.deepEqual(runtimeCat.mentionPatterns, ['@runtime-spark', '@运行时火花']);
     assert.equal(runtimeCat.teamStrengths, '精确点改 + 快速修复');
     assert.equal(runtimeCat.caution, null);
+    assert.deepEqual(runtimeCat.restrictions, ['禁止跳过测试', '禁止无证据交付']);
     assert.deepEqual(runtimeCat.strengths, ['precision', 'speed', 'surgical-edits']);
     assert.equal(runtimeCat.sessionChain, false);
     assert.deepEqual(runtimeCat.contextBudget, {

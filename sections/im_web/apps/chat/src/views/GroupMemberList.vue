@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, onMounted, computed } from 'vue';
+import { ref, computed, watch } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
 import {
   canAppointGroupAdmin,
@@ -28,6 +28,7 @@ const memberKeyword = ref('');
 const selectedCatId = ref('');
 const pendingAction = ref<null | { title: string; message: string; danger?: boolean; run: () => Promise<void> }>(null);
 const pendingActionLoading = ref(false);
+let loadRequestSeq = 0;
 
 const filteredMembers = computed(() => {
   const keyword = memberKeyword.value.trim().toLowerCase();
@@ -82,14 +83,23 @@ const canManage = computed(() => {
   return isOwner.value || currentMemberRole.value === 2 || getMyGroupRole(groupInfo.value, userStore.currentUser?.uid) >= 1;
 });
 
-onMounted(async () => {
-  if (groupNo.value) {
-    await groupStore.getGroupInfo(groupNo.value);
-    await groupStore.fetchGroupMembers(groupNo.value);
-    await clowderStore.loadCatContactDirectory({ includeUnavailable: true }).catch(() => undefined);
-    await clowderStore.loadGroupCats(groupNo.value).catch(() => undefined);
-  }
-});
+async function loadGroupMemberState(nextGroupNo: string) {
+  const targetGroupNo = String(nextGroupNo || '').trim();
+  if (!targetGroupNo) return;
+  const requestSeq = ++loadRequestSeq;
+  selectedCatId.value = '';
+  await groupStore.getGroupInfo(targetGroupNo);
+  if (requestSeq !== loadRequestSeq) return;
+  await groupStore.fetchGroupMembers(targetGroupNo);
+  if (requestSeq !== loadRequestSeq) return;
+  await clowderStore.loadCatContactDirectory({ includeUnavailable: true }).catch(() => undefined);
+  if (requestSeq !== loadRequestSeq) return;
+  await clowderStore.loadGroupCats(targetGroupNo).catch(() => undefined);
+}
+
+watch(groupNo, (nextGroupNo) => {
+  void loadGroupMemberState(nextGroupNo);
+}, { immediate: true });
 
 async function handleRemoveMember(uid: string) {
   pendingAction.value = {
@@ -314,6 +324,7 @@ function handleGoBack() {
             <span class="member-name">{{ cat.displayName }}</span>
             <span class="role-badge cat">猫猫</span>
             <span class="cat-alias">{{ cat.aliases.join(', ') }}</span>
+            <span class="cat-identity">{{ cat.catId }}</span>
           </div>
 
           <div class="member-actions">
@@ -503,6 +514,12 @@ function handleGoBack() {
 .cat-alias {
   color: var(--text-secondary);
   font-size: 12px;
+}
+
+.cat-identity {
+  color: var(--text-tertiary, var(--text-secondary));
+  font-size: 11px;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
 }
 
 .member-actions {

@@ -1,0 +1,32 @@
+[
+  {
+    "name": "Issue 1: right pane width >= 360px",
+    "pass": true,
+    "detail": "w=421"
+  },
+  {
+    "name": "Message context menu opens on right-click",
+    "pass": true,
+    "detail": "items=复制|引用消息|添加表情状态|删除消息"
+  },
+  {
+    "name": "Issue 3: reply ref alignment",
+    "pass": false,
+    "detail": "no reply-ref-me found"
+  },
+  {
+    "name": "Issue 2: file preview replaces sidebar with spacer",
+    "pass": true,
+    "detail": "{\"hasSpacer\":true,\"hasDesktopSidebar\":false}"
+  },
+  {
+    "name": "Issue 2: file preview content rendered with text",
+    "pass": true,
+    "detail": "textLength=91"
+  },
+  {
+    "name": "Issue 2: no horizontal overflow on preview page",
+    "pass": true,
+    "detail": ""
+  }
+]

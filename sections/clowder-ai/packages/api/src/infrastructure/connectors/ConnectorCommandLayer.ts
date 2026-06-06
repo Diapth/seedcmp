@@ -1,5 +1,7 @@
 import { normalizeCatId, parseCommand, type ClientId } from '@cat-cafe/shared';
 import type { CommandRegistry } from '../commands/CommandRegistry.js';
+import type { IMaomiWorkspaceStore, MaomiWorkspace } from '../../domains/maomi-workspaces/MaomiWorkspaceStore.js';
+import type { IThreadWorkspaceBindingStore } from '../../domains/maomi-workspaces/ThreadWorkspaceBindingStore.js';
 import type { IConnectorPermissionStore } from './ConnectorPermissionStore.js';
 import type { IConnectorThreadBindingStore } from './ConnectorThreadBindingStore.js';
 import {
@@ -88,7 +90,10 @@ function parseFlagValue(parts: string[], names: string[]): string | undefined {
 }
 
 function normalizeImWebCatAuthType(value: string | undefined): 'oauth' | 'api_key' | undefined {
-  const normalized = String(value || '').trim().toLowerCase().replace(/-/g, '_');
+  const normalized = String(value || '')
+    .trim()
+    .toLowerCase()
+    .replace(/-/g, '_');
   if (normalized === 'oauth' || normalized === 'subscription') return 'oauth';
   if (normalized === 'api_key' || normalized === 'apikey') return 'api_key';
   return undefined;
@@ -108,7 +113,10 @@ export interface ConnectorCommandLayerDeps {
     list(userId: string): ThreadEntry[] | Promise<ThreadEntry[]>;
     /** F154: Update thread preferred cats for /focus command */
     updatePreferredCats?(threadId: string, catIds: string[]): void | Promise<void>;
+    updateProjectPath?(threadId: string, projectPath: string): void | Promise<void>;
   };
+  readonly maomiWorkspaceStore?: IMaomiWorkspaceStore;
+  readonly threadWorkspaceBindingStore?: IThreadWorkspaceBindingStore;
   /** Phase D: optional backlog store for feat-number matching in /use */
   readonly backlogStore?: {
     get(
@@ -135,6 +143,7 @@ export interface ConnectorCommandLayerDeps {
     create(input: {
       displayName: string;
       mentionPatterns: string[];
+      roleTemplateId?: string;
       clientId: ClientId;
       authType?: 'oauth' | 'api_key';
       accountRef?: string;
@@ -250,16 +259,19 @@ export class ConnectorCommandLayer {
     userId: string,
     title?: string,
   ): Promise<CommandResult> {
-    const effectiveTitle = title?.trim() ? title.trim() : undefined;
+    const { cleanArgs, workspaceRef } = this.extractWorkspaceRef(title ?? '');
+    const effectiveTitle = cleanArgs.trim() ? cleanArgs.trim() : undefined;
     const thread = await this.deps.threadStore.create(userId, effectiveTitle);
     await this.deps.bindingStore.bind(connectorId, externalChatId, thread.id, userId);
+    const workspace = await this.bindWorkspaceRef(userId, thread.id, workspaceRef);
     const deepLink = buildThreadDeepLink(this.deps.frontendBaseUrl, thread.id);
     const titleDisplay = effectiveTitle ? ` "${effectiveTitle}"` : '';
+    const workspaceLine = workspace ? `\n工作区: ${workspace.relativePath}` : '';
     return {
       kind: 'new',
       newActiveThreadId: thread.id,
       contextThreadId: thread.id,
-      response: `✨ 新 thread${titleDisplay} 已创建\nID: ${thread.id}\n🔗 ${deepLink}\n\n现在的消息会发到这个 thread。`,
+      response: `✨ 新 thread${titleDisplay} 已创建\nID: ${thread.id}${workspaceLine}\n🔗 ${deepLink}\n\n现在的消息会发到这个 thread。`,
     };
   }
 
@@ -304,25 +316,68 @@ export class ConnectorCommandLayer {
         response: '❌ 用法: /use F088 | /use 关键词 | /use 3 | /use <ID前缀>\n用 /threads 查看可用列表。',
       };
     }
+    const { cleanArgs, workspaceRef } = this.extractWorkspaceRef(input);
     const allThreads = await this.deps.threadStore.list(userId);
     const match =
-      (await matchByFeatId(input, allThreads, userId, this.deps.backlogStore)) ??
-      matchByListIndex(input, allThreads) ??
-      matchByIdPrefix(input, allThreads) ??
-      matchByTitle(input, allThreads);
+      (await matchByFeatId(cleanArgs, allThreads, userId, this.deps.backlogStore)) ??
+      matchByListIndex(cleanArgs, allThreads) ??
+      matchByIdPrefix(cleanArgs, allThreads) ??
+      matchByTitle(cleanArgs, allThreads);
 
     if (!match) {
-      return { kind: 'use', response: `❌ 找不到匹配 "${input}" 的 thread。用 /threads 查看可用列表。` };
+      return { kind: 'use', response: `❌ 找不到匹配 "${cleanArgs}" 的 thread。用 /threads 查看可用列表。` };
     }
     await this.deps.bindingStore.bind(connectorId, externalChatId, match.id, userId);
+    const workspace = await this.bindWorkspaceRef(userId, match.id, workspaceRef);
     const title = match.title ?? '(无标题)';
     const deepLink = buildThreadDeepLink(this.deps.frontendBaseUrl, match.id);
+    const workspaceLine = workspace ? `\n工作区: ${workspace.relativePath}` : '';
     return {
       kind: 'use',
       newActiveThreadId: match.id,
       contextThreadId: match.id,
-      response: `🔄 已切换到: ${title}\nID: ${match.id}\n🔗 ${deepLink}`,
+      response: `🔄 已切换到: ${title}\nID: ${match.id}${workspaceLine}\n🔗 ${deepLink}`,
     };
+  }
+
+  private extractWorkspaceRef(input: string): { cleanArgs: string; workspaceRef?: string } {
+    const parts = input.trim().split(/\s+/).filter(Boolean);
+    const clean: string[] = [];
+    let workspaceRef: string | undefined;
+    for (let index = 0; index < parts.length; index += 1) {
+      const part = parts[index] ?? '';
+      const lower = part.toLowerCase();
+      if (lower === '--workspace' || lower === '--workspaceslug' || lower === '--workspaceid') {
+        workspaceRef = parts[index + 1]?.trim();
+        index += 1;
+        continue;
+      }
+      const inline = part.match(/^--(?:workspace|workspaceSlug|workspaceId)=(.+)$/i);
+      if (inline) {
+        workspaceRef = inline[1]?.trim();
+        continue;
+      }
+      clean.push(part);
+    }
+    return { cleanArgs: clean.join(' '), ...(workspaceRef ? { workspaceRef } : {}) };
+  }
+
+  private async bindWorkspaceRef(
+    userId: string,
+    threadId: string,
+    workspaceRef: string | undefined,
+  ): Promise<MaomiWorkspace | null> {
+    if (!workspaceRef || !this.deps.maomiWorkspaceStore || !this.deps.threadWorkspaceBindingStore) return null;
+    const workspace =
+      (await this.deps.maomiWorkspaceStore.get(workspaceRef))
+      ?? (await this.deps.maomiWorkspaceStore.findBySlug(userId, workspaceRef));
+    if (!workspace || workspace.userId !== userId) return null;
+    await this.deps.threadWorkspaceBindingStore.bind(threadId, userId, workspace.id);
+    await this.deps.maomiWorkspaceStore.linkThread(workspace.id, threadId);
+    if (this.deps.threadStore.updateProjectPath) {
+      await this.deps.threadStore.updateProjectPath(threadId, workspace.rootPath);
+    }
+    return workspace;
   }
 
   private async handleThread(
@@ -378,7 +433,8 @@ export class ConnectorCommandLayer {
     if (!args) {
       return {
         kind: 'cats',
-        response: '❌ 用法: /cats new <猫名> [@别名] --platform codex|claude-code\n例如: /cats new 悟净 @悟净 --platform codex',
+        response:
+          '❌ 用法: /cats new <猫名> [@别名] --platform codex|claude-code\n例如: /cats new 悟净 @悟净 --platform codex',
         contextThreadId: threadId,
       };
     }
@@ -391,7 +447,8 @@ export class ConnectorCommandLayer {
     if (!displayName) {
       return {
         kind: 'cats',
-        response: '❌ 用法: /cats new <猫名> [@别名] --platform codex|claude-code\n例如: /cats new 悟净 @悟净 --platform codex',
+        response:
+          '❌ 用法: /cats new <猫名> [@别名] --platform codex|claude-code\n例如: /cats new 悟净 @悟净 --platform codex',
         contextThreadId: threadId,
       };
     }
@@ -399,17 +456,20 @@ export class ConnectorCommandLayer {
     if (!clientId) {
       return {
         kind: 'cats',
-        response: '❌ 用法: /cats new <猫名> [@别名] --platform codex|claude-code\n请选择运行平台：codex 或 claude-code。',
+        response:
+          '❌ 用法: /cats new <猫名> [@别名] --platform codex|claude-code\n请选择运行平台：codex 或 claude-code。',
         contextThreadId: threadId,
       };
     }
     const authType = normalizeImWebCatAuthType(parseFlagValue(parts, ['--auth', '--auth-type']));
     const accountRef = parseFlagValue(parts, ['--account', '--account-ref'])?.trim();
     const defaultModel = parseFlagValue(parts, ['--model'])?.trim();
+    const roleTemplateId = parseFlagValue(parts, ['--role-template', '--role-template-id', '--template'])?.trim();
     if (!authType || !accountRef) {
       return {
         kind: 'cats',
-        response: '❌ 用法: /cats new <猫名> [@别名] --platform codex|claude-code --auth oauth|api-key --account <账号引用>',
+        response:
+          '❌ 用法: /cats new <猫名> [@别名] --platform codex|claude-code --auth oauth|api-key --account <账号引用>',
         contextThreadId: threadId,
       };
     }
@@ -424,6 +484,7 @@ export class ConnectorCommandLayer {
         authType,
         accountRef,
         ...(defaultModel ? { defaultModel } : {}),
+        ...(roleTemplateId ? { roleTemplateId } : {}),
         requestedBy,
       });
       if (this.deps.catRoster) {

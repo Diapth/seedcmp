@@ -3,7 +3,7 @@
  * 后端 API 入口
  */
 
-import { join } from 'node:path';
+import { join, resolve } from 'node:path';
 import { type CatConfig, type CatId, CORE_COMMANDS, catRegistry } from '@cat-cafe/shared';
 import type { RedisClient } from '@cat-cafe/shared/utils';
 import { createRedisClient, SessionStore } from '@cat-cafe/shared/utils';
@@ -21,11 +21,14 @@ import {
   getAllCatIdsFromConfig,
   getConfigSessionStrategy,
   getDefaultCatId,
+  loadCatConfig,
+  loadCatTemplateConfig,
   isCatAvailable,
   toAllCatConfigs,
 } from './config/cat-config-loader.js';
 import { configEventBus } from './config/config-event-bus.js';
 import { resolveFrontendBaseUrl, resolveFrontendCorsOrigins } from './config/frontend-origin.js';
+import { resolveProjectTemplatePath } from './config/project-template-path.js';
 import { initRuntimeOverrides } from './config/session-strategy-overrides.js';
 import { assertStorageReady } from './config/storage-guard.js';
 import { createTaskProgressStore } from './domains/cats/services/agents/invocation/createTaskProgressStore.js';
@@ -89,11 +92,16 @@ import { createMessageStore } from './domains/cats/services/stores/factories/Mes
 import { createPendingRequestStore } from './domains/cats/services/stores/factories/PendingRequestStoreFactory.js';
 import { createProposalStore } from './domains/cats/services/stores/factories/ProposalStoreFactory.js';
 import { createPushSubscriptionStore } from './domains/cats/services/stores/factories/PushSubscriptionStoreFactory.js';
+import { createCoordinatorKickoffStore } from './domains/cats/services/stores/factories/CoordinatorKickoffStoreFactory.js';
+import { createCoordinatorStore } from './domains/cats/services/stores/factories/CoordinatorStoreFactory.js';
 import { createReadStateStore } from './domains/cats/services/stores/factories/ReadStateStoreFactory.js';
 import { createSummaryStore } from './domains/cats/services/stores/factories/SummaryStoreFactory.js';
 import { createTaskStore } from './domains/cats/services/stores/factories/TaskStoreFactory.js';
 import { createThreadStore } from './domains/cats/services/stores/factories/ThreadStoreFactory.js';
 import { createWorkflowSopStore } from './domains/cats/services/stores/factories/WorkflowSopStoreFactory.js';
+import { DeploymentExecutor } from './domains/deployments/DeploymentExecutor.js';
+import { createDeploymentJobStore } from './domains/deployments/DeploymentJobStore.js';
+import { createDeploymentRequestStore } from './domains/deployments/DeploymentRequestStore.js';
 import { RedisInvocationRecordStore } from './domains/cats/services/stores/redis/RedisInvocationRecordStore.js';
 import { RedisMessageStore } from './domains/cats/services/stores/redis/RedisMessageStore.js';
 import { MlxAudioTtsProvider } from './domains/cats/services/tts/MlxAudioTtsProvider.js';
@@ -223,6 +231,8 @@ import {
 import { knowledgeFeedRoutes } from './routes/knowledge-feed.js';
 import { marketplaceRoutes } from './routes/marketplace.js';
 import { previewRoutes } from './routes/preview.js';
+import type { ThreadCatDirectoryAgent } from './routes/thread-cats.js';
+import { resolveActiveProjectRoot } from './utils/active-project-root.js';
 import { terminalRoutes } from './routes/terminal.js';
 import { threadExportRoutes } from './routes/thread-export.js';
 import { ApiInstanceLease, type ApiInstanceLeaseInvalidation } from './services/ApiInstanceLease.js';
@@ -254,6 +264,52 @@ function hasRuntimeSessionDrain(service: AgentService): service is AgentService 
   drainRuntimeSession(runtimeSessionId: string): Promise<RuntimeSessionSealReaperDrainResult>;
 } {
   return typeof (service as { drainRuntimeSession?: unknown }).drainRuntimeSession === 'function';
+}
+
+function catConfigToDirectoryAgent(config: CatConfig, source: ThreadCatDirectoryAgent['source']): ThreadCatDirectoryAgent {
+  return {
+    catId: String(config.id),
+    displayName: config.displayName,
+    aliases: [...config.mentionPatterns],
+    mentionPatterns: [...config.mentionPatterns],
+    avatar: config.avatar,
+    personalitySummary: config.personality,
+    capabilitySummary: config.teamStrengths ?? config.roleDescription,
+    ...(config.restrictions && config.restrictions.length > 0 ? { restrictions: [...config.restrictions] } : {}),
+    source,
+  };
+}
+
+function getTemplateDirectoryAgents(): ThreadCatDirectoryAgent[] {
+  try {
+    const projectRoot = resolveActiveProjectRoot();
+    const templatePath = resolveProjectTemplatePath(projectRoot);
+    const template = loadCatTemplateConfig(templatePath);
+    return (template.roleTemplates ?? []).map((role) => ({
+      catId: role.id,
+      displayName: role.name,
+      ...(role.nickname ? { aliases: [`@${role.nickname}`] } : {}),
+      avatar: role.avatar,
+      personalitySummary: role.personality,
+      capabilitySummary: role.teamStrengths ?? role.roleDescription,
+      ...(role.restrictions && role.restrictions.length > 0 ? { restrictions: [...role.restrictions] } : {}),
+      source: 'disconnected',
+    }));
+  } catch {
+    return [];
+  }
+}
+
+function getImWebDirectoryAgents(): ThreadCatDirectoryAgent[] {
+  const byCatId = new Map<string, ThreadCatDirectoryAgent>();
+  for (const config of Object.values(catRegistry.getAllConfigs())) {
+    const agent = catConfigToDirectoryAgent(config, 'existing');
+    byCatId.set(agent.catId, agent);
+  }
+  for (const agent of getTemplateDirectoryAgents()) {
+    if (!byCatId.has(agent.catId)) byCatId.set(agent.catId, agent);
+  }
+  return [...byCatId.values()];
 }
 
 async function main(): Promise<void> {
@@ -481,6 +537,19 @@ async function main(): Promise<void> {
   const { InMemoryGuideDismissTracker } = await import('./domains/guides/GuideDismissTracker.js');
   const dismissTracker = new InMemoryGuideDismissTracker();
   const taskStore = createTaskStore(redis);
+  const { RuntimeWorkspaceStore } = await import('./domains/runtime-workspaces/RuntimeWorkspaceStore.js');
+  const runtimeWorkspaceStore = new RuntimeWorkspaceStore();
+  const { findLaunchedProjectRoot, resolveMaomiWorkspaceRoot } = await import(
+    './domains/maomi-workspaces/workspace-root.js'
+  );
+  const { createMaomiWorkspaceStore, createThreadWorkspaceBindingStore } = await import(
+    './domains/maomi-workspaces/factory.js'
+  );
+  const maomiWorkspaceRoot = await resolveMaomiWorkspaceRoot({
+    launchedProjectRoot: findLaunchedProjectRoot(process.cwd()),
+  });
+  const maomiWorkspaceStore = createMaomiWorkspaceStore(maomiWorkspaceRoot.rootPath, redis);
+  const threadWorkspaceBindingStore = createThreadWorkspaceBindingStore(redis);
   const labelStore = createLabelStore(redis);
   const communityIssueStore = createCommunityIssueStore(redis);
   if (redis) {
@@ -507,6 +576,29 @@ async function main(): Promise<void> {
   const invocationRecordStore = createInvocationRecordStore(redis);
   const draftStore = createDraftStore(redis);
   const readStateStore = createReadStateStore(redis);
+  const deploymentRequestStore = createDeploymentRequestStore(redis);
+  const deploymentJobStore = createDeploymentJobStore(redis);
+  const deploymentDataDir = resolve(process.env.DEPLOYMENT_DATA_DIR ?? './data/deployments');
+  const deploymentDefaultRoot = findMonorepoRoot(process.cwd());
+  const deploymentPublicBaseUrl = process.env.DEPLOYMENT_PUBLIC_BASE_URL
+    ?? process.env.CAT_CAFE_API_URL
+    ?? `http://127.0.0.1:${PORT}`;
+  const deploymentExecutor = new DeploymentExecutor({
+    jobStore: deploymentJobStore,
+    deploymentsDir: deploymentDataDir,
+    allowedRoots: [
+      deploymentDefaultRoot,
+      process.cwd(),
+      maomiWorkspaceRoot.rootPath,
+      ...(process.env.CLOWDER_DEPLOYMENT_ALLOWED_ROOTS || '')
+        .split(',')
+        .map((root) => root.trim())
+        .filter(Boolean),
+    ],
+    defaultRoot: deploymentDefaultRoot,
+    publicBaseUrl: deploymentPublicBaseUrl,
+  });
+  const coordinatorStore = createCoordinatorStore(redis);
   const { ExecutionDigestStore } = await import('./domains/projects/execution-digest-store.js');
   const executionDigestStore = new ExecutionDigestStore();
 
@@ -578,11 +670,11 @@ async function main(): Promise<void> {
   // F102: Memory services — SQLite-only
   // P1 fix: resolve paths relative to repo root, not CWD (which may be packages/api)
   const { existsSync } = await import('node:fs');
-  const { resolve } = await import('node:path');
-  const repoRoot = existsSync(resolve(process.cwd(), 'docs', 'features'))
+  const { resolve: resolvePath } = await import('node:path');
+  const repoRoot = existsSync(resolvePath(process.cwd(), 'docs', 'features'))
     ? process.cwd()
-    : existsSync(resolve(process.cwd(), '..', '..', 'docs', 'features'))
-      ? resolve(process.cwd(), '..', '..')
+    : existsSync(resolvePath(process.cwd(), '..', '..', 'docs', 'features'))
+      ? resolvePath(process.cwd(), '..', '..')
       : process.cwd();
 
   const { initRepoIdentity, isSameRepo } = await import('./utils/is-same-repo.js');
@@ -1320,6 +1412,9 @@ async function main(): Promise<void> {
     ...(threadStore ? { threadStore } : {}),
     sessionChainStore,
     runtimeSessionStore,
+    runtimeWorkspaceStore,
+    maomiWorkspaceStore,
+    threadWorkspaceBindingStore,
     transcriptWriter,
     transcriptReader,
     sessionSealer,
@@ -1400,6 +1495,9 @@ async function main(): Promise<void> {
   }
 
   // Register routes (socketManager injected, no circular import)
+  // Phase 1.5: Coordinator kickoff store — declared here so it can be injected
+  // into messagesRoutes (which is registered just below).
+  const coordinatorKickoffStore = createCoordinatorKickoffStore(redis);
   const messagesOpts = {
     registry,
     messageStore,
@@ -1418,6 +1516,9 @@ async function main(): Promise<void> {
     ...(f101GameStore ? { gameStore: f101GameStore } : {}),
     ...(f101SharedDriver ? { autoPlayer: f101SharedDriver } : {}),
     holdBallCancelDeps: { dynamicTaskStore, taskRunner: taskRunnerV2 },
+    coordinatorKickoffStore,
+    maomiWorkspaceStore,
+    threadWorkspaceBindingStore,
   };
   await app.register(messagesRoutes, messagesOpts);
   await app.register(queueRoutes, {
@@ -1597,6 +1698,8 @@ async function main(): Promise<void> {
     socketManager,
     callbackAuthNotifier,
     taskStore,
+    maomiWorkspaceStore,
+    threadWorkspaceBindingStore,
     backlogStore,
     threadStore,
     sessionChainStore,
@@ -1605,6 +1708,7 @@ async function main(): Promise<void> {
     agentRegistry,
     router,
     invocationRecordStore,
+    coordinatorStore,
     invocationTracker,
     deliveryCursorStore,
     validateRepo,
@@ -1664,6 +1768,8 @@ async function main(): Promise<void> {
     ...(readStateStore ? { readStateStore } : {}),
     guideSessionStore,
     labelStore,
+    maomiWorkspaceStore,
+    threadWorkspaceBindingStore,
     indexBuilder: memoryServices.indexBuilder as
       | { markThreadDirty(threadId: string): void; flushDirtyThreads?(): number | Promise<number> }
       | undefined,
@@ -1695,14 +1801,14 @@ async function main(): Promise<void> {
     ? new RedisConnectorThreadBindingStore(redisClient)
     : new MemoryConnectorThreadBindingStore();
   {
-    const allCatConfigs = catRegistry.getAllConfigs();
     await app.register(threadCatsRoutes, {
       threadStore,
       agentRegistry,
       bindingStore: connectorBindingStore,
-      getCatDisplayName: (catId: string) => allCatConfigs[catId]?.displayName ?? catId,
-      getAllCatIds: () => Object.keys(allCatConfigs),
+      getCatDisplayName: (catId: string) => catRegistry.getAllConfigs()[catId]?.displayName ?? catId,
+      getAllCatIds: () => Object.keys(catRegistry.getAllConfigs()),
       isCatAvailable: (catId: string) => isCatAvailable(catId),
+      getDirectoryAgents: getImWebDirectoryAgents,
     });
   }
   await app.register(tasksRoutes, { taskStore, socketManager });
@@ -2196,6 +2302,61 @@ async function main(): Promise<void> {
   // F-BLOAT: Progressive disclosure docs endpoints (no auth, static content)
   await app.register(registerCallbackDocsRoutes);
 
+  // Phase 1.6: Coordinator kickoff REST API (im_web pulls on mount, dismisses on close)
+  const { coordinatorKickoffRoutes } = await import('./routes/coordinator-kickoff.js');
+  await app.register(coordinatorKickoffRoutes, { kickoffStore: coordinatorKickoffStore });
+
+  const { coordinatorCoordinationRoutes } = await import('./routes/coordinator-coordination.js');
+  await app.register(coordinatorCoordinationRoutes, { coordinatorStore });
+
+  // Phase 4.2: Workspace path validation (read-only preview of the same
+  // rules enforced by `POST /api/threads`).
+  const { workspacePathsRoutes } = await import('./routes/workspace-paths.js');
+  await app.register(workspacePathsRoutes, { log: app.log });
+
+  // Phase 4.5 + 5.2: thread tasks + artifacts REST API.
+  const { threadTasksRoutes } = await import('./routes/thread-tasks.js');
+  await app.register(threadTasksRoutes, {
+    taskStore,
+    ...(threadStore ? { threadStore } : {}),
+    maomiWorkspaceStore,
+    threadWorkspaceBindingStore,
+    invocationRecordStore,
+    ...(process.env.CLOWDER_DEFAULT_OWNER_USER_ID || process.env.DEFAULT_OWNER_USER_ID
+      ? { defaultUserId: (process.env.CLOWDER_DEFAULT_OWNER_USER_ID || process.env.DEFAULT_OWNER_USER_ID) as string }
+      : {}),
+    log: app.log,
+  });
+
+  const { maomiWorkspaceRoutes } = await import('./routes/maomi-workspaces.js');
+  await app.register(maomiWorkspaceRoutes, {
+    workspaceRoot: maomiWorkspaceRoot,
+    workspaceStore: maomiWorkspaceStore,
+    bindingStore: threadWorkspaceBindingStore,
+    threadStore,
+  });
+
+  // V3-32: expose project-scoped runtime/agent workspaces for the bound thread.
+  const { threadWorkspacesRoutes } = await import('./routes/thread-workspaces.js');
+  await app.register(threadWorkspacesRoutes, {
+    threadStore,
+    runtimeWorkspaceStore,
+  });
+
+  // V3-29: IM Web deployment confirmation cards send structured actions.
+  const { deploymentRoutes } = await import('./routes/deployments.js');
+  await app.register(deploymentRoutes, { deploymentJobStore });
+
+  const { connectorDeploymentActionRoutes } = await import('./routes/connector-deployment-action.js');
+  await app.register(connectorDeploymentActionRoutes, {
+    deploymentRequestStore,
+    deploymentJobStore,
+    deploymentExecutor,
+  });
+
+  const { connectorDeploymentRequestRoutes } = await import('./routes/connector-deployment-requests.js');
+  await app.register(connectorDeploymentRequestRoutes, { deploymentRequestStore });
+
   // F088: Register connector webhook routes BEFORE listen (Fastify requires it)
   const connectorWebhookHandlers = new Map<string, import('./routes/connector-webhooks.js').ConnectorWebhookHandler>();
   await app.register(connectorWebhookRoutes, { handlers: connectorWebhookHandlers });
@@ -2425,6 +2586,52 @@ async function main(): Promise<void> {
 
   // F140 Phase 3b: connector invoke trigger (auto-invoke cat after review feedback delivery via polling)
   const frontendBaseUrl = resolveFrontendBaseUrl(process.env, app.log);
+  const buildOutboundThreadMeta = async (threadId: string) => {
+    const thread = await threadStore.get(threadId);
+    if (!thread) return undefined;
+
+    const artifactSearchRoots = new Set<string>();
+    const addRoot = (value?: string | null) => {
+      const trimmed = value?.trim();
+      if (!trimmed || trimmed === 'default' || trimmed.startsWith('games/')) return;
+      artifactSearchRoots.add(resolve(trimmed));
+    };
+
+    addRoot(thread.projectPath);
+
+    try {
+      const binding = await threadWorkspaceBindingStore.get(threadId);
+      const workspaceIds = [
+        binding?.activeWorkspaceId,
+        ...(binding?.recentWorkspaceIds ?? []),
+      ].filter(Boolean) as string[];
+      for (const workspaceId of workspaceIds) {
+        const workspace = await maomiWorkspaceStore.get(workspaceId);
+        addRoot(workspace?.rootPath);
+      }
+    } catch (err) {
+      app.log.warn({ err, threadId }, '[api] outbound thread workspace roots lookup failed');
+    }
+
+    try {
+      const runtimeWorkspaces = await runtimeWorkspaceStore.listByThread(threadId);
+      for (const workspace of runtimeWorkspaces) {
+        addRoot(workspace.path);
+        addRoot(workspace.runtimeRoot);
+        addRoot(workspace.projectRoot);
+      }
+    } catch (err) {
+      app.log.warn({ err, threadId }, '[api] outbound runtime workspace roots lookup failed');
+    }
+
+    return {
+      threadShortId: threadId.slice(0, 15),
+      threadTitle: thread.title ?? undefined,
+      deepLinkUrl: buildThreadDeepLink(frontendBaseUrl, threadId),
+      artifactSearchRoots: [...artifactSearchRoots],
+    };
+  };
+
   const invokeTrigger = new ConnectorInvokeTrigger({
     router,
     socketManager,
@@ -2432,15 +2639,7 @@ async function main(): Promise<void> {
     invocationTracker,
     invocationQueue,
     queueProcessor,
-    threadMetaLookup: async (threadId) => {
-      const thread = await threadStore.get(threadId);
-      if (!thread) return undefined;
-      return {
-        threadShortId: threadId.slice(0, 15),
-        threadTitle: thread.title ?? undefined,
-        deepLinkUrl: buildThreadDeepLink(frontendBaseUrl, threadId),
-      };
-    },
+    threadMetaLookup: buildOutboundThreadMeta,
     log: app.log,
   });
 
@@ -2812,6 +3011,10 @@ async function main(): Promise<void> {
     defaultUserId: 'default-user' as const,
     defaultCatId: resolveConnectorGatewayDefaultCatId(getDefaultCatId()),
     redis: redisClient ?? undefined,
+    maomiWorkspaceStore,
+    threadWorkspaceBindingStore,
+    taskStore,
+    coordinatorStore,
     log: app.log,
     agentRegistry,
     catCreator: createImWebCatCreator(),
@@ -2853,15 +3056,7 @@ async function main(): Promise<void> {
     connectorGatewayHandle = await startConnectorGateway(gatewayConfig, gatewayDeps);
     if (connectorGatewayHandle) {
       wireGatewayHooks(connectorGatewayHandle);
-      queueProcessor.setThreadMetaLookup(async (threadId) => {
-        const thread = await threadStore.get(threadId);
-        if (!thread) return undefined;
-        return {
-          threadShortId: threadId.slice(0, 15),
-          threadTitle: thread.title ?? undefined,
-          deepLinkUrl: buildThreadDeepLink(frontendBaseUrl, threadId),
-        };
-      });
+      queueProcessor.setThreadMetaLookup(buildOutboundThreadMeta);
 
       app.log.info('[api] Connector gateway started');
     }

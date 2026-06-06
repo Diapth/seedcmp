@@ -14,7 +14,7 @@
  */
 
 import { randomUUID } from 'node:crypto';
-import { type CatId, catRegistry, type MessageContent } from '@cat-cafe/shared';
+import { type CatId, type CoordinationContext, catRegistry, type MessageContent } from '@cat-cafe/shared';
 import type { SessionStore } from '@cat-cafe/shared/utils';
 import multipart from '@fastify/multipart';
 import type { FastifyPluginAsync } from 'fastify';
@@ -39,6 +39,13 @@ import type { TaskProgressStore } from '../domains/cats/services/agents/invocati
 import { stampVisibleTurn } from '../domains/cats/services/agents/invocation/visible-turn.js';
 import type { PersistenceContext } from '../domains/cats/services/agents/routing/route-helpers.js';
 import { resetStreak } from '../domains/cats/services/agents/routing/WorklistRegistry.js';
+import {
+  coordinationAuditCatIds,
+  createCoordinationContext,
+} from '../domains/cats/services/agents/routing/lead-agent-selector.js';
+import type { ICoordinatorKickoffStore } from '../domains/cats/services/stores/ports/CoordinatorKickoffStore.js';
+import type { IMaomiWorkspaceStore } from '../domains/maomi-workspaces/MaomiWorkspaceStore.js';
+import type { IThreadWorkspaceBindingStore } from '../domains/maomi-workspaces/ThreadWorkspaceBindingStore.js';
 import {
   accumulateTextParts,
   flattenTextParts,
@@ -144,6 +151,11 @@ export interface MessagesRoutesOptions {
   streamingHook?: StreamingHookLike;
   /** F167 Phase J: deps for auto-cancelling pending hold-ball tasks on user message */
   holdBallCancelDeps?: HoldBallCancelDeps;
+  /** Phase 1.5: persisted CoordinatorKickoff state (one per coordinationId). */
+  coordinatorKickoffStore?: ICoordinatorKickoffStore;
+  /** V3-37: user-visible workspace proposal in coordinator kickoff. */
+  maomiWorkspaceStore?: IMaomiWorkspaceStore;
+  threadWorkspaceBindingStore?: IThreadWorkspaceBindingStore;
 }
 
 const log = createModuleLogger('routes/messages');
@@ -161,6 +173,10 @@ function tryAutoCancelPendingHolds(threadId: string, deps: HoldBallCancelDeps | 
   } catch (err) {
     log.warn({ threadId, err }, 'F167 Phase J: failed to auto-cancel pending holds');
   }
+}
+
+function coordinationExtra(coordination: CoordinationContext | undefined): { coordination: CoordinationContext } | undefined {
+  return coordination ? { coordination } : undefined;
 }
 
 async function persistA2ARoutingMessage(
@@ -457,8 +473,10 @@ export const messagesRoutes: FastifyPluginAsync<MessagesRoutesOptions> = async (
       targetCats: resolvedTargetCats,
       intent,
       hasMentions,
+      leadSelection,
     } = await router.resolveTargetsAndIntent(content, resolvedThreadId, {
       persist: true,
+      disableCoordinator: whisperVisibility === 'whisper' && Boolean(whisperRecipients?.length),
     });
     // F35: When sending a whisper, override routing targets to only whisperTo recipients.
     // This prevents non-recipient cats from being invoked and seeing whisper content.
@@ -474,6 +492,13 @@ export const messagesRoutes: FastifyPluginAsync<MessagesRoutesOptions> = async (
 
     // Server-generated idempotency key if client didn't provide one
     const resolvedIdempotencyKey = idempotencyKey ?? randomUUID();
+    const isWhisperDispatch = whisperVisibility === 'whisper' && Boolean(whisperRecipients?.length);
+    const coordination =
+      !isWhisperDispatch && leadSelection?.mode === 'coordinator'
+        ? createCoordinationContext(leadSelection, `coord-${resolvedIdempotencyKey}`)
+        : undefined;
+    const messageMentions = coordination ? coordinationAuditCatIds(coordination) : targetCats;
+    const messageExtra = coordinationExtra(coordination);
 
     // F39+F108B: Slot-aware delivery mode routing
     // Whisper → check target cat's slot (side-dispatch to idle cat)
@@ -519,6 +544,7 @@ export const messagesRoutes: FastifyPluginAsync<MessagesRoutesOptions> = async (
         source: 'user',
         targetCats,
         intent: intent.intent,
+        ...(coordination ? { sourceCategory: 'coordination' as const, coordination } : {}),
       });
 
       // Queue full → 429, no message written (no ghost message)
@@ -547,12 +573,13 @@ export const messagesRoutes: FastifyPluginAsync<MessagesRoutesOptions> = async (
             userId,
             catId: null,
             content,
-            mentions: targetCats,
+            mentions: messageMentions,
             timestamp: Date.now(),
             threadId: resolvedThreadId,
             idempotencyKey: resolvedIdempotencyKey,
             deliveryStatus: 'queued', // F117: not visible in history/context/mentions until delivered
             ...(contentBlocks ? { contentBlocks } : {}),
+            ...(messageExtra ? { extra: messageExtra } : {}),
             ...(whisperVisibility && whisperRecipients
               ? { visibility: whisperVisibility, whisperTo: whisperRecipients }
               : {}),
@@ -635,6 +662,7 @@ export const messagesRoutes: FastifyPluginAsync<MessagesRoutesOptions> = async (
               source: 'user',
               targetCats,
               intent: intent.intent,
+              ...(coordination ? { sourceCategory: 'coordination' as const, coordination } : {}),
             });
             if (enqueueResult.outcome === 'full') {
               opts.socketManager.emitToUser(userId, 'queue_full_warning', {
@@ -655,12 +683,13 @@ export const messagesRoutes: FastifyPluginAsync<MessagesRoutesOptions> = async (
                   userId,
                   catId: null,
                   content,
-                  mentions: targetCats,
+                  mentions: messageMentions,
                   timestamp: Date.now(),
                   threadId: resolvedThreadId,
                   idempotencyKey: resolvedIdempotencyKey,
                   deliveryStatus: 'queued',
                   ...(contentBlocks ? { contentBlocks } : {}),
+                  ...(messageExtra ? { extra: messageExtra } : {}),
                   ...(whisperVisibility && whisperRecipients
                     ? { visibility: whisperVisibility, whisperTo: whisperRecipients }
                     : {}),
@@ -756,10 +785,11 @@ export const messagesRoutes: FastifyPluginAsync<MessagesRoutesOptions> = async (
           userId,
           catId: null,
           content,
-          mentions: targetCats,
+          mentions: messageMentions,
           timestamp: Date.now(),
           threadId: resolvedThreadId,
           ...(contentBlocks ? { contentBlocks } : {}),
+          ...(messageExtra ? { extra: messageExtra } : {}),
           ...(whisperVisibility && whisperRecipients
             ? { visibility: whisperVisibility, whisperTo: whisperRecipients }
             : {}),
@@ -900,6 +930,7 @@ export const messagesRoutes: FastifyPluginAsync<MessagesRoutesOptions> = async (
               cursorBoundaries,
               persistenceContext,
               parentInvocationId: createResult.invocationId,
+              ...(coordination ? { coordination } : {}),
             },
           )) {
             if (controller?.signal.aborted) {
@@ -1086,6 +1117,39 @@ export const messagesRoutes: FastifyPluginAsync<MessagesRoutesOptions> = async (
             finalStatus = 'succeeded';
             // F194 Phase Z3: chain succeeded — signal for finally fallback
             routeChainTracker.succeed(createResult.invocationId);
+
+            // Project group chat kickoff: if a coordinator just finished its first
+            // intake reply and emitted a `cat-recommendation` JSON block, surface
+            // a "create project group chat?" card to im_web. Phase 1.5 integration.
+            if (coordination && opts.coordinatorKickoffStore) {
+              const assistantText = flattenTurnTextParts(outboundTurns).trim();
+              const { maybeEmitCoordinatorKickoff } = await import(
+                '../domains/cats/services/agents/coordinator-kickoff-trigger.js'
+              );
+              const existingKickoff = await opts.coordinatorKickoffStore
+                .get(coordination.id)
+                .catch(() => null);
+              await maybeEmitCoordinatorKickoff(
+                {
+                  userId,
+                  coordinationId: coordination.id,
+                  replyText: assistantText,
+                  messageId: createResult.invocationId,
+                  phase: coordination.phase,
+                  sourceIntent: content,
+                  threadId: resolvedThreadId,
+                  ...(existingKickoff ? { existingKickoffCoordinationId: existingKickoff.coordinationId } : {}),
+                },
+                {
+                  kickoffStore: opts.coordinatorKickoffStore,
+                  ...(opts.maomiWorkspaceStore ? { maomiWorkspaceStore: opts.maomiWorkspaceStore } : {}),
+                  emit: (uid, evt, data) => opts.socketManager.emitToUser(uid, evt, data),
+                  log,
+                },
+              ).catch((err) => {
+                log.warn({ err, coordinationId: coordination.id }, '[messages] coordinator kickoff trigger failed');
+              });
+            }
 
             for (const continuationCapsule of continuationCapsules.values()) {
               opts.queueProcessor?.enqueueContinuation({
@@ -1386,6 +1450,8 @@ export const messagesRoutes: FastifyPluginAsync<MessagesRoutesOptions> = async (
       m.extra?.stream ||
       m.extra?.targetCats ||
       m.extra?.scheduler ||
+      m.extra?.coordination ||
+      m.extra?.imWebRouting ||
       m.extra?.systemKind ||
       m.extra?.a2aRouting
         ? {
@@ -1395,6 +1461,8 @@ export const messagesRoutes: FastifyPluginAsync<MessagesRoutesOptions> = async (
               ...(m.extra.stream ? { stream: m.extra.stream } : {}),
               ...(m.extra.targetCats ? { targetCats: m.extra.targetCats } : {}),
               ...(m.extra.scheduler ? { scheduler: m.extra.scheduler } : {}),
+              ...(m.extra.coordination ? { coordination: m.extra.coordination } : {}),
+              ...(m.extra.imWebRouting ? { imWebRouting: m.extra.imWebRouting } : {}),
               ...(m.extra.systemKind ? { systemKind: m.extra.systemKind } : {}),
               ...(m.extra.a2aRouting ? { a2aRouting: m.extra.a2aRouting } : {}),
             },

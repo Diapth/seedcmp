@@ -18,6 +18,7 @@ const repoRoot = process.argv[2] ? resolve(process.argv[2]) : defaultRepoRoot;
 const manifestPath = join(repoRoot, 'cat-cafe-skills', 'manifest.yaml');
 const skillsRoot = join(repoRoot, 'cat-cafe-skills');
 const catTemplatePath = join(repoRoot, 'cat-template.json');
+const runtimeCatalogPath = join(repoRoot, '.cat-cafe', 'cat-catalog.json');
 
 function asArray(value) {
   return Array.isArray(value) ? value : [];
@@ -50,32 +51,42 @@ function loadRosterHandles() {
   if (!existsSync(catTemplatePath)) {
     throw new Error(`cat-template.json not found: ${catTemplatePath}`);
   }
-  const raw = readFileSync(catTemplatePath, 'utf-8');
-  const parsed = JSON.parse(raw);
-  if (!parsed.roster || typeof parsed.roster !== 'object') {
-    throw new Error('cat-template.json missing "roster" object');
+  const template = JSON.parse(readFileSync(catTemplatePath, 'utf-8'));
+  const runtime = existsSync(runtimeCatalogPath) ? JSON.parse(readFileSync(runtimeCatalogPath, 'utf-8')) : null;
+
+  const rosterSource =
+    runtime && runtime.roster && typeof runtime.roster === 'object'
+      ? runtime.roster
+      : template.roster && typeof template.roster === 'object'
+        ? template.roster
+        : null;
+  const breedSource = Array.isArray(runtime?.breeds)
+    ? runtime.breeds
+    : Array.isArray(template.breeds)
+      ? template.breeds
+      : [];
+  const roleTemplates = Array.isArray(template.roleTemplates) ? template.roleTemplates : [];
+
+  const handleSet = new Set(
+    rosterSource ? Object.keys(rosterSource).map((id) => `@${id}`) : roleTemplates.map((role) => `@${role.id}`),
+  );
+  for (const breed of breedSource) {
+    if (breed.catId) handleSet.add(`@${breed.catId}`);
+    for (const variant of Array.isArray(breed.variants) ? breed.variants : []) {
+      if (variant.catId) handleSet.add(`@${variant.catId}`);
+    }
   }
 
-  const handleSet = new Set(Object.keys(parsed.roster).map((id) => `@${id}`));
-  if (Array.isArray(parsed.breeds)) {
-    for (const breed of parsed.breeds) {
-      if (breed.catId) handleSet.add(`@${breed.catId}`);
-      for (const variant of Array.isArray(breed.variants) ? breed.variants : []) {
-        if (variant.catId) handleSet.add(`@${variant.catId}`);
-      }
+  const nicknames = new Set();
+  for (const role of roleTemplates) {
+    if (typeof role.nickname === 'string' && role.nickname.trim()) nicknames.add(role.nickname);
+  }
+  for (const breed of breedSource) {
+    if (breed.nickname && typeof breed.nickname === 'string') {
+      nicknames.add(breed.nickname);
     }
   }
   const handles = [...handleSet].sort((a, b) => b.length - a.length);
-
-  const nicknames = new Set();
-  if (Array.isArray(parsed.breeds)) {
-    for (const breed of parsed.breeds) {
-      if (breed.nickname && typeof breed.nickname === 'string') {
-        nicknames.add(breed.nickname);
-      }
-    }
-  }
-
   return { handles, nicknames: [...nicknames].sort((a, b) => b.length - a.length) };
 }
 

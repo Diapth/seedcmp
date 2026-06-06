@@ -2005,6 +2005,37 @@ describe('QueueProcessor', () => {
       assert.equal(calledContent, 'exec-a', 'should only include matching-intent entries');
     });
 
+    it('does not batch coordinator entries from different coordination runs', () => {
+      enqueueEntry(deps.queue, {
+        content: 'pm-a',
+        targetCats: ['coordinator'],
+        sourceCategory: 'coordination',
+        coordination: {
+          id: 'coord-a',
+          leadCatId: 'coordinator',
+          participantCatIds: ['opus'],
+          phase: 'intake',
+          artifactRefs: [],
+        },
+      });
+      enqueueEntry(deps.queue, {
+        content: 'pm-b',
+        targetCats: ['coordinator'],
+        sourceCategory: 'coordination',
+        coordination: {
+          id: 'coord-b',
+          leadCatId: 'coordinator',
+          participantCatIds: ['codex'],
+          phase: 'intake',
+          artifactRefs: [],
+        },
+      });
+
+      const batch = deps.queue.collectUserBatch('t1', 'u1');
+      assert.equal(batch.length, 1, 'different PM coordination IDs must stay as separate work items');
+      assert.equal(batch[0].content, 'pm-a');
+    });
+
     it('removes all batched entries after successful execution', async () => {
       enqueueEntry(deps.queue, { content: 'a' });
       enqueueEntry(deps.queue, { content: 'b' });

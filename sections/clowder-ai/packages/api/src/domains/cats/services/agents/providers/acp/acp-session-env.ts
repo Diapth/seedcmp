@@ -19,6 +19,12 @@ const CALLBACK_ENV_KEYS = [
   'CAT_CAFE_USER_ID',
   'CAT_CAFE_CAT_ID',
   'CAT_CAFE_SIGNAL_USER',
+  'CAT_CAFE_THREAD_ID',
+  'CAT_CAFE_PROJECT_ROOT',
+  'CLOWDER_PROJECT_RUNTIME_ROOT',
+  'CAT_CAFE_PROJECT_RUNTIME_ROOT',
+  'CLOWDER_WORKSPACE_ID',
+  'ALLOWED_WORKSPACE_DIRS',
 ] as const;
 
 function isCatCafeStdioServer(server: AcpMcpServer): server is AcpMcpServerStdio {

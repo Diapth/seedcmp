@@ -51,7 +51,6 @@ feat-lifecycle → Design Gate(设计确认) → writing-plans → worktree → 
 | `browser-automation` | 外部网站浏览/登录态流程/浏览器工具路由 | — |
 | `organize-threads` | 整理未分类 thread，建议合适标签 | — |
 | `workspace-navigator` | 铲屎官说"打开日志/看代码/打开设计图"等模糊指令 → 猫猫自己找路径 → API 导航 | — |
-| `ppt-forge` | 做 PPT/演示文稿/视觉审查（三猫流水线） | — |
 | `video-forge` | 做视频/showcase/教程视频/视频审查 | — |
 
 ### 参考文件（refs/，按需读取）

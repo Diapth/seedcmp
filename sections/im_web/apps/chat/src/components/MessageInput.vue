@@ -13,11 +13,18 @@ import {
   useUserStore,
   useClowderStore
 } from '@tsdaodao/datasource-vue';
+import type { ClowderDeploymentRequest, ClowderDeploymentTargetCandidate } from '@tsdaodao/datasource-vue';
 import { useRobotConfigStore } from '@tsdaodao/contacts-vue';
 import WKSDK, { CMDContent } from 'wukongimjssdk';
 import { getClowderCatDisplayNameFromPayload } from '@tsdaodao/base-vue/utils/clowderMessageIdentity';
 import { resolveGroupCatAutoReplyTrigger, type GroupCatAutoReplyReason } from '../utils/clowderGroupAutoReplyPolicy';
 import { detectDeploymentIntent, type DeploymentIntent } from '../utils/deploymentIntent';
+import {
+  buildDeploymentCardMessage,
+  buildDeploymentTargetCandidates,
+  DEFAULT_DEPLOYMENT_ENVIRONMENT_CANDIDATES,
+} from '../utils/deploymentRequestCard';
+import { isProjectStartRequest, resolveProjectGroupName } from '../utils/clowderProjectGroup';
 
 const props = defineProps<{
   channelId: string;
@@ -59,6 +66,13 @@ let clowderSyncTimers: number[] = [];
 const SYSTEM_ROBOT_ID = 'u_10000';
 const DEEPSEEK_AI_ROBOT_ID = 'deepseek_ai_robot';
 const CLOWDER_AI_ROBOT_ID = 'clowder_ai';
+const CLOWDER_COORDINATOR_CAT_ID = 'coordinator';
+const COORDINATOR_COMMANDS = [
+  { command: '/plan', label: '/plan', text: '/plan 请协调者拆解当前需求并给出分工。' },
+  { command: '/dispatch', label: '/dispatch', text: '/dispatch 请协调者派发上一轮计划中的待办任务。' },
+  { command: '/status', label: '/status', text: '/status' },
+  { command: '/cancel', label: '/cancel', text: '/cancel 请取消当前协调任务。' },
+];
 
 // Mention state
 const showMentionPopup = ref(false);
@@ -70,7 +84,7 @@ let suppressMentionPopupOnce = false;
 const replyUser = computed(() => {
   const target = messageStore.replyTarget;
   if (!target) return '';
-  return userStore.userCache[target.fromUID]?.name || target.fromUID;
+  return getMessageSenderName(target);
 });
 
 const replyDigest = computed(() => {
@@ -92,6 +106,11 @@ const isClowderAiConversation = computed(() => {
 
 const isClowderCatConversation = computed(() => {
   return props.channelType === 1 && isClowderCatContactId(props.channelId);
+});
+
+const isCoordinatorDirectConversation = computed(() => {
+  return isClowderCatConversation.value &&
+    getClowderCatIdFromContactId(props.channelId) === CLOWDER_COORDINATOR_CAT_ID;
 });
 
 const activeConversationDraft = computed(() => {
@@ -124,11 +143,33 @@ const clowderPromptContext = computed(() => {
 });
 
 const clowderConversationKey = computed(() => `${props.channelId}-${Number(props.channelType)}`);
+const activeClowderWorkspace = computed(() => {
+  const threadId = clowderStore.conversations[clowderConversationKey.value]?.binding?.threadId;
+  return clowderStore.getActiveWorkspace(threadId);
+});
 
 const groupAutoReplyMode = computed(() => {
   if (props.channelType !== 2) return 'mentions_only';
-  return clowderStore.groupAutoReplyModes[props.channelId] || 'mentions_only';
+  return clowderStore.groupAutoReplyModes[props.channelId] || 'soft_mentions';
 });
+
+const coordinatorCommandQuery = computed(() => {
+  const text = inputText.value.trimStart();
+  if (!text.startsWith('/')) return '';
+  const token = text.split(/\s+/, 1)[0].toLowerCase();
+  return token;
+});
+
+const filteredCoordinatorCommands = computed(() => {
+  if (!coordinatorCommandQuery.value) return [];
+  return COORDINATOR_COMMANDS.filter(item => item.command.startsWith(coordinatorCommandQuery.value));
+});
+
+const showCoordinatorCommandMenu = computed(() =>
+  props.channelType === 2 &&
+  coordinatorCommandQuery.value.length > 0 &&
+  filteredCoordinatorCommands.value.length > 0
+);
 
 function getMemberUid(member: any): string {
   return String(member?.catContact?.id || member?.member_uid || member?.uid || '');
@@ -374,6 +415,8 @@ function matchesCatTargetToken(candidate: string, lookup: string) {
 function getCommandTargetCatIds(text: string) {
   const match = text.match(/^\/(ask|focus)\s+([^\s]+)/i);
   const lookup = normalizeCatTargetToken(match?.[2] || '');
+  const coordinatorCommand = text.match(/^\/(plan|dispatch|status|cancel)\b/i);
+  if (coordinatorCommand) return [CLOWDER_COORDINATOR_CAT_ID];
   if (!lookup) return [];
   return catMentionMembers.value
     .filter(member => {
@@ -393,14 +436,88 @@ function getMessageVisibleText(message: any) {
 
 function getMessageSenderName(message: any) {
   const content = message?.content || message?.payload || {};
-  if (content.catDisplayName || content.cat_display_name) {
-    return String(content.catDisplayName || content.cat_display_name);
-  }
+  const clowderName = getClowderCatDisplayNameFromPayload(content);
+  if (clowderName) return clowderName;
   const fromUID = String(message?.fromUID || '');
   if (fromUID === userStore.currentUser?.uid) {
     return userStore.currentUser?.name || fromUID;
   }
   return userStore.userCache[fromUID]?.name || fromUID || 'unknown';
+}
+
+function getReplyTargetCatId(message: any) {
+  const content = message?.content || message?.payload || {};
+  const metadata = content.metadata || {};
+  const explicit = String(
+    content.catId ||
+    content.cat_id ||
+    content.agentId ||
+    content.agent_id ||
+    metadata.catId ||
+    metadata.cat_id ||
+    metadata.agentId ||
+    metadata.agent_id ||
+    ''
+  ).trim();
+  if (explicit) return explicit;
+
+  const fromUID = String(message?.fromUID || message?.from_uid || message?.from || '').trim();
+  if (fromUID.startsWith('clowder_cat:')) return fromUID.slice('clowder_cat:'.length);
+  if (fromUID.startsWith('clowder_cat_')) return fromUID.slice('clowder_cat_'.length);
+  if (fromUID.startsWith('clowder:')) return fromUID.slice('clowder:'.length);
+
+  const displayName = getClowderCatDisplayNameFromPayload(content);
+  return findCatContactByDisplayName(displayName)?.catId || '';
+}
+
+function getReplyTargetType(message: any, targetCatId: string) {
+  const content = message?.content || message?.payload || {};
+  const displayName = getClowderCatDisplayNameFromPayload(content);
+  const normalizedCatId = targetCatId.trim().toLowerCase();
+  const normalizedName = displayName.trim().toLowerCase();
+  if (normalizedCatId === CLOWDER_COORDINATOR_CAT_ID || normalizedName === '协调者' || normalizedName === 'pm') {
+    return 'coordinator';
+  }
+  return targetCatId || isGroupCatMessage(message) ? 'cat' : '';
+}
+
+function buildReplyPayload(target: any) {
+  const targetCatId = getReplyTargetCatId(target);
+  const targetType = getReplyTargetType(target, targetCatId);
+  return {
+    messageID: target.messageID,
+    messageSeq: target.messageSeq,
+    conversationId: props.channelId,
+    conversationType: props.channelType,
+    fromUID: target.fromUID,
+    fromName: getMessageSenderName(target),
+    content: target.content,
+    text: getMessageVisibleText(target),
+    targetCatId: targetCatId || undefined,
+    targetAgentId: targetCatId || undefined,
+    targetType: targetType || undefined
+  };
+}
+
+function buildReplyPromptLines(replyTarget?: any) {
+  if (!replyTarget) return [];
+  const reply = buildReplyPayload(replyTarget);
+  return [
+    'Reply reference:',
+    `- quotedMessageId: ${reply.messageID || 'unknown'}`,
+    `- quotedMessageSeq: ${reply.messageSeq || 0}`,
+    `- quotedAuthor: ${reply.fromName || reply.fromUID || 'unknown'} (${reply.fromUID || 'unknown'})`,
+    `- quotedText: ${reply.text || '[消息]'}`,
+    `- quotedTargetType: ${reply.targetType || 'human'}`,
+    `- quotedTargetCatId: ${reply.targetCatId || 'none'}`
+  ];
+}
+
+function isSameReplyTarget(a: any, b: any) {
+  if (!a || !b) return false;
+  const aKey = String(a.clientMsgNo || a.messageID || `${a.messageSeq || ''}:${a.fromUID || ''}`);
+  const bKey = String(b.clientMsgNo || b.messageID || `${b.messageSeq || ''}:${b.fromUID || ''}`);
+  return aKey === bKey;
 }
 
 function isGroupCatMessage(message: any) {
@@ -425,18 +542,49 @@ function buildRecentAutoReplyMessages() {
     });
 }
 
-function buildClowderPromptContext(text: string, targetCatIds: string[], triggerReason?: GroupCatAutoReplyReason) {
-  if (props.channelType !== 2) return clowderPromptContext.value;
+function buildDeploymentResolutionContextLines(text: string) {
+  const intent = detectDeploymentIntent(text);
+  if (!intent.requiresContextResolution) return [];
+
+  const workspace = activeClowderWorkspace.value;
+  const candidates = buildRecentDeploymentTargetCandidates(text);
+  return [
+    '[Deployment target resolution]',
+    'The user is asking for deployment with conversational context. Treat contextual phrases as references to recent artifacts, the active workspace, and prior conversation, not as literal filesystem paths.',
+    intent.environment !== '待确认环境' ? `Requested environment: ${intent.environment}` : 'Requested environment: not specified',
+    intent.target !== '待确认目标' ? `User target phrase: ${intent.target}` : 'User target phrase: not specified',
+    workspace ? `Active workspace: ${workspace.displayName || workspace.relativePath || workspace.rootPath || workspace.id || workspace.workspaceId}` : 'Active workspace: not available',
+    workspace?.relativePath ? `Active workspace relative path: ${workspace.relativePath}` : '',
+    workspace?.rootPath ? `Active workspace root path: ${workspace.rootPath}` : '',
+    candidates.length
+      ? [
+        'Recent deployment target candidates (reference only):',
+        ...candidates.map((candidate, index) =>
+          `${index + 1}. ${candidate.value}${candidate.source ? ` [${candidate.source}]` : ''}`
+        )
+      ].join('\n')
+      : 'Recent deployment target candidates: none found in visible IM context',
+    'Resolve the target yourself from the available context. If exactly one deployable artifact is clear, respond with its concrete path and environment; if confidence is low, ask one concise clarification.',
+    '[/Deployment target resolution]'
+  ].filter(Boolean);
+}
+
+function buildClowderPromptContext(text: string, targetCatIds: string[], triggerReason?: GroupCatAutoReplyReason, replyTarget?: any) {
   const recentMessages = messageStore.getChannelMessages(props.channelId, props.channelType)
     .filter(message => getMessageVisibleText(message))
     .slice(-12)
     .map(message => `- ${getMessageSenderName(message)}: ${getMessageVisibleText(message)}`);
-  const base = clowderPromptContext.value || `Group: ${props.channelId} (id: ${props.channelId})`;
+  const replyLines = buildReplyPromptLines(replyTarget);
+  const base = props.channelType === 2
+    ? (clowderPromptContext.value || `Group: ${props.channelId} (id: ${props.channelId})`)
+    : (clowderPromptContext.value || `Conversation: ${props.channelId} (type: ${props.channelType})`);
   return [
     base,
     `Mention target cat ids: ${targetCatIds.length ? targetCatIds.join(', ') : 'none'}`,
     `Trigger reason: ${triggerReason || 'manual'}`,
     `Current message: ${text}`,
+    ...(replyLines.length ? replyLines : []),
+    ...buildDeploymentResolutionContextLines(text),
     'Recent messages:',
     ...(recentMessages.length ? recentMessages : ['- No recent messages available.'])
   ].join('\n');
@@ -451,43 +599,174 @@ function getCatDisplayName(catId: string) {
   return direct?.displayName || catId;
 }
 
-function addDeploymentConfirmationCard(
+function isActiveDeploymentRequest(request: ClowderDeploymentRequest | null | undefined) {
+  return Boolean(request && ['needs_fields', 'pending_confirmation'].includes(request.status));
+}
+
+function resolveDeploymentRequestTargetCatIds(targetCatIds: string[]) {
+  const directCatId = getClowderCatIdFromContactId(props.channelId);
+  return targetCatIds.length ? targetCatIds : (directCatId ? [directCatId] : []);
+}
+
+function deploymentCandidateLabel(value: string) {
+  const tail = value.split(/[\\/]/).filter(Boolean).pop();
+  return tail || value;
+}
+
+function normalizeDeploymentTargetPath(value: string) {
+  const text = String(value || '')
+    .trim()
+    .replace(/^[`"'“”‘’]+|[`"'“”‘’.,，。!?！？;；:：]+$/g, '');
+  if (!text || text.length > 180) return '';
+  if (/^https?:\/\//i.test(text)) return '';
+  if (text === '待确认目标' || text === '待确认环境') return '';
+  return text;
+}
+
+function sourceForDeploymentTarget(value: string): ClowderDeploymentTargetCandidate['source'] {
+  if (/\.html?$/i.test(value) || /(?:^|\/)(?:index|preview)\.html?$/i.test(value)) return 'artifact';
+  if (/(?:^|\/)(?:dist|build|public|site|stage|preview)(?:\/|$)/i.test(value)) return 'preview';
+  return 'text';
+}
+
+function extractDeploymentTargetPaths(text: string) {
+  const paths: string[] = [];
+  const add = (value?: string) => {
+    const normalized = normalizeDeploymentTargetPath(value || '');
+    if (normalized) paths.push(normalized);
+  };
+  for (const match of String(text || '').matchAll(/`([^`]+)`/g)) {
+    add(match[1]);
+  }
+  for (const match of String(text || '').matchAll(/(?:^|[\s"'“”‘’])((?:\.{0,2}\/)?(?:[\w.@-]+\/)+[\w.@-]+(?:\.(?:html?|css|js|json|md|txt))?|(?:[\w.@-]+\/)*[\w.@-]+\.html?)(?=$|[\s"'“”‘’.,，。!?！？;；])/g)) {
+    add(match[1]);
+  }
+  return Array.from(new Set(paths));
+}
+
+function buildRecentDeploymentTargetCandidates(sourceText?: string): ClowderDeploymentTargetCandidate[] {
+  const candidates: ClowderDeploymentTargetCandidate[] = [];
+  const seen = new Set<string>();
+  const addCandidate = (
+    value: string,
+    source: ClowderDeploymentTargetCandidate['source'] = sourceForDeploymentTarget(value),
+    workspaceId?: string,
+  ) => {
+    const normalized = normalizeDeploymentTargetPath(value);
+    if (!normalized || seen.has(normalized)) return;
+    seen.add(normalized);
+    candidates.push({
+      id: `${source}:${normalized}`,
+      label: deploymentCandidateLabel(normalized),
+      value: normalized,
+      source,
+      ...(workspaceId ? { workspaceId } : {}),
+      path: normalized,
+    });
+  };
+
+  const activeWorkspaceId = activeClowderWorkspace.value?.workspaceId || activeClowderWorkspace.value?.id;
+  for (const path of extractDeploymentTargetPaths(sourceText || '')) {
+    addCandidate(path, sourceForDeploymentTarget(path), activeWorkspaceId);
+  }
+
+  const recentMessages = messageStore.getChannelMessages(props.channelId, props.channelType).slice(-16);
+  for (const message of recentMessages) {
+    const content = message?.content || (message as any)?.payload || {};
+    for (const value of [
+      content.artifactPath,
+      content.workspacePath,
+      content.workspaceRelativePath,
+      content.relativePath,
+      content.filePath,
+      content.path,
+      ...(Array.isArray(content.artifactRefs) ? content.artifactRefs : []),
+    ]) {
+      addCandidate(String(value || ''), 'artifact', activeWorkspaceId);
+    }
+    for (const path of extractDeploymentTargetPaths(getMessageVisibleText(message))) {
+      addCandidate(path, sourceForDeploymentTarget(path), activeWorkspaceId);
+    }
+  }
+
+  return candidates.slice(0, 6);
+}
+
+function buildDeploymentRequestFieldPayload(
+  intent: DeploymentIntent,
+  options: { includeEnvironmentCandidates?: boolean; sourceText?: string } = {}
+) {
+  const workspace = activeClowderWorkspace.value;
+  const target = intent.target === '待确认目标' ? undefined : intent.target;
+  const environment = intent.environment === '待确认环境' ? undefined : intent.environment;
+  const recentCandidates = buildRecentDeploymentTargetCandidates(options.sourceText);
+  return {
+    ...(target ? { target } : {}),
+    ...(environment ? { environment } : {}),
+    targetCandidates: buildDeploymentTargetCandidates(workspace, target || null, recentCandidates),
+    ...(workspace?.workspaceId || workspace?.id ? { workspaceId: workspace.workspaceId || workspace.id } : {}),
+    ...(workspace?.relativePath ? { workspacePath: workspace.relativePath } : {}),
+    ...(options.includeEnvironmentCandidates ? { environmentCandidates: DEFAULT_DEPLOYMENT_ENVIRONMENT_CANDIDATES } : {})
+  };
+}
+
+function buildDeploymentRequestCreatePayload(
   intent: DeploymentIntent,
   text: string,
-  targetCatIds: string[],
-  triggerReason?: GroupCatAutoReplyReason
+  sourceMessageId: string
 ) {
-  const directCatId = getClowderCatIdFromContactId(props.channelId);
-  const effectiveTargetCatIds = targetCatIds.length ? targetCatIds : (directCatId ? [directCatId] : []);
+  return {
+    channelId: props.channelId,
+    channelType: props.channelType as 1 | 2,
+    threadId: clowderStore.conversations[clowderConversationKey.value]?.binding?.threadId,
+    sourceMessageId,
+    originalText: text,
+    ...buildDeploymentRequestFieldPayload(intent, { includeEnvironmentCandidates: true, sourceText: text })
+  };
+}
+
+function buildDeploymentRequestUpdatePayload(
+  intent: DeploymentIntent,
+  sourceMessageId: string,
+  text = ''
+) {
+  return {
+    sourceMessageId,
+    ...buildDeploymentRequestFieldPayload(intent, { sourceText: text })
+  };
+}
+
+function shouldRouteDeploymentPromptToClowder(text: string, shouldRoute: boolean) {
+  if (!shouldRoute) return false;
+  return /(生成|创建|做一个|实现|写一个|制作|协调|请让|Claude|Codex|猫猫|agent|Agent|单文件|活动页|页面|产物)/i.test(text);
+}
+
+function addDeploymentConfirmationCard(
+  deploymentRequest: ClowderDeploymentRequest,
+  text: string,
+  targetCatIds: string[],
+  triggerReason?: GroupCatAutoReplyReason,
+  replyTarget?: any,
+  sourceMessageId?: string,
+  error?: string
+) {
+  const effectiveTargetCatIds = resolveDeploymentRequestTargetCatIds(targetCatIds);
   const firstCatId = effectiveTargetCatIds[0] || '';
   const catDisplayName = getCatDisplayName(firstCatId) || 'Clowder';
-  const clientMsgNo = `deployment-card-${Date.now()}-${Math.random().toString(16).slice(2)}`;
-  messageStore.addMessage(props.channelId, props.channelType, {
-    messageID: clientMsgNo,
-    messageSeq: 0,
-    clientMsgNo,
-    fromUID: props.channelType === 2 ? (userStore.currentUser?.uid || CLOWDER_AI_ROBOT_ID) : CLOWDER_AI_ROBOT_ID,
-    timestamp: Math.floor(Date.now() / 1000),
-    content: {
-      type: 7,
-      cardType: 'deployment',
-      title: '确认部署',
-      target: intent.target,
-      environment: intent.environment,
-      status: 'pending_confirmation',
-      connectorId: 'im-web',
-      catId: firstCatId,
-      catDisplayName,
-      deploymentRequest: {
-        text,
-        targetCatIds: effectiveTargetCatIds,
-        triggerReason,
-        promptContext: buildClowderPromptContext(text, effectiveTargetCatIds, triggerReason)
-      }
-    },
-    isRevoked: false,
-    status: 'success'
-  }, { countUnread: false });
+  const cardMessage = buildDeploymentCardMessage(deploymentRequest, {
+    channelType: props.channelType,
+    currentUserId: userStore.currentUser?.uid,
+    robotId: CLOWDER_AI_ROBOT_ID,
+    sourceText: text,
+    sourceMessageId,
+    targetCatIds: effectiveTargetCatIds,
+    triggerReason,
+    promptContext: buildClowderPromptContext(text, effectiveTargetCatIds, triggerReason, replyTarget),
+    catId: firstCatId,
+    catDisplayName,
+    error
+  });
+  messageStore.addMessage(props.channelId, props.channelType, cardMessage, { countUnread: false });
 }
 
 function openImagePicker() {
@@ -531,15 +810,101 @@ function scheduleClowderConversationSync(channelId: string, channelType: number)
   );
 }
 
-async function sendClowderRouteMessage(text: string, targetCatIds: string[], triggerReason?: GroupCatAutoReplyReason) {
-  await clowderStore.sendConversationMessage({
-    channelId: props.channelId,
-    channelType: props.channelType as 1 | 2,
-    directCatId: getClowderCatIdFromContactId(props.channelId),
-    targetCatIds,
-    promptContext: buildClowderPromptContext(text, targetCatIds, triggerReason)
+function uniqueProjectWorkerCats() {
+  const seen = new Set<string>();
+  const candidates = [
+    ...(clowderStore.connectedCatContacts || []),
+    ...(clowderStore.catContactDirectory || [])
+  ];
+  return candidates.filter(cat => {
+    if (!cat?.catId || cat.catId === CLOWDER_COORDINATOR_CAT_ID || seen.has(cat.catId)) return false;
+    seen.add(cat.catId);
+    return cat.connected !== false && cat.available !== false;
+  });
+}
+
+function addProjectGroupConfirmationCard(text: string, targetCatIds: string[], sourceMessageId: string) {
+  const projectName = resolveProjectGroupName(text, activeClowderWorkspace.value?.displayName);
+  const directThreadId = clowderStore.conversations[clowderConversationKey.value]?.binding?.threadId;
+  const workspace = activeClowderWorkspace.value;
+  const workerCats = uniqueProjectWorkerCats();
+  const effectiveTargetCatIds = targetCatIds.length ? targetCatIds : [CLOWDER_COORDINATOR_CAT_ID];
+  const clientMsgNo = `project-group-confirm-${sourceMessageId || Date.now()}-${Math.random().toString(16).slice(2)}`;
+  const textBody = [
+    `PM 建议为「${projectName}」创建项目群。`,
+    '',
+    '确认后我会创建或复用项目群，并把这条任务投递到项目群里继续执行。'
+  ].join('\n');
+  messageStore.addMessage(props.channelId, props.channelType, {
+    messageID: clientMsgNo,
+    messageSeq: 0,
+    clientMsgNo,
+    fromUID: CLOWDER_AI_ROBOT_ID,
+    timestamp: Math.floor(Date.now() / 1000),
+    content: {
+      type: 1,
+      text: textBody,
+      content: textBody,
+      format: 'markdown',
+      markdown: true,
+      connectorId: 'im-web',
+      catId: CLOWDER_COORDINATOR_CAT_ID,
+      catDisplayName: 'PM / 协调者',
+      metadata: {
+        project_group_confirmation: true,
+        projectGroupConfirmation: true,
+        project_group_status: 'pending_confirmation',
+        projectGroupStatus: 'pending_confirmation',
+        project_name: projectName,
+        projectName,
+        source_text: text,
+        sourceText: text,
+        source_message_id: sourceMessageId,
+        sourceMessageId,
+        targetCatIds: effectiveTargetCatIds,
+        workerCatIds: workerCats.map(cat => cat.catId),
+        workspaceId: workspace?.workspaceId || workspace?.id,
+        workspaceName: workspace?.displayName,
+        pmDirectChannelId: props.channelId,
+        pmDirectChannelType: props.channelType,
+        pmDirectThreadId: directThreadId
+      }
+    },
+    isRevoked: false,
+    status: 'success'
+  }, { countUnread: false });
+}
+
+async function sendClowderRouteMessage(
+  text: string,
+  targetCatIds: string[],
+  triggerReason?: GroupCatAutoReplyReason,
+  replyTarget?: any,
+  routeOverride?: { channelId: string; channelType: 1 | 2; targetCatIds?: string[] }
+) {
+  if (!routeOverride) {
+    const response = await clowderStore.sendConversationMessage({
+      channelId: props.channelId,
+      channelType: props.channelType as 1 | 2,
+      directCatId: getClowderCatIdFromContactId(props.channelId),
+      targetCatIds,
+      promptContext: buildClowderPromptContext(text, targetCatIds, triggerReason, replyTarget)
+    }, text);
+    scheduleClowderConversationSync(props.channelId, props.channelType);
+    return response;
+  }
+  const routeChannelId = routeOverride?.channelId || props.channelId;
+  const routeChannelType = routeOverride?.channelType || props.channelType as 1 | 2;
+  const routeTargetCatIds = routeOverride?.targetCatIds || targetCatIds;
+  const response = await clowderStore.sendConversationMessage({
+    channelId: routeChannelId,
+    channelType: routeChannelType,
+    directCatId: routeChannelType === 1 ? getClowderCatIdFromContactId(routeChannelId) : undefined,
+    targetCatIds: routeTargetCatIds,
+    promptContext: buildClowderPromptContext(text, routeTargetCatIds, triggerReason, replyTarget)
   }, text);
-  scheduleClowderConversationSync(props.channelId, props.channelType);
+  scheduleClowderConversationSync(routeChannelId, routeChannelType);
+  return response;
 }
 
 async function startVoiceRecording() {
@@ -769,6 +1134,14 @@ async function insertMentionTrigger() {
   textareaRef.value?.focus();
 }
 
+async function selectCoordinatorCommand(commandText: string) {
+  inputText.value = commandText;
+  await nextTick();
+  const caretPos = inputText.value.length;
+  textareaRef.value?.setSelectionRange(caretPos, caretPos);
+  textareaRef.value?.focus();
+}
+
 async function openRobotMenu() {
   if (robotMenuState.value === 'ready') {
     robotMenuState.value = 'idle';
@@ -879,6 +1252,7 @@ async function handleSend() {
   conversationStore.updateDraft(props.channelId, props.channelType, '');
 
   const options: any = {};
+  const replyTargetSnapshot = messageStore.replyTarget;
   
   // Build Mention
   if (props.channelType === 2) {
@@ -892,15 +1266,24 @@ async function handleSend() {
     mode: groupAutoReplyMode.value,
     cats: props.channelType === 2 ? (clowderStore.groupCatMemberships[props.channelId] || []) : [],
     explicitTargetCatIds,
+    defaultTargetCatId: props.channelType === 2 ? CLOWDER_COORDINATOR_CAT_ID : undefined,
     focusedCatId: clowderStore.conversations[clowderConversationKey.value]?.focusCatId,
     lastActiveCatId: clowderStore.agentDirectories[clowderConversationKey.value]?.lastActive?.catId,
-    replyTarget: messageStore.replyTarget,
+    replyTarget: replyTargetSnapshot,
     recentMessages: buildRecentAutoReplyMessages()
   });
   const targetCatIds = autoReplyDecision.targetCatIds;
-  const deploymentIntent = detectDeploymentIntent(text);
+  const cachedDeploymentRequest = clowderStore.getDeploymentRequest(props.channelId, props.channelType);
+  const cachedActiveDeploymentRequest = isActiveDeploymentRequest(cachedDeploymentRequest) ? cachedDeploymentRequest : null;
+  const deploymentIntent = detectDeploymentIntent(text, {
+    hasActiveRequest: Boolean(cachedActiveDeploymentRequest)
+  });
   const needsDeploymentConfirmation = deploymentIntent.shouldConfirm &&
+    !deploymentIntent.requiresContextResolution &&
     (isClowderAiConversation.value || isClowderCatConversation.value || autoReplyDecision.shouldRoute);
+  const needsContextualDeploymentRoute = deploymentIntent.requiresContextResolution &&
+    (isClowderAiConversation.value || isClowderCatConversation.value || autoReplyDecision.shouldRoute);
+  const shouldUseProjectGroup = isCoordinatorDirectConversation.value && isProjectStartRequest(text);
 
   if (props.channelType === 2) {
     if (text.includes('@所有人') || text.includes('@all')) {
@@ -918,26 +1301,64 @@ async function handleSend() {
   }
 
   // Build Reply / Quote
-  if (messageStore.replyTarget) {
-    const target = messageStore.replyTarget;
-    options.reply = {
-      messageID: target.messageID,
-      messageSeq: target.messageSeq,
-      fromUID: target.fromUID,
-      fromName: userStore.userCache[target.fromUID]?.name || target.fromUID,
-      content: target.content
-    };
+  if (replyTargetSnapshot) {
+    options.reply = buildReplyPayload(replyTargetSnapshot);
   }
 
   try {
-    await messageStore.sendMessage(props.channelId, props.channelType, text, options);
-    if (needsDeploymentConfirmation) {
-      addDeploymentConfirmationCard(deploymentIntent, text, targetCatIds, autoReplyDecision.reason);
-    } else if (isClowderAiConversation.value || isClowderCatConversation.value || autoReplyDecision.shouldRoute) {
-      await sendClowderRouteMessage(text, targetCatIds, autoReplyDecision.reason);
+    const sentMessage = await messageStore.sendMessage(props.channelId, props.channelType, text, options);
+    if (replyTargetSnapshot && isSameReplyTarget(messageStore.replyTarget, replyTargetSnapshot)) {
+      messageStore.setReplyTarget(null);
     }
-    messageStore.setReplyTarget(null);
     mentionedUids.value = [];
+    if (shouldUseProjectGroup) {
+      addProjectGroupConfirmationCard(text, targetCatIds, sentMessage.clientMsgNo);
+      ArcoMessage.info('已生成项目群确认卡');
+    }
+    const allowCurrentConversationRoute = !shouldUseProjectGroup;
+    if (needsDeploymentConfirmation) {
+      try {
+        const loadedDeploymentRequest = cachedActiveDeploymentRequest || await clowderStore.loadActiveDeploymentRequest({
+          channelId: props.channelId,
+          channelType: props.channelType as 1 | 2
+        }).catch(() => null);
+        const activeDeploymentRequest = isActiveDeploymentRequest(loadedDeploymentRequest) ? loadedDeploymentRequest : null;
+        const resolvedIntent = detectDeploymentIntent(text, {
+          hasActiveRequest: Boolean(activeDeploymentRequest)
+        });
+        const deploymentRequest = activeDeploymentRequest
+          ? await clowderStore.updateDeploymentRequestFields(
+            activeDeploymentRequest.id,
+            buildDeploymentRequestUpdatePayload(resolvedIntent, sentMessage.clientMsgNo, text)
+          )
+          : await clowderStore.createDeploymentRequest(
+            buildDeploymentRequestCreatePayload(resolvedIntent, text, sentMessage.clientMsgNo)
+        );
+        addDeploymentConfirmationCard(
+          deploymentRequest,
+          text,
+          targetCatIds,
+          autoReplyDecision.reason,
+          replyTargetSnapshot,
+          sentMessage.clientMsgNo
+        );
+        if (allowCurrentConversationRoute && shouldRouteDeploymentPromptToClowder(text, autoReplyDecision.shouldRoute)) {
+          await sendClowderRouteMessage(text, targetCatIds, autoReplyDecision.reason, replyTargetSnapshot);
+        }
+      } catch (deploymentErr) {
+        console.error('Failed to sync deployment request', deploymentErr);
+        ArcoMessage.error('部署请求更新失败，请稍后重试');
+      }
+    } else if (
+      allowCurrentConversationRoute && (
+        needsContextualDeploymentRoute ||
+        isClowderAiConversation.value ||
+        isClowderCatConversation.value ||
+        autoReplyDecision.shouldRoute
+      )
+    ) {
+      await sendClowderRouteMessage(text, targetCatIds, autoReplyDecision.reason, replyTargetSnapshot);
+    }
   } catch (err) {
     console.error('Failed to send message', err);
   } finally {
@@ -977,6 +1398,18 @@ onBeforeUnmount(() => {
         <span class="mention-name">{{ getMemberDisplayName(member) }}</span>
         <span v-if="member.role_label !== '成员'" class="mention-role">{{ member.role_label }}</span>
       </div>
+    </div>
+
+    <div v-if="showCoordinatorCommandMenu" class="coordinator-command-panel">
+      <button
+        v-for="item in filteredCoordinatorCommands"
+        :key="item.command"
+        type="button"
+        class="coordinator-command-option"
+        @click="selectCoordinatorCommand(item.text)"
+      >
+        <span>{{ item.label }}</span>
+      </button>
     </div>
 
     <!-- Reply target indicator bar -->
@@ -1178,6 +1611,43 @@ onBeforeUnmount(() => {
   box-shadow: 0 -4px 12px rgba(0, 0, 0, 0.08);
   z-index: 3200;
   margin-bottom: 8px;
+}
+
+.coordinator-command-panel {
+  position: absolute;
+  bottom: 100%;
+  left: 16px;
+  width: min(280px, calc(100% - 32px));
+  max-height: 184px;
+  overflow-y: auto;
+  background-color: var(--bg-primary);
+  border: var(--border-hairline);
+  border-radius: var(--radius-sm);
+  box-shadow: 0 -4px 12px rgba(0, 0, 0, 0.08);
+  z-index: 3190;
+  margin-bottom: 8px;
+  padding: 6px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.coordinator-command-option {
+  min-height: 30px;
+  padding: 0 8px;
+  border: 0;
+  border-radius: var(--radius-sm);
+  background: transparent;
+  color: var(--text-primary);
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: flex-start;
+  font-size: 12px;
+}
+
+.coordinator-command-option:hover {
+  background-color: var(--bg-hover);
 }
 
 .mention-item {

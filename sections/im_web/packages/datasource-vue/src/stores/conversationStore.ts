@@ -30,10 +30,22 @@ export interface Conversation {
   hidden?: number;
 }
 
+export interface DeletedConversationRecord {
+  lastMsgSeq: number;
+  lastMsgTime: number;
+  deletedAt: number;
+}
+
+export interface ConversationDeleteResult {
+  ok: true;
+  localOnly: boolean;
+}
+
 const LOCAL_ONLY_DIRECT_CONVERSATION_IDS = new Set(['deepseek_ai_robot', 'clowder_ai']);
 const LOCAL_ONLY_DRAFTS_STORAGE_PREFIX = 'im-web:local-only-drafts';
 const CLEARED_UNREAD_STORAGE_PREFIX = 'im-web:cleared-unread';
 const HIDDEN_CONVERSATIONS_STORAGE_PREFIX = 'im-web:hidden-conversations';
+const DELETED_CONVERSATIONS_STORAGE_PREFIX = 'im-web:deleted-conversations';
 
 interface ClearedUnreadRecord {
   seq: number;
@@ -48,6 +60,7 @@ export const useConversationStore = defineStore('conversation', () => {
   const unreadMap = ref<Record<string, number>>({});
   const clearedUnreadSeqs = ref<Record<string, number>>({});
   const hiddenConversationKeys = ref<Record<string, true>>({});
+  const deletedConversationRecords = ref<Record<string, DeletedConversationRecord>>({});
   const lastSyncVersion = ref<number>(0);
   const manuallyDeletedConversationKeys = ref<Record<string, true>>({});
   const draftSyncTimers = ref<Record<string, ReturnType<typeof setTimeout>>>({});
@@ -149,6 +162,90 @@ export const useConversationStore = defineStore('conversation', () => {
     const conv = findConversation(channelId, channelType);
     if (conv) {
       conv.hidden = 0;
+    }
+    return true;
+  }
+
+  function normalizeDeletedRecord(value: any): DeletedConversationRecord | undefined {
+    if (!value || typeof value !== 'object') return undefined;
+    return {
+      lastMsgSeq: Number(value.lastMsgSeq || 0),
+      lastMsgTime: Number(value.lastMsgTime || 0),
+      deletedAt: Number(value.deletedAt || Date.now())
+    };
+  }
+
+  function readStoredDeletedConversations() {
+    const raw = readScopedRecord<DeletedConversationRecord>(DELETED_CONVERSATIONS_STORAGE_PREFIX);
+    const next: Record<string, DeletedConversationRecord> = {};
+    for (const [key, value] of Object.entries(raw)) {
+      const normalized = normalizeDeletedRecord(value);
+      if (normalized) {
+        next[key] = normalized;
+      }
+    }
+    return next;
+  }
+
+  function writeDeletedConversationRecords() {
+    writeScopedRecord(DELETED_CONVERSATIONS_STORAGE_PREFIX, deletedConversationRecords.value);
+  }
+
+  function ensureDeletedConversationRecordsLoaded() {
+    const stored = readStoredDeletedConversations();
+    deletedConversationRecords.value = {
+      ...stored,
+      ...deletedConversationRecords.value
+    };
+    for (const key of Object.keys(deletedConversationRecords.value)) {
+      manuallyDeletedConversationKeys.value[key] = true;
+    }
+  }
+
+  function setDeletedConversationRecord(key: string, conv?: Conversation) {
+    const lastMsgSeq = Number(conv?.last_msg_seq || 0);
+    const lastMsgTime = Number(conv?.last_msg_time || 0);
+    deletedConversationRecords.value[key] = {
+      lastMsgSeq,
+      lastMsgTime,
+      deletedAt: Date.now()
+    };
+    manuallyDeletedConversationKeys.value[key] = true;
+    writeDeletedConversationRecords();
+  }
+
+  function clearDeletedConversationRecord(key: string) {
+    delete deletedConversationRecords.value[key];
+    delete manuallyDeletedConversationKeys.value[key];
+    writeDeletedConversationRecords();
+  }
+
+  function getDeletedConversationRecord(key: string) {
+    return deletedConversationRecords.value[key] || readStoredDeletedConversations()[key];
+  }
+
+  function getIncomingConversationSeqTime(item: any) {
+    const lastMessage = getLastMessageSource(item);
+    return {
+      seq: Number(item?.last_msg_seq || item?.messageSeq || item?.message_seq || lastMessage?.messageSeq || lastMessage?.message_seq || 0),
+      time: Number(item?.last_msg_time || item?.timestamp || lastMessage?.timestamp || 0)
+    };
+  }
+
+  function isNewerThanDeletedRecord(record: DeletedConversationRecord, seq: number, time: number) {
+    if (seq > 0 && seq > Number(record.lastMsgSeq || 0)) return true;
+    if (time > 0 && time > Number(record.lastMsgTime || 0)) return true;
+    return false;
+  }
+
+  function shouldSuppressDeletedConversation(key: string, seq = 0, time = 0) {
+    const record = getDeletedConversationRecord(key);
+    if (!record) return false;
+    deletedConversationRecords.value[key] = record;
+    manuallyDeletedConversationKeys.value[key] = true;
+    if (isNewerThanDeletedRecord(record, Number(seq || 0), Number(time || 0))) {
+      clearDeletedConversationRecord(key);
+      return false;
     }
     return true;
   }
@@ -499,7 +596,7 @@ export const useConversationStore = defineStore('conversation', () => {
       channel_type: Number(next.channel_type)
     };
     const key = getConversationKey(next.channel_id, next.channel_type);
-    if (manuallyDeletedConversationKeys.value[key]) return;
+    if (shouldSuppressDeletedConversation(key, next.last_msg_seq, next.last_msg_time)) return;
 
     const conv = findConversation(next.channel_id, next.channel_type);
     if (conv?.last_message && next.last_message?.content && isClowderPayload(next.last_message.content)) {
@@ -527,6 +624,7 @@ export const useConversationStore = defineStore('conversation', () => {
 
   async function syncConversations(options: { throwOnError?: boolean } = {}) {
     const version = resetVersion.value;
+    ensureDeletedConversationRecordsLoaded();
     try {
       const res: any = await syncApi.syncConversations({ msg_count: 1 });
       if (version !== resetVersion.value) return;
@@ -560,6 +658,10 @@ export const useConversationStore = defineStore('conversation', () => {
         const channelId = String(item.channel_id);
         const channelType = Number(item.channel_type);
         const key = getConversationKey(channelId, channelType);
+        const incoming = getIncomingConversationSeqTime(item);
+        if (shouldSuppressDeletedConversation(key, incoming.seq, incoming.time)) {
+          continue;
+        }
         const info = await channelStore.getChannelInfo(channelId, channelType);
         if (version !== resetVersion.value) return;
         const effectiveUnread = getEffectiveUnread(item, key);
@@ -581,9 +683,10 @@ export const useConversationStore = defineStore('conversation', () => {
   }
 
   function ensureGroupConversations() {
+    ensureDeletedConversationRecordsLoaded();
     for (const group of Object.values(groupStore.groups)) {
       const key = getConversationKey(group.group_no, 2);
-      if (manuallyDeletedConversationKeys.value[key] || findConversation(group.group_no, 2)) {
+      if (shouldSuppressDeletedConversation(key) || findConversation(group.group_no, 2)) {
         continue;
       }
       channelStore.updateChannelInfo(group.group_no, 2, {
@@ -600,6 +703,8 @@ export const useConversationStore = defineStore('conversation', () => {
   async function prefetchMissingGroupConversationSummaries() {
     const groups = Object.values(groupStore.groups);
     await Promise.all(groups.map(async (group) => {
+      const key = getConversationKey(group.group_no, 2);
+      if (shouldSuppressDeletedConversation(key)) return;
       const conv = findConversation(group.group_no, 2);
       const shouldPrefetch = !conv ||
         isGroupJoinPlaceholder(conv) ||
@@ -627,6 +732,7 @@ export const useConversationStore = defineStore('conversation', () => {
 
   async function syncGroupConversations(options: { throwOnError?: boolean } = {}) {
     const version = resetVersion.value;
+    ensureDeletedConversationRecordsLoaded();
     await groupStore.fetchMyGroups({ throwOnError: options.throwOnError });
     if (version !== resetVersion.value) return;
     ensureGroupConversations();
@@ -778,7 +884,9 @@ export const useConversationStore = defineStore('conversation', () => {
     channelId = String(channelId);
     channelType = Number(channelType);
     const key = getConversationKey(channelId, channelType);
-    delete manuallyDeletedConversationKeys.value[key];
+    const messageSeqForDeleteGuard = Number(message?.messageSeq || message?.message_seq || 0);
+    const messageTimeForDeleteGuard = Number(message?.timestamp || 0);
+    if (shouldSuppressDeletedConversation(key, messageSeqForDeleteGuard, messageTimeForDeleteGuard)) return;
     if (markConversationVisible(channelId, channelType)) {
       try {
         await syncApi.updateConversationExtra(channelId, channelType, { hidden: 0 });
@@ -846,7 +954,9 @@ export const useConversationStore = defineStore('conversation', () => {
     channelId = String(channelId);
     channelType = Number(channelType);
     const key = getConversationKey(channelId, channelType);
-    if (manuallyDeletedConversationKeys.value[key]) return undefined;
+    const messageSeqForDeleteGuard = Number(message?.messageSeq || message?.message_seq || 0);
+    const messageTimeForDeleteGuard = Number(message?.timestamp || 0);
+    if (shouldSuppressDeletedConversation(key, messageSeqForDeleteGuard, messageTimeForDeleteGuard)) return undefined;
 
     const conv = findConversation(channelId, channelType);
     const isOwnMessage = message?.isOwnMessage === true || message?.fromUID === userStore.currentUser?.uid;
@@ -912,19 +1022,32 @@ export const useConversationStore = defineStore('conversation', () => {
     return next;
   }
 
-  async function deleteConversation(channelId: string, channelType: number) {
+  async function deleteConversation(channelId: string, channelType: number): Promise<ConversationDeleteResult> {
     channelId = String(channelId);
     channelType = Number(channelType);
-    conversations.value = conversations.value.filter(c => !(String(c.channel_id) === channelId && Number(c.channel_type) === channelType));
     const key = getConversationKey(channelId, channelType);
-    manuallyDeletedConversationKeys.value[key] = true;
+    ensureDeletedConversationRecordsLoaded();
+    const previousConversations = conversations.value;
+    const previous = findConversation(channelId, channelType);
+    conversations.value = conversations.value.filter(c => !(String(c.channel_id) === channelId && Number(c.channel_type) === channelType));
+    setDeletedConversationRecord(key, previous);
     delete hiddenConversationKeys.value[key];
     setStoredConversationHidden(key, false);
     delete unreadMap.value[key];
+    if (isLocalOnlyDirectConversation(channelId, channelType)) {
+      return { ok: true, localOnly: true };
+    }
     try {
       await syncApi.deleteConversation(channelId, channelType);
+      return { ok: true, localOnly: false };
     } catch (e) {
       console.error('[ConversationStore] Failed to delete conversation remotely', e);
+      conversations.value = previousConversations;
+      clearDeletedConversationRecord(key);
+      if (previous) {
+        unreadMap.value[key] = Number(previous.unread || 0);
+      }
+      throw e;
     }
   }
 
@@ -947,6 +1070,7 @@ export const useConversationStore = defineStore('conversation', () => {
 
   async function recoverAfterReconnect() {
     recoveryState.value = 'syncing';
+    ensureDeletedConversationRecordsLoaded();
     try {
       await syncConversations({ throwOnError: true });
       await syncGroupConversations({ throwOnError: true });
@@ -975,6 +1099,7 @@ export const useConversationStore = defineStore('conversation', () => {
     unreadMap.value = {};
     clearedUnreadSeqs.value = {};
     hiddenConversationKeys.value = {};
+    deletedConversationRecords.value = {};
     lastSyncVersion.value = 0;
     manuallyDeletedConversationKeys.value = {};
     recoveryState.value = 'idle';

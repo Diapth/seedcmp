@@ -174,7 +174,10 @@ export type {
   CatCafeConfig,
   CatCafeConfigV1,
   CatCafeConfigV2,
+  CatClientDefaults,
   CatFeatures,
+  CatRoleTemplate,
+  CatTemplateConfig,
   CatVariant,
   CliConfig,
   // F067: Co-Creator config for @ mention routing
@@ -226,6 +229,15 @@ export {
   DEFAULT_INTAKE_CHECKLIST,
   validateIntakeChecklist,
 } from './community-issue.js';
+// Coordination / lead-agent routing types
+export type {
+  CoordinatorKickoff,
+  CoordinationContext,
+  CoordinationPhase,
+  LeadSelection,
+  LeadSelectionMode,
+  LeadSelectionReason,
+} from './coordination.js';
 // Connector types (F97 外部信息源抽象)
 export type {
   ConnectorDefinition,

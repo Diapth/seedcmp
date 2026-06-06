@@ -83,9 +83,13 @@ export function buildClowderOutboundSenderId(catId: string) {
 
 export function getClowderCatIdFromContactId(contactId: string) {
   const id = String(contactId || '');
-  return id.startsWith(CLOWDER_CAT_CONTACT_PREFIX)
-    ? id.slice(CLOWDER_CAT_CONTACT_PREFIX.length)
-    : undefined;
+  if (id.startsWith(CLOWDER_CAT_CONTACT_PREFIX)) {
+    return id.slice(CLOWDER_CAT_CONTACT_PREFIX.length);
+  }
+  if (id.startsWith('clowder_cat_')) {
+    return id.slice('clowder_cat_'.length);
+  }
+  return undefined;
 }
 
 export function isClowderCatContactId(contactId: string) {

@@ -311,6 +311,7 @@ export class ConnectorInvokeTrigger {
       const persistenceContext: PersistenceContext = { failed: false, errors: [] };
       const collectedUsage = new Map<string, TokenUsage>();
       const collectedTextParts: string[] = [];
+      const collectedErrors: string[] = [];
 
       // ISSUE-9: Track per-turn content for individual outbound delivery
       // Cloud-P1-4 fix: use ordered array (not Map) to preserve A→B→A turn boundaries
@@ -438,6 +439,9 @@ export class ConnectorInvokeTrigger {
             }
           }
         }
+        if (msg.type === 'error') {
+          collectedErrors.push(`${msg.catId ?? catId}: ${msg.error}`);
+        }
         // Collect text content for outbound delivery (final-only)
         if (msg.type === 'text' && typeof msg.content === 'string') {
           collectedTextParts.push(msg.content);
@@ -482,15 +486,17 @@ export class ConnectorInvokeTrigger {
         });
       } else {
         await router.ackCollectedCursors(userId, threadId, cursorBoundaries);
+        const invocationError = collectedErrors.join('; ');
         await invocationRecordStore.update(createResult.invocationId, {
-          status: 'succeeded',
+          status: invocationError ? 'failed' : 'succeeded',
+          ...(invocationError ? { error: invocationError } : {}),
           ...(collectedUsage.size > 0
             ? {
                 usageByCat: Object.fromEntries(collectedUsage),
               }
             : {}),
         });
-        finalStatus = 'succeeded';
+        finalStatus = invocationError ? 'failed' : 'succeeded';
 
         // ⑥ Outbound delivery: send final text + rich blocks to bound external chats
         const finalContent = collectedTextParts.join('');

@@ -2,7 +2,7 @@
 import { computed } from 'vue';
 import { renderMarkdown } from '@tsdaodao/base-vue';
 
-export type ChatSidePreviewKind = 'file-markdown' | 'file-text' | 'file-html' | 'file-pdf' | 'file-office' | 'file-image' | 'ai-html';
+export type ChatSidePreviewKind = 'file-markdown' | 'file-text' | 'file-html' | 'file-pdf' | 'file-office' | 'file-image' | 'ai-html' | 'deployment-preview';
 
 const props = defineProps<{
   visible: boolean;
@@ -59,6 +59,13 @@ function openExternal() {
           sandbox="allow-scripts"
           :data-sandbox-policy="htmlPreviewSandbox"
           title="HTML 预览"
+        ></iframe>
+        <iframe
+          v-else-if="type === 'deployment-preview'"
+          class="html-preview"
+          :src="sourceUrl"
+          sandbox="allow-scripts allow-same-origin"
+          title="部署预览"
         ></iframe>
         <iframe
           v-else-if="type === 'file-pdf'"

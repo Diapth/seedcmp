@@ -6,6 +6,7 @@
  * Used for cats without MCP (Codex, Gemini) that embed rich blocks in text.
  */
 
+import { isAbsolute } from 'node:path';
 import type { RichBlock } from '@cat-cafe/shared';
 import { normalizeRichBlock } from '@cat-cafe/shared';
 
@@ -127,7 +128,12 @@ export function isValidRichBlock(b: unknown): b is RichBlock {
       // P0/P1 security: whitelist safe URL patterns to prevent file exfiltration + XSS
       const url = (obj.url as string).trim();
       if (url.includes('..')) return false; // path traversal
-      const isSafe = url.startsWith('/uploads/') || url.startsWith('/api/') || url.startsWith('https://');
+      const isSafe =
+        url.startsWith('/uploads/') ||
+        url.startsWith('/api/') ||
+        url.startsWith('https://') ||
+        url.startsWith('file://') ||
+        isAbsolute(url);
       if (!isSafe) return false;
       return true;
     }

@@ -129,6 +129,45 @@ describe('POST /api/messages deliveryMode', () => {
     assert.equal(queueUpdate.arguments[2].action, 'enqueued');
   });
 
+  it('queue mode stores coordinator audit metadata on message and queue entry', async () => {
+    deps.invocationTracker.has.mock.mockImplementation(() => true);
+    deps.router.resolveTargetsAndIntent.mock.mockImplementation(async () => ({
+      targetCats: ['coordinator'],
+      intent: { intent: 'execute' },
+      hasMentions: true,
+      leadSelection: {
+        leadCatId: 'coordinator',
+        participantCatIds: ['opus', 'codex'],
+        mode: 'coordinator',
+        reason: 'multi_mention',
+      },
+    }));
+
+    const res = await app.inject({
+      method: 'POST',
+      url: '/api/messages',
+      headers: { 'x-cat-cafe-user': 'user-1', 'content-type': 'application/json' },
+      payload: {
+        content: '@opus @codex 一起做个 demo',
+        threadId: 'thread-1',
+        deliveryMode: 'queue',
+        idempotencyKey: '33333333-3333-4333-8333-333333333333',
+      },
+    });
+
+    assert.equal(res.statusCode, 202);
+    const appended = deps.messageStore.append.mock.calls[0].arguments[0];
+    assert.deepEqual(appended.mentions, ['coordinator', 'opus', 'codex']);
+    assert.equal(appended.extra.coordination.id, 'coord-33333333-3333-4333-8333-333333333333');
+    assert.equal(appended.extra.coordination.leadCatId, 'coordinator');
+    assert.deepEqual(appended.extra.coordination.participantCatIds, ['opus', 'codex']);
+
+    const [entry] = deps.invocationQueue.list('thread-1', 'user-1');
+    assert.equal(entry.sourceCategory, 'coordination');
+    assert.equal(entry.coordination.id, 'coord-33333333-3333-4333-8333-333333333333');
+    assert.deepEqual(entry.coordination.participantCatIds, ['opus', 'codex']);
+  });
+
   it('queue mode replay with same idempotencyKey does not append duplicate message', async () => {
     deps.invocationTracker.has.mock.mockImplementation(() => true);
 

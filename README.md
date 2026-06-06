@@ -114,6 +114,50 @@
 
 所有短信验证码统一使用：**`123456`**
 
+### Orchestrator + Deployment Demo
+
+本地一键启动完整 IM + Clowder 演示栈：
+
+```bash
+cd /home/yunyi/Desktop/Bytedance_cmp/seedcmp
+bash scripts/start-im-clowder.sh start
+```
+
+Web 入口为 `http://127.0.0.1:3000`。推荐使用 `008618337488675` / `123456` 登录，进入包含 Clowder 猫猫的群聊后发送：
+
+```text
+@协调者 请协调团队做一个“AgentHub 咖啡店活动页”静态页面，要求 Claude/Codex 至少一个真实执行，完成后部署到 preview 环境，最后在聊天里给我预览链接、源码下载链接、执行分工和风险说明。
+```
+
+预期闭环：聊天流出现协调/执行回复与部署确认卡；用户在卡片中补充 target、选择 `preview`、点击确认；卡片轮询到部署成功后显示预览和源码下载按钮，并自动追加 `Coordinator / Deployment 结果汇总`。点击“打开预览”会在右侧预览栏嵌入部署页面。
+
+OAuth 前置条件：
+
+- 优先使用 Claude Code OAuth 猫猫；本机没有 Claude 登录态时先运行 `claude login`。
+- Claude 不可用时使用 Codex OAuth 猫猫；本机没有 Codex 登录态时先运行 `codex login`。
+- 当前本地验收群里可用的 Codex OAuth 猫猫是 `xtz`，可用执行猫包含 `dd`。模板里的 `@协调者` 会作为协调意图，真实可连接猫以页面联系人/群成员为准。
+- 最终 Demo 部署目标为 `packages/api/data/agenthub-coffee-event/index.html`，环境选择 `preview`。如果该 AgentHub 产物尚未生成，可用 `packages/api/qa-test-page.html` 作为部署卡链路 fallback。
+
+常见故障处理：
+
+- 部署卡已出现但烟测等待“新卡”超时：复用已有 active card，补 target 后点击“应用”，再确认部署。
+- 确认按钮提示“请先补充部署目标”：最终 Demo 填入 `packages/api/data/agenthub-coffee-event/index.html`，点击“应用”，确认环境为 `preview`；只验证部署卡链路时可改用 `packages/api/qa-test-page.html`。
+- 右侧预览空白：确认预览 URL 是 `http://127.0.0.1:3004/api/deployments/<id>/preview/`，并检查 Clowder API 是否通过 `bash scripts/start-im-clowder.sh start` 运行。
+- 下载按钮打开空白页：这是浏览器下载导航表现，使用对应 `download` URL 或检查卡片日志里的 source package 生成记录。
+- 猫猫没有回复：确认群成员里有在线 OAuth 猫猫；如果 `@协调者` 对应模板未连接，在 prompt 中同时 @ 当前在线猫，例如 `@协调者 @xtz`。
+
+可选浏览器烟测：
+
+```bash
+cd sections/im_web/apps/chat
+RUN_V3_CLOWDER_SMOKE=1 \
+TEST_GROUP_CONVERSATION_ID=16e006b0b84f40faaa77a271e69b5021 \
+TEST_AGENT_A=xtz \
+TEST_AGENT_B=dd \
+TEST_DEPLOYMENT_TARGET=packages/api/data/agenthub-coffee-event/index.html \
+corepack pnpm test:e2e -- tests-e2e/smoke-v3-orchestrator-deployment.spec.ts
+```
+
 ### 已注册测试用户
 
 | 用户名 | 密码 | 手机号 | 名称 |

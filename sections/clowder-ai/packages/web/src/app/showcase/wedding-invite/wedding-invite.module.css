@@ -1,0 +1,532 @@
+.page {
+  --wedding-bg: #f4ecdf;
+  --wedding-bg-deep: #eadcc9;
+  --wedding-paper: rgba(255, 250, 244, 0.8);
+  --wedding-paper-strong: rgba(255, 250, 244, 0.94);
+  --wedding-ink: #2f241d;
+  --wedding-muted: #6e5f53;
+  --wedding-line: rgba(87, 65, 50, 0.16);
+  --wedding-line-strong: rgba(87, 65, 50, 0.28);
+  --wedding-accent: #92543f;
+  --wedding-accent-strong: #6d382a;
+  --wedding-moss: #64725d;
+  --wedding-shadow: 0 30px 80px rgba(84, 62, 46, 0.12);
+  position: relative;
+  min-height: 100vh;
+  overflow: hidden;
+  padding: max(24px, env(safe-area-inset-top)) 20px max(32px, env(safe-area-inset-bottom));
+  background:
+    radial-gradient(circle at top left, rgba(189, 123, 94, 0.22), transparent 34%),
+    radial-gradient(circle at top right, rgba(100, 114, 93, 0.16), transparent 28%),
+    linear-gradient(180deg, var(--wedding-bg) 0%, #f8f2ea 52%, var(--wedding-bg-deep) 100%);
+  color: var(--wedding-ink);
+  font-family: var(--wedding-body-font), "PingFang SC", "Hiragino Sans GB", "Noto Sans SC", sans-serif;
+}
+
+.page::before,
+.page::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+}
+
+.page::before {
+  background-image: linear-gradient(rgba(255, 255, 255, 0.26) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(255, 255, 255, 0.24) 1px, transparent 1px);
+  background-size: 28px 28px;
+  mask-image: linear-gradient(180deg, rgba(0, 0, 0, 0.24), transparent 60%);
+}
+
+.page::after {
+  background: radial-gradient(circle at 50% 0%, rgba(255, 255, 255, 0.4), transparent 40%);
+}
+
+.hero,
+.infoGrid,
+.sectionBlock,
+.supportGrid {
+  position: relative;
+  z-index: 1;
+  width: min(1120px, 100%);
+  margin: 0 auto;
+}
+
+.hero {
+  display: grid;
+  gap: 24px;
+  align-items: stretch;
+  padding-top: 18px;
+}
+
+.heroCopy,
+.photoCard,
+.countdownCard,
+.infoCard,
+.storyCard,
+.galleryCard,
+.supportCard,
+.timelineItem {
+  border: 1px solid var(--wedding-line);
+  background: var(--wedding-paper);
+  box-shadow: var(--wedding-shadow);
+  backdrop-filter: blur(16px);
+}
+
+.heroCopy {
+  border-radius: 32px;
+  padding: 28px 24px;
+}
+
+.kicker,
+.cardEyebrow,
+.storyYear {
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  font-size: 11px;
+  font-weight: 700;
+  color: var(--wedding-accent-strong);
+}
+
+.overline {
+  margin: 12px 0 0;
+  font-size: 13px;
+  color: var(--wedding-muted);
+}
+
+.heroTitle,
+.sectionTitle,
+.cardTitle,
+.infoTitle {
+  font-family: var(--wedding-display-font), Georgia, serif;
+}
+
+.heroTitle {
+  margin: 16px 0 0;
+  font-size: clamp(3rem, 13vw, 5.8rem);
+  line-height: 0.94;
+  letter-spacing: -0.05em;
+}
+
+.heroNative {
+  margin: 14px 0 0;
+  font-size: 18px;
+  font-weight: 600;
+  color: var(--wedding-moss);
+}
+
+.heroSummary {
+  margin: 20px 0 0;
+  max-width: 38rem;
+  font-size: 16px;
+  line-height: 1.8;
+  color: var(--wedding-muted);
+}
+
+.heroActions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  margin-top: 24px;
+}
+
+.primaryAction,
+.secondaryAction,
+.secondaryActionMuted,
+.tertiaryAction {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 46px;
+  border-radius: 999px;
+  padding: 0 18px;
+  font-size: 14px;
+  font-weight: 700;
+  text-decoration: none;
+  transition:
+    transform 180ms ease,
+    background-color 180ms ease,
+    border-color 180ms ease;
+}
+
+.primaryAction {
+  background: linear-gradient(135deg, var(--wedding-accent) 0%, var(--wedding-accent-strong) 100%);
+  color: #fff8f2;
+}
+
+.secondaryAction,
+.tertiaryAction {
+  border: 1px solid var(--wedding-line-strong);
+  background: rgba(255, 255, 255, 0.5);
+  color: var(--wedding-ink);
+}
+
+.secondaryActionMuted {
+  border: 1px dashed var(--wedding-line-strong);
+  background: rgba(255, 255, 255, 0.34);
+  color: var(--wedding-muted);
+  cursor: not-allowed;
+}
+
+.primaryAction:hover,
+.secondaryAction:hover,
+.tertiaryAction:hover {
+  transform: translateY(-1px);
+}
+
+.heroVisual {
+  display: grid;
+  gap: 16px;
+}
+
+.photoCard,
+.countdownCard {
+  border-radius: 28px;
+  padding: 24px;
+}
+
+.photoCard {
+  position: relative;
+  overflow: hidden;
+  min-height: 280px;
+  background:
+    radial-gradient(circle at top left, rgba(255, 255, 255, 0.48), transparent 38%),
+    linear-gradient(140deg, rgba(189, 123, 94, 0.22) 0%, rgba(100, 114, 93, 0.18) 100%),
+    var(--wedding-paper-strong);
+}
+
+.monogram {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 92px;
+  height: 92px;
+  margin-top: 24px;
+  border-radius: 50%;
+  border: 1px solid rgba(255, 255, 255, 0.55);
+  background: rgba(255, 255, 255, 0.34);
+  font-family: var(--wedding-display-font), Georgia, serif;
+  font-size: 40px;
+  color: var(--wedding-accent-strong);
+}
+
+.photoBadge {
+  display: inline-flex;
+  width: fit-content;
+  border-radius: 999px;
+  padding: 6px 10px;
+  background: rgba(255, 255, 255, 0.62);
+  color: var(--wedding-accent-strong);
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.photoHint,
+.cardBody,
+.infoBody,
+.storyCard p,
+.galleryCard p,
+.noteList p,
+.supportLead,
+.inlineFeedback,
+.emptyState p,
+.timelineContent p,
+.checklist li {
+  margin: 0;
+  color: var(--wedding-muted);
+  line-height: 1.75;
+}
+
+.photoHint {
+  max-width: 18rem;
+  margin-top: 20px;
+}
+
+.cardTitle {
+  margin: 10px 0 0;
+  font-size: 32px;
+  line-height: 1.05;
+}
+
+.cardBody {
+  margin-top: 12px;
+  font-size: 15px;
+}
+
+.countdownGrid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 12px;
+  margin-top: 18px;
+}
+
+.countdownUnit {
+  border-radius: 20px;
+  border: 1px solid rgba(87, 65, 50, 0.08);
+  background: rgba(255, 255, 255, 0.62);
+  padding: 14px 10px;
+  text-align: center;
+}
+
+.countdownUnit strong {
+  display: block;
+  font-family: var(--wedding-display-font), Georgia, serif;
+  font-size: 32px;
+  line-height: 1;
+}
+
+.countdownUnit span {
+  display: block;
+  margin-top: 6px;
+  font-size: 12px;
+  color: var(--wedding-muted);
+}
+
+.infoGrid {
+  display: grid;
+  gap: 14px;
+  margin-top: 18px;
+}
+
+.infoCard {
+  border-radius: 24px;
+  padding: 22px;
+}
+
+.infoTitle {
+  margin: 10px 0 0;
+  font-size: 26px;
+  line-height: 1.15;
+}
+
+.infoBody {
+  margin-top: 12px;
+  font-size: 15px;
+}
+
+.sectionBlock {
+  margin-top: 18px;
+  border-radius: 32px;
+  padding: 24px;
+  background: var(--wedding-paper-strong);
+  border: 1px solid rgba(87, 65, 50, 0.1);
+  box-shadow: var(--wedding-shadow);
+}
+
+.sectionHeading,
+.sectionHeadingCompact {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.sectionTitle {
+  margin: 0;
+  font-size: clamp(2rem, 6vw, 3.4rem);
+  line-height: 0.98;
+}
+
+.timeline {
+  display: grid;
+  gap: 14px;
+  padding: 0;
+  margin: 22px 0 0;
+  list-style: none;
+}
+
+.timelineItem {
+  display: grid;
+  gap: 14px;
+  border-radius: 24px;
+  padding: 18px;
+}
+
+.timelineTime {
+  font-family: var(--wedding-display-font), Georgia, serif;
+  font-size: 28px;
+  color: var(--wedding-accent-strong);
+}
+
+.timelineContent h3,
+.storyCard h3,
+.galleryCard h3 {
+  margin: 0;
+  font-size: 20px;
+  line-height: 1.2;
+}
+
+.timelineContent p,
+.storyCard p,
+.galleryCard p {
+  margin-top: 10px;
+  font-size: 15px;
+}
+
+.storyGrid,
+.galleryGrid,
+.supportGrid {
+  display: grid;
+  gap: 14px;
+  margin-top: 22px;
+}
+
+.storyCard,
+.galleryCard,
+.supportCard {
+  border-radius: 24px;
+  padding: 20px;
+}
+
+.storyYear {
+  display: inline-block;
+  margin-bottom: 10px;
+}
+
+.noteList,
+.checklist {
+  display: grid;
+  gap: 12px;
+  padding: 0;
+  margin: 20px 0 0;
+  list-style: none;
+}
+
+.noteList strong,
+.emptyState strong {
+  display: block;
+  margin-bottom: 6px;
+  font-size: 15px;
+}
+
+.tertiaryAction {
+  margin-top: 20px;
+  width: fit-content;
+}
+
+.inlineFeedback {
+  margin-top: 14px;
+  font-size: 14px;
+}
+
+.inlineAddress {
+  margin: 8px 0 0;
+  color: var(--wedding-ink);
+  line-height: 1.75;
+  word-break: break-word;
+}
+
+.emptyState {
+  margin-top: 18px;
+  border-radius: 22px;
+  border: 1px dashed var(--wedding-line-strong);
+  background: rgba(255, 255, 255, 0.54);
+  padding: 18px;
+}
+
+.supportLead {
+  margin-top: 16px;
+  font-size: 15px;
+}
+
+.checklist li {
+  position: relative;
+  padding-left: 22px;
+  font-size: 15px;
+}
+
+.checklist li::before {
+  content: "";
+  position: absolute;
+  left: 0;
+  top: 10px;
+  width: 9px;
+  height: 9px;
+  border-radius: 50%;
+  background: var(--wedding-accent);
+}
+
+@media (min-width: 768px) {
+  .page {
+    padding-left: 28px;
+    padding-right: 28px;
+  }
+
+  .hero {
+    grid-template-columns: minmax(0, 1.3fr) minmax(320px, 0.9fr);
+    gap: 18px;
+  }
+
+  .heroCopy {
+    padding: 36px 34px;
+  }
+
+  .heroVisual {
+    grid-template-rows: minmax(0, 1fr) auto;
+  }
+
+  .infoGrid,
+  .storyGrid,
+  .galleryGrid,
+  .supportGrid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .infoGrid {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+
+  .timelineItem {
+    grid-template-columns: 120px minmax(0, 1fr);
+    align-items: start;
+  }
+}
+
+@media (min-width: 1024px) {
+  .sectionBlock {
+    padding: 30px;
+  }
+
+  .storyGrid {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+
+  .galleryGrid {
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+  }
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  .heroCopy,
+  .photoCard,
+  .countdownCard,
+  .infoCard,
+  .sectionBlock,
+  .supportCard {
+    animation: wedding-rise 720ms ease-out both;
+  }
+
+  .photoCard {
+    animation-delay: 70ms;
+  }
+
+  .countdownCard,
+  .infoCard:nth-child(2) {
+    animation-delay: 120ms;
+  }
+
+  .infoCard:nth-child(3),
+  .supportCard:nth-child(2) {
+    animation-delay: 160ms;
+  }
+}
+
+@keyframes wedding-rise {
+  from {
+    opacity: 0;
+    transform: translateY(16px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}

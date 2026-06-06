@@ -16,6 +16,7 @@ import {
   getMultiMentionOrchestrator,
   resetMultiMentionOrchestrator,
 } from '../dist/routes/callback-multi-mention-routes.js';
+import { InMemoryCoordinatorStore } from '../dist/domains/cats/services/stores/ports/CoordinatorStore.js';
 
 // ── Mocks ──────────────────────────────────────────────────────────────
 
@@ -134,6 +135,10 @@ function createMockQueueProcessor() {
   };
 }
 
+function flushAsyncWork() {
+  return new Promise((resolve) => setImmediate(resolve));
+}
+
 // ── Tests ──────────────────────────────────────────────────────────────
 
 describe('B6: multi_mention queue dispatch', () => {
@@ -141,6 +146,7 @@ describe('B6: multi_mention queue dispatch', () => {
   let mockRegistry, mockSocket, mockMessageStore, mockInvocationRecordStore;
   let mockInvocationTracker, mockRouter;
   let invocationQueue, mockQueueProcessor;
+  let coordinatorStore;
   let creds;
 
   beforeEach(async () => {
@@ -153,6 +159,7 @@ describe('B6: multi_mention queue dispatch', () => {
     mockRouter = createMockRouter();
     invocationQueue = new InvocationQueue();
     mockQueueProcessor = createMockQueueProcessor();
+    coordinatorStore = new InMemoryCoordinatorStore();
     creds = mockRegistry.register('opus', 'thread-1', 'user-1');
 
     app = Fastify({ logger: false });
@@ -167,6 +174,7 @@ describe('B6: multi_mention queue dispatch', () => {
       invocationTracker: mockInvocationTracker,
       invocationQueue,
       queueProcessor: mockQueueProcessor,
+      coordinatorStore,
     });
     await app.ready();
   });
@@ -225,6 +233,7 @@ describe('B6: multi_mention queue dispatch', () => {
     assert.equal(hooks.size, 1);
     const [entryId] = hooks.keys();
     mockQueueProcessor.simulateComplete(entryId, 'succeeded', 'I reviewed it, looks good!');
+    await flushAsyncWork();
 
     // After completion, orchestrator should be done (all 1 target responded)
     assert.equal(orch.getStatus(requestId), 'done');
@@ -265,6 +274,7 @@ describe('B6: multi_mention queue dispatch', () => {
 
     // Complete second target
     mockQueueProcessor.simulateComplete(entryIds[1], 'succeeded', 'Gemini response');
+    await flushAsyncWork();
     assert.equal(orch.getStatus(requestId), 'done');
 
     // Both responses should be in the flush message
@@ -294,6 +304,7 @@ describe('B6: multi_mention queue dispatch', () => {
     const hooks = mockQueueProcessor.getHooks();
     const [entryId] = hooks.keys();
     mockQueueProcessor.simulateComplete(entryId, 'failed', '');
+    await flushAsyncWork();
 
     assert.equal(orch.getStatus(requestId), 'done');
     const result = orch.getResult(requestId);
@@ -321,6 +332,48 @@ describe('B6: multi_mention queue dispatch', () => {
     assert.deepEqual(entry.targetCats, ['codex']);
     assert.ok(entry.content.includes('[Multi-Mention from opus]'));
     assert.ok(entry.content.includes('Test queue entry fields'));
+  });
+
+  test('updates persisted coordination during dispatch and aggregation', async () => {
+    const created = await coordinatorStore.create({
+      threadId: 'thread-1',
+      sourceMessageId: 'msg-source',
+      createdBy: 'user-1',
+      status: 'planning',
+      goal: '协调实现餐厅落地页并准备部署',
+      targetCatIds: ['opus'],
+      dispatchMode: 'serial',
+      subtasks: [{ title: '需求拆解', targetCatId: 'opus', status: 'doing' }],
+    });
+
+    const res = await app.inject({
+      method: 'POST',
+      url: '/api/callbacks/multi-mention',
+      headers: { 'x-invocation-id': creds.invocationId, 'x-callback-token': creds.callbackToken },
+      payload: {
+        targets: ['codex'],
+        question: '检查可访问性和部署风险',
+        callbackTo: 'opus',
+        coordinationId: created.coordination.coordinationId,
+      },
+    });
+
+    assert.equal(res.statusCode, 200);
+    const body = res.json();
+    const afterDispatch = await coordinatorStore.get(created.coordination.coordinationId);
+    assert.equal(afterDispatch.status, 'running');
+    assert.ok(afterDispatch.targetCatIds.includes('codex'));
+    assert.ok(afterDispatch.subtasks.some((task) => task.targetCatId === 'codex' && task.status === 'doing'));
+
+    const [entryId] = mockQueueProcessor.getHooks().keys();
+    mockQueueProcessor.simulateComplete(entryId, 'succeeded', '检查完成，src/index.html 无明显风险。');
+    await flushAsyncWork();
+
+    const afterAggregate = await coordinatorStore.get(created.coordination.coordinationId);
+    assert.equal(afterAggregate.status, 'succeeded');
+    assert.equal(afterAggregate.aggregateSummary.includes('@codex'), true);
+    assert.ok(afterAggregate.subtasks.some((task) => task.targetCatId === 'codex' && task.status === 'done'));
+    assert.equal(getMultiMentionOrchestrator().getResult(body.requestId).request.coordinationId, created.coordination.coordinationId);
   });
 
   test('depth limit prevents excessive enqueue', async () => {

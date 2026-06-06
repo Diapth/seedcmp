@@ -1,4 +1,5 @@
 const DEFAULT_OBJECT_STORAGE_PORT = '9000';
+const DEFAULT_CLOWDER_API_PORT = '3004';
 
 type RuntimeEnv = Record<string, unknown>;
 
@@ -71,6 +72,18 @@ function getObjectStorageOrigin(mediaOrigin: string, env: RuntimeEnv, browserHos
   }
 }
 
+function getClowderApiOrigin(env: RuntimeEnv, browserHostname?: string) {
+  const origin = env.VITE_CLOWDER_API_URL ||
+    env.VITE_CLOWDER_PUBLIC_URL ||
+    env.VITE_CLOWDER_URL ||
+    env.VITE_CLOWDER_BASE_URL;
+  if (origin) return rewriteLocalUrlForRemoteBrowser(String(origin).replace(/\/+$/, ''), browserHostname).replace(/\/+$/, '');
+
+  const fallback = new URL(globalThis.location?.origin || 'http://localhost');
+  fallback.port = DEFAULT_CLOWDER_API_PORT;
+  return rewriteLocalUrlForRemoteBrowser(fallback.origin, browserHostname).replace(/\/+$/, '');
+}
+
 function normalizePreviewUrl(url: URL, mediaOrigin: string, env: RuntimeEnv, browserHostname?: string) {
   const marker = '/file/preview/';
   const markerIndex = url.pathname.indexOf(marker);
@@ -81,6 +94,17 @@ function normalizePreviewUrl(url: URL, mediaOrigin: string, env: RuntimeEnv, bro
   objectUrl.search = url.search;
   objectUrl.hash = url.hash;
   return objectUrl.toString();
+}
+
+function normalizeClowderUploadUrl(url: URL, env: RuntimeEnv, browserHostname?: string) {
+  if (!url.pathname.startsWith('/uploads/')) return '';
+  if (!isLocalBrowserOnlyHost(url.hostname) || url.port !== '3003') return '';
+
+  const origin = new URL(getClowderApiOrigin(env, browserHostname));
+  url.protocol = origin.protocol;
+  url.hostname = origin.hostname;
+  url.port = origin.port;
+  return url.toString();
 }
 
 export function normalizeMediaUrl(
@@ -96,6 +120,8 @@ export function normalizeMediaUrl(
   if (/^https?:\/\//i.test(pathOrUrl)) {
     try {
       const url = new URL(pathOrUrl);
+      const clowderUploadUrl = normalizeClowderUploadUrl(url, env, browserHostname);
+      if (clowderUploadUrl) return clowderUploadUrl;
       if (mediaOrigin && (url.hostname === '127.0.0.1' || url.hostname === 'localhost')) {
         const target = new URL(mediaOrigin);
         url.protocol = target.protocol;
@@ -105,6 +131,14 @@ export function normalizeMediaUrl(
         }
       }
       return normalizePreviewUrl(url, mediaOrigin, env, browserHostname) || url.toString();
+    } catch {
+      return pathOrUrl;
+    }
+  }
+
+  if (pathOrUrl.startsWith('/uploads/')) {
+    try {
+      return new URL(pathOrUrl, `${getClowderApiOrigin(env, browserHostname)}/`).toString();
     } catch {
       return pathOrUrl;
     }

@@ -30,6 +30,7 @@ import type { IRuntimeSessionStore } from '../domains/cats/services/runtime-sess
 import type { IBacklogStore } from '../domains/cats/services/stores/ports/BacklogStore.js';
 import type { DeliveryCursorStore } from '../domains/cats/services/stores/ports/DeliveryCursorStore.js';
 import type { IInvocationRecordStore } from '../domains/cats/services/stores/ports/InvocationRecordStore.js';
+import type { ICoordinatorStore } from '../domains/cats/services/stores/ports/CoordinatorStore.js';
 import {
   hydrateReplyPreview,
   type IMessageStore,
@@ -41,6 +42,8 @@ import type { IThreadStore, VotingStateV1 } from '../domains/cats/services/store
 import { canViewMessage, isSystemUserMessage } from '../domains/cats/services/stores/visibility.js';
 import { getVoiceBlockSynthesizer } from '../domains/cats/services/tts/VoiceBlockSynthesizer.js';
 import type { IEvidenceStore, IMarkerQueue, IReflectionService } from '../domains/memory/interfaces.js';
+import type { IMaomiWorkspaceStore } from '../domains/maomi-workspaces/MaomiWorkspaceStore.js';
+import type { IThreadWorkspaceBindingStore } from '../domains/maomi-workspaces/ThreadWorkspaceBindingStore.js';
 import { buildThreadDeepLink } from '../infrastructure/connectors/connector-command-helpers.js';
 import { createModuleLogger } from '../infrastructure/logger.js';
 import type { SocketManager } from '../infrastructure/websocket/index.js';
@@ -261,6 +264,8 @@ export interface CallbackRoutesOptions {
     threadId: string,
   ) => Promise<{ memberCardCount: number }> | { memberCardCount: number };
   taskStore?: ITaskStore;
+  maomiWorkspaceStore?: IMaomiWorkspaceStore;
+  threadWorkspaceBindingStore?: IThreadWorkspaceBindingStore;
   backlogStore?: IBacklogStore;
   /** For thinking mode filtering in thread-context + thread-cats discovery */
   threadStore?: IThreadStore;
@@ -277,6 +282,7 @@ export interface CallbackRoutesOptions {
   /** For post_message @mention → invocation triggering */
   router?: AgentRouter;
   invocationRecordStore?: IInvocationRecordStore;
+  coordinatorStore?: ICoordinatorStore;
   invocationTracker?: InvocationTracker;
   /** For mention ack cursor tracking (#77) */
   deliveryCursorStore?: DeliveryCursorStore;
@@ -2200,6 +2206,8 @@ export const callbacksRoutes: FastifyPluginAsync<CallbackRoutesOptions> = async 
       taskStore,
       socketManager,
       ...(threadStore ? { threadStore } : {}),
+      ...(opts.maomiWorkspaceStore ? { maomiWorkspaceStore: opts.maomiWorkspaceStore } : {}),
+      ...(opts.threadWorkspaceBindingStore ? { threadWorkspaceBindingStore: opts.threadWorkspaceBindingStore } : {}),
     });
   }
 
@@ -2267,6 +2275,7 @@ export const callbacksRoutes: FastifyPluginAsync<CallbackRoutesOptions> = async 
       ...(invocationTracker ? { invocationTracker } : {}),
       ...(opts.invocationQueue ? { invocationQueue: opts.invocationQueue } : {}),
       ...(queueProcessor ? { queueProcessor } : {}),
+      ...(opts.coordinatorStore ? { coordinatorStore: opts.coordinatorStore } : {}),
     });
     // Wire orchestrator into SocketManager for cancel propagation (P1-1 fix)
     if (typeof socketManager.setMultiMentionOrchestrator === 'function') {

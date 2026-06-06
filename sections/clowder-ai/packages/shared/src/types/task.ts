@@ -67,7 +67,7 @@ export interface TaskItem {
   readonly ownerCatId: CatId | null;
   readonly status: TaskStatus;
   readonly why: string;
-  readonly createdBy: CatId | 'user' | 'system';
+  readonly createdBy: CatId | 'user' | 'system' | 'coordinator';
   readonly createdAt: number;
   readonly updatedAt: number;
   /** PR tracking automation state (#320 KD-14). Only present for kind=pr_tracking. */
@@ -78,6 +78,16 @@ export interface TaskItem {
   readonly sourceMessageId?: string;
   /** Source summary ID for traceability (4-A feature) */
   readonly sourceSummaryId?: string;
+  /** Coordination chain ID when this task belongs to a PM/coordinator workflow. */
+  readonly coordinationId?: string;
+  /** Task dependencies within the same or related coordination chain. */
+  readonly dependsOn?: readonly string[];
+  /** Workspace/document/preview artifacts produced for this task. */
+  readonly artifactRefs?: readonly string[];
+  /** V3-37: active Maomi project workspace associated with this task. */
+  readonly workspaceId?: string;
+  /** V3-37: primary path relative to the Maomi workspace root, when known. */
+  readonly workspaceRelativePath?: string;
 }
 
 export type CreateTaskInput = Pick<TaskItem, 'threadId' | 'title' | 'why' | 'createdBy'> & {
@@ -88,6 +98,11 @@ export type CreateTaskInput = Pick<TaskItem, 'threadId' | 'title' | 'why' | 'cre
   userId?: string;
   sourceMessageId?: string;
   sourceSummaryId?: string;
+  coordinationId?: string;
+  dependsOn?: readonly string[];
+  artifactRefs?: readonly string[];
+  workspaceId?: string;
+  workspaceRelativePath?: string;
 };
 
 /** Mutable partial for updates — strips readonly from TaskItem fields */
@@ -97,4 +112,8 @@ export type UpdateTaskInput = {
   status?: TaskStatus;
   why?: string;
   automationState?: AutomationState;
+  dependsOn?: readonly string[];
+  artifactRefs?: readonly string[];
+  workspaceId?: string;
+  workspaceRelativePath?: string;
 };

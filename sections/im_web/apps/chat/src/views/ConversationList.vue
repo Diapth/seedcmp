@@ -8,6 +8,7 @@ import {
   getClowderCatDisplayNameFromPayload,
   isClowderPayload
 } from '@tsdaodao/base-vue/utils/clowderMessageIdentity';
+import { Message } from '@arco-design/web-vue';
 import { buildDigestPresentation, formatConversationTime } from '../utils/conversationPresentation';
 
 const router = useRouter();
@@ -154,10 +155,19 @@ function handleConversationContextMenu(event: MouseEvent, conv: any) {
 
 async function handleDeleteConversation() {
   if (!selectedConversation.value) return;
-  await conversationStore.deleteConversation(selectedConversation.value.channel_id, selectedConversation.value.channel_type);
+  const conv = selectedConversation.value;
+  try {
+    const result = await conversationStore.deleteConversation(conv.channel_id, conv.channel_type);
+    Message.success(result.localOnly ? '已删除本地会话' : '已删除会话');
+  } catch (err: any) {
+    const message = err?.msg || err?.message || err?.error?.message || '删除会话失败';
+    Message.error(message);
+    selectedConversation.value = null;
+    return;
+  }
   if (
-    route.params.channelId === selectedConversation.value.channel_id &&
-    Number(route.params.channelType) === selectedConversation.value.channel_type
+    route.params.channelId === String(conv.channel_id) &&
+    Number(route.params.channelType) === Number(conv.channel_type)
   ) {
     router.push('/chat');
   }

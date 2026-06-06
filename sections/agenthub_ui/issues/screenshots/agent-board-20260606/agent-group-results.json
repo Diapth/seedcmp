@@ -1,0 +1,60 @@
+{
+  "baseUrl": "http://localhost:5173",
+  "checks": [
+    {
+      "label": "mobile-chat-list",
+      "url": "http://localhost:5173/#/pages/chat/index",
+      "title": "",
+      "viewportWidth": 375,
+      "docScrollWidth": 375,
+      "bodyScrollWidth": 375,
+      "hasHorizontalOverflow": false,
+      "hasAgentGroup": true
+    },
+    {
+      "label": "mobile-agent-group-chat-detail",
+      "url": "http://localhost:5173/#/pages/chat/detail?id=agent-review",
+      "title": "",
+      "viewportWidth": 375,
+      "docScrollWidth": 375,
+      "bodyScrollWidth": 375,
+      "hasHorizontalOverflow": false,
+      "hasGroupTitle": true,
+      "hasCodexMessage": true
+    },
+    {
+      "label": "mobile-agent-group-info",
+      "url": "http://localhost:5173/#/pages/group/info?id=agent-review",
+      "title": "",
+      "viewportWidth": 375,
+      "docScrollWidth": 375,
+      "bodyScrollWidth": 375,
+      "hasHorizontalOverflow": false,
+      "hasBoardEntry": true,
+      "hasMembers": true
+    },
+    {
+      "label": "mobile-agent-group-board-selected",
+      "url": "http://localhost:5173/#/pages/agents/board?groupId=agent-review",
+      "title": "智能体看板",
+      "viewportWidth": 375,
+      "docScrollWidth": 375,
+      "bodyScrollWidth": 375,
+      "hasHorizontalOverflow": false,
+      "boardSelected": "智能体方案评审群",
+      "activeTabText": "智能体方案评审群3 个智能体任务",
+      "activeAgentReview": true
+    },
+    {
+      "label": "desktop-agent-group-info",
+      "url": "http://localhost:5173/#/pages/group/info?id=agent-review",
+      "title": "",
+      "viewportWidth": 1440,
+      "docScrollWidth": 1440,
+      "bodyScrollWidth": 1440,
+      "hasHorizontalOverflow": false,
+      "hasBoardEntry": true
+    }
+  ],
+  "status": "passed"
+}

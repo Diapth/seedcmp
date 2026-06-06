@@ -3,7 +3,7 @@ name: video-forge
 description: >
   视频制作全链路：素材入库 → 剧本冻结 → 全局配音 → 对齐 → 渲染 → 审查 → 交付。
   Use when: 做视频、做 showcase、做教程视频、录屏剪辑、video review、节奏审查。
-  Not for: 纯代码开发（用 worktree/tdd）、纯文档写作（直接写）、PPT（用 ppt-forge）。
+  Not for: 纯代码开发（用 worktree/tdd）、纯文档写作（直接写）、PPT。
   Output: schema 驱动的视频成片 + 多猫审查通过 + 可发布。
 ---
 

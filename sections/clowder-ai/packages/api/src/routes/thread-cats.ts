@@ -32,10 +32,74 @@ export interface ThreadCatsRoutesOptions {
   getCatDisplayName: (catId: string) => string;
   getAllCatIds: () => string[];
   isCatAvailable: (catId: string) => boolean;
+  getDirectoryAgents?: () => ThreadCatDirectoryAgent[];
 }
 
 export const threadCatsRoutes: FastifyPluginAsync<ThreadCatsRoutesOptions> = async (app, opts) => {
-  const { threadStore, agentRegistry, bindingStore, getCatDisplayName, getAllCatIds, isCatAvailable } = opts;
+  const {
+    threadStore,
+    agentRegistry,
+    bindingStore,
+    getCatDisplayName,
+    getAllCatIds,
+    isCatAvailable,
+    getDirectoryAgents,
+  } = opts;
+
+  const buildDirectoryAgents = (
+    preferredCatIds: string[] = [],
+    participantActivity: ParticipantActivityInput[] = [],
+  ) => {
+    const registeredAgents = agentRegistry.getAllEntries();
+    const preferredSet = new Set(preferredCatIds);
+    const participantByCat = new Map(participantActivity.map((p) => [p.catId, p]));
+    const candidates = getDirectoryAgents?.() ?? getAllCatIds().map((catId) => ({ catId }));
+    const candidateByCat = new Map<string, ThreadCatDirectoryAgent>();
+    for (const candidate of candidates) {
+      if (!candidate.catId || candidateByCat.has(candidate.catId)) continue;
+      candidateByCat.set(candidate.catId, candidate);
+    }
+    const knownCatIds = new Set<string>([
+      ...getAllCatIds(),
+      ...candidateByCat.keys(),
+      ...participantActivity.map((item) => item.catId),
+      ...preferredCatIds,
+    ]);
+
+    return [...knownCatIds].map((catId) => {
+      const candidate = candidateByCat.get(catId);
+      const activity = participantByCat.get(catId);
+      const hasService = registeredAgents.has(catId);
+      const available = isCatAvailable(catId) && hasService;
+      return {
+        catId,
+        displayName: candidate?.displayName ?? getCatDisplayName(catId),
+        ...(candidate?.aliases ? { aliases: candidate.aliases } : {}),
+        mentionPatterns:
+          candidate?.mentionPatterns && candidate.mentionPatterns.length > 0 ? candidate.mentionPatterns : [`@${catId}`],
+        ...(candidate?.avatar ? { avatar: candidate.avatar } : {}),
+        ...(candidate?.personalitySummary ? { personalitySummary: candidate.personalitySummary } : {}),
+        ...(candidate?.capabilitySummary ? { capabilitySummary: candidate.capabilitySummary } : {}),
+        ...(candidate?.restrictions && candidate.restrictions.length > 0 ? { restrictions: candidate.restrictions } : {}),
+        available,
+        availabilityState: available ? 'available' : 'unavailable',
+        source: candidate?.source ?? (hasService ? 'existing' : 'disconnected'),
+        preferred: preferredSet.has(catId),
+        ...(activity?.lastMessageAt ? { lastActiveAt: activity.lastMessageAt } : {}),
+        ...(activity?.messageCount ? { messageCount: activity.messageCount } : {}),
+      };
+    });
+  };
+
+  const buildUnboundDirectory = (externalChatId?: string, extra: Record<string, unknown> = {}) => ({
+    threadId: null,
+    ...(externalChatId ? { externalChatId } : {}),
+    bindingRequired: true,
+    agents: buildDirectoryAgents(),
+    preferredCatIds: [],
+    lastActiveCatId: undefined,
+    ...extra,
+  });
 
   app.get<{ Params: { id: string } }>('/api/threads/:id/cats', async (request, reply) => {
     const { id } = request.params;
@@ -80,21 +144,7 @@ export const threadCatsRoutes: FastifyPluginAsync<ThreadCatsRoutesOptions> = asy
     if (!threadId && externalChatId && bindingStore.getByExternal) {
       const binding = await bindingStore.getByExternal('im-web', externalChatId);
       if (!binding) {
-        const registeredAgents = agentRegistry.getAllEntries();
-        return {
-          threadId: null,
-          externalChatId,
-          bindingRequired: true,
-          agents: getAllCatIds().map((catId) => ({
-            catId,
-            displayName: getCatDisplayName(catId),
-            mentionPatterns: [`@${catId}`],
-            available: isCatAvailable(catId) && registeredAgents.has(catId),
-            preferred: false,
-          })),
-          preferredCatIds: [],
-          lastActiveCatId: undefined,
-        };
+        return buildUnboundDirectory(externalChatId);
       }
       threadId = binding.threadId;
       ownerUserId = binding.userId;
@@ -102,46 +152,30 @@ export const threadCatsRoutes: FastifyPluginAsync<ThreadCatsRoutesOptions> = asy
     if (!threadId) return reply.status(400).send({ error: 'threadId or externalChatId required' });
 
     const thread = await threadStore.get(threadId);
-    if (!thread) return reply.status(404).send({ error: 'Thread not found' });
+    if (!thread) {
+      if (externalChatId) return buildUnboundDirectory(externalChatId, { bindingStatus: 'orphaned' });
+      return reply.status(404).send({ error: 'Thread not found' });
+    }
 
     const bindings = await bindingStore.getByThread(threadId);
     if (bindings.length > 0 || ownerUserId) {
       const requestUserId = resolveHeaderUserId(request);
-      if (!requestUserId) return reply.status(401).send({ error: 'Authentication required' });
+      if (!requestUserId) {
+        if (externalChatId) return buildUnboundDirectory(externalChatId, { authRequired: true });
+        return reply.status(401).send({ error: 'Authentication required' });
+      }
       const allowed = bindings.some((b) => b.userId === requestUserId) || ownerUserId === requestUserId;
-      if (!allowed) return reply.status(403).send({ error: 'Forbidden' });
+      if (!allowed) {
+        if (externalChatId) return buildUnboundDirectory(externalChatId, { permissionDenied: true });
+        return reply.status(403).send({ error: 'Forbidden' });
+      }
     }
 
     const participantActivity = await threadStore.getParticipantsWithActivity(threadId);
-    const participantByCat = new Map(participantActivity.map((p) => [p.catId, p]));
-    const result = categorizeThreadCats({
-      participantActivity,
-      registeredServices: agentRegistry.getAllEntries(),
-      allCatIds: getAllCatIds(),
-      getCatDisplayName,
-      isCatAvailable,
-    });
     const preferredCatIds = Array.isArray((thread as { preferredCats?: unknown }).preferredCats)
       ? ((thread as { preferredCats?: string[] }).preferredCats ?? [])
       : [];
-    const preferredSet = new Set(preferredCatIds);
-    const knownCatIds = new Set<string>([
-      ...getAllCatIds(),
-      ...participantActivity.map((item) => item.catId),
-      ...preferredCatIds,
-    ]);
-    const agents = [...knownCatIds].map((catId) => {
-      const activity = participantByCat.get(catId);
-      return {
-        catId,
-        displayName: getCatDisplayName(catId),
-        mentionPatterns: [`@${catId}`],
-        available: isCatAvailable(catId) && agentRegistry.getAllEntries().has(catId),
-        preferred: preferredSet.has(catId),
-        ...(activity?.lastMessageAt ? { lastActiveAt: activity.lastMessageAt } : {}),
-        ...(activity?.messageCount ? { messageCount: activity.messageCount } : {}),
-      };
-    });
+    const agents = buildDirectoryAgents(preferredCatIds, participantActivity);
     const lastActive = [...participantActivity].filter((item) => item.messageCount > 0).sort((a, b) => b.lastMessageAt - a.lastMessageAt)[0];
 
     return {
@@ -152,3 +186,15 @@ export const threadCatsRoutes: FastifyPluginAsync<ThreadCatsRoutesOptions> = asy
     };
   });
 };
+
+export interface ThreadCatDirectoryAgent {
+  catId: string;
+  displayName?: string;
+  aliases?: string[];
+  mentionPatterns?: string[];
+  avatar?: string;
+  personalitySummary?: string;
+  capabilitySummary?: string;
+  restrictions?: string[];
+  source?: 'existing' | 'runtime-created' | 'disconnected' | 'stale';
+}
