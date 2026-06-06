@@ -217,6 +217,12 @@ const ownedAgentCount = computed(() => {
 
 onMounted(() => {
   navStore.setActiveModule('agents');
+  agentStore.fetchAgentDirectory().catch((err) => {
+    console.warn('[agents] fetchAgentDirectory failed', err);
+  });
+  agentStore.fetchSkills().catch((err) => {
+    console.warn('[agents] fetchSkills failed', err);
+  });
 });
 
 function goCreate() {

@@ -238,6 +238,41 @@ describe('IM domain mapping and stores', () => {
     expect(inbound.time).toBe(1780740778000);
   });
 
+  it('maps real deployment card payloads to deployment messages with channel context', () => {
+    const inbound = createInboundMessage({
+      message_id: 'm-deploy',
+      from_uid: 'clowder_cat:coordinator',
+      channel_id: 'project-group-1',
+      channel_type: 2,
+      timestamp: 1780740778,
+      payload: {
+        type: 7,
+        cardType: 'deployment',
+        title: '部署请求',
+        status: 'pending_confirmation',
+        deploymentRequestId: 'dep-1',
+        deploymentRequest: {
+          deploymentRequestId: 'dep-1',
+          target: 'web',
+          environment: 'preview'
+        }
+      }
+    });
+
+    expect(inbound).toMatchObject({
+      type: 'deployment',
+      content: '部署请求',
+      deploymentRequestId: 'dep-1',
+      channelId: 'project-group-1',
+      channelType: 2
+    });
+    expect(inbound.deployment).toMatchObject({
+      status: 'pending_confirmation',
+      target: 'web',
+      environment: 'preview'
+    });
+  });
+
   it('persists drafts by uid and channel key', () => {
     const conversationStore = useConversationStore();
     conversationStore.setCurrentUid('u-1');

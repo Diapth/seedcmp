@@ -2,11 +2,16 @@ import { beforeEach, describe, expect, it } from 'vitest';
 import { createPinia, setActivePinia } from 'pinia';
 import { useAgentStore } from '../../stores/agent.js';
 import { useClowderStore } from '../../stores/clowder.js';
+import { useDeploymentStore } from '../../stores/deployment.js';
+import { useProjectGroupStore } from '../../stores/projectGroup.js';
+import { useSettingsStore } from '../../stores/settings.js';
 import { resetRequestRuntimeForTests, setRequestAdapter } from '../../utils/request.js';
+import { resetStorageForTests } from '../../utils/storage.js';
 
 describe('Clowder and agent stores', () => {
   beforeEach(() => {
     setActivePinia(createPinia());
+    resetStorageForTests();
     resetRequestRuntimeForTests();
   });
 
@@ -51,6 +56,65 @@ describe('Clowder and agent stores', () => {
     });
   });
 
+  it('hydrates backend templates, model options, and skill catalog from cat directory', async () => {
+    setRequestAdapter(async ({ url }) => {
+      expect(url).toContain('/clowder/cats');
+      return {
+        status: 200,
+        data: {
+          code: 0,
+          data: {
+            agents: [],
+            templates: [
+              {
+                roleTemplateId: 'pm',
+                catId: 'pm-agent',
+                displayName: 'PM',
+                capabilitySummary: '项目拆解',
+                cloneable: true
+              }
+            ],
+            clientDefaults: {
+              codex: { defaultModel: 'gpt-5.4', models: ['gpt-5.4', 'gpt-5.4-mini'] }
+            },
+            skillCatalog: {
+              codex: [
+                {
+                  name: 'Code Review',
+                  category: 'quality',
+                  trigger: '/review',
+                  description: 'review changed files',
+                  mounted: true
+                }
+              ]
+            }
+          }
+        }
+      };
+    });
+
+    const agentStore = useAgentStore();
+    await agentStore.fetchAgentDirectory();
+    const skills = await agentStore.fetchSkills();
+
+    expect(agentStore.roleTemplates[0]).toMatchObject({
+      id: 'pm',
+      label: 'PM',
+      catId: 'pm-agent'
+    });
+    expect(agentStore.platformModelOptions.codex[0]).toMatchObject({
+      id: 'gpt-5.4',
+      default: true
+    });
+    expect(skills[0]).toMatchObject({
+      id: 'codex:Code Review',
+      name: 'Code Review',
+      category: 'quality',
+      status: '已启用',
+      triggers: ['/review']
+    });
+  });
+
   it('surfaces OAuth/runtime capability failures instead of simulating success', async () => {
     setRequestAdapter(async ({ url }) => {
       expect(url).toContain('/clowder/local-auth/capabilities');
@@ -69,5 +133,89 @@ describe('Clowder and agent stores', () => {
     expect(clowderStore.capabilities.oauthEnabled).toBe(false);
     expect(clowderStore.capabilities.runtimeAvailable).toBe(false);
     expect(clowderStore.disabledReason).toContain('OAuth');
+  });
+
+  it('stores project group bindings from wrapped backend responses', async () => {
+    setRequestAdapter(async ({ url, method, data }) => {
+      expect(method).toBe('POST');
+      expect(url).toContain('/clowder/project-groups/ensure');
+      expect(data).toMatchObject({ pmDirectChannelId: 'pm-direct' });
+      return {
+        status: 200,
+        data: {
+          code: 0,
+          data: {
+            binding: {
+              bindingId: 'pg-1',
+              status: 'created',
+              projectGroupId: 'group-1',
+              projectThreadId: 'thread-1'
+            }
+          }
+        }
+      };
+    });
+
+    const projectGroupStore = useProjectGroupStore();
+    const result = await projectGroupStore.ensure({ pmDirectChannelId: 'pm-direct' });
+
+    expect(result).toMatchObject({ bindingId: 'pg-1', projectGroupId: 'group-1' });
+    expect(projectGroupStore.bindings['pg-1']).toMatchObject({ status: 'created' });
+  });
+
+  it('confirms deployment cards with deployment action and stores wrapped request payloads', async () => {
+    const calls = [];
+    setRequestAdapter(async ({ url, method, data }) => {
+      calls.push({ url, method, data });
+      expect(method).toBe('POST');
+      expect(url).toContain('/clowder/conversation/deployment-action');
+      expect(data).toMatchObject({
+        deploymentRequestId: 'dep-1',
+        action: 'confirm',
+        channelId: 'group-1',
+        channelType: 2
+      });
+      expect(data.actionId).toContain('dep-1:confirm:');
+      return {
+        status: 200,
+        data: {
+          code: 0,
+          data: {
+            deploymentRequest: {
+              id: 'dep-1',
+              status: 'running',
+              channelId: 'group-1',
+              channelType: 2
+            }
+          }
+        }
+      };
+    });
+
+    const deploymentStore = useDeploymentStore();
+    const result = await deploymentStore.confirm('dep-1', { channelId: 'group-1', channelType: 2 });
+
+    expect(result).toMatchObject({ id: 'dep-1', status: 'running' });
+    expect(deploymentStore.requests['dep-1']).toMatchObject({ status: 'running' });
+    expect(calls).toHaveLength(1);
+  });
+
+  it('marks settings feature fallbacks unavailable when backend capability is missing', async () => {
+    setRequestAdapter(async ({ url }) => {
+      expect(url).toContain('/user/loginuuid');
+      return {
+        status: 404,
+        data: { message: 'not found' }
+      };
+    });
+
+    const settingsStore = useSettingsStore();
+    const result = await settingsStore.generateQrLoginToken();
+
+    expect(result).toMatchObject({
+      available: false,
+      status: 'unavailable'
+    });
+    expect(result.message).toContain('not found');
   });
 });

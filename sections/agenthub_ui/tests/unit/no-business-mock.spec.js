@@ -76,4 +76,21 @@ describe('business mock cleanup', () => {
     expect(filePreview).not.toContain('下载已完成');
     expect(filePreview).toContain('showDownloadUnavailable');
   });
+
+  it('does not present skill upload as a UI-only success path', () => {
+    const skills = read('pages/agents/skills.vue');
+
+    expect(skills).not.toContain('UI 占位');
+    expect(skills).not.toContain('UI only');
+    expect(skills).not.toContain('为界面示意');
+    expect(skills).toContain('useSettingsStore');
+    expect(skills).toContain('showSkillUploadUnavailable');
+  });
+
+  it('renders deployment payloads with the real deployment card component', () => {
+    const bubble = read('components/chat/MessageBubble.vue');
+
+    expect(bubble).toContain('DeploymentCard');
+    expect(bubble).toContain("data.type === 'deployment'");
+  });
 });

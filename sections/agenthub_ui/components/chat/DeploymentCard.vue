@@ -18,27 +18,35 @@ import { useDeploymentStore } from '@/stores/deployment.js';
 const props = defineProps({
   requestId: { type: String, default: '' },
   title: { type: String, default: '部署请求' },
-  status: { type: String, default: 'pending_confirmation' }
+  status: { type: String, default: 'pending_confirmation' },
+  channelId: { type: String, default: '' },
+  channelType: { type: Number, default: 0 }
 });
 
 const deploymentStore = useDeploymentStore();
 const submitting = ref(false);
 const currentStatus = computed(() => deploymentStore.requests[props.requestId]?.status || props.status);
 const terminal = computed(() => ['succeeded', 'failed', 'cancelled'].includes(currentStatus.value));
-const statusText = computed(() => ({
-  pending_confirmation: '等待确认',
-  submitting: '提交中',
-  running: '部署中',
-  succeeded: '已成功',
-  failed: '失败',
-  cancelled: '已取消'
-}[currentStatus.value] || currentStatus.value);
+const statusText = computed(() => {
+  const labels = {
+    pending_confirmation: '等待确认',
+    submitting: '提交中',
+    running: '部署中',
+    succeeded: '已成功',
+    failed: '失败',
+    cancelled: '已取消'
+  };
+  return labels[currentStatus.value] || currentStatus.value;
+});
 
 async function submit() {
   if (!props.requestId) return;
   submitting.value = true;
   try {
-    await deploymentStore.submit({ requestId: props.requestId });
+    await deploymentStore.confirm(props.requestId, {
+      channelId: props.channelId,
+      channelType: props.channelType
+    });
   } finally {
     submitting.value = false;
   }
@@ -48,7 +56,10 @@ async function cancel() {
   if (!props.requestId) return;
   submitting.value = true;
   try {
-    await deploymentStore.cancel(props.requestId);
+    await deploymentStore.cancel(props.requestId, {
+      channelId: props.channelId,
+      channelType: props.channelType
+    });
   } finally {
     submitting.value = false;
   }

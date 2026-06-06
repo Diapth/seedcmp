@@ -41,22 +41,52 @@ function pickContentText(content) {
   return content.text || content.content || content.title || content.name || content.url || '';
 }
 
+function isDeploymentPayload(content = {}) {
+  if (!content || typeof content !== 'object') return false;
+  const cardType = String(content.cardType || content.card_type || content.kind || '').toLowerCase();
+  return cardType === 'deployment' ||
+    cardType === 'deploy' ||
+    cardType === 'deployment_confirmation' ||
+    Boolean(content.deploymentRequestId || content.deployment_request_id || content.deploymentRequest);
+}
+
 function normalizeMessageType(type) {
   if (typeof type === 'string') return type;
   const numeric = Number(type);
   if (numeric === 1) return 'text';
   if (numeric === 2) return 'image';
   if (numeric === 4) return 'voice';
+  if (numeric === 7) return 'deployment';
   if (numeric === 8) return 'file';
   if (numeric === 99 || numeric === 1000) return 'system';
   return 'text';
 }
 
 function pickMessageType(content, raw = {}) {
+  if (isDeploymentPayload(content)) return 'deployment';
   if (raw.type) return normalizeMessageType(raw.type);
   if (content?.type) return normalizeMessageType(content.type);
   if (raw.payload?.type) return normalizeMessageType(raw.payload.type);
   return 'text';
+}
+
+function normalizeDeployment(content = {}, raw = {}) {
+  const request = content.deploymentRequest || content.deployment_request || {};
+  const id = content.deploymentRequestId || content.deployment_request_id ||
+    request.deploymentRequestId || request.deployment_request_id ||
+    request.id || request.requestId || '';
+  return {
+    requestId: id,
+    title: content.title || content.statusLabel || '部署请求',
+    status: content.status || request.status || 'pending_confirmation',
+    target: content.target || request.target || '',
+    environment: content.environment || request.environment || '',
+    previewUrl: content.previewUrl || content.preview_url || request.previewUrl || request.preview_url || '',
+    downloadUrl: content.downloadUrl || content.download_url || request.downloadUrl || request.download_url || '',
+    channelId: raw.channel_id || raw.channelId || content.channelId || content.channel_id || request.channelId || request.channel_id || '',
+    channelType: Number(raw.channel_type || raw.channelType || content.channelType || content.channel_type || request.channelType || request.channel_type || 0),
+    raw: content
+  };
 }
 
 function isDigestSource(raw = {}) {
@@ -92,7 +122,9 @@ export function createInboundMessage(raw = {}, userCache = {}) {
   const content = normalizePayload(raw.content ?? raw.payload ?? raw.contentObj, raw.type || 1);
   const senderId = raw.from_uid || raw.fromUID || raw.senderId || raw.uid || '';
   const cachedUser = userCache[senderId] || {};
-  const text = pickContentText(content);
+  const type = pickMessageType(content, raw);
+  const deployment = type === 'deployment' ? normalizeDeployment(content, raw) : null;
+  const text = deployment?.title || pickContentText(content);
   return {
     id: String(raw.message_id || raw.messageID || raw.id || raw.client_msg_no || raw.clientMsgNo || Date.now()),
     clientMsgNo: raw.client_msg_no || raw.clientMsgNo || '',
@@ -101,7 +133,7 @@ export function createInboundMessage(raw = {}, userCache = {}) {
     senderName: raw.from_name || raw.senderName || cachedUser.name || cachedUser.nickname || senderId || '未知用户',
     senderAvatar: raw.from_avatar || raw.senderAvatar || cachedUser.avatar || '',
     content: text,
-    type: pickMessageType(content, raw),
+    type,
     time: normalizeTimestamp(raw.timestamp || raw.time || Date.now()),
     status: raw.status || 'success',
     reactions: raw.reactions || [],
@@ -109,6 +141,10 @@ export function createInboundMessage(raw = {}, userCache = {}) {
     mentions: raw.mentions || raw.remote_extra?.mentions || [],
     fileName: raw.fileName || raw.name || content.name || '',
     url: raw.url || content.url || '',
+    channelId: raw.channel_id || raw.channelId || deployment?.channelId || '',
+    channelType: Number(raw.channel_type || raw.channelType || deployment?.channelType || 0),
+    deploymentRequestId: deployment?.requestId || '',
+    deployment,
     raw
   };
 }
