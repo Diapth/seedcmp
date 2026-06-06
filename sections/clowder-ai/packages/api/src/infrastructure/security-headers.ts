@@ -9,7 +9,7 @@ export interface SecurityHeadersOptions {
   /** Override allowed origins (for testing). If omitted, resolved from env. */
   allowedOrigins?: (string | RegExp)[];
   /** API's own public base URL (for split-host deployments). */
-  apiBaseUrl?: string;
+  apiBaseUrl?: string | string[];
 }
 
 interface HostAllowlist {
@@ -23,7 +23,7 @@ interface HostAllowlist {
  * hostname-level patterns. Always includes loopback.
  * Host header may include port — we match hostname part only.
  */
-function buildAllowedHosts(origins: (string | RegExp)[], apiBaseUrl?: string): HostAllowlist {
+function buildAllowedHosts(origins: (string | RegExp)[], apiBaseUrls: string[] = []): HostAllowlist {
   const exact = new Set<string>(LOOPBACK_HOSTS);
   const patterns: RegExp[] = [];
   for (const origin of origins) {
@@ -39,8 +39,8 @@ function buildAllowedHosts(origins: (string | RegExp)[], apiBaseUrl?: string): H
       // skip malformed origins
     }
   }
-  // Split-host: API may live on a different domain than the frontend
-  if (apiBaseUrl) {
+  // Split-host: API may live on a different domain than the frontend.
+  for (const apiBaseUrl of apiBaseUrls) {
     try {
       exact.add(new URL(apiBaseUrl).hostname);
     } catch {
@@ -73,10 +73,18 @@ function isFrameEmbeddableDeploymentPreview(url: string): boolean {
   return /^\/api\/deployments\/[^/]+\/preview(?:\/|$)/.test(pathname);
 }
 
+function resolveApiBaseUrls(env: NodeJS.ProcessEnv, configured?: string | string[]): string[] {
+  const values = Array.isArray(configured)
+    ? configured
+    : configured
+      ? [configured]
+      : [env.CAT_CAFE_API_URL, env.NEXT_PUBLIC_API_URL, env.CAT_CAFE_PUBLIC_URL];
+  return values.map((value) => value?.trim()).filter((value): value is string => Boolean(value));
+}
+
 function securityHeaders(app: FastifyInstance, opts: SecurityHeadersOptions, done: () => void) {
   const origins = opts.allowedOrigins ?? resolveFrontendCorsOrigins(process.env);
-  const apiUrl = opts.apiBaseUrl ?? process.env.NEXT_PUBLIC_API_URL;
-  const allowedHosts = buildAllowedHosts(origins, apiUrl);
+  const allowedHosts = buildAllowedHosts(origins, resolveApiBaseUrls(process.env, opts.apiBaseUrl));
 
   // F156 D-6: DNS Rebinding defense — validate Host header early
   app.addHook('onRequest', (request, reply, next) => {

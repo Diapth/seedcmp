@@ -239,3 +239,40 @@ describe('F156 D-6: Split-host API deployment', () => {
     assert.equal(res.statusCode, 403);
   });
 });
+
+describe('F156 D-6: Host allowlist follows CAT_CAFE_API_URL', () => {
+  let app;
+  let previousCatCafeApiUrl;
+  let previousNextPublicApiUrl;
+
+  before(async () => {
+    previousCatCafeApiUrl = process.env.CAT_CAFE_API_URL;
+    previousNextPublicApiUrl = process.env.NEXT_PUBLIC_API_URL;
+    process.env.CAT_CAFE_API_URL = 'http://172.18.58.156:3004';
+    delete process.env.NEXT_PUBLIC_API_URL;
+
+    app = Fastify();
+    await app.register(securityHeadersPlugin, {
+      allowedOrigins: ['http://localhost:3000'],
+    });
+    app.get('/uploads/demo.zip', async () => ({ ok: true }));
+    await app.ready();
+  });
+
+  after(async () => {
+    if (app) await app.close();
+    if (previousCatCafeApiUrl === undefined) delete process.env.CAT_CAFE_API_URL;
+    else process.env.CAT_CAFE_API_URL = previousCatCafeApiUrl;
+    if (previousNextPublicApiUrl === undefined) delete process.env.NEXT_PUBLIC_API_URL;
+    else process.env.NEXT_PUBLIC_API_URL = previousNextPublicApiUrl;
+  });
+
+  it('allows uploads requests addressed to the CAT_CAFE_API_URL host', async () => {
+    const res = await app.inject({
+      method: 'GET',
+      url: '/uploads/demo.zip',
+      headers: { host: '172.18.58.156:3004' },
+    });
+    assert.equal(res.statusCode, 200);
+  });
+});
