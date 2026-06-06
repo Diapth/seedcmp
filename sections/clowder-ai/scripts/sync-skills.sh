@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# sync-skills.sh — 从 cat-cafe-skills/ 自动同步 symlinks 到三猫 skills 目录
+# sync-skills.sh — 从 cat-cafe-skills/ 自动同步 symlinks 到 provider skills 目录
 # 解决 Wave 2 欠债：手工 symlink 反复遗漏
 #
 # 同步目标：
@@ -8,6 +8,7 @@
 #   3. HOME 级  ~/.claude/skills/          （Claude Code 全局 + Hub 检测）
 #   4. HOME 级  ~/.codex/skills/           （Codex）
 #   5. HOME 级  ~/.gemini/skills/          （Gemini）
+#   6. HOME 级  ~/.kimi/skills/            （Kimi）
 #
 # 注：OpenCode（金渐层）读取 ~/.claude/ 配置，无需单独同步
 #
@@ -15,13 +16,26 @@
 
 set -euo pipefail
 
-MAIN_REPO="$(git worktree list --porcelain | head -1 | sed 's/^worktree //')"
-SKILLS_SRC="$MAIN_REPO/cat-cafe-skills"
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+CAT_CAFE_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
+MAIN_REPO="$CAT_CAFE_ROOT"
+SKILLS_SRC="$CAT_CAFE_ROOT/cat-cafe-skills"
 
 # HOME-level uses absolute symlinks (check-skills-mount.sh expects this)
-HOME_CLAUDE="$HOME/.claude/skills"
-HOME_CODEX="$HOME/.codex/skills"
-HOME_GEMINI="$HOME/.gemini/skills"
+home_root() {
+  local override="$1"
+  local fallback="$2"
+  if [ -n "$override" ]; then
+    printf '%s\n' "$override"
+  else
+    printf '%s\n' "$fallback"
+  fi
+}
+
+HOME_CLAUDE="$(home_root "${CLAUDE_HOME:-}" "$HOME/.claude")/skills"
+HOME_CODEX="$(home_root "${CODEX_HOME:-}" "$HOME/.codex")/skills"
+HOME_GEMINI="$(home_root "${GEMINI_HOME:-}" "$HOME/.gemini")/skills"
+HOME_KIMI="$(home_root "${KIMI_SHARE_DIR:-}" "$HOME/.kimi")/skills"
 
 DRY_RUN=false
 [ "${1:-}" = "--dry-run" ] && DRY_RUN=true
@@ -97,12 +111,17 @@ $DRY_RUN && printf "${YELLOW}[DRY RUN MODE]${NC}\n"
 
 # ─── Part 1: All worktrees (project-level, relative symlinks) ───
 
-# Collect worktree paths
-worktree_paths=()
+# Collect worktree paths. In seedcmp-style nested monorepos, git's top-level
+# worktree is the parent repo, not sections/clowder-ai. Keep the Cat Cafe root
+# itself as the managed project root unless a listed worktree also contains the
+# same cat-cafe-skills manifest.
+worktree_paths=("$CAT_CAFE_ROOT")
 while IFS= read -r line; do
   wt_path="${line#worktree }"
+  [ "$wt_path" != "$CAT_CAFE_ROOT" ] || continue
+  [ -f "$wt_path/cat-cafe-skills/manifest.yaml" ] || continue
   worktree_paths+=("$wt_path")
-done < <(git worktree list --porcelain | grep '^worktree ')
+done < <(git -C "$CAT_CAFE_ROOT" worktree list --porcelain 2>/dev/null | grep '^worktree ' || true)
 
 printf "\n${BOLD}[Worktrees]${NC} %d 个\n" "${#worktree_paths[@]}"
 for wt in "${worktree_paths[@]}"; do
@@ -133,11 +152,12 @@ done
 
 # ─── Part 2: HOME-level (absolute symlinks) ───
 
-printf "\n${BOLD}[HOME]${NC} ~/.{claude,codex,gemini}/skills/ (OpenCode via ~/.claude/)\n"
+printf "\n${BOLD}[HOME]${NC} provider user-level skills (OpenCode via Claude)\n"
 for skill_name in "${skill_names[@]}"; do
   sync_link "$skill_name" "$HOME_CLAUDE" "$SKILLS_SRC/$skill_name"
   sync_link "$skill_name" "$HOME_CODEX"  "$SKILLS_SRC/$skill_name"
   sync_link "$skill_name" "$HOME_GEMINI" "$SKILLS_SRC/$skill_name"
+  sync_link "$skill_name" "$HOME_KIMI" "$SKILLS_SRC/$skill_name"
 done
 
 # ─── Part 3: Write skills-state.json (ADR-025 Phase 1) ───

@@ -1,4 +1,5 @@
 import { execFile } from 'node:child_process';
+import { existsSync } from 'node:fs';
 import { lstat, readlink, realpath } from 'node:fs/promises';
 import { basename, dirname, isAbsolute, join, resolve, sep } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -7,15 +8,26 @@ import { pathsEqual } from './project-path.js';
 
 export type SkillProviderMountKey = 'claude' | 'codex' | 'gemini' | 'kimi';
 
+function resolveProviderHome(value: string | undefined, fallback: string): string {
+  const trimmed = value?.trim();
+  return resolve(trimmed || fallback);
+}
+
 export function buildProviderSkillDirCandidates(
   projectRoot: string,
   home: string,
+  env: NodeJS.ProcessEnv = process.env,
 ): Record<SkillProviderMountKey, string[]> {
+  const claudeHome = resolveProviderHome(env.CLAUDE_HOME, join(home, '.claude'));
+  const codexHome = resolveProviderHome(env.CODEX_HOME, join(home, '.codex'));
+  const geminiHome = resolveProviderHome(env.GEMINI_HOME, join(home, '.gemini'));
+  const kimiHome = resolveProviderHome(env.KIMI_SHARE_DIR, join(home, '.kimi'));
+
   return {
-    claude: [...new Set([join(projectRoot, '.claude', 'skills'), join(home, '.claude', 'skills')])],
-    codex: [...new Set([join(projectRoot, '.codex', 'skills'), join(home, '.codex', 'skills')])],
-    gemini: [...new Set([join(projectRoot, '.gemini', 'skills'), join(home, '.gemini', 'skills')])],
-    kimi: [...new Set([join(projectRoot, '.kimi', 'skills'), join(home, '.kimi', 'skills')])],
+    claude: [...new Set([join(projectRoot, '.claude', 'skills'), join(claudeHome, 'skills')])],
+    codex: [...new Set([join(projectRoot, '.codex', 'skills'), join(codexHome, 'skills')])],
+    gemini: [...new Set([join(projectRoot, '.gemini', 'skills'), join(geminiHome, 'skills')])],
+    kimi: [...new Set([join(projectRoot, '.kimi', 'skills'), join(kimiHome, 'skills')])],
   };
 }
 
@@ -91,18 +103,28 @@ export async function resolveMainRepoPath(): Promise<string> {
   if (cachedMainRepoPathPromise) return cachedMainRepoPathPromise;
   cachedMainRepoPathPromise = (async () => {
     const moduleRepoRoot = resolve(dirname(fileURLToPath(import.meta.url)), '../../../..');
+    if (existsSync(join(moduleRepoRoot, 'cat-cafe-skills', 'manifest.yaml'))) {
+      return moduleRepoRoot;
+    }
     try {
       const { stdout } = await execFileAsync('git', ['worktree', 'list', '--porcelain']);
       const firstLine = stdout.split('\n')[0] ?? '';
-      return firstLine.replace(/^worktree\s+/, '').trim();
+      const gitRoot = firstLine.replace(/^worktree\s+/, '').trim();
+      if (gitRoot && existsSync(join(gitRoot, 'cat-cafe-skills', 'manifest.yaml'))) {
+        return gitRoot;
+      }
     } catch {
       try {
         const { stdout } = await execFileAsync('git', ['rev-parse', '--show-toplevel']);
-        return stdout.trim();
+        const gitRoot = stdout.trim();
+        if (gitRoot && existsSync(join(gitRoot, 'cat-cafe-skills', 'manifest.yaml'))) {
+          return gitRoot;
+        }
       } catch {
-        return moduleRepoRoot;
+        // Fall through to module root.
       }
     }
+    return moduleRepoRoot;
   })().then((p) => {
     cachedMainRepoPath = p;
     return p;

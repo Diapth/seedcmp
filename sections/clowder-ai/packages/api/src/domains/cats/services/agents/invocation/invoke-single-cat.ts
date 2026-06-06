@@ -23,6 +23,7 @@ import {
 import { resolveBoundAccountRefForCat } from '../../../../../config/cat-account-binding.js';
 import { isSessionChainEnabled } from '../../../../../config/cat-config-loader.js';
 import { getContextWindowFallback } from '../../../../../config/context-window-sizes.js';
+import { ensureProviderHomeSkillsSynced } from '../../../../../config/governance/provider-home-skill-sync.js';
 import { getSessionStrategy, shouldTakeAction } from '../../../../../config/session-strategy.js';
 import { assertSafeTestConfigRoot } from '../../../../../config/test-config-write-guard.js';
 import { capturePromptIfEnabled } from '../../../../../infrastructure/debug/prompt-capture-bridge.js';
@@ -60,6 +61,7 @@ import { resolveCliCommand } from '../../../../../utils/cli-resolve.js';
 import { DEFAULT_CLI_TIMEOUT_MS, resolveCliTimeoutMs } from '../../../../../utils/cli-timeout.js';
 import { findMonorepoRoot, isSameProject } from '../../../../../utils/monorepo-root.js';
 import { isUnderAllowedRoot } from '../../../../../utils/project-path.js';
+import { resolveMainRepoPath } from '../../../../../utils/skill-mount.js';
 import { tcpProbe } from '../../../../../utils/tcp-probe.js';
 import type { IRuntimeWorkspaceStore, RuntimeWorkspaceRecord } from '../../../../runtime-workspaces/RuntimeWorkspaceStore.js';
 import {
@@ -496,7 +498,21 @@ export async function* invokeSingleCat(deps: InvocationDeps, params: InvocationP
   let didComplete = false;
   let didResetRestoreFailures = false;
   let openCodeRuntimeConfigPath: string | undefined;
-  const hostProjectRoot = findMonorepoRoot(process.cwd());
+  const hostProjectRoot = await resolveMainRepoPath();
+  try {
+    const skillsSource = resolve(hostProjectRoot, 'cat-cafe-skills');
+    if (existsSync(resolve(skillsSource, 'manifest.yaml'))) {
+      const result = await ensureProviderHomeSkillsSynced(skillsSource);
+      if (result.skippedExisting.length > 0) {
+        log.warn(
+          { skippedExisting: result.skippedExisting, providerDirs: result.providerDirs },
+          'provider HOME skill sync skipped existing user skill paths',
+        );
+      }
+    }
+  } catch (err) {
+    log.warn({ err, hostProjectRoot }, 'provider HOME skill sync failed');
+  }
 
   // === CAT_INVOKED 审计 (fire-and-forget, 缅因猫 review P2-3) ===
   auditLog
