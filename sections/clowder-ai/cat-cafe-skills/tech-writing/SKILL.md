@@ -3,7 +3,7 @@ name: tech-writing
 description: >
   技术文章对外写作：从内部实践到读者能代入的叙事。
   Use when: 写技术博客、公众号文章、社区分享、对外 longform、技术文章 review、写推广语。
-  Not for: 内部文档/spec（直接写）、PPT（用 ppt-forge）。
+  Not for: 内部文档/spec（直接写）、PPT。
   Output: 有呼吸感的技术文章 + 读者反馈聚类分析。
 triggers:
   - "写文章"

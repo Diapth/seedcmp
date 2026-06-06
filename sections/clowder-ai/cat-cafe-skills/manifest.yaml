@@ -602,7 +602,7 @@ skills:
     description: >
       视频制作全链路：素材入库 → 剧本冻结 → 全局配音 → 对齐 → 渲染 → 审查 → 交付。
       Use when: 做视频、做 showcase、做教程视频、录屏剪辑、video review、节奏审查。
-      Not for: 纯代码开发（用 worktree/tdd）、纯文档写作（直接写）、PPT（用 ppt-forge）。
+      Not for: 纯代码开发（用 worktree/tdd）、纯文档写作（直接写）、PPT。
       Output: schema 驱动的视频成片 + 多猫审查通过 + 可发布。
     triggers:
       - "做视频"
@@ -963,39 +963,12 @@ skills:
     sop_step: null
     merged_from: null
 
-  # ── PPT 制作全链路 (F144) ──
-  ppt-forge:
-    description: >
-      PPT 制作全链路：内容规划 → 风格定调 → Slide 制作 → 视觉审查 → 导出验证 → 交付。
-      Use when: 做 PPT、做演示文稿、做 slide、做海报、PPT review、视觉审查。
-      Not for: 纯代码开发（用 worktree/tdd）、纯文档写作（直接写）。
-      Output: 高密度 HTML slide + 多猫审查通过 + 导出验证。
-    triggers:
-      - "做 PPT"
-      - "做个 PPT"
-      - "做演示"
-      - "做 slide"
-      - "PPT review"
-      - "视觉审查"
-      - "ppt-forge"
-      - "做海报"
-      - "华为风格"
-      - "做个演示文稿"
-    not_for:
-      - "纯代码开发"
-      - "纯文档写作"
-    output: "High-density HTML slides + multi-cat visual review pass + export verification"
-    next: ["feat-lifecycle"]
-    sop_step: null
-    merged_from: null
-    feature: "F144"
-
   # ── 技术文章对外写作 ──
   tech-writing:
     description: >
       技术文章对外写作：从内部实践到读者能代入的叙事。
       Use when: 写技术博客、公众号文章、社区分享、对外 longform、技术文章 review、写推广语。
-      Not for: 内部文档/spec（直接写）、PPT（用 ppt-forge）、纯调研报告（用 deep-research）。
+      Not for: 内部文档/spec（直接写）、PPT、纯调研报告（用 deep-research）。
       Output: 读者能代入的技术文章 + AI味自检通过 + 推广语。
     triggers:
       - "写文章"
