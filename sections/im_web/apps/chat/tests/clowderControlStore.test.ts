@@ -80,6 +80,96 @@ describe('clowder control store', () => {
     })
   })
 
+  it('caches PM project group bindings and persists the routed project thread', async () => {
+    const { useClowderStore } = await import('../../../packages/datasource-vue/src/stores/clowderStore.ts')
+    const store = useClowderStore()
+    const binding = {
+      id: 'binding-1',
+      userId: 'user-1',
+      projectName: '婚礼',
+      pmDirectChannelId: 'clowder_cat:coordinator',
+      pmDirectChannelType: 1,
+      pmDirectThreadId: 'thread-direct',
+      projectGroupNo: 'group-wedding',
+      projectThreadId: '',
+      pmMemberId: 'clowder_cat:coordinator',
+      userMemberIds: ['user-1', 'clowder_cat:coordinator'],
+      catMemberIds: ['codex'],
+      createdBy: 'pm',
+      createdAt: 1,
+      updatedAt: 1,
+      status: 'active'
+    }
+
+    post.mockResolvedValueOnce({
+      data: {
+        binding,
+        group: { group_no: 'group-wedding', name: '婚礼' },
+        reused: false
+      }
+    })
+
+    await store.ensureProjectGroup({
+      projectName: '婚礼',
+      pmDirectChannelId: 'clowder_cat:coordinator',
+      pmDirectChannelType: 1,
+      pmDirectThreadId: 'thread-direct'
+    })
+
+    expect(store.getProjectGroupBinding({
+      userId: 'user-1',
+      pmDirectChannelId: 'clowder_cat:coordinator',
+      pmDirectChannelType: 1,
+      projectName: '婚礼'
+    })?.projectGroupNo).toBe('group-wedding')
+    expect(store.getActiveProjectGroupBindingForDirect({
+      userId: 'user-1',
+      pmDirectChannelId: 'clowder_cat:coordinator',
+      pmDirectChannelType: 1
+    })?.id).toBe('binding-1')
+
+    get.mockResolvedValueOnce({
+      data: {
+        binding: {
+          ...binding,
+          updatedAt: 2
+        }
+      }
+    })
+    await store.loadActiveProjectGroupBindingForDirect({
+      pmDirectChannelId: 'clowder_cat:coordinator',
+      pmDirectChannelType: 1
+    })
+
+    expect(get).toHaveBeenCalledWith('clowder/project-groups/active', {
+      params: {
+        pmDirectChannelId: 'clowder_cat:coordinator',
+        pmDirectChannelType: 1,
+        projectName: undefined
+      }
+    })
+
+    post.mockResolvedValueOnce({
+      data: {
+        binding: {
+          ...binding,
+          projectThreadId: 'thread-project',
+          updatedAt: 3
+        }
+      }
+    })
+    await store.updateProjectGroupBindingThread('binding-1', 'thread-project')
+
+    expect(post).toHaveBeenLastCalledWith('clowder/project-groups/binding-1/thread', {
+      projectThreadId: 'thread-project'
+    })
+    expect(store.getActiveProjectGroupBindingForDirect({
+      userId: 'user-1',
+      pmDirectChannelId: 'clowder_cat:coordinator',
+      pmDirectChannelType: 1
+    })?.projectThreadId).toBe('thread-project')
+  })
+
   it('tracks coordination records by id and thread', async () => {
     const { useClowderStore } = await import('../../../packages/datasource-vue/src/stores/clowderStore.ts')
     const store = useClowderStore()

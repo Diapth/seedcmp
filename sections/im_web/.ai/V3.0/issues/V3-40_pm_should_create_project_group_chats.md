@@ -197,6 +197,15 @@ sections/clowder-ai/packages/mcp-server/src/tools/callback-tools.ts
 - Project groups include `clowder_cat:coordinator` as a real TangSeng group member backed by a virtual user named `PM / 协调者` or `PM`, so the PM appears in the normal member list and can be addressed like other visible members.
 - `GroupMemberList.vue` continues to show real TangSeng members and Clowder cat members in one member surface, with cats coming from `groupCatMemberships`.
 
+### Stage 5: Automated Regression
+
+- Added `clowderControlStore.test.ts` coverage for project-group binding cache, active PM direct lookup, and route-response `projectThreadId` persistence.
+- Automated validation passed:
+  - `go test ./modules/clowder`
+  - `pnpm test:unit`
+  - `pnpm exec vue-tsc --noEmit`
+  - `pnpm build`
+
 ## Notes
 
 Do not solve this by only changing copy in the PM direct chat. The core requirement is a conversation topology change: PM/user direct chat is for coordination and feedback; project execution happens in a named group that includes the user and the relevant agents.
