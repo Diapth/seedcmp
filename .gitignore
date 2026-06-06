@@ -12,7 +12,7 @@ __pycache__/
 .seedcmp-run/
 .clowder/
 **/.clowder/
-
+manual-test-artifacts/
 # IM backend sources are tracked for V2/V3 integration.
 sections/im/*
 !sections/im/TangSengDaoDaoServer/

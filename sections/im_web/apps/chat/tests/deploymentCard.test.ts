@@ -50,15 +50,28 @@ describe('deployment confirmation card', () => {
   })
 
   it('detects deployment requests without treating every release discussion as confirmed deployment', () => {
-    expect(detectDeploymentIntent('部署婚礼，环境是本地')).toMatchObject({
+    expect(detectDeploymentIntent('部署 packages/api/data/wedding/index.html，环境是本地')).toMatchObject({
       shouldConfirm: true,
+      requiresContextResolution: false,
+      targetResolution: 'explicit',
+      target: 'packages/api/data/wedding/index.html',
+      environment: 'local',
+      missingFields: [],
+      reason: 'new_deployment_request'
+    })
+    expect(detectDeploymentIntent('部署婚礼，环境是本地')).toMatchObject({
+      shouldConfirm: false,
+      requiresContextResolution: true,
+      targetResolution: 'contextual',
       target: '婚礼',
       environment: 'local',
       missingFields: [],
       reason: 'new_deployment_request'
     })
     expect(detectDeploymentIntent('把婚礼部署到本地')).toMatchObject({
-      shouldConfirm: true,
+      shouldConfirm: false,
+      requiresContextResolution: true,
+      targetResolution: 'contextual',
       target: '婚礼',
       environment: 'local',
       missingFields: []
@@ -72,25 +85,37 @@ describe('deployment confirmation card', () => {
       shouldConfirm: false
     })
     expect(detectDeploymentIntent('猫猫，请部署到生产环境')).toMatchObject({
-      shouldConfirm: true,
+      shouldConfirm: false,
+      requiresContextResolution: true,
       environment: 'production'
     })
-    expect(detectDeploymentIntent('deploy cat-cafe-web to staging')).toMatchObject({
+    expect(detectDeploymentIntent('deploy packages/cat-cafe-web to staging')).toMatchObject({
       shouldConfirm: true,
+      requiresContextResolution: false,
+      targetResolution: 'explicit',
+      target: 'packages/cat-cafe-web',
       environment: 'staging',
       missingFields: []
     })
     expect(detectDeploymentIntent('帮我部署')).toMatchObject({
-      shouldConfirm: true,
+      shouldConfirm: false,
+      requiresContextResolution: true,
       target: '待确认目标',
       environment: '待确认环境',
       missingFields: ['target', 'environment']
     })
     expect(detectDeploymentIntent('给我生成预览链接')).toMatchObject({
-      shouldConfirm: true,
+      shouldConfirm: false,
+      requiresContextResolution: true,
       target: '待确认目标',
       environment: 'preview',
       missingFields: ['target']
+    })
+    expect(detectDeploymentIntent('部署刚刚的项目')).toMatchObject({
+      shouldConfirm: false,
+      requiresContextResolution: true,
+      targetResolution: 'contextual',
+      target: '刚刚的项目'
     })
     expect(detectDeploymentIntent('打包源码 packages/site/index.html')).toMatchObject({
       shouldConfirm: true
@@ -177,6 +202,8 @@ describe('deployment confirmation card', () => {
     expect(input.default).toContain('buildDeploymentRequestCreatePayload')
     expect(input.default).toContain('buildDeploymentRequestUpdatePayload')
     expect(input.default).toContain('buildRecentDeploymentTargetCandidates')
+    expect(input.default).toContain('buildDeploymentResolutionContextLines')
+    expect(input.default).toContain('needsContextualDeploymentRoute')
     expect(input.default).toContain('shouldRouteDeploymentPromptToClowder')
     expect(list.default).toContain('handleDeploymentCardAction')
     expect(list.default).toContain('handleDeploymentFieldUpdate')

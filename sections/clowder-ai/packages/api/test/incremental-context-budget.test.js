@@ -72,6 +72,31 @@ describe('assembleIncrementalContext — GAP-1 budget enforcement', () => {
     assert.equal(result.includesCurrentUserMessage, true, 'Current user message (newest) should be in capped set');
   });
 
+  test('injects current IM Web routing context for contextual deployment prompts', async () => {
+    const messageStore = new MessageStore();
+    const deliveryCursorStore = new DeliveryCursorStore();
+    const current = messageStore.append(mockMsg({
+      content: '部署刚刚的项目',
+      extra: {
+        imWebRouting: {
+          promptContext: [
+            '[Deployment target resolution]',
+            'Recent deployment target candidates (reference only):',
+            '1. packages/api/data/agenthub-coffee-event/index.html [artifact]',
+            '[/Deployment target resolution]',
+          ].join('\n'),
+        },
+      },
+    }));
+
+    const deps = buildDeps(messageStore, deliveryCursorStore);
+    const result = await assembleIncrementalContext(deps, 'user-1', 'thread-1', 'opus', current.id);
+
+    assert.equal(result.includesCurrentUserMessage, true);
+    assert.match(result.contextText, /IM Web routing context - reference only/);
+    assert.match(result.contextText, /packages\/api\/data\/agenthub-coffee-event\/index\.html/);
+  });
+
   test('includesCurrentUserMessage is false when current msg is in oldest capped-off portion', async () => {
     const budget = getCatContextBudget('opus');
     const overCount = budget.maxMessages + 50;

@@ -3,6 +3,8 @@ export interface DeploymentIntent {
   target: string;
   environment: string;
   missingFields: Array<'target' | 'environment'>;
+  requiresContextResolution: boolean;
+  targetResolution: 'explicit' | 'contextual' | 'none';
   reason: 'new_deployment_request' | 'deployment_field_update' | 'negated_or_discussion' | 'no_deployment_intent';
 }
 
@@ -65,6 +67,7 @@ const DEPLOYMENT_FILLER_TOKENS = new Set([
 ]);
 
 const DEPLOYMENT_ENVIRONMENT_TEXT = /(本地|local|localhost|预览|preview|测试|testing|staging|stage|uat|预发|生产|线上|prod|production|开发|dev|development|环境)/i;
+const EXPLICIT_DEPLOYMENT_TARGET = /(?:^\.{0,2}\/|[\\/]|(?:\.(?:html?|css|js|jsx|ts|tsx|json|md|txt|zip|tgz|tar\.gz))$)/i;
 
 function hasDeploymentKeyword(text: string) {
   return DEPLOYMENT_KEYWORDS.some((keyword) => text.toLowerCase().includes(keyword.toLowerCase()));
@@ -103,6 +106,13 @@ function isLikelyLooseTarget(text: string) {
   return /[\u4e00-\u9fa5a-zA-Z0-9_.:/-]/.test(trimmed);
 }
 
+function isExplicitDeploymentTarget(target: string) {
+  const text = String(target || '').trim();
+  if (!text || text === '待确认目标') return false;
+  if (/^https?:\/\//i.test(text)) return false;
+  return EXPLICIT_DEPLOYMENT_TARGET.test(text);
+}
+
 function detectTarget(text: string, allowLoose = false) {
   const english = text.match(/\bdeploy(?:ment|ed)?\s+([a-z0-9_.:/-]{2,80})(?:\s+(?:to|into|on)\b|\s*$)/i);
   if (english?.[1]) return sanitizeTargetCandidate(english[1]);
@@ -125,6 +135,12 @@ function detectTarget(text: string, allowLoose = false) {
     if (target !== '待确认目标') return target;
   }
 
+  const packageOrPreviewTargetAfter = text.match(/(?:生成预览链接|打包源码|下载源码包|源码包|预览链接)\s+([^\s,，。！？!?;；、`"“”']{1,120})/);
+  if (packageOrPreviewTargetAfter?.[1]) {
+    const target = sanitizeTargetCandidate(packageOrPreviewTargetAfter[1]);
+    if (target !== '待确认目标') return target;
+  }
+
   if (allowLoose) {
     const loose = text.match(/(?:给我|帮我|我要|要|切到|换成|改成)\s*([^\s,，。！？!?;；、]{1,20})/);
     if (loose?.[1]) {
@@ -144,67 +160,60 @@ function missingFieldsFor(target: string, environment: string): Array<'target' |
   return missingFields;
 }
 
+function targetResolutionFor(target: string, hasActiveRequest: boolean): DeploymentIntent['targetResolution'] {
+  if (target === '待确认目标') return 'none';
+  if (hasActiveRequest || isExplicitDeploymentTarget(target)) return 'explicit';
+  return 'contextual';
+}
+
+function noDeploymentIntent(reason: DeploymentIntent['reason'] = 'no_deployment_intent'): DeploymentIntent {
+  return {
+    shouldConfirm: false,
+    target: '',
+    environment: '',
+    missingFields: [],
+    requiresContextResolution: false,
+    targetResolution: 'none',
+    reason
+  };
+}
+
 export function detectDeploymentIntent(input: string, context: DeploymentIntentContext = {}): DeploymentIntent {
   const text = String(input || '').trim();
   if (!text) {
-    return {
-      shouldConfirm: false,
-      target: '',
-      environment: '',
-      missingFields: [],
-      reason: 'no_deployment_intent'
-    };
+    return noDeploymentIntent();
   }
 
   if (NEGATED_OR_DISCUSSION.test(text)) {
-    return {
-      shouldConfirm: false,
-      target: '',
-      environment: '',
-      missingFields: [],
-      reason: 'negated_or_discussion'
-    };
+    return noDeploymentIntent('negated_or_discussion');
   }
 
   const hasKeyword = hasDeploymentKeyword(text);
   const hasActiveRequest = context.hasActiveRequest === true;
   if (!hasKeyword && !hasActiveRequest) {
-    return {
-      shouldConfirm: false,
-      target: '',
-      environment: '',
-      missingFields: [],
-      reason: 'no_deployment_intent'
-    };
+    return noDeploymentIntent();
   }
 
   const target = detectTarget(text, hasActiveRequest);
   const environment = detectEnvironment(text);
   const hasFieldSignal = target !== '待确认目标' || environment !== '待确认环境';
   if (!hasKeyword && !hasActiveRequest) {
-    return {
-      shouldConfirm: false,
-      target: '',
-      environment: '',
-      missingFields: [],
-      reason: 'no_deployment_intent'
-    };
+    return noDeploymentIntent();
   }
   if (hasActiveRequest && !hasKeyword && !hasFieldSignal) {
-    return {
-      shouldConfirm: false,
-      target: '',
-      environment: '',
-      missingFields: [],
-      reason: 'no_deployment_intent'
-    };
+    return noDeploymentIntent();
   }
 
+  const targetResolution = targetResolutionFor(target, hasActiveRequest);
+  const requiresContextResolution = hasKeyword && !hasActiveRequest && targetResolution !== 'explicit';
+
   return {
-    shouldConfirm: true,
+    shouldConfirm: !requiresContextResolution,
     target,
     environment,
     missingFields: missingFieldsFor(target, environment),
+    requiresContextResolution,
+    targetResolution,
     reason: hasActiveRequest ? 'deployment_field_update' : 'new_deployment_request'
   };
 }

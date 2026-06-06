@@ -594,6 +594,23 @@ export function digestRichBlocks(msg: StoredMessage): string {
   return `${msg.content}\n${digests.join(' ')}`;
 }
 
+function formatCurrentImWebRoutingContext(
+  msg: StoredMessage,
+  currentUserMessageId: string | undefined,
+  limit: number,
+): string {
+  if (!currentUserMessageId || msg.id !== currentUserMessageId) return '';
+  const raw = msg.extra?.imWebRouting?.promptContext?.trim();
+  if (!raw) return '';
+  const clean = sanitizeInjectedContent(raw);
+  if (!clean) return '';
+  const maxLength = Math.max(800, Math.min(2400, limit));
+  const body = clean.length > maxLength
+    ? `${clean.slice(0, maxLength)}\n[...routing context truncated...]`
+    : clean;
+  return `\n[IM Web routing context - reference only]\n${body}\n[/IM Web routing context]`;
+}
+
 export async function fetchAfterCursor(
   messageStore: IMessageStore,
   threadId: string,
@@ -799,7 +816,7 @@ export async function assembleIncrementalContext(
     const cleanContent = sanitizeInjectedContent(contentWithDigest);
     const normalized: StoredMessage = cleanContent === m.content ? m : { ...m, content: cleanContent };
     const rendered = formatMessage(normalized, { truncate: truncateLimit });
-    return `[${m.id}] ${rendered}`;
+    return `[${m.id}] ${rendered}${formatCurrentImWebRoutingContext(m, currentUserMessageId, truncateLimit)}`;
   });
 
   // 第二刀: Aggregate token budget — trim oldest lines until within effective token limit.
@@ -1062,7 +1079,7 @@ async function assembleSmartWindowContext(
     const cleanContent = sanitizeInjectedContent(contentWithDigest);
     const normalized: StoredMessage = cleanContent === m.content ? m : { ...m, content: cleanContent };
     const rendered = formatMessage(normalized, { truncate: truncateLimit });
-    return `[${m.id}] ${rendered}`;
+    return `[${m.id}] ${rendered}${formatCurrentImWebRoutingContext(m, currentUserMessageId, truncateLimit)}`;
   });
 
   // 7. Respect effectiveMaxContextTokens (same as warm path)

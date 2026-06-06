@@ -536,20 +536,49 @@ function buildRecentAutoReplyMessages() {
     });
 }
 
+function buildDeploymentResolutionContextLines(text: string) {
+  const intent = detectDeploymentIntent(text);
+  if (!intent.requiresContextResolution) return [];
+
+  const workspace = activeClowderWorkspace.value;
+  const candidates = buildRecentDeploymentTargetCandidates(text);
+  return [
+    '[Deployment target resolution]',
+    'The user is asking for deployment with conversational context. Treat contextual phrases as references to recent artifacts, the active workspace, and prior conversation, not as literal filesystem paths.',
+    intent.environment !== '待确认环境' ? `Requested environment: ${intent.environment}` : 'Requested environment: not specified',
+    intent.target !== '待确认目标' ? `User target phrase: ${intent.target}` : 'User target phrase: not specified',
+    workspace ? `Active workspace: ${workspace.displayName || workspace.relativePath || workspace.rootPath || workspace.id || workspace.workspaceId}` : 'Active workspace: not available',
+    workspace?.relativePath ? `Active workspace relative path: ${workspace.relativePath}` : '',
+    workspace?.rootPath ? `Active workspace root path: ${workspace.rootPath}` : '',
+    candidates.length
+      ? [
+        'Recent deployment target candidates (reference only):',
+        ...candidates.map((candidate, index) =>
+          `${index + 1}. ${candidate.value}${candidate.source ? ` [${candidate.source}]` : ''}`
+        )
+      ].join('\n')
+      : 'Recent deployment target candidates: none found in visible IM context',
+    'Resolve the target yourself from the available context. If exactly one deployable artifact is clear, respond with its concrete path and environment; if confidence is low, ask one concise clarification.',
+    '[/Deployment target resolution]'
+  ].filter(Boolean);
+}
+
 function buildClowderPromptContext(text: string, targetCatIds: string[], triggerReason?: GroupCatAutoReplyReason, replyTarget?: any) {
-  if (props.channelType !== 2) return clowderPromptContext.value;
   const recentMessages = messageStore.getChannelMessages(props.channelId, props.channelType)
     .filter(message => getMessageVisibleText(message))
     .slice(-12)
     .map(message => `- ${getMessageSenderName(message)}: ${getMessageVisibleText(message)}`);
   const replyLines = buildReplyPromptLines(replyTarget);
-  const base = clowderPromptContext.value || `Group: ${props.channelId} (id: ${props.channelId})`;
+  const base = props.channelType === 2
+    ? (clowderPromptContext.value || `Group: ${props.channelId} (id: ${props.channelId})`)
+    : (clowderPromptContext.value || `Conversation: ${props.channelId} (type: ${props.channelType})`);
   return [
     base,
     `Mention target cat ids: ${targetCatIds.length ? targetCatIds.join(', ') : 'none'}`,
     `Trigger reason: ${triggerReason || 'manual'}`,
     `Current message: ${text}`,
     ...(replyLines.length ? replyLines : []),
+    ...buildDeploymentResolutionContextLines(text),
     'Recent messages:',
     ...(recentMessages.length ? recentMessages : ['- No recent messages available.'])
   ].join('\n');
@@ -1158,6 +1187,9 @@ async function handleSend() {
     hasActiveRequest: Boolean(cachedActiveDeploymentRequest)
   });
   const needsDeploymentConfirmation = deploymentIntent.shouldConfirm &&
+    !deploymentIntent.requiresContextResolution &&
+    (isClowderAiConversation.value || isClowderCatConversation.value || autoReplyDecision.shouldRoute);
+  const needsContextualDeploymentRoute = deploymentIntent.requiresContextResolution &&
     (isClowderAiConversation.value || isClowderCatConversation.value || autoReplyDecision.shouldRoute);
 
   if (props.channelType === 2) {
@@ -1219,7 +1251,7 @@ async function handleSend() {
         console.error('Failed to sync deployment request', deploymentErr);
         ArcoMessage.error('部署请求更新失败，请稍后重试');
       }
-    } else if (isClowderAiConversation.value || isClowderCatConversation.value || autoReplyDecision.shouldRoute) {
+    } else if (needsContextualDeploymentRoute || isClowderAiConversation.value || isClowderCatConversation.value || autoReplyDecision.shouldRoute) {
       await sendClowderRouteMessage(text, targetCatIds, autoReplyDecision.reason, replyTargetSnapshot);
     }
   } catch (err) {

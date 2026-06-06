@@ -78,6 +78,43 @@ describe('Clowder cats as contact identities', () => {
     expect(directory[1].availabilityState).toBe('unavailable')
   })
 
+  it('deduplicates concurrent and immediate repeated cat directory loads', async () => {
+    const { useClowderStore } = await import('../../../packages/datasource-vue/src/stores/clowderStore.ts')
+    const store = useClowderStore()
+
+    let resolveDirectory!: (value: unknown) => void
+    get.mockReturnValueOnce(new Promise(resolve => {
+      resolveDirectory = resolve
+    }))
+
+    const first = store.loadCatContactDirectory({ includeUnavailable: true })
+    const second = store.loadCatContactDirectory({ includeUnavailable: true })
+
+    expect(get).toHaveBeenCalledTimes(1)
+
+    resolveDirectory({
+      agents: [
+        {
+          catId: 'codex',
+          displayName: 'Codex',
+          aliases: ['@codex'],
+          mentionPatterns: ['@codex'],
+          available: true,
+          connected: true,
+          source: 'existing'
+        }
+      ]
+    })
+
+    const [firstDirectory, secondDirectory] = await Promise.all([first, second])
+    expect(firstDirectory.map(cat => cat.catId)).toEqual(['codex'])
+    expect(secondDirectory).toBe(firstDirectory)
+
+    const cached = await store.loadCatContactDirectory({ includeUnavailable: true })
+    expect(get).toHaveBeenCalledTimes(1)
+    expect(cached).toBe(store.catContactDirectory)
+  })
+
   it('connects an existing cat and exposes direct conversation metadata without remote lookup', async () => {
     const { useClowderStore } = await import('../../../packages/datasource-vue/src/stores/clowderStore.ts')
     const { useChannelStore } = await import('@tsdaodao/datasource-vue')
