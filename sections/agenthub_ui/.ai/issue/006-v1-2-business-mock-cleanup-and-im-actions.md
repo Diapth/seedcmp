@@ -35,6 +35,9 @@ Prototype UI affordances survived the backend-integration pass. Some features ha
 
 - `npm run test:unit` -> 35 passed
 - `npm run build:h5` -> passed
+- `npm run test:e2e:realtime` -> passed
+  - Evidence: `.ai/tests-e2e/v1-2-20260606T194812/`
+  - Browser log check: no `pageerror`, no `http-error`, no `requestfailed`
 - Source scan clean for removed fake-success signatures:
   - `sendMockImage`, `sendMockFile`, `sendMockVoice`
   - `mockFile`, `Mock a new user`, `分组创建成功`
