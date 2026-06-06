@@ -12,7 +12,7 @@
 
 AgentHub UI V1 的 V1-1/V1-2 主链路已完成真实后端接入、IM 会话/消息/群列表同步、业务 mock 与伪造成功路径清理，并通过单元测试、H5 构建和 agenthub_ui -> im_web 真实双端实时验收。
 
-V1-3 的 Clowder/Agent/File/Settings API 化与 unavailable 兜底已有代码与单测覆盖；本轮新增真实 live 证据覆盖 OAuth cat 创建、PM 项目群创建、真实 active deployment request 同步、AgentHub/IM Web 双端 deployment card hydration、AgentHub 确认部署动作和移动端项目群可见性。Kanban/artifacts 专项视图未被本次 V1-3 harness 单独断言，不能把本报告当作 artifacts UI 的完整证明。
+V1-3 的 Clowder/Agent/File/Settings API 化与 unavailable 兜底已有代码与单测覆盖；本轮新增真实 live 证据覆盖 OAuth cat 创建、PM 项目群创建、真实 active deployment request 同步、AgentHub/IM Web 双端 deployment card hydration、AgentHub 确认部署动作和移动端项目群可见性。随后补齐 Kanban/artifacts 工作台代码门禁：项目群右侧栏不再走 `agentStore.boards`，而是从真实 Clowder binding 解析 thread id 并挂载 `ProjectKanbanPanel` / `ProjectArtifactsPanel`。Kanban/artifacts 仍需追加 fresh browser live screenshot 作为最终完成证明。
 
 本轮验收重点确认：
 
@@ -26,6 +26,7 @@ V1-3 的 Clowder/Agent/File/Settings API 化与 unavailable 兜底已有代码�
 8. 真实创建 PM 项目群并拉入新 cat，AgentHub 与 im_web 会话列表均可见。
 9. 真实 deployment request 由 active-request API hydrate 成双端 deployment card。
 10. AgentHub 点击确认后，`clowder/conversation/deployment-action` 返回 200 且 deployment request 进入 `queued`。
+11. 项目群右侧栏从真实 Clowder thread id 加载 Kanban 与 artifacts，不再依赖本地 `agentStore.boards`。
 
 ## 2. 真实账号与运行环境
 
@@ -63,7 +64,7 @@ V1-3 的 Clowder/Agent/File/Settings API 化与 unavailable 兜底已有代码�
 ### V1-3 Clowder 与功能完善
 
 - `api/clowder.js`：Clowder status、cat directory、capabilities、binding、group cats、project groups、deployment 等接口。
-- `stores/clowder.js`：真实 Clowder 状态、能力失败态、binding、tasks/artifacts/deployments/projectGroups。
+- `stores/clowder.js`：真实 Clowder 状态、能力失败态、binding、thread tasks、thread artifacts、deployments、projectGroups。
 - `stores/agent.js`：智能体目录、创建/连接/断开走真实 Clowder API；不再内置 7 个硬编码 agent。
 - `stores/projectGroup.js` / `stores/deployment.js`：项目群与部署状态机接入真实 API。
 - `stores/settings.js`：设备、二维码登录、skill 上传等能力接后端；接不上时显式 unavailable。
@@ -77,7 +78,7 @@ node scripts/run-vitest.mjs
 结果：
 
 - Test Files：7 passed
-- Tests：48 passed
+- Tests：50 passed
 
 ```bash
 node scripts/run-uni.mjs build -p h5
@@ -206,6 +207,7 @@ GOFLAGS=-buildvcs=false go test ./...
 - `005-wksdk-send-payload-and-clowder-draft-sync.md`：Resolved
 - `006-v1-2-business-mock-cleanup-and-im-actions.md`：Resolved for V1-2/unit/E2E scope
 - `007-v1-3-deployment-skill-catalog-rendering.md`：Resolved with live OAuth cat / project group / deployment evidence
+- `008-v1-3-project-workspace-kanban-artifacts-wiring.md`：Resolved with unit/build evidence; fresh browser screenshot still pending
 
 ## 7. 残余风险
 
@@ -213,5 +215,5 @@ GOFLAGS=-buildvcs=false go test ./...
 2. 二维码登录、skill 上传等能力依赖后端能力，接不上时已显式 unavailable，没有伪造成功。
 3. Sass `@import` 与 uni alpha 告警不影响本轮构建，但后续升级 uni/Sass 时建议清理。
 4. Go VCS stamping 在本地 worktree 启动后端时需要 `GOFLAGS=-buildvcs=false`，已记录 issue。
-5. Kanban/artifacts 专项视图仍需独立 live proof；本轮 V1-3 evidence 只覆盖 deployment card 与项目群会话链路。
+5. Kanban/artifacts 代码接线已补齐并通过单测/构建；仍需独立 live screenshot proof 覆盖真实项目群工作台。
 6. 新项目群点击时 `coversation/clearUnread` 可能返回 `stale metadata` 400；AgentHub 与 im_web 均保留本地清零且不阻断 UI，后续若要满足“全零 HTTP 4xx”验收口径，需要单独治理该后端/IM 元数据时序。

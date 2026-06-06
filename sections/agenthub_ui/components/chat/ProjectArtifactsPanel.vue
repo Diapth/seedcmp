@@ -4,9 +4,10 @@
       <view v-for="item in items" :key="item.id" class="artifact-row">
         <view class="artifact-main">
           <text class="artifact-name">{{ item.name }}</text>
-          <text class="artifact-meta">{{ item.type || 'artifact' }}</text>
+          <text class="artifact-meta">{{ item.meta }}</text>
+          <text v-if="item.reason" class="artifact-reason">{{ item.reason }}</text>
         </view>
-        <button class="artifact-action" :disabled="!item.url" @click="openArtifact(item)">打开</button>
+        <button class="artifact-action" :disabled="!item.url || item.status !== 'available'" @click="openArtifact(item)">打开</button>
       </view>
     </view>
     <text v-else class="empty-copy">暂无真实产物</text>
@@ -14,10 +15,14 @@
 </template>
 
 <script setup>
-import { computed, onMounted } from 'vue';
+import { computed, onMounted, watch } from 'vue';
 import { useClowderStore } from '@/stores/clowder.js';
 
 const props = defineProps({
+  threadId: {
+    type: String,
+    default: ''
+  },
   coordinationId: {
     type: String,
     default: ''
@@ -25,15 +30,26 @@ const props = defineProps({
 });
 
 const clowderStore = useClowderStore();
-const items = computed(() => (clowderStore.artifacts[props.coordinationId] || []).map((item) => ({
-  id: item.id || item.artifact_id || item.url || item.name,
-  name: item.name || item.title || '未命名产物',
-  type: item.type || item.kind || '',
-  url: item.url || item.download_url || ''
+const artifactKey = computed(() => props.threadId || props.coordinationId || '');
+const sourceItems = computed(() => {
+  if (props.threadId) return clowderStore.threadArtifacts[props.threadId] || [];
+  return clowderStore.artifacts[props.coordinationId] || [];
+});
+const items = computed(() => sourceItems.value.map((item) => ({
+  id: item.id || item.artifact_id || item.url || item.name || `${item.taskId || item.task_id || 'artifact'}:${item.path || item.absolutePath || ''}`,
+  name: item.name || item.title || item.workspaceRelativePath || item.workspace_relative_path || item.path || '未命名产物',
+  meta: [
+    item.kind || item.type || 'artifact',
+    item.ownerCatId || item.owner_cat_id || item.owner || '',
+    item.status || ''
+  ].filter(Boolean).join(' · '),
+  status: item.status || 'available',
+  reason: item.reason || '',
+  url: item.url || item.download_url || (item.absolutePath ? `file://${item.absolutePath}` : '')
 })));
 
 function openArtifact(item) {
-  if (!item.url) return;
+  if (!item.url || item.status !== 'available') return;
   // #ifdef H5
   if (typeof window !== 'undefined') window.open(item.url, '_blank');
   // #endif
@@ -42,8 +58,19 @@ function openArtifact(item) {
   // #endif
 }
 
+function refresh() {
+  if (!artifactKey.value) return Promise.resolve([]);
+  if (props.threadId) return clowderStore.fetchThreadArtifacts(props.threadId).catch(() => []);
+  const coordination = props.coordinationId;
+  return clowderStore.fetchArtifacts(coordination).catch(() => []);
+}
+
 onMounted(() => {
-  if (props.coordinationId) clowderStore.fetchArtifacts(props.coordinationId).catch(() => undefined);
+  refresh();
+});
+
+watch(artifactKey, () => {
+  refresh();
 });
 </script>
 
@@ -78,9 +105,14 @@ onMounted(() => {
 }
 
 .artifact-meta,
+.artifact-reason,
 .empty-copy {
   font-size: 12px;
   color: var(--color-text-muted);
+}
+
+.artifact-reason {
+  color: var(--color-warning);
 }
 
 .artifact-action {

@@ -52,6 +52,9 @@ export const clowderApi = {
     });
     return request(`clowder/thread/${encodeURIComponent(threadId)}/tasks${query ? `?${query}` : ''}`);
   },
+  getThreadArtifacts(threadId) {
+    return request(`clowder/thread/${encodeURIComponent(threadId)}/artifacts`);
+  },
   createDeploymentRequest(data) {
     return request('clowder/conversation/deployment-request', { method: 'POST', data });
   },

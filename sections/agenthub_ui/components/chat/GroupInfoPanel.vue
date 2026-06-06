@@ -38,12 +38,16 @@
     </view>
 
     <view class="info-card action-section flex-column">
-      <button v-if="agentBoard" class="action-row board-action" @click="$emit('open-board', agentBoard)">
+      <button v-if="projectThreadId" class="action-row board-action" @click="$emit('open-project-workspace')">
         <AppIcon name="briefcase" :size="18" color="var(--color-primary)" />
-        <text class="action-text flex-1">智能体看板</text>
-        <text class="count-chip board-chip">{{ agentBoard.tasks.length }}</text>
+        <text class="action-text flex-1">Clowder 项目工作台</text>
+        <text class="count-chip board-chip">实时</text>
         <AppIcon name="right" :size="14" color="var(--color-text-muted)" />
       </button>
+      <view v-else-if="projectWorkspaceLoading" class="action-row action-row-static">
+        <AppIcon name="briefcase" :size="18" color="var(--color-text-muted)" />
+        <text class="action-text flex-1">项目工作台同步中</text>
+      </view>
       <button class="action-row" @click="$emit('open-qrcode')">
         <AppIcon name="grid" :size="18" color="var(--color-text-primary)" />
         <text class="action-text flex-1">群二维码</text>
@@ -88,31 +92,28 @@ import { computed } from 'vue';
 import { useConversationStore } from '@/stores/conversation';
 import { useGroupStore } from '@/stores/group';
 import { useMessageStore } from '@/stores/message';
-import { useAgentStore } from '@/stores/agent';
 import { useConfirm } from '@/composables/useConfirm';
 import AppAvatar from '../common/AppAvatar.vue';
 import AppIcon from '../common/AppIcon.vue';
 import GroupAnnouncement from './GroupAnnouncement.vue';
 
 const props = defineProps({
-  group: { type: Object, required: true }
+  group: { type: Object, required: true },
+  projectThreadId: { type: String, default: '' },
+  projectWorkspaceLoading: { type: Boolean, default: false }
 });
 
-const emit = defineEmits(['open-members', 'open-qrcode', 'open-board', 'preview-file', 'select-member', 'member-contextmenu']);
+const emit = defineEmits(['open-members', 'open-qrcode', 'open-project-workspace', 'preview-file', 'select-member', 'member-contextmenu']);
 
 const convStore = useConversationStore();
 const groupStore = useGroupStore();
 const messageStore = useMessageStore();
-const agentStore = useAgentStore();
 const { confirm } = useConfirm();
 
 const members = computed(() => convStore.groupMembers(props.group.id));
 const memberCount = computed(() => members.value.length || props.group.memberCount || 0);
 const previewMembers = computed(() => members.value.slice(0, 4));
 const isCreator = computed(() => convStore.isGroupCreator(props.group.id, 'me'));
-const agentBoard = computed(() => {
-  return agentStore.boards.find((board) => board.groupId === props.group.id) || null;
-});
 const announcementText = computed(() => {
   return convStore.announcements[props.group.id]?.text || props.group.announcement || '';
 });
@@ -336,6 +337,11 @@ function handleDisband() {
 
 .action-row:last-child {
   border-bottom: none;
+}
+
+.action-row-static {
+  cursor: default;
+  color: var(--color-text-muted);
 }
 
 .action-row.danger {

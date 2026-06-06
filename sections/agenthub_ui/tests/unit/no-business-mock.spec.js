@@ -110,6 +110,27 @@ describe('business mock cleanup', () => {
     expect(chatDetail).toContain('messageStore.addDeploymentRequestCard');
   });
 
+  it('wires project groups to real Clowder kanban and artifacts panels', () => {
+    const workspace = read('components/chat/RightWorkspace.vue');
+    const groupInfo = read('components/chat/GroupInfoPanel.vue');
+    const artifacts = read('components/chat/ProjectArtifactsPanel.vue');
+
+    expect(workspace).toContain('ProjectKanbanPanel');
+    expect(workspace).toContain('ProjectArtifactsPanel');
+    expect(workspace).toContain('clowderStore.fetchBinding');
+    expect(workspace).not.toContain('useAgentStore');
+    expect(workspace).not.toContain('agentStore.boards');
+
+    expect(groupInfo).toContain('projectThreadId');
+    expect(groupInfo).toContain('open-project-workspace');
+    expect(groupInfo).not.toContain('useAgentStore');
+    expect(groupInfo).not.toContain('agentStore.boards');
+
+    expect(artifacts).toContain('threadId');
+    expect(artifacts).toContain('fetchThreadArtifacts');
+    expect(artifacts).not.toContain('fetchArtifacts(props.coordinationId)');
+  });
+
   it('defaults OAuth cat creation to backend-required provider account refs', () => {
     const newAgent = read('pages/agents/new.vue');
 

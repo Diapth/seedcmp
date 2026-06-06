@@ -319,6 +319,95 @@ describe('Clowder and agent stores', () => {
     expect(deploymentStore.requests['dep-active']).toMatchObject({ channelType: 2 });
   });
 
+  it('loads project-group workspace data from real Clowder thread endpoints', async () => {
+    const calls = [];
+    setRequestAdapter(async ({ url, method }) => {
+      calls.push({ url, method });
+      expect(method).toBe('GET');
+
+      if (url.includes('/clowder/conversation?')) {
+        expect(url).toContain('channelId=group-1');
+        expect(url).toContain('channelType=2');
+        return {
+          status: 200,
+          data: {
+            code: 0,
+            data: {
+              binding: {
+                threadId: 'thread-1',
+                projectName: 'AgentHub V1',
+                status: 'active'
+              }
+            }
+          }
+        };
+      }
+
+      if (url.includes('/clowder/thread/thread-1/tasks')) {
+        return {
+          status: 200,
+          data: {
+            code: 0,
+            data: {
+              tasks: [
+                {
+                  id: 'task-1',
+                  title: 'Wire project workspace',
+                  status: 'doing',
+                  ownerCatId: 'codex'
+                }
+              ]
+            }
+          }
+        };
+      }
+
+      if (url.includes('/clowder/thread/thread-1/artifacts')) {
+        return {
+          status: 200,
+          data: {
+            code: 0,
+            data: {
+              artifacts: [
+                {
+                  path: 'acceptance.md',
+                  kind: 'doc',
+                  ownerCatId: 'codex',
+                  taskId: 'task-1',
+                  status: 'available'
+                }
+              ],
+              diagnostics: { available: 1 }
+            }
+          }
+        };
+      }
+
+      throw new Error(`unexpected request ${url}`);
+    });
+
+    const clowderStore = useClowderStore();
+    const conversation = await clowderStore.fetchBinding('group-1', 2);
+    await clowderStore.fetchThreadTasks(conversation.binding.threadId);
+    await clowderStore.fetchThreadArtifacts(conversation.binding.threadId);
+
+    expect(clowderStore.bindings['group-1-2']).toMatchObject({
+      threadId: 'thread-1',
+      projectName: 'AgentHub V1'
+    });
+    expect(clowderStore.tasks['thread-1'][0]).toMatchObject({ id: 'task-1', status: 'doing' });
+    expect(clowderStore.threadArtifacts['thread-1'][0]).toMatchObject({
+      path: 'acceptance.md',
+      ownerCatId: 'codex'
+    });
+    expect(clowderStore.threadArtifactDiagnostics['thread-1']).toMatchObject({ available: 1 });
+    expect(calls.map((call) => call.url)).toEqual([
+      expect.stringContaining('/clowder/conversation?'),
+      expect.stringContaining('/clowder/thread/thread-1/tasks'),
+      expect.stringContaining('/clowder/thread/thread-1/artifacts')
+    ]);
+  });
+
   it('marks settings feature fallbacks unavailable when backend capability is missing', async () => {
     setRequestAdapter(async ({ url }) => {
       expect(url).toContain('/user/loginuuid');

@@ -86,6 +86,8 @@ export const useClowderStore = defineStore('clowder', {
     threads: {},
     tasks: {},
     artifacts: {},
+    threadArtifacts: {},
+    threadArtifactDiagnostics: {},
     deployments: {},
     projectGroups: {},
     groupCats: {},
@@ -187,6 +189,13 @@ export const useClowderStore = defineStore('clowder', {
       this.tasks[threadId] = data.tasks || [];
       return this.tasks[threadId];
     },
+    async fetchThreadArtifacts(threadId) {
+      const response = await clowderApi.getThreadArtifacts(threadId);
+      const data = unwrapData(response);
+      this.threadArtifacts[threadId] = data.artifacts || [];
+      this.threadArtifactDiagnostics[threadId] = data.diagnostics || {};
+      return this.threadArtifacts[threadId];
+    },
     async fetchArtifacts(coordinationId) {
       const response = await clowderApi.getCoordination(coordinationId);
       const data = unwrapData(response);
@@ -245,6 +254,8 @@ export const useClowderStore = defineStore('clowder', {
       this.threads = {};
       this.tasks = {};
       this.artifacts = {};
+      this.threadArtifacts = {};
+      this.threadArtifactDiagnostics = {};
       this.deployments = {};
       this.projectGroups = {};
       this.groupCats = {};

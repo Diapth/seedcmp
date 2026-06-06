@@ -33,7 +33,7 @@ V1 的核心目标不是做演示壳，而是把已经成型的 UI 接到真实 
 - 真实消息：消息同步、发送入口、实时入库、去重、撤回/编辑/reaction 基础接口。
 - IM 动作：typing、撤回、reaction、清未读必须走真实 SDK/API 或真实本地状态合并，不允许只改 UI。
 - 真实群：我的群、群资料、成员、建群/退出/解散接口。
-- 真实 Clowder：cat directory、capabilities、conversation binding、group cats、project group、deployment API。
+- 真实 Clowder：cat directory、capabilities、conversation binding、group cats、project group、thread Kanban、thread artifacts、deployment API。
 - 真实文件：文件列表、预览入口、不可用状态；未接入真实上传/下载时必须 explicit unavailable。
 - 设置：设备、二维码登录、skill 上传、通知状态；不可用时显式 unavailable。
 - 多端适配：H5 已验收；代码层使用 uni storage/request 抽象兼容 APP-PLUS。
@@ -100,7 +100,8 @@ V1 的核心目标不是做演示壳，而是把已经成型的 UI 接到真实 
 - Agent directory 从 Clowder 后端读取。
 - 创建/连接/断开 cat 走真实 API。
 - OAuth/runtime/queue/groupDenied 等能力失败态必须在 store/UI 可见。
-- 项目群、deployment、artifacts/tasks 走 Clowder API。
+- 项目群、deployment、thread artifacts/tasks 走 Clowder API。
+- 项目群右侧栏必须从真实 Clowder binding 解析 thread id 并挂载 Kanban / artifacts，不允许依赖本地 `agentStore.boards`。
 
 验收：
 
@@ -154,7 +155,7 @@ V1 的核心目标不是做演示壳，而是把已经成型的 UI 接到真实 
 7. 无 `未命名会话` / `1970`。
 8. 浏览器无 pageerror、requestfailed、HTTP 4xx/5xx。
 9. 截图证据保存到 `issues/screenshots/` 或 `.ai/tests-e2e/`。
-10. V1-3 完成判定还必须提供 OAuth cat、PM 项目群、Kanban/artifacts/deployment card 的真实 live 证据；当前 `.ai/tests-e2e/v1-3-20260606T210434/` 已覆盖 OAuth cat、PM 项目群和 deployment card，Kanban/artifacts 仍需专项 live proof。
+10. V1-3 完成判定还必须提供 OAuth cat、PM 项目群、Kanban/artifacts/deployment card 的真实 live 证据；当前 `.ai/tests-e2e/v1-3-20260606T210434/` 已覆盖 OAuth cat、PM 项目群和 deployment card，Kanban/artifacts 已补齐代码与单测门禁，仍需 fresh browser live proof。
 
 ## 7. 风险与后续
 
