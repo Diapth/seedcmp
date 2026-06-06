@@ -38,6 +38,6 @@ This meant a real project group could pass deployment-card hydration while still
   - `04-artifacts-visible.png` shows the declared `acceptance-report-v1.md` artifact as available.
   - `05-refresh-entry-visible.png` and `06-refresh-kanban-visible.png` prove refresh recovery via `projectGroupNo`.
 
-## Remaining Verification
+## Post-Fix Verification
 
 No workspace-specific verification remains. Android APP-PLUS device validation is still outside this issue and remains a broader V1 residual risk.

@@ -37,8 +37,8 @@ During the V1-3 acceptance audit, several Clowder-facing paths were present but 
   - Deployment action: `confirm` returned 200 and queued the deployment.
 - `git diff --check` - clean.
 
-## Remaining Verification
+## Post-Fix Verification
 
 This resolves the deployment/skill-catalog issue and now has live H5 evidence for OAuth cat, PM project group, and deployment card behavior against the running Clowder stack.
 
-Kanban/artifacts-specific UI evidence is outside this issue's fix and remains a broader V1-3 acceptance item.
+Kanban/artifacts-specific UI evidence was completed separately in `008-v1-3-project-workspace-kanban-artifacts-wiring.md`.

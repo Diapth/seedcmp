@@ -43,6 +43,10 @@ Prototype UI affordances survived the backend-integration pass. Some features ha
   - `mockFile`, `Mock a new user`, `分组创建成功`
   - preset contact-card group/phone fallbacks
 
-## Remaining
+## Post-Fix Verification
 
-- Full V1-2/V1-3 live H5 acceptance still needs to rerun against local im_web/Clowder after this cleanup.
+- Full V1-2/V1-3 live H5 acceptance was rerun after this cleanup.
+- V1-2 realtime evidence: `.ai/tests-e2e/v1-2-20260606T210801/`.
+- V1-3 Clowder live evidence: `.ai/tests-e2e/v1-3-20260606T210434/`.
+- V1-3 project workspace evidence: `.ai/tests-e2e/v1-3-workspace-final-20260606T215418Z/`.
+- No issue-specific verification remains; known non-blocking `coversation/clearUnread` 400 and no-active-deployment 404 probes are documented in `acceptance-report-v1.md`.

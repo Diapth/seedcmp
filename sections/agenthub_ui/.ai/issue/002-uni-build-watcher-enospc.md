@@ -24,4 +24,4 @@
 
 ## 复测
 
-- `npm run build:h5` 需要重新执行确认不再输出 ENOSPC。
+- 最终 V1 验收已重新执行 H5 build：`node scripts/run-uni.mjs build -p h5` / `pnpm build:h5` 均完成，未再记录 ENOSPC 复现。
