@@ -20,28 +20,15 @@
             </view>
           </view>
 
-          <view class="status-tabs">
-            <view
-              v-for="item in qrStates"
-              :key="item.id"
-              class="status-tab"
-              :class="{ active: activeState === item.id }"
-              @click="activeState = item.id"
-            >
-              <text>{{ item.label }}</text>
-            </view>
-          </view>
-
           <view class="qr-card">
-            <text class="qr-demo-caption">演示用二维码 · 扫码可扫描占位 URL</text>
-            <view class="qr-box" :class="{ disabled: activeState === 'expired' }">
-              <view v-for="n in 81" :key="n" class="qr-cell" :class="{ active: qrPattern(n) }"></view>
+            <text class="qr-demo-caption">群二维码后端能力待接入</text>
+            <view class="qr-box unavailable">
+              <AppIcon name="info" :size="32" color="var(--color-text-muted)" />
             </view>
-            <text class="qr-title">{{ stateCopy.title }}</text>
-            <text class="qr-desc">{{ stateCopy.desc }}</text>
+            <text class="qr-title">群二维码暂不可用</text>
+            <text class="qr-desc">接入真实群二维码 token 与审批接口后可分享给成员。</text>
             <view class="action-row">
-              <button class="btn-primary" @click="handlePrimary">{{ stateCopy.action }}</button>
-              <button class="btn-secondary" @click="copyLink">复制链接</button>
+              <button class="btn-primary" @click="showQrUnavailable">暂不可用</button>
             </view>
           </view>
         </view>
@@ -51,7 +38,7 @@
 </template>
 
 <script setup>
-import { computed, onMounted, ref } from 'vue';
+import { computed, onMounted } from 'vue';
 import { useNavigationStore } from '@/stores/navigation';
 import { useConversationStore } from '@/stores/conversation';
 import AppSubpageShell from '@/components/layout/AppSubpageShell.vue';
@@ -60,42 +47,12 @@ import AppAvatar from '@/components/common/AppAvatar.vue';
 
 const navStore = useNavigationStore();
 const convStore = useConversationStore();
-const activeState = ref('active');
-const qrSeed = ref(1);
-
-const qrStates = [
-  { id: 'active', label: '可加入' },
-  { id: 'approval', label: '待审批' },
-  { id: 'expired', label: '已过期' }
-];
 
 const groupInfo = computed(() => {
-  return convStore.conversations.find(item => item.id === '2') || {
-    id: '2',
-    name: 'AgentHub 产品研发群',
+  return convStore.conversations.find(item => item.id === convStore.activeId) || {
+    id: convStore.activeId || '',
+    name: '群聊',
     avatar: ''
-  };
-});
-
-const stateCopy = computed(() => {
-  if (activeState.value === 'approval') {
-    return {
-      title: '入群需要管理员审批',
-      desc: '成员扫码后会进入申请队列，管理员确认后才能加入群聊。',
-      action: '查看待审批'
-    };
-  }
-  if (activeState.value === 'expired') {
-    return {
-      title: '二维码已过期或不可用',
-      desc: '当前二维码已失效，请重新生成后再分享给成员。',
-      action: '重新生成'
-    };
-  }
-  return {
-    title: '扫码加入群聊',
-    desc: '二维码 7 天内有效，外部成员加入前需要管理员确认。',
-    action: '分享二维码'
   };
 });
 
@@ -103,37 +60,8 @@ onMounted(() => {
   navStore.setActiveModule('contacts');
 });
 
-function qrPattern(index) {
-  if (activeState.value === 'expired') return index % 6 === 0;
-  const row = Math.floor((index - 1) / 9);
-  const col = (index - 1) % 9;
-  const isCorner =
-    (row <= 2 && col <= 2) ||
-    (row <= 2 && col >= 6) ||
-    (row >= 6 && col <= 2);
-  return isCorner || ((row * 7 + col * 3 + qrSeed.value) % 5 === 0);
-}
-
-function handlePrimary() {
-  if (activeState.value === 'expired') {
-    activeState.value = 'active';
-    // TODO: 接入真实 token + QR 库,当前只切换本地种子
-    qrSeed.value += 1;
-    uni.showToast({ title: '二维码已重新生成', icon: 'success' });
-    return;
-  }
-  if (activeState.value === 'approval') {
-    uni.showToast({ title: '暂无新的入群申请', icon: 'none' });
-    return;
-  }
-  uni.showToast({ title: '分享面板已打开', icon: 'none' });
-}
-
-function copyLink() {
-  uni.setClipboardData({
-    data: `agenthub://group/${groupInfo.value.id}`,
-    success: () => uni.showToast({ title: '链接已复制', icon: 'success' })
-  });
+function showQrUnavailable() {
+  uni.showToast({ title: '群二维码需接入真实接口', icon: 'none' });
 }
 
 function goBack() {

@@ -2653,19 +2653,21 @@ function getTypeFromName(name) {
 }
 
 function startDownload() {
-  if (isDownloading.value) return;
-  isDownloading.value = true;
-  progress.value = 0;
+  if (!normalizedFile.value.url) {
+    showDownloadUnavailable();
+    return;
+  }
+  isDownloaded.value = true;
+  // #ifdef H5
+  if (typeof window !== 'undefined') window.open(normalizedFile.value.url, '_blank');
+  // #endif
+  // #ifndef H5
+  uni.showToast({ title: '请在 Web 端打开文件链接', icon: 'none' });
+  // #endif
+}
 
-  const timer = setInterval(() => {
-    progress.value = Math.min(100, progress.value + 12);
-    if (progress.value < 100) return;
-
-    clearInterval(timer);
-    isDownloading.value = false;
-    isDownloaded.value = true;
-    uni.showToast({ title: '下载已完成', icon: 'success' });
-  }, 120);
+function showDownloadUnavailable() {
+  uni.showToast({ title: '文件下载需接入真实下载能力', icon: 'none' });
 }
 
 function handleImageLoad() {

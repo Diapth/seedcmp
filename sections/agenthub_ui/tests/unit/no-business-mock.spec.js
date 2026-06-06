@@ -55,4 +55,25 @@ describe('business mock cleanup', () => {
     expect(chatDetail).toContain('@typing="handleTyping"');
     expect(chatDetail).toContain('messageStore.sendTyping');
   });
+
+  it('does not fake QR or file download success', () => {
+    const profile = read('pages/profile/index.vue');
+    const groupQr = read('pages/group/qrcode.vue');
+    const fileList = read('components/files/FileList.vue');
+    const filePreview = read('components/chat/FilePreviewPanel.vue');
+
+    expect(profile).not.toContain('演示用二维码');
+    expect(profile).not.toContain('二维码已刷新');
+    expect(groupQr).not.toContain('演示用二维码');
+    expect(groupQr).not.toContain('二维码已重新生成');
+    expect(groupQr).not.toContain('agenthub://group');
+
+    expect(fileList).not.toContain('setInterval');
+    expect(fileList).not.toContain('下载成功');
+    expect(fileList).not.toContain('文件已打开');
+    expect(fileList).toContain('showDownloadUnavailable');
+    expect(filePreview).not.toContain('setInterval');
+    expect(filePreview).not.toContain('下载已完成');
+    expect(filePreview).toContain('showDownloadUnavailable');
+  });
 });

@@ -14,6 +14,7 @@ V1-2 live messaging had real text sync proof, but follow-up audit found runtime 
 - Realtime revoke could miss messages when CMD used `client_msg_no`.
 - Typing send path was not wired from agenthub_ui to WKSDK.
 - Reaction API requests used a hardcoded direct-chat channel type.
+- QR refresh/regenerate and file download controls simulated success/progress without real QR/download backend support.
 
 ## Root Cause
 
@@ -27,10 +28,12 @@ Prototype UI affordances survived the backend-integration pass. Some features ha
 - Revoke now matches by server id, `messageID`, `clientMsgNo`, or sequence, and CMD revoke applies locally without echoing a revoke API call.
 - Typing now emits from `MessageInput`, routes through chat pages, and sends WKSDK `CMDContent`.
 - Reactions now send the message's real channel type.
+- QR and file-download controls now either open a real URL or show explicit unavailable messages.
+- Unread clear has focused proof for local reset plus backend read-cursor payload.
 
 ## Verification
 
-- `npm run test:unit` -> 33 passed
+- `npm run test:unit` -> 35 passed
 - `npm run build:h5` -> passed
 - Source scan clean for removed fake-success signatures:
   - `sendMockImage`, `sendMockFile`, `sendMockVoice`

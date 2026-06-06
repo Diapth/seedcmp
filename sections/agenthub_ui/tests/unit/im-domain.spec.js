@@ -249,6 +249,29 @@ describe('IM domain mapping and stores', () => {
     expect(conversationStore.getDraft('friend-a', 1)).toBe('跨端草稿');
   });
 
+  it('clears unread locally and posts the backend read cursor', async () => {
+    const adapter = vi.fn(async () => ({ status: 200, data: { code: 0, data: {} } }));
+    setRequestAdapter(adapter);
+    const conversationStore = useConversationStore();
+    conversationStore.addOrUpdateConversation('group-a', 2, {
+      name: '项目群',
+      unread: 5,
+      lastMessageSeq: 42
+    });
+
+    await conversationStore.clearUnread('group-a', 2);
+
+    expect(conversationStore.getConversation('group-a', 2).unread).toBe(0);
+    expect(adapter).toHaveBeenCalledTimes(1);
+    expect(adapter.mock.calls[0][0].url).toContain('/coversation/clearUnread');
+    expect(adapter.mock.calls[0][0].data).toMatchObject({
+      channel_id: 'group-a',
+      channel_type: 2,
+      unread: 0,
+      message_seq: 42
+    });
+  });
+
   it('skips remote draft sync for unchanged empty drafts', async () => {
     const adapter = vi.fn(async () => ({ status: 200, data: { code: 0, data: {} } }));
     setRequestAdapter(adapter);
