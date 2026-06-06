@@ -675,3 +675,25 @@ func TestBuildCreateCatCommandRequiresAndNormalizesClientPlatform(t *testing.T) 
 	_, ok = buildCreateCatCommand(createCatRequest{Name: "无认证猫", ClientID: "openai"})
 	assert.False(t, ok)
 }
+
+func TestCreatedCatContactsPrependFallbackCatsToDirectory(t *testing.T) {
+	c := New(nil)
+	fallback := fallbackCreatedCatResponse(createCatRequest{
+		Name:         "V13验收猫",
+		Alias:        "@v13cat",
+		Personality:  "live proof",
+		Capabilities: []string{"项目拆解"},
+	}, "@v13cat")
+	c.storeCreatedCatContact("user-1", fallback.Agent)
+
+	merged := c.mergeCreatedCatContacts("user-1", []ClowderAgent{
+		{CatID: "coordinator", DisplayName: "PM", Available: true, Source: "existing"},
+	})
+
+	require.Len(t, merged, 2)
+	assert.Equal(t, "v13cat", merged[0].CatID)
+	assert.Equal(t, "V13验收猫", merged[0].DisplayName)
+	assert.Equal(t, "runtime-created", merged[0].Source)
+	assert.True(t, merged[0].Connected)
+	assert.Equal(t, "coordinator", merged[1].CatID)
+}

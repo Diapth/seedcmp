@@ -12,7 +12,7 @@
 
 AgentHub UI V1 的 V1-1/V1-2 主链路已完成真实后端接入、IM 会话/消息/群列表同步、业务 mock 与伪造成功路径清理，并通过单元测试、H5 构建和 agenthub_ui -> im_web 真实双端实时验收。
 
-V1-3 的 Clowder/Agent/File/Settings API 化与 unavailable 兜底已有代码与单测覆盖；完整 OAuth cat 创建、PM 项目群、Kanban/artifacts/deployment card 的真实 live 验收仍需单独执行，不能仅凭本报告判定 V1-3 全量完成。
+V1-3 的 Clowder/Agent/File/Settings API 化与 unavailable 兜底已有代码与单测覆盖；本轮新增真实 live 证据覆盖 OAuth cat 创建、PM 项目群创建、真实 active deployment request 同步、AgentHub/IM Web 双端 deployment card hydration、AgentHub 确认部署动作和移动端项目群可见性。Kanban/artifacts 专项视图未被本次 V1-3 harness 单独断言，不能把本报告当作 artifacts UI 的完整证明。
 
 本轮验收重点确认：
 
@@ -22,6 +22,10 @@ V1-3 的 Clowder/Agent/File/Settings API 化与 unavailable 兜底已有代码�
 4. 不再出现“未命名会话”和 1970 时间。
 5. H5 桌面与移动端截图无白屏、无明显遮挡、无主要文本溢出。
 6. agenthub_ui 发送真实文本消息后，im_web 无刷新收到同一消息。
+7. AgentHub 创建 OAuth cat（Claude Code / Claude OAuth）后，cat directory 真实显示。
+8. 真实创建 PM 项目群并拉入新 cat，AgentHub 与 im_web 会话列表均可见。
+9. 真实 deployment request 由 active-request API hydrate 成双端 deployment card。
+10. AgentHub 点击确认后，`clowder/conversation/deployment-action` 返回 200 且 deployment request 进入 `queued`。
 
 ## 2. 真实账号与运行环境
 
@@ -67,16 +71,16 @@ V1-3 的 Clowder/Agent/File/Settings API 化与 unavailable 兜底已有代码�
 ## 4. 回归测试
 
 ```bash
-npm run test:unit
+node scripts/run-vitest.mjs
 ```
 
 结果：
 
 - Test Files：7 passed
-- Tests：35 passed
+- Tests：48 passed
 
 ```bash
-npm run build:h5
+node scripts/run-uni.mjs build -p h5
 ```
 
 结果：
@@ -84,16 +88,47 @@ npm run build:h5
 - `DONE Build complete.`
 
 ```bash
-npm run test:e2e:realtime
+TEST_CONVERSATION='Clowder AI' node tests-e2e/agenthub-imweb-realtime.mjs
 ```
 
 结果：
 
 - Passed
-- Evidence：`.ai/tests-e2e/v1-2-20260606T194812/`
-- Message：`agenthub-imweb-live-20260606T194812`
-- Conversation：`qwq` / `clowder_cat:codex`
-- Browser diagnostics：pageerror 0、requestfailed 0、HTTP 4xx/5xx 0
+- Evidence：`.ai/tests-e2e/v1-2-20260606T210801/`
+- Message：`agenthub-imweb-live-20260606T210801`
+- Conversation：`Clowder AI` / `clowder_ai`
+- Browser diagnostics：pageerror 0、requestfailed 0；`deployment-request/active` 对该 direct chat 返回 404，属于无 active deployment 的非阻断 hydration 探测。
+
+```bash
+TEST_PASSWORD=<redacted> node tests-e2e/agenthub-v1-3-clowder.mjs
+```
+
+结果：
+
+- Passed
+- Evidence：`.ai/tests-e2e/v1-3-20260606T210434/`
+- OAuth cat：`v13210434` / `V13验收猫210434`
+- Project group：`a8156f762c7c4707acc614df08a8f07e` / `V13验收项目210434`
+- Deployment request：`deploy_e49199b3-dc74-4b70-838c-2c2597d5f68b`
+- Deployment action：`confirm` -> 200，status `queued`
+- Browser diagnostics：pageerror 0、requestfailed 0；`coversation/clearUnread` 对新项目群返回 400 并被前端作为非阻断本地清零处理，im_web 也有相同既有行为。
+
+```bash
+GOFLAGS=-buildvcs=false go test ./modules/clowder
+```
+
+结果：
+
+- Passed
+- `ok github.com/TangSengDaoDao/TangSengDaoDaoServer/modules/clowder`
+
+```bash
+GOFLAGS=-buildvcs=false go test ./...
+```
+
+结果：
+
+- 环境受限，未通过全仓：多个既有测试依赖本机 `test` MySQL 数据库、缺失 `assets/assets/*.png|jpeg` 测试资源或外部 push 厂商权限；`modules/clowder` 目标测试已单独通过。
 
 非阻断告警：
 
@@ -138,15 +173,29 @@ npm run test:e2e:realtime
 
 - agenthub_ui：`http://localhost:5173`
 - im_web：`http://localhost:3000`
-- 目标会话：`qwq`
+- 目标会话：`Clowder AI`
 - 发送端：agenthub_ui
 - 接收端：im_web
-- 结果：im_web 不刷新收到 `agenthub-imweb-live-20260606T194812`
+- 结果：im_web 不刷新收到 `agenthub-imweb-live-20260606T210801`
 - 证据：
-  - `.ai/tests-e2e/v1-2-20260606T194812/events.json`
-  - `.ai/tests-e2e/v1-2-20260606T194812/ws-frames.json`
-  - `.ai/tests-e2e/v1-2-20260606T194812/01-agenthub-before-send.png`
-  - `.ai/tests-e2e/v1-2-20260606T194812/04-imweb-received-without-refresh.png`
+  - `.ai/tests-e2e/v1-2-20260606T210801/events.json`
+  - `.ai/tests-e2e/v1-2-20260606T210801/ws-frames.json`
+  - `.ai/tests-e2e/v1-2-20260606T210801/01-agenthub-before-send.png`
+  - `.ai/tests-e2e/v1-2-20260606T210801/04-imweb-received-without-refresh.png`
+
+### V1-3 Clowder Live
+
+- agenthub_ui：`http://localhost:5173`
+- im_web：`http://localhost:3000`
+- 结果：OAuth cat 创建、项目群创建、active deployment request 同步、AgentHub/IM Web deployment card hydration、AgentHub confirm action、移动端项目群列表均通过。
+- 证据：
+  - `.ai/tests-e2e/v1-3-20260606T210434/events.json`
+  - `.ai/tests-e2e/v1-3-20260606T210434/api-evidence.json`
+  - `.ai/tests-e2e/v1-3-20260606T210434/01-agenthub-agent-directory-oauth-cat.png`
+  - `.ai/tests-e2e/v1-3-20260606T210434/03-agenthub-deployment-card-before-confirm.png`
+  - `.ai/tests-e2e/v1-3-20260606T210434/04-agenthub-deployment-card-after-confirm.png`
+  - `.ai/tests-e2e/v1-3-20260606T210434/05-imweb-project-group-deployment-card.png`
+  - `.ai/tests-e2e/v1-3-20260606T210434/06-agenthub-mobile-project-group.png`
 
 ## 6. 问题单状态
 
@@ -156,6 +205,7 @@ npm run test:e2e:realtime
 - `004-conversation-sync-shape-and-group-gap.md`：Resolved
 - `005-wksdk-send-payload-and-clowder-draft-sync.md`：Resolved
 - `006-v1-2-business-mock-cleanup-and-im-actions.md`：Resolved for V1-2/unit/E2E scope
+- `007-v1-3-deployment-skill-catalog-rendering.md`：Resolved with live OAuth cat / project group / deployment evidence
 
 ## 7. 残余风险
 
@@ -163,4 +213,5 @@ npm run test:e2e:realtime
 2. 二维码登录、skill 上传等能力依赖后端能力，接不上时已显式 unavailable，没有伪造成功。
 3. Sass `@import` 与 uni alpha 告警不影响本轮构建，但后续升级 uni/Sass 时建议清理。
 4. Go VCS stamping 在本地 worktree 启动后端时需要 `GOFLAGS=-buildvcs=false`，已记录 issue。
-5. V1-3 OAuth cat 创建、PM 项目群、Kanban/artifacts/deployment card 仍缺少本轮 live H5 证据。
+5. Kanban/artifacts 专项视图仍需独立 live proof；本轮 V1-3 evidence 只覆盖 deployment card 与项目群会话链路。
+6. 新项目群点击时 `coversation/clearUnread` 可能返回 `stale metadata` 400；AgentHub 与 im_web 均保留本地清零且不阻断 UI，后续若要满足“全零 HTTP 4xx”验收口径，需要单独治理该后端/IM 元数据时序。

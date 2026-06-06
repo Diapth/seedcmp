@@ -1,0 +1,634 @@
+[
+  {
+    "at": "2026-06-06T21:04:34.136Z",
+    "type": "run-start",
+    "agenthubBaseUrl": "http://localhost:5173",
+    "imWebBaseUrl": "http://localhost:3000",
+    "username": "008618337488675",
+    "catName": "V13验收猫210434",
+    "projectName": "V13验收项目210434",
+    "deploymentTitle": "V1-3 deployment 210434"
+  },
+  {
+    "at": "2026-06-06T21:04:34.247Z",
+    "type": "api-login-ok",
+    "uid": "edbb4e4566f840f4a6f14b9f9cf01c22",
+    "token": "01aef8...6d320f"
+  },
+  {
+    "at": "2026-06-06T21:04:34.294Z",
+    "type": "console",
+    "page": "agenthub_ui",
+    "level": "debug",
+    "text": "[vite] connecting..."
+  },
+  {
+    "at": "2026-06-06T21:04:34.297Z",
+    "type": "console",
+    "page": "agenthub_ui",
+    "level": "debug",
+    "text": "[vite] connected."
+  },
+  {
+    "at": "2026-06-06T21:04:34.331Z",
+    "type": "console",
+    "page": "agenthub_ui",
+    "level": "warning",
+    "text": "[vue-router]: importing from 'vue-router/dist/vue-router.esm-bundler.js' is deprecated. Use 'vue-router' directly."
+  },
+  {
+    "at": "2026-06-06T21:04:34.352Z",
+    "type": "console",
+    "page": "agenthub_ui",
+    "level": "log",
+    "text": "App Launch"
+  },
+  {
+    "at": "2026-06-06T21:04:34.355Z",
+    "type": "console",
+    "page": "agenthub_ui",
+    "level": "log",
+    "text": "App Show"
+  },
+  {
+    "at": "2026-06-06T21:04:34.593Z",
+    "type": "console",
+    "page": "agenthub_ui",
+    "level": "log",
+    "text": "UniApp运行环境"
+  },
+  {
+    "at": "2026-06-06T21:04:34.593Z",
+    "type": "console",
+    "page": "agenthub_ui",
+    "level": "log",
+    "text": "打开websocket成功"
+  },
+  {
+    "at": "2026-06-06T21:04:34.594Z",
+    "type": "console",
+    "page": "agenthub_ui",
+    "level": "log",
+    "text": "websocket SocketTask"
+  },
+  {
+    "at": "2026-06-06T21:04:34.599Z",
+    "type": "console",
+    "page": "agenthub_ui",
+    "level": "log",
+    "text": "onopen..."
+  },
+  {
+    "at": "2026-06-06T21:04:34.608Z",
+    "type": "console",
+    "page": "agenthub_ui",
+    "level": "log",
+    "text": "服务器协议版本: 5"
+  },
+  {
+    "at": "2026-06-06T21:04:34.608Z",
+    "type": "console",
+    "page": "agenthub_ui",
+    "level": "log",
+    "text": "成功连接到节点[1]"
+  },
+  {
+    "at": "2026-06-06T21:04:34.810Z",
+    "type": "agenthub-login-ok"
+  },
+  {
+    "at": "2026-06-06T21:04:34.835Z",
+    "type": "console",
+    "page": "im_web",
+    "level": "debug",
+    "text": "[vite] connecting..."
+  },
+  {
+    "at": "2026-06-06T21:04:34.843Z",
+    "type": "console",
+    "page": "im_web",
+    "level": "debug",
+    "text": "[vite] connected."
+  },
+  {
+    "at": "2026-06-06T21:04:35.145Z",
+    "type": "console",
+    "page": "im_web",
+    "level": "log",
+    "text": "web运行环境"
+  },
+  {
+    "at": "2026-06-06T21:04:35.145Z",
+    "type": "console",
+    "page": "im_web",
+    "level": "log",
+    "text": "使用原生websocket"
+  },
+  {
+    "at": "2026-06-06T21:04:35.146Z",
+    "type": "console",
+    "page": "im_web",
+    "level": "log",
+    "text": "websocket WebSocket"
+  },
+  {
+    "at": "2026-06-06T21:04:35.147Z",
+    "type": "console",
+    "page": "im_web",
+    "level": "log",
+    "text": "onopen..."
+  },
+  {
+    "at": "2026-06-06T21:04:35.156Z",
+    "type": "console",
+    "page": "im_web",
+    "level": "log",
+    "text": "服务器协议版本: 5"
+  },
+  {
+    "at": "2026-06-06T21:04:35.157Z",
+    "type": "console",
+    "page": "im_web",
+    "level": "log",
+    "text": "成功连接到节点[1]"
+  },
+  {
+    "at": "2026-06-06T21:04:35.159Z",
+    "type": "console",
+    "page": "im_web",
+    "level": "log",
+    "text": "[SDK] Connected successfully."
+  },
+  {
+    "at": "2026-06-06T21:04:35.260Z",
+    "type": "imweb-login-ok"
+  },
+  {
+    "at": "2026-06-06T21:04:35.359Z",
+    "type": "console",
+    "page": "agenthub_ui",
+    "level": "log",
+    "text": "消息内容--> RecvPacket2"
+  },
+  {
+    "at": "2026-06-06T21:04:35.359Z",
+    "type": "console",
+    "page": "im_web",
+    "level": "log",
+    "text": "消息内容--> RecvPacket2"
+  },
+  {
+    "at": "2026-06-06T21:04:35.404Z",
+    "type": "oauth-cat-created",
+    "catId": "v13210434",
+    "catName": "V13验收猫210434"
+  },
+  {
+    "at": "2026-06-06T21:04:35.600Z",
+    "type": "console",
+    "page": "im_web",
+    "level": "log",
+    "text": "消息内容--> RecvPacket2"
+  },
+  {
+    "at": "2026-06-06T21:04:35.600Z",
+    "type": "console",
+    "page": "agenthub_ui",
+    "level": "log",
+    "text": "消息内容--> RecvPacket2"
+  },
+  {
+    "at": "2026-06-06T21:04:35.601Z",
+    "type": "project-group-created",
+    "projectName": "V13验收项目210434",
+    "groupNo": "a8156f762c7c4707acc614df08a8f07e",
+    "bindingId": "e7f828d26a4143c0b5b32a60da4efa66",
+    "catId": "v13210434"
+  },
+  {
+    "at": "2026-06-06T21:04:35.608Z",
+    "type": "deployment-request-created-for-card-hydration",
+    "deploymentRequestId": "deploy_e49199b3-dc74-4b70-838c-2c2597d5f68b",
+    "groupNo": "a8156f762c7c4707acc614df08a8f07e"
+  },
+  {
+    "at": "2026-06-06T21:04:35.741Z",
+    "type": "api-response",
+    "page": "agenthub_ui",
+    "url": "http://localhost:3000/v1/clowder/cats?includeUnavailable=true",
+    "status": 200
+  },
+  {
+    "at": "2026-06-06T21:04:35.771Z",
+    "type": "api-response",
+    "page": "agenthub_ui",
+    "url": "http://localhost:3000/v1/clowder/cats",
+    "status": 200
+  },
+  {
+    "at": "2026-06-06T21:04:35.845Z",
+    "type": "agenthub-agent-directory-visible",
+    "catName": "V13验收猫210434"
+  },
+  {
+    "at": "2026-06-06T21:04:35.866Z",
+    "type": "console",
+    "page": "agenthub_ui",
+    "level": "log",
+    "text": "App Hide"
+  },
+  {
+    "at": "2026-06-06T21:04:35.875Z",
+    "type": "console",
+    "page": "agenthub_ui",
+    "level": "debug",
+    "text": "[vite] connecting..."
+  },
+  {
+    "at": "2026-06-06T21:04:35.885Z",
+    "type": "console",
+    "page": "agenthub_ui",
+    "level": "debug",
+    "text": "[vite] connected."
+  },
+  {
+    "at": "2026-06-06T21:04:35.907Z",
+    "type": "console",
+    "page": "agenthub_ui",
+    "level": "warning",
+    "text": "[vue-router]: importing from 'vue-router/dist/vue-router.esm-bundler.js' is deprecated. Use 'vue-router' directly."
+  },
+  {
+    "at": "2026-06-06T21:04:35.914Z",
+    "type": "console",
+    "page": "agenthub_ui",
+    "level": "log",
+    "text": "App Launch"
+  },
+  {
+    "at": "2026-06-06T21:04:35.916Z",
+    "type": "console",
+    "page": "agenthub_ui",
+    "level": "log",
+    "text": "App Show"
+  },
+  {
+    "at": "2026-06-06T21:04:36.016Z",
+    "type": "console",
+    "page": "agenthub_ui",
+    "level": "log",
+    "text": "UniApp运行环境"
+  },
+  {
+    "at": "2026-06-06T21:04:36.016Z",
+    "type": "console",
+    "page": "agenthub_ui",
+    "level": "log",
+    "text": "打开websocket成功"
+  },
+  {
+    "at": "2026-06-06T21:04:36.016Z",
+    "type": "console",
+    "page": "agenthub_ui",
+    "level": "log",
+    "text": "websocket SocketTask"
+  },
+  {
+    "at": "2026-06-06T21:04:36.037Z",
+    "type": "console",
+    "page": "agenthub_ui",
+    "level": "log",
+    "text": "onopen..."
+  },
+  {
+    "at": "2026-06-06T21:04:36.040Z",
+    "type": "console",
+    "page": "agenthub_ui",
+    "level": "log",
+    "text": "服务器协议版本: 5"
+  },
+  {
+    "at": "2026-06-06T21:04:36.040Z",
+    "type": "console",
+    "page": "agenthub_ui",
+    "level": "log",
+    "text": "成功连接到节点[1]"
+  },
+  {
+    "at": "2026-06-06T21:04:36.151Z",
+    "type": "http-error",
+    "page": "agenthub_ui",
+    "url": "http://localhost:3000/v1/coversation/clearUnread",
+    "status": 400
+  },
+  {
+    "at": "2026-06-06T21:04:36.151Z",
+    "type": "console",
+    "page": "agenthub_ui",
+    "level": "error",
+    "text": "Failed to load resource: the server responded with a status of 400 (Bad Request)"
+  },
+  {
+    "at": "2026-06-06T21:04:36.161Z",
+    "type": "api-response",
+    "page": "agenthub_ui",
+    "url": "http://localhost:3000/v1/clowder/conversation/deployment-request/active?channelId=a8156f762c7c4707acc614df08a8f07e&channelType=2",
+    "status": 200
+  },
+  {
+    "at": "2026-06-06T21:04:36.163Z",
+    "type": "http-error",
+    "page": "agenthub_ui",
+    "url": "http://localhost:3000/v1/coversation/clearUnread",
+    "status": 400
+  },
+  {
+    "at": "2026-06-06T21:04:36.163Z",
+    "type": "console",
+    "page": "agenthub_ui",
+    "level": "error",
+    "text": "Failed to load resource: the server responded with a status of 400 (Bad Request)"
+  },
+  {
+    "at": "2026-06-06T21:04:36.256Z",
+    "type": "agenthub-deployment-card-visible",
+    "deploymentRequestId": "deploy_e49199b3-dc74-4b70-838c-2c2597d5f68b",
+    "groupNo": "a8156f762c7c4707acc614df08a8f07e"
+  },
+  {
+    "at": "2026-06-06T21:04:36.270Z",
+    "type": "console",
+    "page": "im_web",
+    "level": "debug",
+    "text": "[vite] connecting..."
+  },
+  {
+    "at": "2026-06-06T21:04:36.274Z",
+    "type": "console",
+    "page": "im_web",
+    "level": "debug",
+    "text": "[vite] connected."
+  },
+  {
+    "at": "2026-06-06T21:04:36.368Z",
+    "type": "requestfailed",
+    "page": "im_web",
+    "url": "http://localhost:3000/src/views/ChatWelcome.vue",
+    "failure": "net::ERR_ABORTED"
+  },
+  {
+    "at": "2026-06-06T21:04:36.368Z",
+    "type": "requestfailed",
+    "page": "im_web",
+    "url": "http://localhost:3000/src/layouts/MainLayout.vue",
+    "failure": "net::ERR_ABORTED"
+  },
+  {
+    "at": "2026-06-06T21:04:36.373Z",
+    "type": "console",
+    "page": "im_web",
+    "level": "debug",
+    "text": "[vite] connecting..."
+  },
+  {
+    "at": "2026-06-06T21:04:36.379Z",
+    "type": "console",
+    "page": "im_web",
+    "level": "debug",
+    "text": "[vite] connected."
+  },
+  {
+    "at": "2026-06-06T21:04:36.466Z",
+    "type": "console",
+    "page": "im_web",
+    "level": "log",
+    "text": "web运行环境"
+  },
+  {
+    "at": "2026-06-06T21:04:36.466Z",
+    "type": "console",
+    "page": "im_web",
+    "level": "log",
+    "text": "使用原生websocket"
+  },
+  {
+    "at": "2026-06-06T21:04:36.467Z",
+    "type": "console",
+    "page": "im_web",
+    "level": "log",
+    "text": "websocket WebSocket"
+  },
+  {
+    "at": "2026-06-06T21:04:36.481Z",
+    "type": "console",
+    "page": "im_web",
+    "level": "log",
+    "text": "onopen..."
+  },
+  {
+    "at": "2026-06-06T21:04:36.493Z",
+    "type": "console",
+    "page": "im_web",
+    "level": "log",
+    "text": "服务器协议版本: 5"
+  },
+  {
+    "at": "2026-06-06T21:04:36.493Z",
+    "type": "console",
+    "page": "im_web",
+    "level": "log",
+    "text": "成功连接到节点[1]"
+  },
+  {
+    "at": "2026-06-06T21:04:36.494Z",
+    "type": "console",
+    "page": "im_web",
+    "level": "log",
+    "text": "[SDK] Connected successfully."
+  },
+  {
+    "at": "2026-06-06T21:04:36.606Z",
+    "type": "api-response",
+    "page": "im_web",
+    "url": "http://127.0.0.1:8090/v1/clowder/group/cats?groupId=a8156f762c7c4707acc614df08a8f07e",
+    "status": 200
+  },
+  {
+    "at": "2026-06-06T21:04:36.624Z",
+    "type": "api-response",
+    "page": "im_web",
+    "url": "http://127.0.0.1:8090/v1/clowder/conversation/deployment-request/active?channelId=a8156f762c7c4707acc614df08a8f07e&channelType=2",
+    "status": 200
+  },
+  {
+    "at": "2026-06-06T21:04:36.627Z",
+    "type": "http-error",
+    "page": "im_web",
+    "url": "http://127.0.0.1:8090/v1/coversation/clearUnread",
+    "status": 400
+  },
+  {
+    "at": "2026-06-06T21:04:36.627Z",
+    "type": "console",
+    "page": "im_web",
+    "level": "error",
+    "text": "Failed to load resource: the server responded with a status of 400 (Bad Request)"
+  },
+  {
+    "at": "2026-06-06T21:04:36.627Z",
+    "type": "console",
+    "page": "im_web",
+    "level": "warning",
+    "text": "[ConversationStore] Remote clear unread command failed; local state was kept {error: AxiosError: Request failed with status code 400\n    at settle (http://localhost:3000/node_modules/.…, msg: IM服务失败！ -> channel: stale metadata, status: 400}"
+  },
+  {
+    "at": "2026-06-06T21:04:36.628Z",
+    "type": "api-response",
+    "page": "im_web",
+    "url": "http://127.0.0.1:8090/v1/clowder/conversation/agents?channelId=a8156f762c7c4707acc614df08a8f07e&channelType=2",
+    "status": 200
+  },
+  {
+    "at": "2026-06-06T21:04:36.628Z",
+    "type": "http-error",
+    "page": "im_web",
+    "url": "http://127.0.0.1:8090/v1/coversation/clearUnread",
+    "status": 400
+  },
+  {
+    "at": "2026-06-06T21:04:36.628Z",
+    "type": "console",
+    "page": "im_web",
+    "level": "error",
+    "text": "Failed to load resource: the server responded with a status of 400 (Bad Request)"
+  },
+  {
+    "at": "2026-06-06T21:04:36.628Z",
+    "type": "console",
+    "page": "im_web",
+    "level": "warning",
+    "text": "[ConversationStore] Remote clear unread command failed; local state was kept {error: AxiosError: Request failed with status code 400\n    at settle (http://localhost:3000/node_modules/.…, msg: IM服务失败！ -> channel: stale metadata, status: 400}"
+  },
+  {
+    "at": "2026-06-06T21:04:36.632Z",
+    "type": "api-response",
+    "page": "im_web",
+    "url": "http://127.0.0.1:8090/v1/clowder/group/cats?groupId=a8156f762c7c4707acc614df08a8f07e",
+    "status": 200
+  },
+  {
+    "at": "2026-06-06T21:04:36.634Z",
+    "type": "api-response",
+    "page": "im_web",
+    "url": "http://127.0.0.1:8090/v1/clowder/conversation/agents?channelId=a8156f762c7c4707acc614df08a8f07e&channelType=2",
+    "status": 200
+  },
+  {
+    "at": "2026-06-06T21:04:36.707Z",
+    "type": "imweb-project-group-visible",
+    "projectName": "V13验收项目210434"
+  },
+  {
+    "at": "2026-06-06T21:04:36.740Z",
+    "type": "api-response",
+    "page": "agenthub_ui",
+    "url": "http://localhost:3000/v1/clowder/conversation/deployment-action",
+    "status": 200
+  },
+  {
+    "at": "2026-06-06T21:04:36.797Z",
+    "type": "agenthub-deployment-confirm-clicked",
+    "deploymentRequestId": "deploy_e49199b3-dc74-4b70-838c-2c2597d5f68b",
+    "status": 200
+  },
+  {
+    "at": "2026-06-06T21:04:36.838Z",
+    "type": "console",
+    "page": "agenthub_ui_mobile",
+    "level": "debug",
+    "text": "[vite] connecting..."
+  },
+  {
+    "at": "2026-06-06T21:04:36.842Z",
+    "type": "console",
+    "page": "agenthub_ui_mobile",
+    "level": "debug",
+    "text": "[vite] connected."
+  },
+  {
+    "at": "2026-06-06T21:04:36.873Z",
+    "type": "console",
+    "page": "agenthub_ui_mobile",
+    "level": "warning",
+    "text": "[vue-router]: importing from 'vue-router/dist/vue-router.esm-bundler.js' is deprecated. Use 'vue-router' directly."
+  },
+  {
+    "at": "2026-06-06T21:04:36.898Z",
+    "type": "console",
+    "page": "agenthub_ui_mobile",
+    "level": "log",
+    "text": "App Launch"
+  },
+  {
+    "at": "2026-06-06T21:04:36.901Z",
+    "type": "console",
+    "page": "agenthub_ui_mobile",
+    "level": "log",
+    "text": "App Show"
+  },
+  {
+    "at": "2026-06-06T21:04:37.127Z",
+    "type": "console",
+    "page": "agenthub_ui_mobile",
+    "level": "log",
+    "text": "UniApp运行环境"
+  },
+  {
+    "at": "2026-06-06T21:04:37.127Z",
+    "type": "console",
+    "page": "agenthub_ui_mobile",
+    "level": "log",
+    "text": "打开websocket成功"
+  },
+  {
+    "at": "2026-06-06T21:04:37.127Z",
+    "type": "console",
+    "page": "agenthub_ui_mobile",
+    "level": "log",
+    "text": "websocket SocketTask"
+  },
+  {
+    "at": "2026-06-06T21:04:37.132Z",
+    "type": "console",
+    "page": "agenthub_ui_mobile",
+    "level": "log",
+    "text": "onopen..."
+  },
+  {
+    "at": "2026-06-06T21:04:37.140Z",
+    "type": "console",
+    "page": "agenthub_ui_mobile",
+    "level": "log",
+    "text": "服务器协议版本: 5"
+  },
+  {
+    "at": "2026-06-06T21:04:37.141Z",
+    "type": "console",
+    "page": "agenthub_ui_mobile",
+    "level": "log",
+    "text": "成功连接到节点[1]"
+  },
+  {
+    "at": "2026-06-06T21:04:37.326Z",
+    "type": "agenthub-login-ok"
+  },
+  {
+    "at": "2026-06-06T21:04:37.407Z",
+    "type": "run-pass",
+    "catId": "v13210434",
+    "projectGroupNo": "a8156f762c7c4707acc614df08a8f07e",
+    "deploymentRequestId": "deploy_e49199b3-dc74-4b70-838c-2c2597d5f68b",
+    "runtimeChoice": "Claude Code",
+    "oauthProvider": "claude"
+  }
+]

@@ -87,11 +87,27 @@ describe('business mock cleanup', () => {
     expect(skills).toContain('showSkillUploadUnavailable');
   });
 
+  it('keeps the agents index skill preview bounded so the agent directory remains visible', () => {
+    const index = read('pages/agents/index.vue');
+
+    expect(index).toContain('previewSkills');
+    expect(index).toContain('userSkills.value.slice(0, 10)');
+    expect(index).toContain('v-for="skill in previewSkills"');
+  });
+
   it('renders deployment payloads with the real deployment card component', () => {
     const bubble = read('components/chat/MessageBubble.vue');
+    const chatIndex = read('pages/chat/index.vue');
+    const chatDetail = read('pages/chat/detail.vue');
 
     expect(bubble).toContain('DeploymentCard');
     expect(bubble).toContain("data.type === 'deployment'");
+    expect(chatIndex).toContain('hydrateActiveDeploymentCard');
+    expect(chatIndex).toContain('deploymentStore.fetchActive');
+    expect(chatIndex).toContain('messageStore.addDeploymentRequestCard');
+    expect(chatDetail).toContain('hydrateActiveDeploymentCard');
+    expect(chatDetail).toContain('deploymentStore.fetchActive');
+    expect(chatDetail).toContain('messageStore.addDeploymentRequestCard');
   });
 
   it('defaults OAuth cat creation to backend-required provider account refs', () => {

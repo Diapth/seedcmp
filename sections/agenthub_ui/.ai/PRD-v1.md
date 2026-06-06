@@ -154,7 +154,7 @@ V1 的核心目标不是做演示壳，而是把已经成型的 UI 接到真实 
 7. 无 `未命名会话` / `1970`。
 8. 浏览器无 pageerror、requestfailed、HTTP 4xx/5xx。
 9. 截图证据保存到 `issues/screenshots/` 或 `.ai/tests-e2e/`。
-10. V1-3 完成判定还必须提供 OAuth cat、PM 项目群、Kanban/artifacts/deployment card 的真实 live 证据。
+10. V1-3 完成判定还必须提供 OAuth cat、PM 项目群、Kanban/artifacts/deployment card 的真实 live 证据；当前 `.ai/tests-e2e/v1-3-20260606T210434/` 已覆盖 OAuth cat、PM 项目群和 deployment card，Kanban/artifacts 仍需专项 live proof。
 
 ## 7. 风险与后续
 

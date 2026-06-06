@@ -21,6 +21,28 @@ function defaultMsg(overrides = {}) {
   };
 }
 
+function pickDeploymentRequestId(request = {}) {
+  return request.id || request.requestId || request.request_id || request.deploymentRequestId || request.deployment_request_id || '';
+}
+
+function deploymentChannelId(request = {}) {
+  return request.channelId || request.channel_id || '';
+}
+
+function deploymentChannelType(request = {}) {
+  return Number(request.channelType || request.channel_type || 0);
+}
+
+function deploymentTimestamp(request = {}) {
+  const value = Number(request.createdAt || request.created_at || request.updatedAt || request.updated_at || 0);
+  if (!Number.isFinite(value) || value <= 0) return Date.now();
+  return value < 1_000_000_000_000 ? value * 1000 : value;
+}
+
+function deploymentCardTitle(request = {}) {
+  return request.title || request.originalText || request.original_text || request.statusLabel || request.status_label || '部署请求';
+}
+
 async function sendSdkTextMessage() {
   const module = await import('@/utils/wk-sdk.js');
   if (!module?.sendTextMessage) {
@@ -98,6 +120,58 @@ export const useMessageStore = defineStore('message', {
         list.push(msg);
       }
       return msg;
+    },
+    addDeploymentRequestCard(request = {}) {
+      const requestId = pickDeploymentRequestId(request);
+      const channelId = deploymentChannelId(request);
+      const channelType = deploymentChannelType(request);
+      if (!requestId || !channelId || !channelType) return null;
+
+      const clientMsgNo = `deployment-card-${requestId}`;
+      const title = deploymentCardTitle(request);
+      const card = defaultMsg({
+        id: clientMsgNo,
+        clientMsgNo,
+        senderId: request.senderId || request.sender_id || 'clowder_cat:coordinator',
+        senderName: request.senderName || request.sender_name || 'PM / Deployment',
+        content: title,
+        type: 'deployment',
+        time: deploymentTimestamp(request),
+        channelId,
+        channelType,
+        deploymentRequestId: requestId,
+        deployment: {
+          requestId,
+          title,
+          status: request.status || 'pending_confirmation',
+          target: request.target || '',
+          environment: request.environment || '',
+          previewUrl: request.previewUrl || request.preview_url || '',
+          downloadUrl: request.downloadUrl || request.download_url || '',
+          channelId,
+          channelType,
+          raw: request
+        },
+        raw: {
+          payload: {
+            type: 7,
+            cardType: 'deployment',
+            deploymentRequestId: requestId,
+            deploymentRequest: request
+          }
+        }
+      });
+
+      const list = this.ensureBucket(channelId, channelType);
+      const existingIndex = list.findIndex((item) =>
+        item.id === card.id || item.clientMsgNo === card.clientMsgNo || item.deploymentRequestId === requestId
+      );
+      if (existingIndex >= 0) {
+        list[existingIndex] = { ...list[existingIndex], ...card };
+        return list[existingIndex];
+      }
+      list.push(card);
+      return card;
     },
     async sendMessage(conversationId, text, sender = null, type = 'text', extra = {}) {
       if (type !== 'text') {

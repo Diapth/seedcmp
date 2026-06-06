@@ -44,6 +44,13 @@ export const useDeploymentStore = defineStore('deployment', {
       this.requests[deploymentId(request, id)] = request;
       return request;
     },
+    async fetchActive(params) {
+      const response = await clowderApi.getActiveDeploymentRequest(params);
+      const request = pickDeploymentRequest(response);
+      const id = deploymentId(request);
+      if (id) this.requests[id] = request;
+      return id ? request : null;
+    },
     async confirm(id, context = {}) {
       const existing = this.requests[id] || {};
       const { channelId, channelType } = normalizeChannelContext(context, existing);

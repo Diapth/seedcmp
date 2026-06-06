@@ -273,6 +273,50 @@ describe('IM domain mapping and stores', () => {
     });
   });
 
+  it('hydrates active backend deployment requests as local deployment card messages', () => {
+    const messageStore = useMessageStore();
+
+    const card = messageStore.addDeploymentRequestCard({
+      id: 'dep-active',
+      status: 'pending_confirmation',
+      channelId: 'project-group-1',
+      channelType: 2,
+      originalText: 'V1-3 deployment proof',
+      target: 'agenthub-ui',
+      environment: 'preview'
+    });
+
+    expect(card).toMatchObject({
+      id: 'deployment-card-dep-active',
+      clientMsgNo: 'deployment-card-dep-active',
+      type: 'deployment',
+      content: 'V1-3 deployment proof',
+      deploymentRequestId: 'dep-active',
+      channelId: 'project-group-1',
+      channelType: 2
+    });
+    expect(card.deployment).toMatchObject({
+      requestId: 'dep-active',
+      status: 'pending_confirmation',
+      target: 'agenthub-ui',
+      environment: 'preview'
+    });
+    expect(messageStore.getMessages('project-group-1', 2)).toHaveLength(1);
+
+    messageStore.addDeploymentRequestCard({
+      id: 'dep-active',
+      status: 'running',
+      channelId: 'project-group-1',
+      channelType: 2,
+      originalText: 'V1-3 deployment proof',
+      target: 'agenthub-ui',
+      environment: 'preview'
+    });
+
+    expect(messageStore.getMessages('project-group-1', 2)).toHaveLength(1);
+    expect(messageStore.getMessages('project-group-1', 2)[0].deployment.status).toBe('running');
+  });
+
   it('persists drafts by uid and channel key', () => {
     const conversationStore = useConversationStore();
     conversationStore.setCurrentUid('u-1');

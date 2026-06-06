@@ -9,6 +9,7 @@ import (
 	"io"
 	"net/http"
 	"net/url"
+	"sort"
 	"strconv"
 	"strings"
 	"sync"
@@ -26,6 +27,8 @@ type Clowder struct {
 	ctx                  *config.Context
 	groupCatsMu          sync.RWMutex
 	groupCatState        map[string]groupCatSyncResponse
+	createdCatsMu        sync.RWMutex
+	createdCatContacts   map[string]map[string]ClowderAgent
 	projectGroupMu       sync.RWMutex
 	projectGroupBindings map[string]ProjectGroupBinding
 	log.Log
@@ -39,6 +42,7 @@ func New(ctx *config.Context) *Clowder {
 	return &Clowder{
 		ctx:                  ctx,
 		groupCatState:        map[string]groupCatSyncResponse{},
+		createdCatContacts:   map[string]map[string]ClowderAgent{},
 		projectGroupBindings: map[string]ProjectGroupBinding{},
 		Log:                  log.NewTLog("clowder"),
 		config:               commonmodule.ClowderBridgeConfigFromEnv(),
@@ -878,15 +882,19 @@ func (c *Clowder) createCatAndConnect(ctx *wkhttp.Context) {
 	}
 	if directory, err := c.fetchCatDirectory(ctx.GetLoginUID()); err == nil {
 		if response, ok := catContactResponse(name, directory.Agents, "runtime-created"); ok {
+			c.storeCreatedCatContact(ctx.GetLoginUID(), response.Agent)
 			ctx.JSON(http.StatusOK, response)
 			return
 		}
 		if response, ok := catContactResponse(alias, directory.Agents, "runtime-created"); ok {
+			c.storeCreatedCatContact(ctx.GetLoginUID(), response.Agent)
 			ctx.JSON(http.StatusOK, response)
 			return
 		}
 	}
-	ctx.JSON(http.StatusOK, fallbackCreatedCatResponse(req, alias))
+	response := fallbackCreatedCatResponse(req, alias)
+	c.storeCreatedCatContact(ctx.GetLoginUID(), response.Agent)
+	ctx.JSON(http.StatusOK, response)
 }
 
 func (c *Clowder) deleteCatContact(ctx *wkhttp.Context) {
@@ -902,6 +910,7 @@ func (c *Clowder) deleteCatContact(ctx *wkhttp.Context) {
 	}
 	if statusCode >= 200 && statusCode < 300 {
 		c.pruneGroupCatState(catID)
+		c.pruneCreatedCatContact(ctx.GetLoginUID(), catID)
 	}
 	ctx.Data(statusCode, "application/json; charset=utf-8", body)
 }
@@ -1129,6 +1138,103 @@ func (c *Clowder) loadGroupCats(groupID string) (groupCatSyncResponse, bool) {
 	}
 	response, ok := c.groupCatState[strings.TrimSpace(groupID)]
 	return response, ok
+}
+
+func createdCatOwnerKey(userID string) string {
+	trimmed := strings.TrimSpace(userID)
+	if trimmed == "" {
+		return "default"
+	}
+	return trimmed
+}
+
+func (c *Clowder) storeCreatedCatContact(userID string, agent ClowderAgent) ClowderAgent {
+	agent = decorateCatContact(agent, "runtime-created")
+	catID := strings.TrimSpace(agent.CatID)
+	if catID == "" {
+		return agent
+	}
+	agent.LastActiveAt = time.Now().UnixMilli()
+	ownerKey := createdCatOwnerKey(userID)
+	c.createdCatsMu.Lock()
+	defer c.createdCatsMu.Unlock()
+	if c.createdCatContacts == nil {
+		c.createdCatContacts = map[string]map[string]ClowderAgent{}
+	}
+	if c.createdCatContacts[ownerKey] == nil {
+		c.createdCatContacts[ownerKey] = map[string]ClowderAgent{}
+	}
+	c.createdCatContacts[ownerKey][normalizeCatLookup(catID)] = agent
+	return agent
+}
+
+func (c *Clowder) loadCreatedCatContacts(userID string) []ClowderAgent {
+	ownerKey := createdCatOwnerKey(userID)
+	c.createdCatsMu.RLock()
+	defer c.createdCatsMu.RUnlock()
+	contacts := c.createdCatContacts[ownerKey]
+	if len(contacts) == 0 {
+		return nil
+	}
+	agents := make([]ClowderAgent, 0, len(contacts))
+	for _, agent := range contacts {
+		agents = append(agents, decorateCatContact(agent, "runtime-created"))
+	}
+	sort.SliceStable(agents, func(i, j int) bool {
+		if agents[i].LastActiveAt != agents[j].LastActiveAt {
+			return agents[i].LastActiveAt > agents[j].LastActiveAt
+		}
+		return strings.ToLower(agents[i].DisplayName) < strings.ToLower(agents[j].DisplayName)
+	})
+	return agents
+}
+
+func (c *Clowder) mergeCreatedCatContacts(userID string, agents []ClowderAgent) []ClowderAgent {
+	created := c.loadCreatedCatContacts(userID)
+	if len(created) == 0 {
+		return agents
+	}
+	seen := map[string]bool{}
+	for _, agent := range agents {
+		if key := normalizeCatLookup(agent.CatID); key != "" {
+			seen[key] = true
+		}
+	}
+	merged := make([]ClowderAgent, 0, len(created)+len(agents))
+	for _, agent := range created {
+		key := normalizeCatLookup(agent.CatID)
+		if key == "" || seen[key] {
+			continue
+		}
+		seen[key] = true
+		merged = append(merged, agent)
+	}
+	merged = append(merged, agents...)
+	return merged
+}
+
+func (c *Clowder) pruneCreatedCatContact(userID string, catID string) bool {
+	needle := normalizeCatLookup(catID)
+	if needle == "" {
+		return false
+	}
+	ownerKey := createdCatOwnerKey(userID)
+	c.createdCatsMu.Lock()
+	defer c.createdCatsMu.Unlock()
+	contacts := c.createdCatContacts[ownerKey]
+	if len(contacts) == 0 {
+		return false
+	}
+	for key, agent := range contacts {
+		if key == needle ||
+			normalizeCatLookup(agent.DisplayName) == needle ||
+			containsNormalized(agent.MentionPatterns, needle) ||
+			containsNormalized(agent.Aliases, needle) {
+			delete(contacts, key)
+			return true
+		}
+	}
+	return false
 }
 
 func normalizeProjectGroupName(value string) string {
@@ -2075,6 +2181,7 @@ func (c *Clowder) fetchCatDirectory(userID string) (CatDirectoryResponse, error)
 	for idx := range directory.Agents {
 		directory.Agents[idx] = decorateCatDirectoryContact(directory.Agents[idx])
 	}
+	directory.Agents = c.mergeCreatedCatContacts(userID, directory.Agents)
 	templates := catRoleTemplatesFromFallbackAgents(directory.Agents)
 	if len(templates) == 0 {
 		if templateResponse == nil {

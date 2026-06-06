@@ -284,6 +284,41 @@ describe('Clowder and agent stores', () => {
     expect(calls).toHaveLength(1);
   });
 
+  it('loads active deployment requests from wrapped backend responses', async () => {
+    setRequestAdapter(async ({ url, method }) => {
+      expect(method).toBe('GET');
+      expect(url).toContain('/clowder/conversation/deployment-request/active');
+      expect(url).toContain('channelId=group-1');
+      expect(url).toContain('channelType=2');
+      return {
+        status: 200,
+        data: {
+          code: 0,
+          data: {
+            deploymentRequest: {
+              id: 'dep-active',
+              status: 'pending_confirmation',
+              channelId: 'group-1',
+              channelType: 2,
+              target: 'agenthub-ui',
+              environment: 'preview'
+            }
+          }
+        }
+      };
+    });
+
+    const deploymentStore = useDeploymentStore();
+    const request = await deploymentStore.fetchActive({ channelId: 'group-1', channelType: 2 });
+
+    expect(request).toMatchObject({
+      id: 'dep-active',
+      status: 'pending_confirmation',
+      target: 'agenthub-ui'
+    });
+    expect(deploymentStore.requests['dep-active']).toMatchObject({ channelType: 2 });
+  });
+
   it('marks settings feature fallbacks unavailable when backend capability is missing', async () => {
     setRequestAdapter(async ({ url }) => {
       expect(url).toContain('/user/loginuuid');

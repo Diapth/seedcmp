@@ -26,10 +26,19 @@ During the V1-3 acceptance audit, several Clowder-facing paths were present but 
 
 ## Evidence
 
-- `npm run test:unit` - 42 tests passed.
-- `npm run build:h5` - build complete.
+- `node scripts/run-vitest.mjs` - 48 tests passed.
+- `node scripts/run-uni.mjs build -p h5` - build complete.
+- `GOFLAGS=-buildvcs=false go test ./modules/clowder` - passed.
+- `TEST_PASSWORD=<redacted> node tests-e2e/agenthub-v1-3-clowder.mjs` - passed with live evidence in `.ai/tests-e2e/v1-3-20260606T210434/`.
+- Live IDs:
+  - OAuth cat: `v13210434` / `V13验收猫210434`
+  - Project group: `a8156f762c7c4707acc614df08a8f07e` / `V13验收项目210434`
+  - Deployment request: `deploy_e49199b3-dc74-4b70-838c-2c2597d5f68b`
+  - Deployment action: `confirm` returned 200 and queued the deployment.
 - `git diff --check` - clean.
 
 ## Remaining Verification
 
-This resolves code-level V1-3 gaps, but full V1-3 completion still requires live H5 evidence for OAuth cat, PM project group, Kanban/artifacts, and deployment card behavior against the running Clowder stack.
+This resolves the deployment/skill-catalog issue and now has live H5 evidence for OAuth cat, PM project group, and deployment card behavior against the running Clowder stack.
+
+Kanban/artifacts-specific UI evidence is outside this issue's fix and remains a broader V1-3 acceptance item.

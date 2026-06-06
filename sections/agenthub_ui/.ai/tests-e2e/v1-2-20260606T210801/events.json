@@ -1,0 +1,257 @@
+[
+  {
+    "at": "2026-06-06T21:08:01.210Z",
+    "type": "run-start",
+    "agenthubBaseUrl": "http://localhost:5173",
+    "imWebBaseUrl": "http://localhost:3000",
+    "username": "008618337488675",
+    "conversationName": "Clowder AI",
+    "messageText": "agenthub-imweb-live-20260606T210801"
+  },
+  {
+    "at": "2026-06-06T21:08:01.256Z",
+    "type": "console",
+    "page": "agenthub_ui",
+    "level": "debug",
+    "text": "[vite] connecting..."
+  },
+  {
+    "at": "2026-06-06T21:08:01.270Z",
+    "type": "websocket-open",
+    "page": "agenthub_ui",
+    "url": "ws://localhost:5173/?token=REDACTED"
+  },
+  {
+    "at": "2026-06-06T21:08:01.274Z",
+    "type": "console",
+    "page": "agenthub_ui",
+    "level": "debug",
+    "text": "[vite] connected."
+  },
+  {
+    "at": "2026-06-06T21:08:01.304Z",
+    "type": "console",
+    "page": "agenthub_ui",
+    "level": "warning",
+    "text": "[vue-router]: importing from 'vue-router/dist/vue-router.esm-bundler.js' is deprecated. Use 'vue-router' directly."
+  },
+  {
+    "at": "2026-06-06T21:08:01.325Z",
+    "type": "console",
+    "page": "agenthub_ui",
+    "level": "log",
+    "text": "App Launch"
+  },
+  {
+    "at": "2026-06-06T21:08:01.328Z",
+    "type": "console",
+    "page": "agenthub_ui",
+    "level": "log",
+    "text": "App Show"
+  },
+  {
+    "at": "2026-06-06T21:08:01.574Z",
+    "type": "console",
+    "page": "agenthub_ui",
+    "level": "log",
+    "text": "UniApp运行环境"
+  },
+  {
+    "at": "2026-06-06T21:08:01.574Z",
+    "type": "console",
+    "page": "agenthub_ui",
+    "level": "log",
+    "text": "打开websocket成功"
+  },
+  {
+    "at": "2026-06-06T21:08:01.574Z",
+    "type": "console",
+    "page": "agenthub_ui",
+    "level": "log",
+    "text": "websocket SocketTask"
+  },
+  {
+    "at": "2026-06-06T21:08:01.578Z",
+    "type": "websocket-open",
+    "page": "agenthub_ui",
+    "url": "ws://0.0.0.0:5200/"
+  },
+  {
+    "at": "2026-06-06T21:08:01.579Z",
+    "type": "console",
+    "page": "agenthub_ui",
+    "level": "log",
+    "text": "onopen..."
+  },
+  {
+    "at": "2026-06-06T21:08:01.587Z",
+    "type": "console",
+    "page": "agenthub_ui",
+    "level": "log",
+    "text": "服务器协议版本: 5"
+  },
+  {
+    "at": "2026-06-06T21:08:01.588Z",
+    "type": "console",
+    "page": "agenthub_ui",
+    "level": "log",
+    "text": "成功连接到节点[1]"
+  },
+  {
+    "at": "2026-06-06T21:08:01.787Z",
+    "type": "agenthub-login-ok"
+  },
+  {
+    "at": "2026-06-06T21:08:01.813Z",
+    "type": "console",
+    "page": "im_web",
+    "level": "debug",
+    "text": "[vite] connecting..."
+  },
+  {
+    "at": "2026-06-06T21:08:01.818Z",
+    "type": "websocket-open",
+    "page": "im_web",
+    "url": "ws://localhost:3000/"
+  },
+  {
+    "at": "2026-06-06T21:08:01.822Z",
+    "type": "console",
+    "page": "im_web",
+    "level": "debug",
+    "text": "[vite] connected."
+  },
+  {
+    "at": "2026-06-06T21:08:02.155Z",
+    "type": "console",
+    "page": "im_web",
+    "level": "log",
+    "text": "web运行环境"
+  },
+  {
+    "at": "2026-06-06T21:08:02.155Z",
+    "type": "console",
+    "page": "im_web",
+    "level": "log",
+    "text": "使用原生websocket"
+  },
+  {
+    "at": "2026-06-06T21:08:02.155Z",
+    "type": "console",
+    "page": "im_web",
+    "level": "log",
+    "text": "websocket WebSocket"
+  },
+  {
+    "at": "2026-06-06T21:08:02.159Z",
+    "type": "websocket-open",
+    "page": "im_web",
+    "url": "ws://127.0.0.1:5200/"
+  },
+  {
+    "at": "2026-06-06T21:08:02.160Z",
+    "type": "console",
+    "page": "im_web",
+    "level": "log",
+    "text": "onopen..."
+  },
+  {
+    "at": "2026-06-06T21:08:02.174Z",
+    "type": "console",
+    "page": "im_web",
+    "level": "log",
+    "text": "服务器协议版本: 5"
+  },
+  {
+    "at": "2026-06-06T21:08:02.175Z",
+    "type": "console",
+    "page": "im_web",
+    "level": "log",
+    "text": "成功连接到节点[1]"
+  },
+  {
+    "at": "2026-06-06T21:08:02.179Z",
+    "type": "console",
+    "page": "im_web",
+    "level": "log",
+    "text": "[SDK] Connected successfully."
+  },
+  {
+    "at": "2026-06-06T21:08:02.271Z",
+    "type": "imweb-login-ok"
+  },
+  {
+    "at": "2026-06-06T21:08:02.325Z",
+    "type": "http-error",
+    "page": "agenthub_ui",
+    "url": "http://localhost:3000/v1/clowder/conversation/deployment-request/active?channelId=clowder_ai&channelType=1",
+    "status": 404
+  },
+  {
+    "at": "2026-06-06T21:08:02.325Z",
+    "type": "console",
+    "page": "agenthub_ui",
+    "level": "error",
+    "text": "Failed to load resource: the server responded with a status of 404 (Not Found)"
+  },
+  {
+    "at": "2026-06-06T21:08:02.334Z",
+    "type": "agenthub-conversation-selected",
+    "requestedName": "Clowder AI",
+    "title": "Clowder AI"
+  },
+  {
+    "at": "2026-06-06T21:08:02.437Z",
+    "type": "http-error",
+    "page": "im_web",
+    "url": "http://127.0.0.1:8090/v1/clowder/conversation/deployment-request/active?channelId=clowder_ai&channelType=1",
+    "status": 404
+  },
+  {
+    "at": "2026-06-06T21:08:02.437Z",
+    "type": "console",
+    "page": "im_web",
+    "level": "error",
+    "text": "Failed to load resource: the server responded with a status of 404 (Not Found)"
+  },
+  {
+    "at": "2026-06-06T21:08:02.443Z",
+    "type": "imweb-conversation-selected",
+    "channelId": "clowder_ai",
+    "channelType": "1",
+    "text": "C\nClowder AI\n05:04\n⚠️ 当前没有绑定 thread，请先用 /new 创建或 /use 切换。\n5"
+  },
+  {
+    "at": "2026-06-06T21:08:02.645Z",
+    "type": "agenthub-message-visible",
+    "messageText": "agenthub-imweb-live-20260606T210801"
+  },
+  {
+    "at": "2026-06-06T21:08:02.708Z",
+    "type": "console",
+    "page": "im_web",
+    "level": "log",
+    "text": "消息内容--> RecvPacket2"
+  },
+  {
+    "at": "2026-06-06T21:08:02.713Z",
+    "type": "console",
+    "page": "im_web",
+    "level": "log",
+    "text": "消息内容--> RecvPacket2"
+  },
+  {
+    "at": "2026-06-06T21:08:05.434Z",
+    "type": "imweb-message-received-without-refresh",
+    "messageText": "agenthub-imweb-live-20260606T210801"
+  },
+  {
+    "at": "2026-06-06T21:08:05.534Z",
+    "type": "run-pass",
+    "imWebConversation": {
+      "channelId": "clowder_ai",
+      "channelType": "1",
+      "text": "C\nClowder AI\n05:04\n⚠️ 当前没有绑定 thread，请先用 /new 创建或 /use 切换。\n5"
+    }
+  }
+]
