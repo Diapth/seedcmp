@@ -153,9 +153,9 @@ V1 的核心目标不是做演示壳，而是把已经成型的 UI 接到真实 
 5. agenthub_ui 与 im_web 对照关键会话一致。
 6. 项目群、PM、Clowder AI 会话可见。
 7. 无 `未命名会话` / `1970`。
-8. 浏览器无 pageerror、requestfailed、HTTP 4xx/5xx。
+8. 浏览器无 pageerror、无未处理 requestfailed，且无未解释的 HTTP 4xx/5xx；能力探测型 404 或已知非阻断 400 必须在验收报告记录。
 9. 截图证据保存到 `issues/screenshots/` 或 `.ai/tests-e2e/`。
-10. V1-3 完成判定还必须提供 OAuth cat、PM 项目群、Kanban/artifacts/deployment card 的真实 live 证据；当前 `.ai/tests-e2e/v1-3-20260606T210434/` 已覆盖 OAuth cat、PM 项目群和 deployment card，Kanban/artifacts 已补齐代码与单测门禁，仍需 fresh browser live proof。
+10. V1-3 完成判定还必须提供 OAuth cat、PM 项目群、Kanban/artifacts/deployment card 的真实 live 证据；当前 `.ai/tests-e2e/v1-3-20260606T210434/` 已覆盖 OAuth cat、PM 项目群和 deployment card，`.ai/tests-e2e/v1-3-workspace-final-20260606T215418Z/` 已覆盖真实项目群 Kanban/artifacts 和刷新恢复。
 
 ## 7. 风险与后续
 

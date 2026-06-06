@@ -408,6 +408,42 @@ describe('Clowder and agent stores', () => {
     ]);
   });
 
+  it('loads active project-group bindings by project group number for refreshed group chats', async () => {
+    setRequestAdapter(async ({ url, method }) => {
+      expect(method).toBe('GET');
+      expect(url).toContain('/clowder/project-groups/active');
+      expect(url).toContain('projectGroupNo=group-1');
+      expect(url).not.toContain('pmDirectChannelId=');
+      return {
+        status: 200,
+        data: {
+          code: 0,
+          data: {
+            binding: {
+              id: 'binding-by-group',
+              projectGroupNo: 'group-1',
+              projectName: 'AgentHub V1',
+              projectThreadId: 'thread-1',
+              status: 'active'
+            }
+          }
+        }
+      };
+    });
+
+    const clowderStore = useClowderStore();
+    const binding = await clowderStore.fetchActiveProjectGroup({ projectGroupNo: 'group-1' });
+
+    expect(binding).toMatchObject({
+      id: 'binding-by-group',
+      projectGroupNo: 'group-1',
+      projectThreadId: 'thread-1'
+    });
+    expect(clowderStore.projectGroups['binding-by-group']).toMatchObject({
+      projectThreadId: 'thread-1'
+    });
+  });
+
   it('marks settings feature fallbacks unavailable when backend capability is missing', async () => {
     setRequestAdapter(async ({ url }) => {
       expect(url).toContain('/user/loginuuid');

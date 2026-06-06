@@ -247,7 +247,16 @@ async function hydrateGroupProjectWorkspace() {
   projectWorkspaceLoading.value = true;
   try {
     const state = await clowderStore.fetchBinding(groupChannelId.value, groupChannelType.value);
-    const threadId = bindingThreadId(state?.binding || state || projectBinding.value || {});
+    let threadId = bindingThreadId(state?.binding || state || projectBinding.value || {});
+    if (!threadId) {
+      const activeBinding = await clowderStore.fetchActiveProjectGroup({
+        projectGroupNo: groupChannelId.value
+      }).catch((err) => {
+        if (err?.status === 404) return null;
+        throw err;
+      });
+      threadId = bindingThreadId(activeBinding || projectBinding.value || {});
+    }
     if (threadId) {
       await Promise.all([
         clowderStore.fetchThreadTasks(threadId).catch(() => undefined),

@@ -118,6 +118,7 @@ describe('business mock cleanup', () => {
     expect(workspace).toContain('ProjectKanbanPanel');
     expect(workspace).toContain('ProjectArtifactsPanel');
     expect(workspace).toContain('clowderStore.fetchBinding');
+    expect(workspace).toContain('clowderStore.fetchActiveProjectGroup');
     expect(workspace).not.toContain('useAgentStore');
     expect(workspace).not.toContain('agentStore.boards');
 

@@ -208,6 +208,12 @@ export const useClowderStore = defineStore('clowder', {
       if (bindingKey(binding)) this.projectGroups[bindingKey(binding)] = binding;
       return binding;
     },
+    async fetchActiveProjectGroup(params = {}) {
+      const response = await clowderApi.getActiveProjectGroup(params);
+      const binding = pickBinding(response);
+      if (bindingKey(binding)) this.projectGroups[bindingKey(binding)] = binding;
+      return binding;
+    },
     async cancelProjectGroup(bindingId, reason = '用户取消') {
       this.projectGroups[bindingId] = { ...(this.projectGroups[bindingId] || {}), status: 'cancelled', reason };
     },

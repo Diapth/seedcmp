@@ -1048,6 +1048,24 @@ func (c *Clowder) activeProjectGroup(ctx *wkhttp.Context) {
 		ctx.JSON(http.StatusUnauthorized, map[string]string{"error": "login_required"})
 		return
 	}
+	if projectGroupNo := strings.TrimSpace(ctx.Query("projectGroupNo")); projectGroupNo != "" {
+		binding, ok := c.findActiveProjectGroupBindingByGroupNo(userID, projectGroupNo)
+		if !ok {
+			ctx.JSON(http.StatusNotFound, map[string]string{"error": "active_project_group_not_found"})
+			return
+		}
+		ctx.JSON(http.StatusOK, projectGroupBindingResponse{Binding: binding})
+		return
+	}
+	if projectGroupNo := strings.TrimSpace(ctx.Query("projectGroupId")); projectGroupNo != "" {
+		binding, ok := c.findActiveProjectGroupBindingByGroupNo(userID, projectGroupNo)
+		if !ok {
+			ctx.JSON(http.StatusNotFound, map[string]string{"error": "active_project_group_not_found"})
+			return
+		}
+		ctx.JSON(http.StatusOK, projectGroupBindingResponse{Binding: binding})
+		return
+	}
 	pmChannelID := strings.TrimSpace(ctx.Query("pmDirectChannelId"))
 	rawChannelType := strings.TrimSpace(ctx.Query("pmDirectChannelType"))
 	if pmChannelID == "" || rawChannelType == "" {
@@ -1294,6 +1312,35 @@ func (c *Clowder) findActiveProjectGroupBinding(userID string, pmChannelID strin
 			continue
 		}
 		if hasProjectName && normalizeProjectGroupName(binding.ProjectName) != normalizedProjectName {
+			continue
+		}
+		if best.ID == "" || binding.UpdatedAt > best.UpdatedAt {
+			best = binding
+		}
+	}
+	return best, best.ID != ""
+}
+
+func (c *Clowder) findActiveProjectGroupBindingByGroupNo(userID string, projectGroupNo string) (ProjectGroupBinding, bool) {
+	c.projectGroupMu.RLock()
+	defer c.projectGroupMu.RUnlock()
+	if c.projectGroupBindings == nil {
+		return ProjectGroupBinding{}, false
+	}
+	trimmedUserID := strings.TrimSpace(userID)
+	trimmedGroupNo := strings.TrimSpace(projectGroupNo)
+	if trimmedUserID == "" || trimmedGroupNo == "" {
+		return ProjectGroupBinding{}, false
+	}
+	var best ProjectGroupBinding
+	for _, binding := range c.projectGroupBindings {
+		if binding.Status != "active" {
+			continue
+		}
+		if strings.TrimSpace(binding.UserID) != trimmedUserID {
+			continue
+		}
+		if strings.TrimSpace(binding.ProjectGroupNo) != trimmedGroupNo {
 			continue
 		}
 		if best.ID == "" || binding.UpdatedAt > best.UpdatedAt {

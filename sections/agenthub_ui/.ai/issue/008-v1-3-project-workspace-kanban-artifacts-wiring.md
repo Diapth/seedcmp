@@ -23,6 +23,7 @@ This meant a real project group could pass deployment-card hydration while still
 - Rewired `GroupInfoPanel.vue` to expose `Clowder 项目工作台` from a real `projectThreadId`, not from `agentStore.boards`.
 - Updated `ProjectArtifactsPanel.vue` to prefer `threadId` and fetch real thread artifacts.
 - Added unit regressions that fail if the project workspace path falls back to `agentStore.boards`.
+- Added `projectGroupNo` active-binding fallback so a refreshed project-group chat can recover the workspace thread even when the normal conversation binding response has no thread.
 
 ## Evidence
 
@@ -30,9 +31,13 @@ This meant a real project group could pass deployment-card hydration while still
   - `ProjectKanbanPanel` missing from `RightWorkspace.vue`.
   - `clowderStore.fetchThreadArtifacts is not a function`.
 - `pnpm test:unit tests/unit/clowder-agent.spec.js tests/unit/no-business-mock.spec.js` - 50 tests passed in the affected unit runner set.
-- `pnpm test:unit` - 50 tests passed.
+- `pnpm test:unit` - 51 tests passed.
 - `pnpm build:h5` - `DONE Build complete.`
+- Live H5 proof: `.ai/tests-e2e/v1-3-workspace-final-20260606T215418Z/`
+  - `03-kanban-visible.png` shows the real thread task card in the project workspace.
+  - `04-artifacts-visible.png` shows the declared `acceptance-report-v1.md` artifact as available.
+  - `05-refresh-entry-visible.png` and `06-refresh-kanban-visible.png` prove refresh recovery via `projectGroupNo`.
 
 ## Remaining Verification
 
-Code and build coverage now prove the real project workspace panels are wired. A fresh browser/live screenshot pass should still capture the actual Kanban/artifacts sidebar in the running H5 app before final V1 completion is claimed.
+No workspace-specific verification remains. Android APP-PLUS device validation is still outside this issue and remains a broader V1 residual risk.

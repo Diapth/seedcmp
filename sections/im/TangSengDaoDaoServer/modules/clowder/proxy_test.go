@@ -504,6 +504,54 @@ func TestFindActiveProjectGroupBindingReturnsLatestForDirect(t *testing.T) {
 	assert.Equal(t, "binding-old", named.ID)
 }
 
+func TestFindActiveProjectGroupBindingByGroupNo(t *testing.T) {
+	c := New(nil)
+	c.projectGroupBindings = map[string]ProjectGroupBinding{
+		"target": {
+			ID:                  "binding-target",
+			UserID:              "user-1",
+			ProjectName:         "验收项目",
+			PMDirectChannelID:   "clowder_cat:coordinator",
+			PMDirectChannelType: 1,
+			ProjectGroupNo:      "group-target",
+			ProjectThreadID:     "thread-target",
+			UpdatedAt:           200,
+			Status:              "active",
+		},
+		"other-user": {
+			ID:                  "binding-other-user",
+			UserID:              "user-2",
+			ProjectName:         "验收项目",
+			PMDirectChannelID:   "clowder_cat:coordinator",
+			PMDirectChannelType: 1,
+			ProjectGroupNo:      "group-target",
+			ProjectThreadID:     "thread-wrong-user",
+			UpdatedAt:           300,
+			Status:              "active",
+		},
+		"archived": {
+			ID:                  "binding-archived",
+			UserID:              "user-1",
+			ProjectName:         "归档项目",
+			PMDirectChannelID:   "clowder_cat:coordinator",
+			PMDirectChannelType: 1,
+			ProjectGroupNo:      "group-archived",
+			ProjectThreadID:     "thread-archived",
+			UpdatedAt:           400,
+			Status:              "archived",
+		},
+	}
+
+	binding, ok := c.findActiveProjectGroupBindingByGroupNo("user-1", "group-target")
+
+	require.True(t, ok)
+	assert.Equal(t, "binding-target", binding.ID)
+	assert.Equal(t, "thread-target", binding.ProjectThreadID)
+
+	_, ok = c.findActiveProjectGroupBindingByGroupNo("user-1", "group-archived")
+	assert.False(t, ok)
+}
+
 func TestUpdateProjectGroupBindingThreadPersistsThreadID(t *testing.T) {
 	c := New(nil)
 	key := projectGroupBindingKey("user-1", "clowder_cat:coordinator", 1, "婚礼")

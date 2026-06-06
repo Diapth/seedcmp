@@ -12,7 +12,7 @@
 
 AgentHub UI V1 的 V1-1/V1-2 主链路已完成真实后端接入、IM 会话/消息/群列表同步、业务 mock 与伪造成功路径清理，并通过单元测试、H5 构建和 agenthub_ui -> im_web 真实双端实时验收。
 
-V1-3 的 Clowder/Agent/File/Settings API 化与 unavailable 兜底已有代码与单测覆盖；本轮新增真实 live 证据覆盖 OAuth cat 创建、PM 项目群创建、真实 active deployment request 同步、AgentHub/IM Web 双端 deployment card hydration、AgentHub 确认部署动作和移动端项目群可见性。随后补齐 Kanban/artifacts 工作台代码门禁：项目群右侧栏不再走 `agentStore.boards`，而是从真实 Clowder binding 解析 thread id 并挂载 `ProjectKanbanPanel` / `ProjectArtifactsPanel`。Kanban/artifacts 仍需追加 fresh browser live screenshot 作为最终完成证明。
+V1-3 的 Clowder/Agent/File/Settings API 化与 unavailable 兜底已有代码与单测覆盖；本轮新增真实 live 证据覆盖 OAuth cat 创建、PM 项目群创建、真实 active deployment request 同步、AgentHub/IM Web 双端 deployment card hydration、AgentHub 确认部署动作和移动端项目群可见性。随后补齐 Kanban/artifacts 工作台代码门禁与浏览器证据：项目群右侧栏不再走 `agentStore.boards`，而是从真实 Clowder binding 解析 thread id 并挂载 `ProjectKanbanPanel` / `ProjectArtifactsPanel`；刷新后的项目群也能通过 `projectGroupNo` 重新取回 active binding 并恢复工作台入口。
 
 本轮验收重点确认：
 
@@ -27,6 +27,7 @@ V1-3 的 Clowder/Agent/File/Settings API 化与 unavailable 兜底已有代码�
 9. 真实 deployment request 由 active-request API hydrate 成双端 deployment card。
 10. AgentHub 点击确认后，`clowder/conversation/deployment-action` 返回 200 且 deployment request 进入 `queued`。
 11. 项目群右侧栏从真实 Clowder thread id 加载 Kanban 与 artifacts，不再依赖本地 `agentStore.boards`。
+12. 刷新项目群聊天页后，AgentHub 能通过 `projectGroupNo` fallback 恢复项目工作台入口、Kanban 和 artifacts。
 
 ## 2. 真实账号与运行环境
 
@@ -78,7 +79,7 @@ node scripts/run-vitest.mjs
 结果：
 
 - Test Files：7 passed
-- Tests：50 passed
+- Tests：51 passed
 
 ```bash
 node scripts/run-uni.mjs build -p h5
@@ -198,6 +199,23 @@ GOFLAGS=-buildvcs=false go test ./...
   - `.ai/tests-e2e/v1-3-20260606T210434/05-imweb-project-group-deployment-card.png`
   - `.ai/tests-e2e/v1-3-20260606T210434/06-agenthub-mobile-project-group.png`
 
+### V1-3 Project Workspace Live
+
+- agenthub_ui：`http://localhost:5173`
+- 项目群：`V13工作台终验T215418`
+- Project group no：`347dfdbc00004d22868a87e5b4f0b02c`
+- Thread：`v1-3-workspace-final-20260606T215418Z`
+- 结果：真实项目群右侧栏显示 `Clowder 项目工作台`；点击后显示真实 thread Kanban；切到 artifacts 后显示真实 declared artifact；刷新页面后通过 `projectGroupNo` fallback 恢复入口并再次显示 Kanban。
+- 证据：
+  - `.ai/tests-e2e/v1-3-workspace-final-20260606T215418Z/events.json`
+  - `.ai/tests-e2e/v1-3-workspace-final-20260606T215418Z/api-evidence.json`
+  - `.ai/tests-e2e/v1-3-workspace-final-20260606T215418Z/02-workspace-entry-visible.png`
+  - `.ai/tests-e2e/v1-3-workspace-final-20260606T215418Z/03-kanban-visible.png`
+  - `.ai/tests-e2e/v1-3-workspace-final-20260606T215418Z/04-artifacts-visible.png`
+  - `.ai/tests-e2e/v1-3-workspace-final-20260606T215418Z/05-refresh-entry-visible.png`
+  - `.ai/tests-e2e/v1-3-workspace-final-20260606T215418Z/06-refresh-kanban-visible.png`
+- Browser diagnostics：project workspace 相关 `project-groups/active?projectGroupNo=...`、`thread/.../tasks`、`thread/.../artifacts` 均为 200；同轮仍可见既有非阻断 `coversation/clearUnread` 400 与无 active deployment 时的 `deployment-request/active` 404。
+
 ## 6. 问题单状态
 
 - `001-real-backend-integration-gap.md`：Resolved
@@ -207,7 +225,7 @@ GOFLAGS=-buildvcs=false go test ./...
 - `005-wksdk-send-payload-and-clowder-draft-sync.md`：Resolved
 - `006-v1-2-business-mock-cleanup-and-im-actions.md`：Resolved for V1-2/unit/E2E scope
 - `007-v1-3-deployment-skill-catalog-rendering.md`：Resolved with live OAuth cat / project group / deployment evidence
-- `008-v1-3-project-workspace-kanban-artifacts-wiring.md`：Resolved with unit/build evidence; fresh browser screenshot still pending
+- `008-v1-3-project-workspace-kanban-artifacts-wiring.md`：Resolved with unit/build and live browser evidence
 
 ## 7. 残余风险
 
@@ -215,5 +233,4 @@ GOFLAGS=-buildvcs=false go test ./...
 2. 二维码登录、skill 上传等能力依赖后端能力，接不上时已显式 unavailable，没有伪造成功。
 3. Sass `@import` 与 uni alpha 告警不影响本轮构建，但后续升级 uni/Sass 时建议清理。
 4. Go VCS stamping 在本地 worktree 启动后端时需要 `GOFLAGS=-buildvcs=false`，已记录 issue。
-5. Kanban/artifacts 代码接线已补齐并通过单测/构建；仍需独立 live screenshot proof 覆盖真实项目群工作台。
-6. 新项目群点击时 `coversation/clearUnread` 可能返回 `stale metadata` 400；AgentHub 与 im_web 均保留本地清零且不阻断 UI，后续若要满足“全零 HTTP 4xx”验收口径，需要单独治理该后端/IM 元数据时序。
+5. 新项目群点击时 `coversation/clearUnread` 可能返回 `stale metadata` 400；AgentHub 与 im_web 均保留本地清零且不阻断 UI，后续若要满足“全零 HTTP 4xx”验收口径，需要单独治理该后端/IM 元数据时序。
