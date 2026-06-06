@@ -2,6 +2,7 @@ import { afterEach, describe, expect, it } from 'vitest'
 import { cleanup, fireEvent, render, screen } from '@testing-library/vue'
 import CardCell from '../../../packages/base-vue/src/components/messages/CardCell.vue'
 import { detectDeploymentIntent } from '../src/utils/deploymentIntent'
+import { buildDeploymentCardMessage } from '../src/utils/deploymentRequestCard'
 
 describe('deployment confirmation card', () => {
   afterEach(() => {
@@ -160,6 +161,36 @@ describe('deployment confirmation card', () => {
       'download',
       'retry'
     ])
+  })
+
+  it('keeps deployment card timestamps stable across refresh rebuilds', () => {
+    const deploymentRequest = {
+      id: 'deploy-1',
+      userId: 'user-1',
+      connectorId: 'im-web',
+      channelId: 'channel-1',
+      channelType: 1,
+      originalText: '部署 index.html',
+      target: 'index.html',
+      environment: 'preview',
+      missingFields: [],
+      status: 'running',
+      targetCandidates: [],
+      environmentCandidates: [],
+      createdAt: 1710000000123,
+      updatedAt: 1710000000456
+    } as any
+
+    expect(buildDeploymentCardMessage(deploymentRequest, {
+      channelType: 1,
+      sourceText: '部署 index.html'
+    }).timestamp).toBe(1710000000)
+
+    expect(buildDeploymentCardMessage(deploymentRequest, {
+      channelType: 1,
+      sourceText: '部署 index.html',
+      timestamp: 1709999900
+    }).timestamp).toBe(1709999900)
   })
 
   it('keeps underspecified deployment cards from accidental confirmation', async () => {

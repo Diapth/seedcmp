@@ -67,9 +67,14 @@ test.describe('V3-40 PM project group acceptance', () => {
     const taskText = `帮我做一个项目，项目名叫 ${projectName}，请 PM 创建项目群并拉猫猫执行，项目群里给出一句 V3-40 验收说明。`;
     await sendChatMessage(page, taskText);
 
+    const confirmProjectGroupButton = page.getByRole('button', { name: '确认创建项目群' }).first();
+    await expect(confirmProjectGroupButton).toBeVisible({ timeout: 15000 });
+    await screenshot('04-pm-direct-confirmation-card');
+    await confirmProjectGroupButton.click();
+
     const handoffButton = page.getByRole('button', { name: new RegExp(`打开项目群「${projectName}`) }).first();
     await expect(handoffButton).toBeVisible({ timeout: 45000 });
-    await screenshot('04-pm-direct-handoff');
+    await screenshot('05-pm-direct-handoff');
 
     const activeBinding = await page.evaluate(async ({ channelId, channelType }) => {
       const token = window.localStorage.getItem('token') || '';
@@ -96,20 +101,20 @@ test.describe('V3-40 PM project group acceptance', () => {
     const groupNo = decodeURIComponent(groupMatch?.[1] || '');
     expect(groupNo).toBeTruthy();
     await expect(page.locator('.message-list')).toBeVisible({ timeout: 15000 });
-    await screenshot('05-project-group-opened');
+    await screenshot('06-project-group-opened');
 
     const clowderReplyCountBefore = await page.locator('.message-list .clowder-meta').count();
     await expect
       .poll(async () => page.locator('.message-list .clowder-meta').count(), { timeout: 180000 })
       .toBeGreaterThan(clowderReplyCountBefore);
-    await screenshot('06-project-group-agent-reply');
+    await screenshot('07-project-group-agent-reply');
 
     await page.goto(`/chat/group-members/${encodeURIComponent(groupNo)}`);
     await expect(page.locator('.members-page')).toBeVisible({ timeout: 15000 });
     await expect(page.locator('body')).toContainText(/PM|协调者|clowder_cat:coordinator/, { timeout: 15000 });
     await expect(page.locator('.clowder-cat-member').first()).toBeVisible({ timeout: 15000 });
     await expect(page.locator('body')).toContainText(new RegExp(activeCatMemberIds.map(id => String(id).replace(/[.*+?^${}()|[\]\\]/g, '\\$&')).join('|')), { timeout: 15000 });
-    await screenshot('07-project-group-members');
+    await screenshot('08-project-group-members');
 
     await page.goto(`/chat/conversation/${encodeURIComponent(pmChannelId)}/1`);
     await expect(page.locator('.message-input-container')).toBeVisible({ timeout: 15000 });
@@ -119,7 +124,7 @@ test.describe('V3-40 PM project group acceptance', () => {
     const panel = page.locator('.clowder-panel').first();
     await expect(panel).toBeVisible({ timeout: 15000 });
     await expect(panel).toContainText(/Project Group|Project Thread|V340项目群/, { timeout: 15000 });
-    await screenshot('08-pm-direct-panel-project-context');
+    await screenshot('09-pm-direct-panel-project-context');
 
     const finalBinding = await page.evaluate(async ({ channelId, channelType }) => {
       const token = window.localStorage.getItem('token') || '';

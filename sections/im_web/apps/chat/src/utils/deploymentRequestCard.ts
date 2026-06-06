@@ -9,6 +9,7 @@ export interface DeploymentCardMessageContext {
   channelType: number;
   currentUserId?: string;
   robotId?: string;
+  timestamp?: number;
   sourceText: string;
   sourceMessageId?: string;
   targetCatIds?: string[];
@@ -54,6 +55,12 @@ function deploymentDisabledReason(request: ClowderDeploymentRequest, error?: str
   if (request.status === 'cancelled') return '已取消部署';
   if (request.status === 'succeeded') return '部署已完成';
   return '';
+}
+
+function normalizeDeploymentCardTimestamp(value?: number) {
+  const timestamp = Number(value || 0);
+  if (!Number.isFinite(timestamp) || timestamp <= 0) return 0;
+  return Math.floor(timestamp > 10_000_000_000 ? timestamp / 1000 : timestamp);
 }
 
 export function getDeploymentCardClientMsgNo(deploymentRequestId: string) {
@@ -119,13 +126,14 @@ export function buildDeploymentCardMessage(
     ? (context.currentUserId || context.robotId || 'clowder_ai')
     : (context.robotId || 'clowder_ai');
   const disabledReason = deploymentDisabledReason(deploymentRequest, context.error);
+  const timestamp = normalizeDeploymentCardTimestamp(context.timestamp || deploymentRequest.createdAt) || Math.floor(Date.now() / 1000);
 
   return {
     messageID: clientMsgNo,
     messageSeq: 0,
     clientMsgNo,
     fromUID,
-    timestamp: Math.floor(Date.now() / 1000),
+    timestamp,
     content: {
       type: 7,
       cardType: 'deployment',

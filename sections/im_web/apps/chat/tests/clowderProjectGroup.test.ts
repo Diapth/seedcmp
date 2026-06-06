@@ -21,14 +21,21 @@ describe('Clowder PM project group helpers', () => {
     expect(resolveProjectGroupName('@PM 请协调一下 todo 页面')).toBe('请协调一下 todo 页面')
   })
 
-  it('persists the routed project thread after PM direct kickoff is sent to the group', async () => {
+  it('creates a pending confirmation card instead of auto-creating PM direct project groups', async () => {
     const input = await import('../src/components/MessageInput.vue?raw')
+    const list = await import('../src/components/MessageList.vue?raw')
     const store = await import('../../../packages/datasource-vue/src/stores/clowderStore.ts?raw')
     const api = await import('../../../packages/datasource-vue/src/api/clowder.ts?raw')
 
-    expect(input.default).toContain('persistProjectGroupThreadFromRoute')
-    expect(input.default).toContain('updateProjectGroupBindingThread(bindingId, routedThreadId)')
-    expect(input.default).toContain('bindingId: response.binding.id')
+    expect(input.default).toContain('addProjectGroupConfirmationCard')
+    expect(input.default).toContain('project_group_confirmation: true')
+    expect(input.default).toContain('pending_confirmation')
+    expect(input.default).toContain('已生成项目群确认卡')
+    expect(input.default).not.toContain('projectGroupRoute = await ensureProjectGroupForPMDirect')
+    expect(list.default).toContain('confirmProjectGroupCreation')
+    expect(list.default).toContain('确认创建项目群')
+    expect(list.default).toContain('ensureProjectGroupFromConfirmation')
+    expect(list.default).toContain('updateProjectGroupBindingThread(trimmedBindingId, routedThreadId)')
     expect(store.default).toContain('updateProjectGroupBindingThread')
     expect(api.default).toContain('project-groups/${encodeURIComponent(bindingId)}/thread')
   })

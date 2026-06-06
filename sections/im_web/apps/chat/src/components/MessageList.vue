@@ -5,6 +5,7 @@ import {
   getClowderCatIdFromContactId,
   useChannelStore,
   useClowderStore,
+  useGroupStore,
   useMessageStore,
   useUserStore
 } from '@tsdaodao/datasource-vue';
@@ -14,6 +15,7 @@ import {
   isClowderPayload
 } from '@tsdaodao/base-vue/utils/clowderMessageIdentity';
 import { buildDeploymentCardMessage } from '../utils/deploymentRequestCard';
+import { resolveProjectGroupName } from '../utils/clowderProjectGroup';
 import CoordinatorSummaryCard from './CoordinatorSummaryCard.vue';
 import {
   TextCell,
@@ -49,6 +51,7 @@ const messageStore = useMessageStore();
 const userStore = useUserStore();
 const channelStore = useChannelStore();
 const clowderStore = useClowderStore();
+const groupStore = useGroupStore();
 const { remoteConfig } = useRemoteConfig();
 const appRouter = getCurrentInstance()?.appContext.config.globalProperties.$router as { push?: (path: string) => Promise<unknown> } | undefined;
 
@@ -77,6 +80,9 @@ const deploymentResultSummaryKeys = new Set<string>();
 const deploymentPollableStatuses = new Set(['confirmed', 'queued', 'running', 'submitting']);
 const deploymentTerminalStatuses = new Set(['succeeded', 'failed', 'cancelled', 'canceled']);
 const deploymentPollIntervalMs = 2500;
+const projectGroupActionKeys = new Set<string>();
+const CLOWDER_COORDINATOR_CAT_ID = 'coordinator';
+const CLOWDER_COORDINATOR_MEMBER_ID = buildClowderCatContactId(CLOWDER_COORDINATOR_CAT_ID);
 let deploymentPollTimer: ReturnType<typeof setInterval> | null = null;
 let deploymentPollInFlight = false;
 const coordinatorActionKey = ref('');
@@ -109,6 +115,25 @@ interface ProjectGroupHandoffView {
   groupName: string;
   bindingId?: string;
   reused: boolean;
+}
+
+interface ProjectGroupConfirmationView {
+  projectName: string;
+  status: 'pending_confirmation' | 'creating' | 'created' | 'failed' | 'cancelled' | string;
+  sourceText: string;
+  sourceMessageId?: string;
+  targetCatIds: string[];
+  workerCatIds: string[];
+  workspaceId?: string;
+  pmDirectChannelId: string;
+  pmDirectChannelType: number;
+  pmDirectThreadId?: string;
+  groupNo?: string;
+  groupName?: string;
+  bindingId?: string;
+  projectThreadId?: string;
+  reused?: boolean;
+  error?: string;
 }
 
 const emptyCoordinatorSummary: CoordinatorSummaryView = { status: 'succeeded' };
@@ -498,6 +523,297 @@ async function openProjectGroupFromHandoff(msg: any) {
   } catch (err) {
     console.warn('[MessageList] open project group failed', err);
   }
+}
+
+function asStringList(value: unknown): string[] {
+  const raw = Array.isArray(value)
+    ? value
+    : typeof value === 'string'
+      ? value.split(/[,，\s]+/)
+      : [];
+  return Array.from(new Set(raw.map(item => String(item || '').trim()).filter(Boolean)));
+}
+
+function getProjectGroupConfirmation(msg: any): ProjectGroupConfirmationView | null {
+  const content = msg?.content || msg?.payload || {};
+  const metadata = content.metadata || {};
+  const isConfirmation = metadata.project_group_confirmation === true ||
+    metadata.projectGroupConfirmation === true ||
+    content.project_group_confirmation === true ||
+    content.projectGroupConfirmation === true;
+  if (!isConfirmation) return null;
+
+  const sourceText = String(
+    metadata.source_text ||
+    metadata.sourceText ||
+    content.source_text ||
+    content.sourceText ||
+    content.text ||
+    ''
+  ).trim();
+  const projectName = String(
+    metadata.project_name ||
+    metadata.projectName ||
+    content.project_name ||
+    content.projectName ||
+    resolveProjectGroupName(sourceText)
+  ).trim();
+  const pmDirectChannelId = String(metadata.pmDirectChannelId || content.pmDirectChannelId || props.channelId || '').trim();
+  const pmDirectChannelType = Number(metadata.pmDirectChannelType || content.pmDirectChannelType || props.channelType || 1);
+  return {
+    projectName: projectName || '项目群聊',
+    status: String(metadata.project_group_status || metadata.projectGroupStatus || content.project_group_status || content.projectGroupStatus || 'pending_confirmation'),
+    sourceText,
+    sourceMessageId: String(metadata.source_message_id || metadata.sourceMessageId || content.sourceMessageId || '').trim() || undefined,
+    targetCatIds: asStringList(metadata.targetCatIds || content.targetCatIds),
+    workerCatIds: asStringList(metadata.workerCatIds || content.workerCatIds),
+    workspaceId: String(metadata.workspaceId || content.workspaceId || '').trim() || undefined,
+    pmDirectChannelId,
+    pmDirectChannelType,
+    pmDirectThreadId: String(metadata.pmDirectThreadId || content.pmDirectThreadId || '').trim() || undefined,
+    groupNo: String(metadata.project_group_no || metadata.projectGroupNo || content.projectGroupNo || '').trim() || undefined,
+    groupName: String(metadata.project_group_name || metadata.projectGroupName || content.projectGroupName || '').trim() || undefined,
+    bindingId: String(metadata.project_binding_id || metadata.projectBindingId || content.projectBindingId || '').trim() || undefined,
+    projectThreadId: String(metadata.projectThreadId || content.projectThreadId || '').trim() || undefined,
+    reused: metadata.reused === true || metadata.reused === 'true' || content.reused === true,
+    error: String(metadata.error || content.error || '').trim() || undefined,
+  };
+}
+
+function projectGroupConfirmationStatusText(confirmation?: ProjectGroupConfirmationView | null) {
+  if (!confirmation) return '';
+  if (confirmation.status === 'creating') return '正在创建或复用项目群，并准备投递任务。';
+  if (confirmation.status === 'created') return confirmation.reused ? '已复用项目群，任务已投递。' : '已创建项目群，任务已投递。';
+  if (confirmation.status === 'failed') return confirmation.error || '项目群创建失败，可以重试。';
+  if (confirmation.status === 'cancelled') return '已取消创建项目群。';
+  return '确认后，PM 会创建或复用项目群，并把这条任务投递到项目群继续执行。';
+}
+
+function projectGroupConfirmationText(confirmation: ProjectGroupConfirmationView) {
+  const actionText = confirmation.status === 'created'
+    ? (confirmation.reused ? '已复用项目群' : '已创建项目群')
+    : 'PM 建议创建项目群';
+  return [
+    `${actionText}「${confirmation.groupName || confirmation.projectName}」。`,
+    '',
+    projectGroupConfirmationStatusText(confirmation)
+  ].join('\n');
+}
+
+function canConfirmProjectGroup(confirmation?: ProjectGroupConfirmationView | null) {
+  if (!confirmation) return false;
+  return ['pending_confirmation', 'failed', 'cancelled'].includes(confirmation.status);
+}
+
+function updateProjectGroupConfirmationMessage(
+  msg: any,
+  next: Partial<ProjectGroupConfirmationView> & { status: ProjectGroupConfirmationView['status'] }
+) {
+  const current = getProjectGroupConfirmation(msg);
+  if (!current) return;
+  const content = msg?.content || {};
+  const metadata = content.metadata || {};
+  const confirmation = { ...current, ...next };
+  const text = projectGroupConfirmationText(confirmation);
+  messageStore.updateMessageStatus(msg.clientMsgNo, {
+    content: {
+      ...content,
+      type: 1,
+      text,
+      content: text,
+      format: 'markdown',
+      markdown: true,
+      connectorId: content.connectorId || content.connector_id || 'im-web',
+      catId: content.catId || content.cat_id || CLOWDER_COORDINATOR_CAT_ID,
+      catDisplayName: content.catDisplayName || content.cat_display_name || 'PM / 协调者',
+      metadata: {
+        ...metadata,
+        project_group_confirmation: true,
+        projectGroupConfirmation: true,
+        project_group_status: confirmation.status,
+        projectGroupStatus: confirmation.status,
+        project_name: confirmation.projectName,
+        projectName: confirmation.projectName,
+        source_text: confirmation.sourceText,
+        sourceText: confirmation.sourceText,
+        source_message_id: confirmation.sourceMessageId,
+        sourceMessageId: confirmation.sourceMessageId,
+        targetCatIds: confirmation.targetCatIds,
+        workerCatIds: confirmation.workerCatIds,
+        workspaceId: confirmation.workspaceId,
+        pmDirectChannelId: confirmation.pmDirectChannelId,
+        pmDirectChannelType: confirmation.pmDirectChannelType,
+        pmDirectThreadId: confirmation.pmDirectThreadId,
+        project_group_no: confirmation.groupNo,
+        projectGroupNo: confirmation.groupNo,
+        project_group_name: confirmation.groupName,
+        projectGroupName: confirmation.groupName,
+        project_binding_id: confirmation.bindingId,
+        projectBindingId: confirmation.bindingId,
+        projectThreadId: confirmation.projectThreadId,
+        project_handoff: confirmation.status === 'created' && Boolean(confirmation.groupNo),
+        projectHandoff: confirmation.status === 'created' && Boolean(confirmation.groupNo),
+        reused: confirmation.reused === true,
+        error: confirmation.error
+      }
+    },
+    status: confirmation.status === 'creating' ? 'sending' : 'success'
+  });
+}
+
+function uniqueProjectWorkerCats() {
+  const seen = new Set<string>();
+  const candidates = [
+    ...(clowderStore.connectedCatContacts || []),
+    ...(clowderStore.catContactDirectory || [])
+  ];
+  return candidates.filter(cat => {
+    if (!cat?.catId || cat.catId === CLOWDER_COORDINATOR_CAT_ID || seen.has(cat.catId)) return false;
+    seen.add(cat.catId);
+    return cat.connected !== false && cat.available !== false;
+  });
+}
+
+function buildProjectGroupPromptContext(confirmation: ProjectGroupConfirmationView, targetCatIds: string[]) {
+  const recentMessages = messageStore.getChannelMessages(props.channelId, props.channelType)
+    .filter(message => getMessageBodyText(message))
+    .slice(-12)
+    .map(message => `- ${getMessageSenderName(message)}: ${getMessageBodyText(message)}`);
+  return [
+    `Conversation: ${confirmation.pmDirectChannelId} (type: ${confirmation.pmDirectChannelType})`,
+    `Project group confirmation: ${confirmation.projectName}`,
+    `Mention target cat ids: ${targetCatIds.length ? targetCatIds.join(', ') : 'none'}`,
+    'Trigger reason: project_group_confirmation',
+    `Current message: ${confirmation.sourceText}`,
+    'Recent messages:',
+    ...(recentMessages.length ? recentMessages : ['- No recent messages available.'])
+  ].join('\n');
+}
+
+async function persistProjectGroupThreadFromRoute(bindingId?: string, currentThreadId?: string, routeResponse?: unknown) {
+  const trimmedBindingId = String(bindingId || '').trim();
+  const existingThreadId = String(currentThreadId || '').trim();
+  const routedThreadId = String((routeResponse as { threadId?: unknown })?.threadId || '').trim();
+  if (!trimmedBindingId || !routedThreadId || routedThreadId === existingThreadId) return existingThreadId || routedThreadId;
+  try {
+    const binding = await clowderStore.updateProjectGroupBindingThread(trimmedBindingId, routedThreadId);
+    return binding?.projectThreadId || routedThreadId;
+  } catch (err) {
+    console.warn('[MessageList] project group thread binding update failed', err);
+    return existingThreadId || routedThreadId;
+  }
+}
+
+async function ensureProjectGroupFromConfirmation(confirmation: ProjectGroupConfirmationView) {
+  if (clowderStore.connectedCatContacts.length === 0 && clowderStore.catContactDirectory.length === 0) {
+    await clowderStore.loadCatContactDirectory({ includeUnavailable: true }).catch(() => undefined);
+  }
+  const workerCats = uniqueProjectWorkerCats();
+  const directKey = `${confirmation.pmDirectChannelId}-${Number(confirmation.pmDirectChannelType)}`;
+  const directThreadId = confirmation.pmDirectThreadId ||
+    clowderStore.conversations[directKey]?.binding?.threadId ||
+    undefined;
+  const response = await clowderStore.ensureProjectGroup({
+    projectName: confirmation.projectName,
+    workspaceId: confirmation.workspaceId,
+    pmDirectChannelId: confirmation.pmDirectChannelId,
+    pmDirectChannelType: confirmation.pmDirectChannelType as 1,
+    pmDirectThreadId: directThreadId,
+    pmMemberId: CLOWDER_COORDINATOR_MEMBER_ID,
+    pmDisplayName: 'PM / 协调者',
+    userMemberIds: userStore.currentUser?.uid ? [userStore.currentUser.uid] : [],
+    catMemberIds: workerCats.map(cat => cat.catId),
+    createdBy: 'pm'
+  });
+  const groupNo = response.binding.projectGroupNo;
+  const groupName = response.binding.projectName;
+  if (response.group) {
+    groupStore.upsertGroup(response.group);
+  }
+  if (workerCats.length > 0) {
+    await clowderStore.syncMixedGroupCats({
+      groupId: groupNo,
+      groupName,
+      humanMembers: [
+        {
+          id: userStore.currentUser?.uid || 'current-user',
+          displayName: userStore.currentUser?.name || userStore.currentUser?.uid || '我',
+          role: 'owner',
+          mentionHandle: `@${userStore.currentUser?.name || userStore.currentUser?.uid || '我'}`
+        },
+        {
+          id: CLOWDER_COORDINATOR_MEMBER_ID,
+          displayName: 'PM / 协调者',
+          role: 'pm',
+          mentionHandle: '@PM'
+        }
+      ],
+      catMembers: workerCats,
+      rules: {
+        proactiveReplies: true,
+        privacy: 'PM direct chat is private; only project handoff, task summary, and explicit project context may be shared into this group.'
+      }
+    });
+  }
+  const targetCatIds = confirmation.targetCatIds.length ? confirmation.targetCatIds : [CLOWDER_COORDINATOR_CAT_ID];
+  const routeResponse = await clowderStore.sendConversationMessage({
+    channelId: groupNo,
+    channelType: 2,
+    targetCatIds,
+    promptContext: buildProjectGroupPromptContext(confirmation, targetCatIds)
+  }, confirmation.sourceText);
+  const projectThreadId = await persistProjectGroupThreadFromRoute(
+    response.binding.id,
+    response.binding.projectThreadId,
+    routeResponse
+  );
+  void messageStore.syncMessages(groupNo, 2, { hydrateVisibleHistory: true });
+  return {
+    groupNo,
+    groupName,
+    bindingId: response.binding.id,
+    projectThreadId,
+    reused: response.reused === true,
+    targetCatIds,
+    workerCatIds: workerCats.map(cat => cat.catId)
+  };
+}
+
+async function confirmProjectGroupCreation(msg: any) {
+  const confirmation = getProjectGroupConfirmation(msg);
+  if (!confirmation || !canConfirmProjectGroup(confirmation)) return;
+  const key = String(msg.clientMsgNo || msg.messageID || confirmation.sourceMessageId || '');
+  if (key && projectGroupActionKeys.has(key)) return;
+  if (key) projectGroupActionKeys.add(key);
+  updateProjectGroupConfirmationMessage(msg, { ...confirmation, status: 'creating', error: undefined });
+  try {
+    const result = await ensureProjectGroupFromConfirmation(confirmation);
+    updateProjectGroupConfirmationMessage(msg, {
+      ...confirmation,
+      status: 'created',
+      groupNo: result.groupNo,
+      groupName: result.groupName,
+      bindingId: result.bindingId,
+      projectThreadId: result.projectThreadId,
+      reused: result.reused,
+      targetCatIds: result.targetCatIds,
+      workerCatIds: result.workerCatIds,
+      error: undefined
+    });
+    Message.success(result.reused ? `已复用项目群「${result.groupName}」` : `已创建项目群「${result.groupName}」`);
+  } catch (err) {
+    const error = err instanceof Error ? err.message : '项目群创建失败';
+    updateProjectGroupConfirmationMessage(msg, { ...confirmation, status: 'failed', error });
+    Message.error('项目群创建失败，请重试');
+  } finally {
+    if (key) projectGroupActionKeys.delete(key);
+  }
+}
+
+function cancelProjectGroupCreation(msg: any) {
+  const confirmation = getProjectGroupConfirmation(msg);
+  if (!confirmation || !canConfirmProjectGroup(confirmation)) return;
+  updateProjectGroupConfirmationMessage(msg, { ...confirmation, status: 'cancelled', error: undefined });
 }
 
 function getCoordinationIdFromMessage(msg: any): string {
@@ -1130,6 +1446,7 @@ function upsertDeploymentCardFromRequest(
     channelType: props.channelType,
     currentUserId: userStore.currentUser?.uid,
     robotId: 'clowder_ai',
+    timestamp: deploymentRequest.createdAt || Number(sourceMessage?.timestamp || 0),
     sourceText: String(requestContext.text || sourceContent.originalText || deploymentRequest.originalText || ''),
     sourceMessageId: String(requestContext.sourceMessageId || deploymentRequest.sourceMessageId || sourceMessage?.clientMsgNo || ''),
     targetCatIds: Array.isArray(requestContext.targetCatIds) ? requestContext.targetCatIds : [],
@@ -1367,6 +1684,43 @@ onBeforeUnmount(() => {
             :is-me="isMe(item.msg)"
             @preview-code="handleCodePreview"
           />
+          <div v-if="getProjectGroupConfirmation(item.msg)" class="project-confirm-card">
+            <div class="project-confirm-card__header">
+              <span>Project Group</span>
+              <strong>{{ getProjectGroupConfirmation(item.msg)?.projectName }}</strong>
+            </div>
+            <p>{{ projectGroupConfirmationStatusText(getProjectGroupConfirmation(item.msg)) }}</p>
+            <div class="project-confirm-card__meta">
+              <span>PM 直聊</span>
+              <span>{{ getProjectGroupConfirmation(item.msg)?.workerCatIds.length || 0 }} 个猫猫候选</span>
+            </div>
+            <div class="project-confirm-card__actions">
+              <button
+                v-if="canConfirmProjectGroup(getProjectGroupConfirmation(item.msg))"
+                type="button"
+                class="project-confirm-card__btn primary"
+                @click.stop="confirmProjectGroupCreation(item.msg)"
+              >
+                确认创建项目群
+              </button>
+              <button
+                v-if="getProjectGroupConfirmation(item.msg)?.status === 'pending_confirmation'"
+                type="button"
+                class="project-confirm-card__btn"
+                @click.stop="cancelProjectGroupCreation(item.msg)"
+              >
+                取消
+              </button>
+              <button
+                v-if="getProjectGroupConfirmation(item.msg)?.status === 'created'"
+                type="button"
+                class="project-confirm-card__btn primary"
+                @click.stop="openProjectGroupFromHandoff(item.msg)"
+              >
+                打开项目群
+              </button>
+            </div>
+          </div>
           <div v-if="getProjectGroupHandoff(item.msg)" class="project-handoff-row">
             <button
               type="button"
@@ -1502,6 +1856,86 @@ onBeforeUnmount(() => {
   min-height: 24px;
   overflow-anchor: none;
   flex-shrink: 0;
+}
+
+.project-confirm-card {
+  width: min(360px, 100%);
+  margin-top: 8px;
+  padding: 12px;
+  border: var(--border-hairline);
+  border-radius: var(--radius-sm);
+  background: var(--bg-secondary);
+  color: var(--text-primary);
+  box-sizing: border-box;
+}
+
+.project-confirm-card__header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  margin-bottom: 8px;
+}
+
+.project-confirm-card__header span {
+  color: var(--text-secondary);
+  font-size: 11px;
+  font-weight: 700;
+  text-transform: uppercase;
+}
+
+.project-confirm-card__header strong {
+  min-width: 0;
+  overflow: hidden;
+  color: var(--text-primary);
+  font-size: 13px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.project-confirm-card p {
+  margin: 0;
+  color: var(--text-secondary);
+  font-size: 12px;
+  line-height: 1.5;
+}
+
+.project-confirm-card__meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 10px;
+  color: var(--text-tertiary, var(--text-secondary));
+  font-size: 11px;
+}
+
+.project-confirm-card__actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 12px;
+}
+
+.project-confirm-card__btn {
+  min-height: 30px;
+  border: var(--border-hairline);
+  border-radius: var(--radius-sm);
+  background: var(--bg-primary);
+  color: var(--text-primary);
+  padding: 0 10px;
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.project-confirm-card__btn.primary {
+  border-color: var(--primary-color, #165dff);
+  background: var(--primary-color, #165dff);
+  color: #fff;
+}
+
+.project-confirm-card__btn:hover {
+  filter: brightness(0.98);
 }
 
 .project-handoff-row {

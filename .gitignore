@@ -13,6 +13,7 @@ __pycache__/
 .clowder/
 **/.clowder/
 manual-test-artifacts/
+maomi_workspace/ 
 # IM backend sources are tracked for V2/V3 integration.
 sections/im/*
 !sections/im/TangSengDaoDaoServer/

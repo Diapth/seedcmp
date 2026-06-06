@@ -10,8 +10,10 @@ function deploymentStatusLabel(status) {
         return '需要补充信息';
     if (status === 'submitting')
         return '提交中';
-    if (status === 'confirmed' || status === 'running')
-        return '已确认，等待执行';
+    if (status === 'confirmed' || status === 'queued')
+        return '已排队';
+    if (status === 'running')
+        return '部署中';
     if (status === 'succeeded')
         return '部署成功';
     if (status === 'failed')
@@ -32,10 +34,16 @@ function deploymentDisabledReason(request, error) {
         return '部署已完成';
     return '';
 }
+function normalizeDeploymentCardTimestamp(value) {
+    const timestamp = Number(value || 0);
+    if (!Number.isFinite(timestamp) || timestamp <= 0)
+        return 0;
+    return Math.floor(timestamp > 10_000_000_000 ? timestamp / 1000 : timestamp);
+}
 export function getDeploymentCardClientMsgNo(deploymentRequestId) {
     return `deployment-card-${deploymentRequestId}`;
 }
-export function buildDeploymentTargetCandidates(workspace, currentTarget) {
+export function buildDeploymentTargetCandidates(workspace, currentTarget, extraCandidates = []) {
     const candidates = [];
     const seen = new Set();
     const pushCandidate = (candidate) => {
@@ -73,6 +81,9 @@ export function buildDeploymentTargetCandidates(workspace, currentTarget) {
             source: 'text',
         });
     }
+    for (const candidate of extraCandidates) {
+        pushCandidate(candidate);
+    }
     return candidates;
 }
 export function buildDeploymentCardMessage(deploymentRequest, context) {
@@ -81,22 +92,30 @@ export function buildDeploymentCardMessage(deploymentRequest, context) {
         ? (context.currentUserId || context.robotId || 'clowder_ai')
         : (context.robotId || 'clowder_ai');
     const disabledReason = deploymentDisabledReason(deploymentRequest, context.error);
+    const timestamp = normalizeDeploymentCardTimestamp(context.timestamp || deploymentRequest.createdAt) || Math.floor(Date.now() / 1000);
     return {
         messageID: clientMsgNo,
         messageSeq: 0,
         clientMsgNo,
         fromUID,
-        timestamp: Math.floor(Date.now() / 1000),
+        timestamp,
         content: {
             type: 7,
             cardType: 'deployment',
             title: '确认部署',
+            statusLabel: deploymentStatusLabel(deploymentRequest.status),
             target: deploymentRequest.target || '待确认目标',
             environment: deploymentRequest.environment || '待确认环境',
             workspaceId: deploymentRequest.workspaceId,
             workspacePath: deploymentRequest.workspacePath,
             status: deploymentRequest.status,
             deploymentRequestId: deploymentRequest.id,
+            deploymentJobId: deploymentRequest.deploymentJobId,
+            previewUrl: deploymentRequest.previewUrl,
+            downloadUrl: deploymentRequest.downloadUrl,
+            logsSummary: deploymentRequest.logsSummary,
+            failureReason: deploymentRequest.failureReason,
+            containerPlan: deploymentRequest.containerPlan,
             missingFields: deploymentRequest.missingFields,
             disabledReason,
             connectorId: 'im-web',
