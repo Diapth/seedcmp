@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, onMounted, onBeforeUnmount, watch, nextTick, computed } from 'vue';
+import { computed, getCurrentInstance, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue';
 import {
   buildClowderCatContactId,
   getClowderCatIdFromContactId,
@@ -50,6 +50,7 @@ const userStore = useUserStore();
 const channelStore = useChannelStore();
 const clowderStore = useClowderStore();
 const { remoteConfig } = useRemoteConfig();
+const appRouter = getCurrentInstance()?.appContext.config.globalProperties.$router as { push?: (path: string) => Promise<unknown> } | undefined;
 
 const scrollContainer = ref<HTMLDivElement | null>(null);
 const scrollTop = ref(0);
@@ -101,6 +102,13 @@ interface CoordinatorSummaryView {
   conflict?: boolean;
   targetCatIds?: readonly string[];
   subtasks?: readonly CoordinatorSummarySubtaskView[];
+}
+
+interface ProjectGroupHandoffView {
+  groupNo: string;
+  groupName: string;
+  bindingId?: string;
+  reused: boolean;
 }
 
 const emptyCoordinatorSummary: CoordinatorSummaryView = { status: 'succeeded' };
@@ -447,6 +455,49 @@ function getCoordinationContext(msg: any): any {
   const content = msg?.content || msg?.payload || {};
   const metadata = content.metadata || {};
   return content.coordination || metadata.coordination || content.extra?.coordination || msg?.extra?.coordination;
+}
+
+function getProjectGroupHandoff(msg: any): ProjectGroupHandoffView | null {
+  const content = msg?.content || msg?.payload || {};
+  const metadata = content.metadata || {};
+  const groupNo = String(
+    metadata.project_group_no ||
+    metadata.projectGroupNo ||
+    content.project_group_no ||
+    content.projectGroupNo ||
+    ''
+  ).trim();
+  const isHandoff = metadata.project_handoff === true || metadata.projectHandoff === true || Boolean(groupNo);
+  if (!isHandoff || !groupNo) return null;
+  const groupName = String(
+    metadata.project_group_name ||
+    metadata.projectGroupName ||
+    content.project_group_name ||
+    content.projectGroupName ||
+    groupNo
+  ).trim();
+  return {
+    groupNo,
+    groupName,
+    bindingId: String(metadata.project_binding_id || metadata.projectBindingId || '').trim() || undefined,
+    reused: metadata.reused === true || metadata.reused === 'true',
+  };
+}
+
+async function openProjectGroupFromHandoff(msg: any) {
+  const handoff = getProjectGroupHandoff(msg);
+  if (!handoff?.groupNo) return;
+  const path = `/chat/conversation/${handoff.groupNo}/2`;
+  try {
+    if (appRouter?.push) {
+      await appRouter.push(path);
+      return;
+    }
+    window.history.pushState({}, '', path);
+    window.dispatchEvent(new PopStateEvent('popstate'));
+  } catch (err) {
+    console.warn('[MessageList] open project group failed', err);
+  }
 }
 
 function getCoordinationIdFromMessage(msg: any): string {
@@ -1316,6 +1367,15 @@ onBeforeUnmount(() => {
             :is-me="isMe(item.msg)"
             @preview-code="handleCodePreview"
           />
+          <div v-if="getProjectGroupHandoff(item.msg)" class="project-handoff-row">
+            <button
+              type="button"
+              class="project-handoff-link"
+              @click.stop="openProjectGroupFromHandoff(item.msg)"
+            >
+              打开项目群「{{ getProjectGroupHandoff(item.msg)?.groupName }}」
+            </button>
+          </div>
           <CoordinatorSummaryCard
             v-if="buildCoordinatorSummary(item.msg)"
             :summary="buildCoordinatorSummary(item.msg) || emptyCoordinatorSummary"
@@ -1442,6 +1502,25 @@ onBeforeUnmount(() => {
   min-height: 24px;
   overflow-anchor: none;
   flex-shrink: 0;
+}
+
+.project-handoff-row {
+  margin-top: 8px;
+}
+
+.project-handoff-link {
+  border: var(--border-hairline);
+  border-radius: var(--radius-sm);
+  background: var(--bg-secondary);
+  color: var(--primary-color, #165dff);
+  padding: 6px 10px;
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.project-handoff-link:hover {
+  background: var(--bg-hover);
 }
 
 .message-row-wrapper.is-located {

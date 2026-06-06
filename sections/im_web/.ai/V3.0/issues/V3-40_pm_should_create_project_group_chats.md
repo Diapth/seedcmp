@@ -191,6 +191,12 @@ sections/clowder-ai/packages/mcp-server/src/tools/callback-tools.ts
 - `ClowderConversationPanel.vue` resolves PM/coordinator direct views through the active project group binding. When a PM direct conversation has an active binding, coordination, Kanban, artifacts, workspace binding, agent directory, and observed task ids use the project group channel/thread instead of the PM direct thread.
 - The PM direct panel now shows the active project group and provides an entry to open the group conversation, while the PM direct chat remains the private feedback channel.
 
+### Stage 4: Handoff Link And Visible Members
+
+- PM handoff messages include project-group metadata from the bridge and `MessageList.vue` now renders an `打开项目群` action under those messages. The action routes to `/chat/conversation/<groupNo>/2`, so the user can enter the project group from the PM direct chat history.
+- Project groups include `clowder_cat:coordinator` as a real TangSeng group member backed by a virtual user named `PM / 协调者` or `PM`, so the PM appears in the normal member list and can be addressed like other visible members.
+- `GroupMemberList.vue` continues to show real TangSeng members and Clowder cat members in one member surface, with cats coming from `groupCatMemberships`.
+
 ## Notes
 
 Do not solve this by only changing copy in the PM direct chat. The core requirement is a conversation topology change: PM/user direct chat is for coordination and feedback; project execution happens in a named group that includes the user and the relevant agents.

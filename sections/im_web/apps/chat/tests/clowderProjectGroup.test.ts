@@ -1,3 +1,5 @@
+import fs from 'node:fs/promises'
+import path from 'node:path'
 import { describe, expect, it } from 'vitest'
 import { isProjectStartRequest, resolveProjectGroupName } from '../src/utils/clowderProjectGroup'
 
@@ -44,5 +46,29 @@ describe('Clowder PM project group helpers', () => {
     expect(store.default).toContain('getActiveProjectGroupBindingForDirect')
     expect(store.default).toContain('loadActiveProjectGroupBindingForDirect')
     expect(api.default).toContain('clowder/project-groups/active')
+  })
+
+  it('renders a clickable project group handoff from PM direct messages', async () => {
+    const list = await import('../src/components/MessageList.vue?raw')
+
+    expect(list.default).toContain('getProjectGroupHandoff')
+    expect(list.default).toContain('metadata.project_group_no')
+    expect(list.default).toContain('openProjectGroupFromHandoff')
+    expect(list.default).toContain('打开项目群')
+    expect(list.default).toContain('/chat/conversation/${handoff.groupNo}/2')
+  })
+
+  it('keeps PM and cats visible in the group member surface', async () => {
+    const members = await import('../src/views/GroupMemberList.vue?raw')
+    const bridge = await fs.readFile(
+      path.resolve(process.cwd(), '../../../im/TangSengDaoDaoServer/modules/clowder/api.go'),
+      'utf8',
+    )
+
+    expect(members.default).toContain('members.length + catMembers.length')
+    expect(members.default).toContain('猫猫成员')
+    expect(members.default).toContain('role-badge admin')
+    expect(bridge).toContain('defaultPMMemberID = "clowder_cat:coordinator"')
+    expect(bridge).toContain('ensureVirtualClowderUser(pmMemberID, pmDisplayName)')
   })
 })
