@@ -1,0 +1,128 @@
+{
+  "id": "v340-20260606101256",
+  "projectName": "V340项目群06101256",
+  "taskText": "帮我做一个项目，项目名叫 V340项目群06101256，请 PM 创建项目群并拉猫猫执行，项目群里给出一句 V3-40 验收说明。",
+  "account": "18337488675",
+  "cat": {
+    "catName": "V340 Claude 101256",
+    "alias": "@v340claude101256",
+    "catUrl": "http://localhost:3000/chat/conversation/clowder_cat:v340claude101256/1"
+  },
+  "pmChannelId": "clowder_cat:coordinator",
+  "groupNo": "ec27d036cfc14de29f2adc398794504e",
+  "groupUrl": "http://localhost:3000/chat/conversation/ec27d036cfc14de29f2adc398794504e/2",
+  "activeBinding": {
+    "status": 200,
+    "body": {
+      "binding": {
+        "id": "229fa45f0aac45c6ab5d14e789d0d2cd",
+        "userId": "edbb4e4566f840f4a6f14b9f9cf01c22",
+        "projectName": "V340项目群06101256",
+        "pmDirectChannelId": "clowder_cat:coordinator",
+        "pmDirectChannelType": 1,
+        "projectGroupNo": "ec27d036cfc14de29f2adc398794504e",
+        "projectThreadId": "thread_mq272y5dm4far4qf",
+        "pmMemberId": "clowder_cat:coordinator",
+        "userMemberIds": [
+          "edbb4e4566f840f4a6f14b9f9cf01c22",
+          "clowder_cat:coordinator"
+        ],
+        "catMemberIds": [
+          "dd",
+          "xtz",
+          "cs"
+        ],
+        "createdBy": "pm",
+        "createdAt": 1780740777976,
+        "updatedAt": 1780740778087,
+        "status": "active"
+      }
+    }
+  },
+  "finalBinding": {
+    "status": 200,
+    "body": {
+      "binding": {
+        "id": "229fa45f0aac45c6ab5d14e789d0d2cd",
+        "userId": "edbb4e4566f840f4a6f14b9f9cf01c22",
+        "projectName": "V340项目群06101256",
+        "pmDirectChannelId": "clowder_cat:coordinator",
+        "pmDirectChannelType": 1,
+        "projectGroupNo": "ec27d036cfc14de29f2adc398794504e",
+        "projectThreadId": "thread_mq272y5dm4far4qf",
+        "pmMemberId": "clowder_cat:coordinator",
+        "userMemberIds": [
+          "edbb4e4566f840f4a6f14b9f9cf01c22",
+          "clowder_cat:coordinator"
+        ],
+        "catMemberIds": [
+          "dd",
+          "xtz",
+          "cs"
+        ],
+        "createdBy": "pm",
+        "createdAt": 1780740777976,
+        "updatedAt": 1780740778087,
+        "status": "active"
+      }
+    }
+  },
+  "failedRequests": [],
+  "browserConsole": [
+    "[debug] [vite] connecting...",
+    "[debug] [vite] connected.",
+    "[log] web运行环境",
+    "[log] 使用原生websocket",
+    "[log] websocket WebSocket",
+    "[log] onopen...",
+    "[log] 服务器协议版本: 5",
+    "[log] 成功连接到节点[1]",
+    "[log] [SDK] Connected successfully.",
+    "[debug] [vite] connecting...",
+    "[debug] [vite] connected.",
+    "[log] web运行环境",
+    "[log] 使用原生websocket",
+    "[log] websocket WebSocket",
+    "[log] onopen...",
+    "[log] 服务器协议版本: 5",
+    "[log] 成功连接到节点[1]",
+    "[log] [SDK] Connected successfully.",
+    "[log] 消息内容--> RecvPacket2",
+    "[error] Failed to load resource: the server responded with a status of 404 (Not Found)",
+    "[debug] [vite] connecting...",
+    "[debug] [vite] connected.",
+    "[log] web运行环境",
+    "[log] 使用原生websocket",
+    "[log] websocket WebSocket",
+    "[error] Failed to load resource: the server responded with a status of 404 (Not Found)",
+    "[log] onopen...",
+    "[log] 服务器协议版本: 5",
+    "[log] 成功连接到节点[1]",
+    "[log] [SDK] Connected successfully.",
+    "[log] 消息内容--> RecvPacket2",
+    "[log] 消息内容--> RecvPacket2",
+    "[error] Failed to load resource: the server responded with a status of 404 (Not Found)",
+    "[log] 消息内容--> RecvPacket2",
+    "[debug] [vite] connecting...",
+    "[debug] [vite] connected.",
+    "[log] web运行环境",
+    "[log] 使用原生websocket",
+    "[log] websocket WebSocket",
+    "[log] onopen...",
+    "[log] 服务器协议版本: 5",
+    "[log] 成功连接到节点[1]",
+    "[log] [SDK] Connected successfully.",
+    "[debug] [vite] connecting...",
+    "[debug] [vite] connected.",
+    "[log] web运行环境",
+    "[log] 使用原生websocket",
+    "[log] websocket WebSocket",
+    "[error] Failed to load resource: the server responded with a status of 404 (Not Found)",
+    "[log] onopen...",
+    "[log] 服务器协议版本: 5",
+    "[log] 成功连接到节点[1]",
+    "[log] [SDK] Connected successfully.",
+    "[error] Failed to load resource: the server responded with a status of 400 (Bad Request)",
+    "[warning] [clowderStore] loadRecentKickoffs failed {error: AxiosError: Request failed with status code 400\n    at settle (http://localhost:3000/node_modules/.…, msg: 请求失败, status: 400}"
+  ]
+}

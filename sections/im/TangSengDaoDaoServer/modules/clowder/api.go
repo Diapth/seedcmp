@@ -1219,8 +1219,8 @@ func (c *Clowder) findExistingProjectGroup(projectName string, userID string) (s
 	_, err := c.ctx.DB().
 		Select("g.group_no").
 		From("`group` g").
-		Join("group_member gm", "g.group_no=gm.group_no").
-		Where("g.name=? and g.status=1 and gm.uid=? and gm.is_deleted=0 and gm.status=1", projectName, userID).
+		Join("group_member", "g.group_no=group_member.group_no").
+		Where("g.name=? and g.status=1 and group_member.uid=? and group_member.is_deleted=0 and group_member.status=1", projectName, userID).
 		Limit(1).
 		Load(&rows)
 	if err != nil {

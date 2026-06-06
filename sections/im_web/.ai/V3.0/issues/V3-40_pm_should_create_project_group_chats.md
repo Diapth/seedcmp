@@ -2,7 +2,7 @@
 
 ## Status
 
-Open. Reported from live IM Web V3.0 Clowder PM/coordinator usage on 2026-06-06. When a user starts project work with the PM, the PM should create a dedicated project group chat and invite the required agents plus the user. The current PM direct conversation should remain a PM/user feedback channel, not become the place where other agents are pulled in.
+Fixed. Reported from live IM Web V3.0 Clowder PM/coordinator usage on 2026-06-06. When a user starts project work with the PM, the PM should create a dedicated project group chat and invite the required agents plus the user. The current PM direct conversation should remain a PM/user feedback channel, not become the place where other agents are pulled in.
 
 ## Created
 
@@ -205,6 +205,17 @@ sections/clowder-ai/packages/mcp-server/src/tools/callback-tools.ts
   - `pnpm test:unit`
   - `pnpm exec vue-tsc --noEmit`
   - `pnpm build`
+
+### Stage 6: Real Web Acceptance
+
+- Real browser acceptance passed on 2026-06-06 with `RUN_V3_40_ACCEPTANCE=1 pnpm exec playwright test tests-e2e/v3-40-project-group-acceptance.spec.ts --project=chromium --reporter=line`.
+- Evidence path: `docs/manual-test-artifacts/v3-40-v340-20260606101256/`.
+- Test account: `18337488675`; user id: `edbb4e4566f840f4a6f14b9f9cf01c22`.
+- PM direct conversation: `clowder_cat:coordinator`; project group: `ec27d036cfc14de29f2adc398794504e`; project thread: `thread_mq272y5dm4far4qf`; binding id: `229fa45f0aac45c6ab5d14e789d0d2cd`.
+- Project name: `V340项目群06101256`; task text asked PM to create a project group and route V3-40 execution into it.
+- OAuth Claude Code cat creation succeeded in Web: `V340 Claude 101256` / `@v340claude101256`; no Codex downgrade was needed.
+- The actual PM project-group worker roster came from runtime group state: `dd`, `xtz`, `cs`. The group member page shows PM plus these Clowder cat members, and agent replies were delivered to the project group external chat.
+- Acceptance JSON recorded `failedRequests: []`.
 
 ## Notes
 
