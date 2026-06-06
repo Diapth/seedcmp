@@ -107,6 +107,7 @@
           @draft-change="handleDraftChange"
           @cancel-reply="replyTarget = null"
           @open-emoji="openInputEmojiPicker"
+          @typing="handleTyping"
         />
       </template>
 
@@ -538,6 +539,10 @@ function normalizeAgentName(name = '') {
 }
 
 function handleSendMessage({ type, content, fileName, fileSize, replyRef, previewContent, fileType, url }) {
+  if (type !== 'text') {
+    uni.showToast({ title: '图片、文件和语音发送需接入真实上传能力', icon: 'none' });
+    return;
+  }
   const sender = {
     id: 'me',
     name: appStore.currentUser?.nickname || '我'
@@ -589,6 +594,13 @@ function handleSendMessage({ type, content, fileName, fileSize, replyRef, previe
 
 function handleDraftChange(draftVal) {
   convStore.updateConversationDraft(convStore.activeId, draftVal);
+}
+
+function handleTyping() {
+  const conv = activeConversation.value;
+  if (!conv) return;
+  const channelType = conv.channelType || (conv.type === 'group' ? 2 : 1);
+  messageStore.sendTyping(conv.id, channelType).catch(() => undefined);
 }
 
 function updateConversationField(fields) {

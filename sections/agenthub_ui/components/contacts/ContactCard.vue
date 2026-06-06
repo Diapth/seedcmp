@@ -41,14 +41,14 @@
               <AppIcon name="phone" :size="15" color="#94a3b8" />
               <text>电话号码</text>
             </view>
-            <text class="info-value">{{ contact.phone || '13800000001' }}</text>
+            <text class="info-value">{{ contact.phone || '未填写' }}</text>
           </view>
           <view class="info-row flex-row align-center justify-between">
             <view class="info-label flex-row align-center gap-2">
               <AppIcon name="user" :size="15" color="#94a3b8" />
               <text>所属分组</text>
             </view>
-            <text class="info-value">{{ contact.group || '同事' }}</text>
+            <text class="info-value">{{ contact.group || '未分组' }}</text>
           </view>
           <view class="info-row flex-row align-center justify-between">
             <view class="info-label flex-row align-center gap-2">
@@ -70,8 +70,9 @@
           <text class="card-title">共同群聊</text>
         </view>
         <view class="card-content flex-column gap-2">
-          <view 
-            v-for="group in commonGroups" 
+          <text v-if="commonGroups.length === 0" class="empty-meta-text">暂无共同群聊</text>
+          <view
+            v-for="group in commonGroups"
             :key="group.name"
             class="group-row-item flex-row align-center gap-3"
           >
@@ -176,60 +177,25 @@ const statusText = computed(() => {
   return '忙碌';
 });
 
-// 计算共同群聊数据 (若系统内群聊较少，通过预设 mock 组合渲染，完全还原 UI 截图效果)
+// Show only group conversations that are already present in the real conversation store.
 const commonGroups = computed(() => {
   const list = convStore.conversations.filter(c => c.type === 'group');
-  
-  const fallbacks = [
-    { name: '产品讨论群', icon: 'group', color: '#3b82f6' },
-    { name: '研发协作群', icon: 'code', color: '#7c3aed' },
-    { name: '项目A协作群', icon: 'briefcase', color: '#0d9488' }
-  ];
-  
-  const result = [];
-  list.forEach((item, index) => {
-    result.push({
-      name: item.name,
-      icon: 'group',
-      color: index % 3 === 0 ? '#3b82f6' : index % 3 === 1 ? '#7c3aed' : '#0d9488'
-    });
-  });
-  
-  let fallbackIdx = 0;
-  while (result.length < 3 && fallbackIdx < fallbacks.length) {
-    const item = fallbacks[fallbackIdx++];
-    if (!result.some(r => r.name === item.name)) {
-      result.push(item);
-    }
-  }
-  
-  return result.slice(0, 3);
+  return list.slice(0, 3).map((item, index) => ({
+    name: item.name,
+    icon: 'group',
+    color: index % 3 === 0 ? '#3b82f6' : index % 3 === 1 ? '#7c3aed' : '#0d9488'
+  }));
 });
 
-// 精细对齐 UI 截图的标签数据
 const defaultTags = computed(() => {
   if (!props.contact) return [];
-  const name = props.contact.nickname;
-  if (name.includes('张伟')) {
-    return [
-      { text: '同事', type: 'blue' },
-      { text: '研发', type: 'purple' },
-      { text: '常联系', type: 'green' }
-    ];
+  if (Array.isArray(props.contact.tags)) {
+    return props.contact.tags.map((tag) => ({
+      text: typeof tag === 'string' ? tag : tag.text,
+      type: typeof tag === 'string' ? 'blue' : tag.type || 'blue'
+    })).filter((tag) => tag.text);
   }
-  if (name.includes('李四')) {
-    return [
-      { text: '研发', type: 'purple' }
-    ];
-  }
-  if (name.includes('王五')) {
-    return [
-      { text: '架构', type: 'orange' }
-    ];
-  }
-  return [
-    { text: props.contact.group || '同事', type: 'blue' }
-  ];
+  return props.contact.group ? [{ text: props.contact.group, type: 'blue' }] : [];
 });
 
 function getAvatarBg(item) {
@@ -527,6 +493,11 @@ function reportContact() {
   font-size: 13.5px;
   color: #334155;
   font-weight: 600;
+}
+
+.empty-meta-text {
+  font-size: 13px;
+  color: #94a3b8;
 }
 
 /* 备注与标签内容 */

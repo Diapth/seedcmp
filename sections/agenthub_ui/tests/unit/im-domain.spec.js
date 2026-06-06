@@ -7,11 +7,13 @@ import { resetRequestRuntimeForTests, setRequestAdapter } from '../../utils/requ
 import { createInboundMessage, toConversationItem } from '../../utils/im-mappers.js';
 
 const wkSdkMock = vi.hoisted(() => ({
-  sendTextMessage: vi.fn()
+  sendTextMessage: vi.fn(),
+  sendTypingCommand: vi.fn()
 }));
 
 vi.mock('@/utils/wk-sdk.js', () => ({
-  sendTextMessage: wkSdkMock.sendTextMessage
+  sendTextMessage: wkSdkMock.sendTextMessage,
+  sendTypingCommand: wkSdkMock.sendTypingCommand
 }));
 
 describe('IM domain mapping and stores', () => {
@@ -20,6 +22,7 @@ describe('IM domain mapping and stores', () => {
     resetStorageForTests();
     resetRequestRuntimeForTests();
     wkSdkMock.sendTextMessage.mockReset();
+    wkSdkMock.sendTypingCommand.mockReset();
   });
 
   it('maps backend conversations to the existing agenthub visual contract', () => {
@@ -302,5 +305,109 @@ describe('IM domain mapping and stores', () => {
       status: 'success'
     });
     expect(messageStore.pendingQueue[msg.clientMsgNo]).toBeUndefined();
+  });
+
+  it('rejects non-text sends until real upload-backed media sending is connected', async () => {
+    const conversationStore = useConversationStore();
+    const messageStore = useMessageStore();
+    conversationStore.addOrUpdateConversation('friend-a', 1, { name: '好友' });
+
+    await expect(messageStore.sendMessage(
+      'friend-a',
+      'https://example.com/fake.png',
+      { id: 'u-1', name: '我' },
+      'image'
+    )).rejects.toMatchObject({
+      code: 'MEDIA_SEND_UNAVAILABLE'
+    });
+    expect(wkSdkMock.sendTextMessage).not.toHaveBeenCalled();
+    expect(messageStore.getMessages('friend-a')).toHaveLength(0);
+  });
+
+  it('applies realtime revoke by client message number without echoing a revoke request', async () => {
+    const adapter = vi.fn(async () => ({ status: 200, data: { code: 0, data: {} } }));
+    setRequestAdapter(adapter);
+    const messageStore = useMessageStore();
+    messageStore.addMessage('friend-a', {
+      id: 'server-message-1',
+      clientMsgNo: 'client-message-1',
+      content: '可撤回消息',
+      type: 'text',
+      channelType: 1
+    }, 1);
+
+    const applied = messageStore.applyMessageRevoke('friend-a', 'client-message-1');
+
+    expect(applied).toBe(true);
+    expect(messageStore.getMessages('friend-a')[0]).toMatchObject({
+      id: 'server-message-1',
+      clientMsgNo: 'client-message-1',
+      status: 'revoked',
+      type: 'system',
+      content: '你撤回了一条消息'
+    });
+    expect(adapter).not.toHaveBeenCalled();
+  });
+
+  it('sends local revoke with server id while matching by client message number', async () => {
+    const adapter = vi.fn(async ({ url }) => {
+      expect(url).toContain('/message/revoke?');
+      expect(decodeURIComponent(url)).toContain('message_id=server-message-1');
+      expect(decodeURIComponent(url)).toContain('client_msg_no=client-message-1');
+      return { status: 200, data: { code: 0, data: {} } };
+    });
+    setRequestAdapter(adapter);
+    const messageStore = useMessageStore();
+    messageStore.addMessage('friend-a', {
+      id: 'server-message-1',
+      clientMsgNo: 'client-message-1',
+      content: '本端撤回',
+      type: 'text',
+      channelType: 1
+    }, 1);
+
+    await messageStore.revokeMessage('friend-a', 'client-message-1');
+
+    expect(adapter).toHaveBeenCalledTimes(1);
+    expect(messageStore.getMessages('friend-a')[0].status).toBe('revoked');
+  });
+
+  it('posts reactions with the message channel type', async () => {
+    const adapter = vi.fn(async () => ({ status: 200, data: { code: 0, data: {} } }));
+    setRequestAdapter(adapter);
+    const messageStore = useMessageStore();
+    messageStore.addMessage('group-a', {
+      id: 'group-message-1',
+      content: '群消息',
+      type: 'text',
+      channelType: 2,
+      reactions: []
+    }, 2);
+
+    messageStore.reactMessage('group-a', 'group-message-1', '👍', 'u-1');
+
+    expect(messageStore.getMessages('group-a')[0].reactions).toEqual([
+      { emoji: '👍', userIds: ['u-1'], count: 1 }
+    ]);
+    expect(adapter).toHaveBeenCalledTimes(1);
+    expect(adapter.mock.calls[0][0].url).toContain('/reactions');
+    expect(adapter.mock.calls[0][0].data).toMatchObject({
+      channel_id: 'group-a',
+      channel_type: 2,
+      message_id: 'group-message-1',
+      emoji: '👍'
+    });
+  });
+
+  it('sends typing command for a real channel', async () => {
+    wkSdkMock.sendTypingCommand.mockResolvedValue({});
+    const messageStore = useMessageStore();
+
+    await messageStore.sendTyping('group-a', 2);
+
+    expect(wkSdkMock.sendTypingCommand).toHaveBeenCalledWith({
+      channelId: 'group-a',
+      channelType: 2
+    });
   });
 });

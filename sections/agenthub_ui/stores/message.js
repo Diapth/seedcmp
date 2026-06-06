@@ -29,6 +29,14 @@ async function sendSdkTextMessage() {
   return module.sendTextMessage(...arguments);
 }
 
+async function sendSdkTypingCommand(args) {
+  const module = await import('@/utils/wk-sdk.js');
+  if (!module?.sendTypingCommand) {
+    throw new AppError('WKSDK 输入状态能力不可用', { code: 'SDK_UNAVAILABLE' });
+  }
+  return module.sendTypingCommand(args);
+}
+
 export const useMessageStore = defineStore('message', {
   state: () => ({
     messages: {},
@@ -92,6 +100,9 @@ export const useMessageStore = defineStore('message', {
       return msg;
     },
     async sendMessage(conversationId, text, sender = null, type = 'text', extra = {}) {
+      if (type !== 'text') {
+        throw new AppError('图片、文件和语音发送需先接入真实上传能力', { code: 'MEDIA_SEND_UNAVAILABLE' });
+      }
       const convStore = useConversationStore();
       const conv = convStore.conversations.find((item) => item.id === conversationId);
       const channelType = toBackendChannelType(conv?.channelType || conv?.type || extra.channelType || 1);
@@ -137,6 +148,13 @@ export const useMessageStore = defineStore('message', {
         throw err;
       }
     },
+    async sendTyping(conversationId, channelType = 1) {
+      if (!conversationId) return null;
+      return sendSdkTypingCommand({
+        channelId: conversationId,
+        channelType: toBackendChannelType(channelType)
+      });
+    },
     receiveMessage(conversationId, msg) {
       return this.addRealtimeMessage(conversationId, msg.channelType || 1, msg);
     },
@@ -167,10 +185,8 @@ export const useMessageStore = defineStore('message', {
       const pending = Object.values(this.pendingQueue);
       return pending;
     },
-    reactMessage(conversationId, messageId, emoji, userId = 'me') {
-      const list = this.messages[conversationId];
-      if (!list) return;
-      const msg = list.find((m) => m.id === messageId);
+    reactMessage(conversationId, messageId, emoji, userId = 'me', channelType = '') {
+      const msg = this.findMessageByRef(conversationId, messageId, channelType);
       if (!msg) return;
       if (!msg.reactions) msg.reactions = [];
       const existing = msg.reactions.find((r) => r.emoji === emoji);
@@ -186,24 +202,45 @@ export const useMessageStore = defineStore('message', {
       } else {
         msg.reactions.push({ emoji, userIds: [userId], count: 1 });
       }
-      syncApi.addReaction({ channel_id: conversationId, channel_type: 1, message_id: messageId, emoji }).catch(() => undefined);
+      syncApi.addReaction({
+        channel_id: conversationId,
+        channel_type: toBackendChannelType(msg.channelType || channelType || 1),
+        message_id: msg.messageID || msg.id,
+        emoji
+      }).catch(() => undefined);
     },
-    unreactMessage(conversationId, messageId, emoji, userId = 'me') {
-      this.reactMessage(conversationId, messageId, emoji, userId);
+    unreactMessage(conversationId, messageId, emoji, userId = 'me', channelType = '') {
+      this.reactMessage(conversationId, messageId, emoji, userId, channelType);
     },
-    async revokeMessage(conversationId, messageId) {
-      const list = this.messages[conversationId];
-      const msg = list?.find((m) => m.id === messageId);
-      if (!msg) return;
+    findMessageByRef(conversationId, messageRef, channelType = '') {
+      const ref = String(messageRef || '');
+      const list = this.getMessages(conversationId, channelType);
+      return list.find((m) =>
+        String(m.id || '') === ref ||
+        String(m.messageID || '') === ref ||
+        String(m.clientMsgNo || '') === ref ||
+        (m.messageSeq !== undefined && String(m.messageSeq) === ref)
+      );
+    },
+    applyMessageRevoke(conversationId, messageRef, channelType = '') {
+      const msg = this.findMessageByRef(conversationId, messageRef, channelType);
+      if (!msg) return false;
       msg.status = 'revoked';
       msg.type = 'system';
       msg.content = '你撤回了一条消息';
+      return true;
+    },
+    async revokeMessage(conversationId, messageRef, channelType = '') {
+      const msg = this.findMessageByRef(conversationId, messageRef, channelType);
+      if (!msg) return false;
+      this.applyMessageRevoke(conversationId, messageRef, channelType);
       await syncApi.revokeMessage({
         channel_id: conversationId,
-        channel_type: msg.channelType || 1,
-        message_id: messageId,
+        channel_type: msg.channelType || channelType || 1,
+        message_id: msg.messageID || msg.id,
         client_msg_no: msg.clientMsgNo || ''
       }).catch(() => undefined);
+      return true;
     },
     deleteMessage(conversationId, messageId) {
       const list = this.messages[conversationId];

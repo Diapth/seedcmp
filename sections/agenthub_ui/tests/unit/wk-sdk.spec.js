@@ -2,6 +2,13 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 const sdkMock = vi.hoisted(() => {
   const textContent = { kind: 'text-content', encode: vi.fn(() => new Uint8Array()) };
+  class CMDContent {
+    constructor() {
+      this.kind = 'cmd-content';
+      this.cmd = '';
+      this.param = {};
+    }
+  }
   const channel = { channelID: 'clowder_cat:codex', channelType: 1 };
   const sendResult = { clientSeq: 7, clientMsgNo: 'sdk-generated' };
   const shared = {
@@ -11,13 +18,15 @@ const sdkMock = vi.hoisted(() => {
       send: vi.fn(async () => sendResult)
     }
   };
-  return { textContent, channel, sendResult, shared };
+  return { CMDContent, textContent, channel, sendResult, shared };
 });
 
 vi.mock('wukongimjssdk', () => ({
   default: {
-    shared: () => sdkMock.shared
-  }
+    shared: () => sdkMock.shared,
+    CMDContent: sdkMock.CMDContent
+  },
+  CMDContent: sdkMock.CMDContent
 }));
 
 describe('WKSDK adapter', () => {
@@ -40,5 +49,19 @@ describe('WKSDK adapter', () => {
     expect(sdkMock.shared.newChannel).toHaveBeenCalledWith('clowder_cat:codex', 1);
     expect(sdkMock.shared.chatManager.send).toHaveBeenCalledWith(sdkMock.textContent, sdkMock.channel);
     expect(result.clientMsgNo).toBe('agenthub-client-1');
+  });
+
+  it('sends typing as a WKSDK command content', async () => {
+    const { sendTypingCommand } = await import('../../utils/wk-sdk.js');
+
+    await sendTypingCommand({
+      channelId: 'clowder_cat:codex',
+      channelType: 1
+    });
+
+    const [content, channel] = sdkMock.shared.chatManager.send.mock.calls[0];
+    expect(content).toBeInstanceOf(sdkMock.CMDContent);
+    expect(content).toMatchObject({ cmd: 'typing', param: {} });
+    expect(channel).toBe(sdkMock.channel);
   });
 });

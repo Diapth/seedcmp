@@ -99,6 +99,29 @@ export async function sendTextMessage({ channelId, channelType, text, clientMsgN
   return sent;
 }
 
+export async function sendTypingCommand({ channelId, channelType }) {
+  const mod = await loadSdkModule();
+  const sdk = mod.default || mod.WKSDK || mod;
+  const shared = sdk.shared();
+  const chatManager = shared?.chatManager;
+  if (!chatManager?.send) {
+    throw new AppError('WKSDK 当前不可发送输入状态', { code: 'SDK_UNAVAILABLE' });
+  }
+  const Channel = sdk.Channel || shared.Channel;
+  const CMDContent = mod.CMDContent || sdk.CMDContent || shared.CMDContent;
+  const channel = shared.newChannel
+    ? shared.newChannel(channelId, channelType)
+    : Channel
+      ? new Channel(channelId, channelType)
+      : { channelID: channelId, channelType };
+  const content = CMDContent
+    ? new CMDContent()
+    : { cmd: '', param: {}, type: 'cmd', encode: () => new Uint8Array() };
+  content.cmd = 'typing';
+  content.param = {};
+  return chatManager.send(content, channel);
+}
+
 if (import.meta.hot) {
   import.meta.hot.dispose(() => {
     disconnectSdk();

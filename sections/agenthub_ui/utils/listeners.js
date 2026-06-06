@@ -63,7 +63,7 @@ export function registerCMDListeners(sdk) {
       return;
     }
     if (type === 'messageRevoke' && channel) {
-      messageStore.revokeMessage(channel.channelID, param.client_msg_no || param.message_id);
+      messageStore.applyMessageRevoke(channel.channelID, param.client_msg_no || param.message_id, channel.channelType);
       return;
     }
     if (type === 'unreadClear' && channel) {

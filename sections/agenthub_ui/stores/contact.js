@@ -14,6 +14,15 @@ function normalizeContact(input = {}) {
   };
 }
 
+function normalizeSearchUser(input = {}) {
+  const normalized = normalizeContact(input);
+  return {
+    ...normalized,
+    relationship: input.relationship || input.relation || 'stranger',
+    vercode: input.vercode || input.verify_code || input.verification_code || input.token || ''
+  };
+}
+
 export const useContactStore = defineStore('contact', {
   state: () => ({
     contacts: [],
@@ -76,11 +85,14 @@ export const useContactStore = defineStore('contact', {
       this.blacklist = this.blacklist.filter((entry) => entry.id !== contactId);
       if (item) this.addContact(item);
     },
-    async sendFriendRequest(toUidOrNickname, message) {
-      const response = await friendApi.applyFriend({
+    async sendFriendRequest(toUidOrNickname, message, vercode = '') {
+      const payload = {
         to_uid: toUidOrNickname,
         remark: message || '你好，我想添加你为好友'
-      });
+      };
+      if (vercode) payload.vercode = vercode;
+
+      const response = await friendApi.applyFriend(payload);
       const data = response?.data || response || {};
       const request = {
         id: data.id || data.to_uid || toUidOrNickname,
@@ -96,7 +108,10 @@ export const useContactStore = defineStore('contact', {
     async searchUser(keyword) {
       const response = await friendApi.searchUser(keyword);
       const data = response?.data || response || {};
-      return normalizeContact(data.user || data);
+      if (data.exist === 0 || data.exist === false) return null;
+      const user = data.user || data.data || data;
+      if (!user || (typeof user === 'object' && Object.keys(user).length === 0)) return null;
+      return normalizeSearchUser(user);
     },
     reset() {
       this.contacts = [];

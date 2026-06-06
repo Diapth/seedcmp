@@ -223,7 +223,7 @@ function handleReject(id) {
   uni.showToast({ title: '已拒绝申请', icon: 'none' });
 }
 
-function handleSearch() {
+async function handleSearch() {
   const query = searchQuery.value.trim();
   if (!query) {
     uni.showToast({ title: '请输入搜索内容', icon: 'none' });
@@ -274,15 +274,12 @@ function handleSearch() {
     return;
   }
 
-  searchResult.value = query.length >= 2
-    ? {
-        id: String(Date.now()),
-        nickname: query,
-        phone: /^\d+$/.test(query) ? query : `139${Math.floor(Math.random() * 90000000 + 10000000)}`,
-        avatar: '',
-        relationship: 'stranger'
-      }
-    : null;
+  try {
+    searchResult.value = await contactStore.searchUser(query);
+  } catch (err) {
+    searchResult.value = null;
+    uni.showToast({ title: err?.message || '搜索用户失败', icon: 'none' });
+  }
 }
 
 function goChat() {
@@ -322,7 +319,11 @@ async function sendRequest() {
   sending.value = true;
 
   try {
-    await contactStore.sendFriendRequest(searchResult.value.id || searchResult.value.nickname, verificationMsg.value);
+    await contactStore.sendFriendRequest(
+      searchResult.value.id || searchResult.value.nickname,
+      verificationMsg.value,
+      searchResult.value.vercode
+    );
     searchResult.value.relationship = 'sent';
     sending.value = false;
     uni.showToast({ title: '好友申请已发送', icon: 'success' });
