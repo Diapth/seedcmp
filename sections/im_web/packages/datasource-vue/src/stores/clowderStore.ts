@@ -21,6 +21,9 @@ import {
   type ClowderLocalOAuthConfigSummary,
   type ClowderLocalOAuthProvider,
   type ClowderPlatformModelOption,
+  type ClowderSkillCatalog,
+  type ClowderSkillEntry,
+  type ClowderSkillProvider,
   type ClowderConversationRef,
   type ClowderConversationStateResponse,
   type ClowderConnectionStatus,
@@ -266,6 +269,7 @@ export const useClowderStore = defineStore('clowder', () => {
   const catContactDirectory = ref<ClowderCatContact[]>([]);
   const catRoleTemplates = ref<ClowderCatRoleTemplate[]>([]);
   const platformModelOptions = ref<Record<string, ClowderPlatformModelOption[]>>({});
+  const catSkillCatalog = ref<ClowderSkillCatalog>({});
   const localOAuthCapabilities = ref<Partial<Record<ClowderLocalOAuthProvider, ClowderLocalOAuthConfigSummary>>>({});
   const localOAuthLoading = ref(false);
   const localOAuthError = ref<string | undefined>();
@@ -852,6 +856,40 @@ export const useClowderStore = defineStore('clowder', () => {
     return result;
   }
 
+  function normalizeSkillCatalog(catalog?: ClowderSkillCatalog) {
+    const result: ClowderSkillCatalog = {};
+    const providers: ClowderSkillProvider[] = ['codex', 'claude', 'gemini', 'kimi'];
+    for (const provider of providers) {
+      const skills = Array.isArray(catalog?.[provider]) ? catalog?.[provider] || [] : [];
+      result[provider] = skills
+        .map((skill): ClowderSkillEntry | undefined => {
+          const name = String(skill?.name || '').trim();
+          if (!name) return undefined;
+          const category = String(skill?.category || '').trim();
+          const trigger = String(skill?.trigger || '').trim();
+          const description = String(skill?.description || '').trim();
+          const requiresMcp = Array.isArray(skill?.requiresMcp)
+            ? skill.requiresMcp
+                .map(dep => ({
+                  id: String(dep?.id || '').trim(),
+                  status: String(dep?.status || '').trim()
+                }))
+                .filter(dep => dep.id)
+            : [];
+          return {
+            name,
+            ...(category ? { category } : {}),
+            ...(trigger ? { trigger } : {}),
+            ...(description ? { description } : {}),
+            mounted: skill?.mounted === true,
+            ...(requiresMcp.length > 0 ? { requiresMcp } : {})
+          };
+        })
+        .filter((skill): skill is ClowderSkillEntry => Boolean(skill));
+    }
+    return result;
+  }
+
   function applyCatDirectoryRefresh(directory: ClowderCatContact[]) {
     const directoryIds = new Set(directory.map(cat => cat.catId));
     const retainedConnectedContacts = connectedCatContacts.value.filter(cat =>
@@ -907,6 +945,7 @@ export const useClowderStore = defineStore('clowder', () => {
       const directory = normalizeCatDirectory(response);
       catRoleTemplates.value = normalizeRoleTemplates(response, directory);
       platformModelOptions.value = normalizePlatformModelOptions(response?.clientDefaults);
+      catSkillCatalog.value = normalizeSkillCatalog(response?.skillCatalog);
       catDirectoryLoadedAt.set(key, Date.now());
       return applyCatDirectoryRefresh(directory);
     })();
@@ -1695,6 +1734,7 @@ export const useClowderStore = defineStore('clowder', () => {
     catContactDirectory.value = [];
     catRoleTemplates.value = [];
     platformModelOptions.value = {};
+    catSkillCatalog.value = {};
     localOAuthCapabilities.value = {};
     localOAuthLoading.value = false;
     localOAuthError.value = undefined;
@@ -1733,6 +1773,7 @@ export const useClowderStore = defineStore('clowder', () => {
     catContactDirectory,
     catRoleTemplates,
     platformModelOptions,
+    catSkillCatalog,
     localOAuthCapabilities,
     localOAuthLoading,
     localOAuthError,

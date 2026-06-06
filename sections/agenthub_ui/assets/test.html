@@ -1,0 +1,561 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>色块消消 - 极限挑战版</title>
+    <style>
+        :root {
+            --bg: #F5F7FA;
+            --text: #141414;
+            --primary: #141414;
+            --white: #FFFFFF;
+            --gray: #94A3B8;
+            --orange: #F97316;
+            --red: #EF4444;
+        }
+
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+            user-select: none;
+            -webkit-tap-highlight-color: transparent;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+            background-color: var(--bg);
+            color: var(--text);
+            height: 100vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            overflow: hidden;
+        }
+
+        /* 布局容器 */
+        #app {
+            width: 100%;
+            max-width: 400px;
+            padding: 20px;
+            text-align: center;
+        }
+
+        .screen {
+            display: none;
+        }
+
+        .screen.active {
+            display: block;
+            animation: fadeIn 0.4s ease-out;
+        }
+
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(10px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+
+        /* 首页样式 */
+        .title {
+            font-size: 3.5rem;
+            font-weight: 900;
+            letter-spacing: -2px;
+            margin-bottom: 10px;
+        }
+
+        .subtitle {
+            color: var(--gray);
+            font-weight: 500;
+            margin-bottom: 40px;
+        }
+
+        .color-preview {
+            display: flex;
+            justify-content: center;
+            gap: 10px;
+            margin-bottom: 50px;
+        }
+
+        .preview-dot {
+            width: 40px;
+            height: 40px;
+            border-radius: 12px;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+            animation: bounce 2s infinite ease-in-out;
+        }
+
+        @keyframes bounce {
+            0%, 100% { transform: scale(1) rotate(0); }
+            50% { transform: scale(1.1) rotate(5deg); }
+        }
+
+        .btn {
+            background: var(--primary);
+            color: var(--white);
+            border: none;
+            padding: 16px 48px;
+            font-size: 1.25rem;
+            font-weight: 700;
+            border-radius: 50px;
+            cursor: pointer;
+            box-shadow: 0 10px 25px rgba(0,0,0,0.15);
+            transition: transform 0.2s, background 0.2s;
+        }
+
+        .btn:active {
+            transform: scale(0.95);
+        }
+
+        /* 游戏界面样式 */
+        .stats {
+            display: flex;
+            justify-content: space-between;
+            align-items: flex-end;
+            margin-bottom: 20px;
+        }
+
+        .stat-label {
+            font-size: 0.7rem;
+            font-weight: 800;
+            color: var(--gray);
+            text-transform: uppercase;
+            letter-spacing: 1px;
+        }
+
+        .stat-value {
+            font-size: 2rem;
+            font-weight: 900;
+        }
+
+        .combo-text {
+            color: var(--orange);
+            font-weight: 800;
+            font-size: 0.9rem;
+        }
+
+        .timer-text {
+            font-family: monospace;
+            font-size: 1.5rem;
+            font-weight: 700;
+        }
+
+        .progress-bar {
+            height: 6px;
+            background: #E2E8F0;
+            border-radius: 10px;
+            margin-bottom: 30px;
+            overflow: hidden;
+        }
+
+        #progress-inner {
+            height: 100%;
+            background: var(--primary);
+            width: 0%;
+            transition: width 0.3s ease;
+        }
+
+        .target-container {
+            margin-bottom: 40px;
+        }
+
+        #target-block {
+            width: 120px;
+            height: 120px;
+            margin: 15px auto;
+            border-radius: 24px;
+            border: 6px solid var(--white);
+            box-shadow: 0 20px 40px rgba(0,0,0,0.1);
+            transition: opacity 0.3s, filter 0.3s, transform 0.3s;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 2rem;
+            font-weight: 900;
+        }
+
+        #target-block.hidden {
+            opacity: 0;
+            filter: blur(40px);
+            transform: scale(0.6);
+        }
+
+        /* 16色块网格 */
+        .grid {
+            display: grid;
+            grid-template-columns: repeat(4, 1fr);
+            gap: 10px;
+            perspective: 1000px;
+        }
+
+        .grid.shake {
+            animation: shake 0.4s;
+        }
+
+        @keyframes shake {
+            0%, 100% { transform: translateX(0); }
+            25% { transform: translateX(-10px); }
+            75% { transform: translateX(10px); }
+        }
+
+        .block {
+            aspect-ratio: 1 / 1;
+            border-radius: 12px;
+            border: 2px solid var(--white);
+            box-shadow: 0 4px 12px rgba(0,0,0,0.08);
+            cursor: pointer;
+            transition: transform 0.2s, opacity 0.2s, filter 0.2s;
+        }
+
+        .block.clicked {
+            transform: scale(0.5);
+            opacity: 0;
+            filter: blur(10px);
+        }
+
+        .block:active {
+            transform: scale(0.9);
+        }
+
+        /* 结算界面 */
+        .card {
+            background: var(--white);
+            padding: 40px;
+            border-radius: 40px;
+            box-shadow: 0 20px 50px rgba(0,0,0,0.05);
+            margin-bottom: 30px;
+        }
+
+        .result-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 20px;
+            margin-bottom: 20px;
+            text-align: left;
+        }
+
+        .levelup-overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(255, 255, 255, 0.7);
+            backdrop-filter: blur(30px);
+            -webkit-backdrop-filter: blur(30px);
+            display: none;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            z-index: 1000;
+            animation: fadeIn 0.3s ease-out;
+        }
+
+        .levelup-content {
+            text-align: center;
+            background: white;
+            padding: 40px;
+            border-radius: 32px;
+            box-shadow: 0 20px 60px rgba(0,0,0,0.1);
+            max-width: 300px;
+            width: 90%;
+        }
+
+        .levelup-title {
+            font-size: 2.5rem;
+            font-weight: 900;
+            margin-bottom: 10px;
+            color: var(--primary);
+        }
+
+        .levelup-subtitle {
+            font-size: 1.2rem;
+            color: var(--gray);
+            margin-bottom: 30px;
+            font-weight: 600;
+        }
+
+        .btn-group {
+            display: flex;
+            flex-direction: column;
+            gap: 12px;
+            width: 100%;
+        }
+
+        .btn-secondary {
+            background: #E2E8F0;
+            color: var(--text);
+            box-shadow: none;
+        }
+    </style>
+</head>
+<body>
+
+    <div id="app">
+        <!-- 首页 -->
+        <div id="screen-start" class="screen active">
+            <h1 class="title">色块消消</h1>
+            <p class="subtitle">极限色彩记忆挑战</p>
+            <div class="color-preview" id="preview-dots"></div>
+            <button class="btn" onclick="game.start()">开始挑战</button>
+        </div>
+
+        <!-- 游戏界面 -->
+        <div id="screen-game" class="screen">
+            <div class="stats">
+                <div style="text-align: left;">
+                    <div class="stat-label" id="level-label">LEVEL 1</div>
+                    <div class="stat-value" id="score-val">0</div>
+                </div>
+                <div style="text-align: right;">
+                    <div class="combo-text" id="combo-val">0 COMBO</div>
+                    <div class="timer-text" id="timer-val">3.0s</div>
+                </div>
+            </div>
+            <div class="progress-bar">
+                <div id="progress-inner"></div>
+            </div>
+            <div class="target-container">
+                <div class="stat-label" id="target-hint">记住这个颜色</div>
+                <div id="target-block"></div>
+            </div>
+            <div class="grid" id="game-grid"></div>
+        </div>
+
+        <!-- 结算界面 -->
+        <div id="screen-over" class="screen">
+            <div style="font-size: 4rem; margin-bottom: 20px;">🏆</div>
+            <h2 style="font-size: 2.5rem; font-weight: 900; margin-bottom: 30px;">挑战结束</h2>
+            <div class="card">
+                <div class="result-grid">
+                    <div>
+                        <div class="stat-label">最终得分</div>
+                        <div class="stat-value" id="final-score">0</div>
+                    </div>
+                    <div>
+                        <div class="stat-label">最高关卡</div>
+                        <div class="stat-value" id="final-level">1</div>
+                    </div>
+                </div>
+                <p id="rank-text" style="color: var(--gray); font-style: italic;"></p>
+            </div>
+            <button class="btn" onclick="game.start()" style="width: 100%; margin-bottom: 10px;">再试一次</button>
+        </div>
+
+        <!-- 升级/继续弹窗 -->
+        <div id="levelup-overlay" class="levelup-overlay">
+            <div class="levelup-content">
+                <div class="levelup-title">LEVEL UP!</div>
+                <div class="levelup-subtitle" id="next-level-text">即将进入第 2 关</div>
+                <div class="btn-group">
+                    <button class="btn" onclick="game.continueNext()">继续挑战</button>
+                    <button class="btn btn-secondary" onclick="game.start()">重新开始</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const game = {
+            state: {
+                status: 'start',
+                level: 1,
+                score: 0,
+                timeLeft: 3.0,
+                combo: 0,
+                targetColor: '',
+                correctIndex: -1,
+                round: 1
+            },
+            timer: null,
+            memoryTimer: null,
+
+            init() {
+                this.renderPreview();
+            },
+
+            renderPreview() {
+                const container = document.getElementById('preview-dots');
+                const hues = [0, 45, 90, 150, 210];
+                container.innerHTML = hues.map(h => 
+                    `<div class="preview-dot" style="background: hsl(${h}, 80%, 60%); animation-delay: ${h/200}s"></div>`
+                ).join('');
+            },
+
+            start() {
+                if (this.timer) clearInterval(this.timer);
+                if (this.memoryTimer) clearTimeout(this.memoryTimer);
+                
+                this.state = {
+                    status: 'playing',
+                    level: 1,
+                    score: 0,
+                    timeLeft: 3.0,
+                    combo: 0,
+                    targetColor: '',
+                    correctIndex: -1,
+                    round: 1
+                };
+                this.switchScreen('game');
+                document.getElementById('levelup-overlay').style.display = 'none';
+                this.nextRound();
+                this.startTimer();
+            },
+
+            switchScreen(id) {
+                document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
+                document.getElementById('screen-' + id).classList.add('active');
+            },
+
+            generateColors(level) {
+                const baseHue = Math.round(Math.random() * 360);
+                const hueGap = Math.max(12, 50 - level * 2);
+                const satGap = Math.max(5, 15 - level * 0.5);
+                const lightGap = Math.max(5, 12 - level * 0.3);
+
+                const saturation = Math.round(60 + Math.random() * 30);
+                const lightness = Math.round(40 + Math.random() * 20);
+                
+                const target = `hsl(${baseHue}, ${saturation}%, ${lightness}%)`;
+                
+                const type = Math.floor(Math.random() * 3);
+                let distractor;
+                const direction = Math.random() > 0.5 ? 1 : -1;
+
+                if (type === 0 || level < 3) {
+                    distractor = `hsl(${Math.round((baseHue + hueGap * direction + 360) % 360)}, ${saturation}%, ${lightness}%)`;
+                } else if (type === 1) {
+                    distractor = `hsl(${baseHue}, ${Math.round(Math.max(10, Math.min(90, saturation + satGap * direction)))}%, ${lightness}%)`;
+                } else {
+                    distractor = `hsl(${baseHue}, ${saturation}%, ${Math.round(Math.max(10, Math.min(90, lightness + lightGap * direction)))}%)`;
+                }
+
+                return { target, distractor };
+            },
+
+            nextRound() {
+                if (this.memoryTimer) clearTimeout(this.memoryTimer);
+                
+                const { target, distractor } = this.generateColors(this.state.level);
+                this.state.targetColor = target;
+                this.state.correctIndex = Math.floor(Math.random() * 16);
+                this.state.timeLeft = Math.max(1.2, 3.0 - (this.state.level * 0.12));
+
+                // 更新UI
+                document.getElementById('level-label').innerText = 'LEVEL ' + this.state.level;
+                document.getElementById('score-val').innerText = this.state.score;
+                document.getElementById('combo-val').innerText = this.state.combo + ' COMBO';
+                document.getElementById('progress-inner').style.width = (this.state.round / 5 * 100) + '%';
+                
+                const targetBlock = document.getElementById('target-block');
+                targetBlock.style.backgroundColor = target;
+                targetBlock.classList.remove('hidden');
+                targetBlock.innerText = '';
+                document.getElementById('target-hint').innerText = '记住这个颜色';
+
+                // 生成网格
+                const grid = document.getElementById('game-grid');
+                grid.innerHTML = '';
+                for (let i = 0; i < 16; i++) {
+                    const block = document.createElement('div');
+                    block.className = 'block';
+                    
+                    if (i === this.state.correctIndex) {
+                        block.style.backgroundColor = target;
+                    } else {
+                        const hVar = Math.round((Math.random() - 0.5) * 40);
+                        const sVar = Math.round((Math.random() - 0.5) * 30);
+                        const lVar = Math.round((Math.random() - 0.5) * 20);
+                        
+                        // 解析distractor HSL
+                        const parts = distractor.match(/\d+/g);
+                        const h = (parseInt(parts[0]) + hVar + 360) % 360;
+                        const s = Math.max(10, Math.min(90, parseInt(parts[1]) + sVar));
+                        const l = Math.max(10, Math.min(90, parseInt(parts[2]) + lVar));
+                        block.style.backgroundColor = `hsl(${h}, ${s}%, ${l}%)`;
+                    }
+                    
+                    block.onclick = (e) => this.handleTap(i, e.target);
+                    grid.appendChild(block);
+                }
+
+                // 记忆模式定时器
+                const duration = Math.max(150, 1000 - this.state.level * 100);
+                this.memoryTimer = setTimeout(() => {
+                    targetBlock.classList.add('hidden');
+                    targetBlock.innerText = '?';
+                    document.getElementById('target-hint').innerText = '凭记忆点击！';
+                }, duration);
+            },
+
+            handleTap(idx, element) {
+                if (this.state.status !== 'playing') return;
+
+                if (idx === this.state.correctIndex) {
+                    // 正确 - 添加消失动画
+                    element.classList.add('clicked');
+                    
+                    this.state.score += 10 + this.state.combo * 2;
+                    this.state.combo++;
+                    this.state.round++;
+
+                    if (this.state.round > 5) {
+                        setTimeout(() => this.levelUp(), 200);
+                    } else {
+                        setTimeout(() => this.nextRound(), 200);
+                    }
+                } else {
+                    // 错误
+                    this.state.combo = 0;
+                    this.state.timeLeft = Math.max(0, this.state.timeLeft - 0.8);
+                    document.getElementById('game-grid').classList.add('shake');
+                    setTimeout(() => document.getElementById('game-grid').classList.remove('shake'), 400);
+                    document.getElementById('combo-val').innerText = '0 COMBO';
+                }
+            },
+
+            levelUp() {
+                this.state.status = 'levelup';
+                document.getElementById('next-level-text').innerText = `即将进入第 ${this.state.level + 1} 关`;
+                
+                const overlay = document.getElementById('levelup-overlay');
+                overlay.style.display = 'flex';
+            },
+
+            continueNext() {
+                this.state.level++;
+                this.state.round = 1;
+                document.getElementById('levelup-overlay').style.display = 'none';
+                this.state.status = 'playing';
+                this.nextRound();
+            },
+
+            startTimer() {
+                if (this.timer) clearInterval(this.timer);
+                this.timer = setInterval(() => {
+                    if (this.state.status !== 'playing') return;
+                    
+                    this.state.timeLeft -= 0.1;
+                    if (this.state.timeLeft <= 0) {
+                        this.gameOver();
+                    }
+                    document.getElementById('timer-val').innerText = Math.max(0, this.state.timeLeft).toFixed(1) + 's';
+                }, 100);
+            },
+
+            gameOver() {
+                this.state.status = 'over';
+                clearInterval(this.timer);
+                this.switchScreen('over');
+                document.getElementById('final-score').innerText = this.state.score;
+                document.getElementById('final-level').innerText = this.state.level;
+                document.getElementById('rank-text').innerText = 
+                    `"你的色感超过了 ${Math.min(99, Math.floor(this.state.score / 10 + 50))}% 的玩家"`;
+            }
+        };
+
+        game.init();
+    </script>
+</body>
+</html>
+

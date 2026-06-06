@@ -1,0 +1,67 @@
+{
+  "generatedAt": "2026-06-04T07:23:22.659Z",
+  "passed": 12,
+  "failed": 0,
+  "results": [
+    {
+      "name": "desktop conversation list visible",
+      "pass": true,
+      "details": ""
+    },
+    {
+      "name": "desktop right pane widened",
+      "pass": true,
+      "details": "width=361"
+    },
+    {
+      "name": "group info order is name avatar members actions",
+      "pass": true,
+      "details": "{\"name\":72,\"avatar\":106,\"members\":247,\"actions\":692}"
+    },
+    {
+      "name": "input toolbar plus menu removed",
+      "pass": true,
+      "details": "toolbar buttons=4"
+    },
+    {
+      "name": "chat input is taller for multiline",
+      "pass": true,
+      "details": "{\"row\":128,\"textarea\":102}"
+    },
+    {
+      "name": "emoji panel is pure 5-column grid",
+      "pass": true,
+      "details": "{\"columns\":5,\"cells\":35,\"hasVisibleWords\":false,\"textLength\":101}"
+    },
+    {
+      "name": "file card has view and preview buttons",
+      "pass": true,
+      "details": "buttons=2; previewEnabled=true"
+    },
+    {
+      "name": "desktop preview replaces group info pane",
+      "pass": true,
+      "details": "{\"previewVisible\":true,\"groupInfoVisible\":false,\"documentPreview\":true,\"filename\":\"AgentHub_IM_Preview_Guide.docx\",\"stateTextLength\":6}"
+    },
+    {
+      "name": "desktop office preview rendered",
+      "pass": true,
+      "details": "{\"previewVisible\":true,\"groupInfoVisible\":false,\"documentPreview\":true,\"filename\":\"AgentHub_IM_Preview_Guide.docx\",\"stateTextLength\":6}"
+    },
+    {
+      "name": "closing preview restores group info",
+      "pass": true,
+      "details": ""
+    },
+    {
+      "name": "image message opens enlarged lightbox",
+      "pass": true,
+      "details": ""
+    },
+    {
+      "name": "mobile preview opens dedicated page",
+      "pass": true,
+      "details": "{\"url\":\"http://localhost:5173/#/pages/files/preview?file=%257B%2522id%2522%253A%25221780557802405%2522%252C%2522name%2522%253A%2522AgentHub_IM_Preview_Guide.docx%2522%252C%2522fileName%2522%253A%2522AgentHub_IM_Preview_Guide.docx%2522%252C%2522content%2522%253A%2522AgentHub_IM_Preview_Guide.docx%2522%252C%2522fileSize%2522%253A%25224.8%2520MB%2522%252C%2522size%2522%253A%25224.8%2520MB%2522%252C%2522fileType%2522%253A%2522%2522%252C%2522ext%2522%253A%2522%2522%252C%2522url%2522%253A%2522%2522%252C%2522sourceUrl%2522%253A%2522%2522%252C%2522contentUrl%2522%253A%2522%2522%252C%2522previewContent%2522%253A%2522AgentHub%2520IM%2520%25E6%2596%2587%25E4%25BB%25B6%25E9%25A2%2584%25E8%25A7%2588%25E6%2596%25B9%25E6%25A1%2588%255Cn%255Cn1.%2520%25E5%258F%25B3%25E4%25BE%25A7%25E4%25BF%25A1%25E6%2581%25AF%25E6%25A0%258F%25E4%25B8%258E%25E9%25A2%2584%25E8%25A7%2588%25E6%25A0%258F%25E4%25BA%258C%25E9%2580%2589%25E4%25B8%2580%25E5%25B1%2595%25E7%25A4%25BA%25E3%2580%2582%255Cn2.%2520%25E6%2596%2587%25E4%25BB%25B6%25E5%258D%25A1%25E7%2589%2587%25E6%258F%2590%25E4%25BE%259B%25E6%259F%25A5%25E7%259C%258B%25E5%2592%258C%25E9%25A2%2584%25E8%25A7%2588%25E4%25B8%25A4%25E4%25B8%25AA%25E5%2585%25A5%25E5%258F%25A3%25E3%2580%2582%255Cn3.%2520%25E7%25A7%25BB%25E5%258A%25A8%25E7%25AB%25AF%25E9%2580%259A%25E8%25BF%2587%25E6%2596%25B0%25E9%25A1%25B5%25E9%259D%25A2%25E6%2589%25BF%25E8%25BD%25BD%25E9%25A2%2584%25E8%25A7%2588%25E3%2580%2582%2522%252C%2522contentText%2522%253A%2522%2522%252C%2522markdown%2522%253A%2522%2522%252C%2522text%2522%253A%2522%2522%257D\",\"pageVisible\":true,\"previewVisible\":true,\"bottomTabs\":0}"
+    }
+  ]
+}

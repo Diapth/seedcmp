@@ -36,6 +36,7 @@ import { createRuntimeCat, deleteRuntimeCat, updateRuntimeCat } from '../config/
 import { deleteRuntimeOverride, getRuntimeOverride, setRuntimeOverride } from '../config/session-strategy-overrides.js';
 import { resolveActiveProjectRoot } from '../utils/active-project-root.js';
 import { resolveHeaderUserId } from '../utils/request-identity.js';
+import { buildProviderSkillCatalog } from '../utils/skill-catalog.js';
 
 const colorSchema = z.object({
   primary: z.string().min(1),
@@ -410,10 +411,14 @@ export const catsRoutes: FastifyPluginAsync<CatsRoutesOptions> = async (app, opt
       const projectRoot = resolveProjectRoot();
       const templatePath = resolveProjectTemplatePath(projectRoot);
       const template = loadCatTemplateConfig(templatePath);
-      return { templates: template.roleTemplates ?? [], clientDefaults: template.clientDefaults ?? {} };
+      const skillCatalog = await buildProviderSkillCatalog(projectRoot).catch((err) => {
+        app.log.warn({ err }, 'Failed to load provider skill catalog');
+        return { claude: [], codex: [], gemini: [], kimi: [] };
+      });
+      return { templates: template.roleTemplates ?? [], clientDefaults: template.clientDefaults ?? {}, skillCatalog };
     } catch (err) {
       app.log.warn({ err }, 'Failed to load cat templates');
-      return { templates: [], clientDefaults: {} };
+      return { templates: [], clientDefaults: {}, skillCatalog: { claude: [], codex: [], gemini: [], kimi: [] } };
     }
   });
 

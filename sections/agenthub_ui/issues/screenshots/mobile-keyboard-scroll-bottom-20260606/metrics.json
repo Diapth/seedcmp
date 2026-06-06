@@ -1,0 +1,50 @@
+{
+  "initial": {
+    "label": "initial",
+    "areaBottom": 733,
+    "areaHeight": 669,
+    "lastBottom": 696,
+    "anchorBottom": 713,
+    "anchorDistanceToAreaBottom": 20,
+    "lastDistanceToAreaBottom": 37,
+    "activeScroller": {
+      "className": "uni-scroll-view",
+      "tagName": "DIV",
+      "scrollTop": 574,
+      "scrollHeight": 1243,
+      "clientHeight": 669
+    }
+  },
+  "input": {
+    "label": "input",
+    "areaBottom": 453,
+    "areaHeight": 389,
+    "lastBottom": 416,
+    "anchorBottom": 433,
+    "anchorDistanceToAreaBottom": 20,
+    "lastDistanceToAreaBottom": 37,
+    "activeScroller": {
+      "className": "uni-scroll-view",
+      "tagName": "DIV",
+      "scrollTop": 854,
+      "scrollHeight": 1243,
+      "clientHeight": 389
+    }
+  },
+  "emoji": {
+    "label": "inputToEmoji",
+    "areaBottom": 453,
+    "areaHeight": 389,
+    "lastBottom": 416,
+    "anchorBottom": 433,
+    "anchorDistanceToAreaBottom": 20,
+    "lastDistanceToAreaBottom": 37,
+    "activeScroller": {
+      "className": "uni-scroll-view",
+      "tagName": "DIV",
+      "scrollTop": 854,
+      "scrollHeight": 1243,
+      "clientHeight": 389
+    }
+  }
+}

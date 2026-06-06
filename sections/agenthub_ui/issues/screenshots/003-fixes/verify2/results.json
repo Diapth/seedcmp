@@ -1,0 +1,22 @@
+[
+  {
+    "name": "Issue 1: right pane width",
+    "pass": null,
+    "detail": "w=none"
+  },
+  {
+    "name": "Reply ref element exists for self",
+    "pass": false,
+    "detail": "me=0 other=0"
+  },
+  {
+    "name": "Issue 4: emoji panel height <= 280px",
+    "pass": true,
+    "detail": "h=240"
+  },
+  {
+    "name": "No horizontal overflow on 1024x768",
+    "pass": true,
+    "detail": "bodyW=1024 winW=1024"
+  }
+]

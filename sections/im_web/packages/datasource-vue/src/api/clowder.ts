@@ -98,6 +98,23 @@ export interface ClowderPlatformModelOption {
 }
 
 export type ClowderLocalOAuthProvider = 'codex' | 'claude';
+export type ClowderSkillProvider = ClowderLocalOAuthProvider | 'gemini' | 'kimi';
+
+export interface ClowderSkillMcpDependency {
+  id: string;
+  status: 'ready' | 'missing' | 'unresolved' | string;
+}
+
+export interface ClowderSkillEntry {
+  name: string;
+  category?: string;
+  trigger?: string;
+  description?: string;
+  mounted?: boolean;
+  requiresMcp?: ClowderSkillMcpDependency[];
+}
+
+export type ClowderSkillCatalog = Partial<Record<ClowderSkillProvider, ClowderSkillEntry[]>>;
 
 export interface ClowderLocalOAuthConfigFile {
   path: string;
@@ -161,6 +178,7 @@ export interface ClowderCatDirectoryResponse {
   agents: ClowderAgent[];
   templates?: ClowderCatRoleTemplate[];
   clientDefaults?: Record<string, ClowderClientDefaultModels>;
+  skillCatalog?: ClowderSkillCatalog;
 }
 
 export interface ClowderBindRequest extends ClowderConversationRef {

@@ -53,6 +53,11 @@ const selectedOAuthProvider = computed<'' | 'codex' | 'claude'>(() => {
   return '';
 });
 
+const selectedProviderSkills = computed(() => {
+  const provider = selectedOAuthProvider.value;
+  return provider ? clowderStore.catSkillCatalog[provider] || [] : [];
+});
+
 const selectedOAuthConfig = computed(() => {
   const provider = selectedOAuthProvider.value;
   return provider ? clowderStore.localOAuthCapabilities[provider] : undefined;
@@ -324,6 +329,24 @@ function back() {
             <option value="anthropic">Claude Code</option>
           </select>
         </label>
+        <div v-if="form.clientId" class="skill-preview">
+          <div class="skill-preview-title">
+            <span>{{ oauthProviderLabel() }} Skills</span>
+            <span class="skill-count">{{ selectedProviderSkills.length }}</span>
+          </div>
+          <div v-if="selectedProviderSkills.length > 0" class="skill-list">
+            <div
+              v-for="skill in selectedProviderSkills"
+              :key="skill.name"
+              class="skill-row"
+              :title="skill.description || skill.trigger || skill.category || skill.name"
+            >
+              <span class="skill-name">{{ skill.name }}</span>
+              <span class="skill-category">{{ skill.category || 'Skill' }}</span>
+            </div>
+          </div>
+          <span v-else class="muted">暂无已挂载 skill</span>
+        </div>
         <label class="field">
           <span>添加方式</span>
           <select v-model="form.authType">
@@ -572,6 +595,76 @@ function back() {
 .template-name {
   color: var(--text-primary);
   font-weight: 600;
+}
+
+.skill-preview {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin: -2px 0 12px;
+  padding: 10px;
+  border: var(--border-hairline);
+  border-radius: var(--radius-sm);
+  background-color: var(--bg-secondary);
+}
+
+.skill-preview-title {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  color: var(--text-primary);
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.skill-count {
+  flex-shrink: 0;
+  min-width: 20px;
+  height: 18px;
+  border-radius: var(--radius-sm);
+  background-color: rgba(22, 93, 255, 0.08);
+  color: var(--primary-color, #165dff);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 10px;
+}
+
+.skill-list {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  max-height: 176px;
+  overflow: auto;
+}
+
+.skill-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(72px, 128px);
+  gap: 8px;
+  align-items: center;
+  min-height: 26px;
+  color: var(--text-secondary);
+  font-size: 12px;
+}
+
+.skill-name,
+.skill-category {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.skill-name {
+  color: var(--text-primary);
+  font-weight: 600;
+}
+
+.skill-category {
+  text-align: right;
+  color: var(--text-tertiary, var(--text-secondary));
 }
 
 .oauth-status {

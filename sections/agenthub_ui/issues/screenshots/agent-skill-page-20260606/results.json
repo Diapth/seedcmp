@@ -1,0 +1,43 @@
+{
+  "desktop": {
+    "name": "desktop-skill-page",
+    "width": 1440,
+    "height": 900,
+    "title": "技能库",
+    "hasSkillLibrary": true,
+    "hasUploadUi": true,
+    "hasRenderedDoc": true,
+    "hasCodegenSelected": true,
+    "bodyScrollWidth": 1440,
+    "viewportWidth": 1440,
+    "horizontalOverflow": false,
+    "docPanelHeight": 759,
+    "uploadHeight": 206
+  },
+  "mobile": {
+    "name": "mobile-skill-page",
+    "width": 375,
+    "height": 844,
+    "title": "技能库",
+    "hasSkillLibrary": true,
+    "hasUploadUi": true,
+    "hasRenderedDoc": true,
+    "hasCodegenSelected": true,
+    "bodyScrollWidth": 375,
+    "viewportWidth": 375,
+    "horizontalOverflow": false,
+    "docPanelHeight": 900,
+    "uploadHeight": 280
+  },
+  "sourceToggle": {
+    "hasSourceBody": true,
+    "sourceTextIncludesHeading": true,
+    "horizontalOverflow": false
+  },
+  "logs": [
+    {
+      "type": "error",
+      "text": "Failed to load resource: the server responded with a status of 404 (Not Found)"
+    }
+  ]
+}

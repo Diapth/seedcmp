@@ -1,0 +1,47 @@
+[
+  {
+    "name": "Issue 1: right pane wider than 360px",
+    "pass": null,
+    "detail": "w=none"
+  },
+  {
+    "name": "GroupInfoPanel: group name visible",
+    "pass": true,
+    "detail": "count=1"
+  },
+  {
+    "name": "Group avatar reasonable size",
+    "pass": true,
+    "detail": "h=64"
+  },
+  {
+    "name": "Danger section background subtle (transparent or base)",
+    "pass": true,
+    "detail": "bg=rgba(0, 0, 0, 0)"
+  },
+  {
+    "name": "Issue 3: reply ref right edge aligns with bubble",
+    "pass": false,
+    "detail": "reply-ref-me or bubble-me not found"
+  },
+  {
+    "name": "Issue 2: file preview desktop sidebar replaced by spacer",
+    "pass": true,
+    "detail": "spacer w=65"
+  },
+  {
+    "name": "Issue 2: preview content rendered",
+    "pass": true,
+    "detail": "count=1"
+  },
+  {
+    "name": "Issue 5: toolbar above input box",
+    "pass": true,
+    "detail": "toolbar bottom=780 input top=786"
+  },
+  {
+    "name": "Issue 5: mobile input row single-line height",
+    "pass": true,
+    "detail": "h=50"
+  }
+]

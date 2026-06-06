@@ -152,8 +152,10 @@ type ClowderAgent struct {
 }
 
 type CatDirectoryResponse struct {
-	Agents    []ClowderAgent       `json:"agents"`
-	Templates []ClowderCatTemplate `json:"templates,omitempty"`
+	Agents         []ClowderAgent                  `json:"agents"`
+	Templates      []ClowderCatTemplate            `json:"templates,omitempty"`
+	ClientDefaults map[string]ClowderClientDefault `json:"clientDefaults,omitempty"`
+	SkillCatalog   map[string][]ClowderSkill       `json:"skillCatalog,omitempty"`
 }
 
 type ClowderCatTemplate struct {
@@ -171,7 +173,28 @@ type ClowderCatTemplate struct {
 }
 
 type catTemplatesResponse struct {
-	Templates []catTemplate `json:"templates"`
+	Templates      []catTemplate                   `json:"templates"`
+	ClientDefaults map[string]ClowderClientDefault `json:"clientDefaults,omitempty"`
+	SkillCatalog   map[string][]ClowderSkill       `json:"skillCatalog,omitempty"`
+}
+
+type ClowderClientDefault struct {
+	DefaultModel string   `json:"defaultModel,omitempty"`
+	Models       []string `json:"models,omitempty"`
+}
+
+type ClowderSkill struct {
+	Name        string                      `json:"name"`
+	Category    string                      `json:"category,omitempty"`
+	Trigger     string                      `json:"trigger,omitempty"`
+	Description string                      `json:"description,omitempty"`
+	Mounted     bool                        `json:"mounted"`
+	RequiresMCP []ClowderSkillMCPDependency `json:"requiresMcp,omitempty"`
+}
+
+type ClowderSkillMCPDependency struct {
+	ID     string `json:"id"`
+	Status string `json:"status"`
 }
 
 type catTemplate struct {
@@ -1789,12 +1812,17 @@ func (c *Clowder) queryConversationRef(ctx *wkhttp.Context) (string, uint8, bool
 }
 
 func (c *Clowder) fetchAgentDirectory(channelID string, channelType uint8, userID string) (AgentDirectoryResponse, error) {
+	directory, _, err := c.fetchAgentDirectoryWithTemplateResponse(channelID, channelType, userID)
+	return directory, err
+}
+
+func (c *Clowder) fetchAgentDirectoryWithTemplateResponse(channelID string, channelType uint8, userID string) (AgentDirectoryResponse, *catTemplatesResponse, error) {
 	if !c.config.IsConfigured() {
-		return AgentDirectoryResponse{}, fmt.Errorf("clowder bridge is not configured")
+		return AgentDirectoryResponse{}, nil, fmt.Errorf("clowder bridge is not configured")
 	}
 	endpoint, err := url.Parse(strings.TrimRight(c.config.APIBaseURL, "/") + "/api/connectors/im-web/agents")
 	if err != nil {
-		return AgentDirectoryResponse{}, err
+		return AgentDirectoryResponse{}, nil, err
 	}
 	query := endpoint.Query()
 	query.Set("externalChatId", externalChatIDForUser(channelID, channelType, userID))
@@ -1802,89 +1830,102 @@ func (c *Clowder) fetchAgentDirectory(channelID string, channelType uint8, userI
 
 	req, err := http.NewRequest(http.MethodGet, endpoint.String(), nil)
 	if err != nil {
-		return AgentDirectoryResponse{}, err
+		return AgentDirectoryResponse{}, nil, err
 	}
 	c.applyDirectoryUserHeader(req, userID)
 
 	res, err := c.httpClient().Do(req)
 	if err != nil {
-		return c.fallbackAgentDirectory(userID, err)
+		return c.fallbackAgentDirectoryWithTemplateResponse(userID, err)
 	}
 	defer res.Body.Close()
 	if res.StatusCode < 200 || res.StatusCode >= 300 {
-		return c.fallbackAgentDirectory(userID, fmt.Errorf("clowder agents failed: %s", res.Status))
+		return c.fallbackAgentDirectoryWithTemplateResponse(userID, fmt.Errorf("clowder agents failed: %s", res.Status))
 	}
 
 	var directory AgentDirectoryResponse
 	if err := json.NewDecoder(res.Body).Decode(&directory); err != nil {
-		return c.fallbackAgentDirectory(userID, err)
+		return c.fallbackAgentDirectoryWithTemplateResponse(userID, err)
 	}
 	if directory.Agents == nil {
 		directory.Agents = []ClowderAgent{}
 	}
 	if len(directory.Agents) == 0 {
-		if fallback, fallbackErr := c.fetchTemplateCandidateDirectory(userID); fallbackErr == nil && len(fallback.Agents) > 0 {
-			return fallback, nil
+		if fallback, templateResponse, fallbackErr := c.fetchTemplateCandidateDirectoryWithResponse(userID); fallbackErr == nil && len(fallback.Agents) > 0 {
+			return fallback, &templateResponse, nil
 		}
 	}
-	return directory, nil
+	return directory, nil, nil
 }
 
 func (c *Clowder) fallbackAgentDirectory(userID string, cause error) (AgentDirectoryResponse, error) {
-	fallback, fallbackErr := c.fetchTemplateCandidateDirectory(userID)
-	if fallbackErr == nil && len(fallback.Agents) > 0 {
-		return fallback, nil
-	}
-	if cause != nil {
-		return AgentDirectoryResponse{}, cause
-	}
+	fallback, _, fallbackErr := c.fallbackAgentDirectoryWithTemplateResponse(userID, cause)
 	return fallback, fallbackErr
 }
 
+func (c *Clowder) fallbackAgentDirectoryWithTemplateResponse(userID string, cause error) (AgentDirectoryResponse, *catTemplatesResponse, error) {
+	fallback, templateResponse, fallbackErr := c.fetchTemplateCandidateDirectoryWithResponse(userID)
+	if fallbackErr == nil && len(fallback.Agents) > 0 {
+		return fallback, &templateResponse, nil
+	}
+	if cause != nil {
+		return AgentDirectoryResponse{}, nil, cause
+	}
+	return fallback, nil, fallbackErr
+}
+
 func (c *Clowder) fetchTemplateCandidateDirectory(userID string) (AgentDirectoryResponse, error) {
-	templates, err := c.fetchCatTemplates(userID)
+	directory, _, err := c.fetchTemplateCandidateDirectoryWithResponse(userID)
+	return directory, err
+}
+
+func (c *Clowder) fetchTemplateCandidateDirectoryWithResponse(userID string) (AgentDirectoryResponse, catTemplatesResponse, error) {
+	templateResponse, err := c.fetchCatTemplates(userID)
 	if err != nil {
-		return AgentDirectoryResponse{}, err
+		return AgentDirectoryResponse{}, catTemplatesResponse{}, err
 	}
 
-	agents := make([]ClowderAgent, 0, len(templates))
-	for _, template := range templates {
+	agents := make([]ClowderAgent, 0, len(templateResponse.Templates))
+	for _, template := range templateResponse.Templates {
 		if agent, ok := catTemplateCandidateAgent(template); ok {
 			agents = append(agents, agent)
 		}
 	}
-	return AgentDirectoryResponse{Agents: agents}, nil
+	return AgentDirectoryResponse{Agents: agents}, templateResponse, nil
 }
 
-func (c *Clowder) fetchCatTemplates(userID string) ([]catTemplate, error) {
+func (c *Clowder) fetchCatTemplates(userID string) (catTemplatesResponse, error) {
 	if !c.config.IsConfigured() {
-		return nil, fmt.Errorf("clowder bridge is not configured")
+		return catTemplatesResponse{}, fmt.Errorf("clowder bridge is not configured")
 	}
 	endpoint, err := url.Parse(strings.TrimRight(c.config.APIBaseURL, "/") + "/api/cat-templates")
 	if err != nil {
-		return nil, err
+		return catTemplatesResponse{}, err
 	}
 
 	req, err := http.NewRequest(http.MethodGet, endpoint.String(), nil)
 	if err != nil {
-		return nil, err
+		return catTemplatesResponse{}, err
 	}
 	c.applyDirectoryUserHeader(req, userID)
 
 	res, err := c.httpClient().Do(req)
 	if err != nil {
-		return nil, err
+		return catTemplatesResponse{}, err
 	}
 	defer res.Body.Close()
 	if res.StatusCode < 200 || res.StatusCode >= 300 {
-		return nil, fmt.Errorf("clowder cat templates failed: %s", res.Status)
+		return catTemplatesResponse{}, fmt.Errorf("clowder cat templates failed: %s", res.Status)
 	}
 
 	var response catTemplatesResponse
 	if err := json.NewDecoder(res.Body).Decode(&response); err != nil {
-		return nil, err
+		return catTemplatesResponse{}, err
 	}
-	return response.Templates, nil
+	if response.Templates == nil {
+		response.Templates = []catTemplate{}
+	}
+	return response, nil
 }
 
 func (c *Clowder) applyDirectoryUserHeader(req *http.Request, userID string) {
@@ -2027,7 +2068,7 @@ func templateCandidateMentions(values ...string) []string {
 }
 
 func (c *Clowder) fetchCatDirectory(userID string) (CatDirectoryResponse, error) {
-	directory, err := c.fetchAgentDirectory(clowderAIDirectChannelID, 1, userID)
+	directory, templateResponse, err := c.fetchAgentDirectoryWithTemplateResponse(clowderAIDirectChannelID, 1, userID)
 	if err != nil {
 		return CatDirectoryResponse{}, err
 	}
@@ -2036,14 +2077,27 @@ func (c *Clowder) fetchCatDirectory(userID string) (CatDirectoryResponse, error)
 	}
 	templates := catRoleTemplatesFromFallbackAgents(directory.Agents)
 	if len(templates) == 0 {
-		rawTemplates, templateErr := c.fetchCatTemplates(userID)
-		if templateErr == nil {
-			templates = catRoleTemplatesFromTemplates(rawTemplates)
+		if templateResponse == nil {
+			rawTemplates, templateErr := c.fetchCatTemplates(userID)
+			if templateErr == nil {
+				templateResponse = &rawTemplates
+			}
+		}
+		if templateResponse != nil {
+			templates = catRoleTemplatesFromTemplates(templateResponse.Templates)
 		}
 	}
+	clientDefaults := map[string]ClowderClientDefault(nil)
+	skillCatalog := map[string][]ClowderSkill(nil)
+	if templateResponse != nil {
+		clientDefaults = templateResponse.ClientDefaults
+		skillCatalog = templateResponse.SkillCatalog
+	}
 	return CatDirectoryResponse{
-		Agents:    directory.Agents,
-		Templates: templates,
+		Agents:         directory.Agents,
+		Templates:      templates,
+		ClientDefaults: clientDefaults,
+		SkillCatalog:   skillCatalog,
 	}, nil
 }
 

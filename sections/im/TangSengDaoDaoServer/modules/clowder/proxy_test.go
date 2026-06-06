@@ -136,6 +136,29 @@ func TestFetchCatDirectoryUsesDirectHubAndKeepsExistingRagdoll(t *testing.T) {
 						"teamStrengths": "需求澄清、任务拆分",
 					},
 				},
+				"clientDefaults": map[string]interface{}{
+					"openai": map[string]interface{}{
+						"defaultModel": "gpt-5.4",
+						"models":       []string{"gpt-5.4"},
+					},
+				},
+				"skillCatalog": map[string]interface{}{
+					"codex": []map[string]interface{}{
+						{
+							"name":        "tdd",
+							"category":    "开发流程链",
+							"trigger":     "TDD",
+							"description": "测试驱动开发",
+						},
+					},
+					"claude": []map[string]interface{}{
+						{
+							"name":     "deep-research",
+							"category": "研究",
+							"trigger":  "deep research",
+						},
+					},
+				},
 			})
 		default:
 			http.NotFound(w, r)
@@ -162,6 +185,11 @@ func TestFetchCatDirectoryUsesDirectHubAndKeepsExistingRagdoll(t *testing.T) {
 	assert.Equal(t, "opus", directory.Agents[0].CatID)
 	assert.Equal(t, "coordinator", directory.Templates[0].RoleTemplateID)
 	assert.Equal(t, "协调者", directory.Templates[0].DisplayName)
+	require.Len(t, directory.SkillCatalog["codex"], 1)
+	assert.Equal(t, "tdd", directory.SkillCatalog["codex"][0].Name)
+	require.Len(t, directory.SkillCatalog["claude"], 1)
+	assert.Equal(t, "deep-research", directory.SkillCatalog["claude"][0].Name)
+	assert.Equal(t, "gpt-5.4", directory.ClientDefaults["openai"].DefaultModel)
 	assert.Equal(t, "布偶猫", directory.Agents[0].DisplayName)
 	assert.Equal(t, []string{"@opus", "@布偶猫"}, directory.Agents[0].MentionPatterns)
 	assert.True(t, directory.Agents[0].Connected)

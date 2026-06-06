@@ -270,7 +270,24 @@ describe('Clowder cats as contact identities', () => {
           cloneable: true,
           source: 'role-template'
         }
-      ]
+      ],
+      skillCatalog: {
+        codex: [
+          {
+            name: 'tdd',
+            category: '开发流程链',
+            trigger: 'TDD',
+            description: '测试驱动开发'
+          }
+        ],
+        claude: [
+          {
+            name: 'deep-research',
+            category: '研究',
+            trigger: 'deep research'
+          }
+        ]
+      }
     })
 
     await store.loadCatContactDirectory({ includeUnavailable: true })
@@ -281,6 +298,8 @@ describe('Clowder cats as contact identities', () => {
       displayName: '协调者',
       cloneable: true
     })
+    expect(store.catSkillCatalog.codex?.map(skill => skill.name)).toEqual(['tdd'])
+    expect(store.catSkillCatalog.claude?.map(skill => skill.name)).toEqual(['deep-research'])
   })
 
   it('deletes a connected cat and prunes local contact, group, directory, and focus state', async () => {

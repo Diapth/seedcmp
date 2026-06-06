@@ -8,6 +8,17 @@ import { pathsEqual } from './project-path.js';
 
 export type SkillProviderMountKey = 'claude' | 'codex' | 'gemini' | 'kimi';
 
+/** Resolve Clowder AI skills source from module location (stable across cwd/project). */
+export function resolveCatCafeSkillsSourceDir(): string {
+  let dir = dirname(fileURLToPath(import.meta.url));
+  while (dir !== dirname(dir)) {
+    const candidate = join(dir, 'cat-cafe-skills', 'manifest.yaml');
+    if (existsSync(candidate)) return join(dir, 'cat-cafe-skills');
+    dir = dirname(dir);
+  }
+  return resolve(process.cwd(), 'cat-cafe-skills');
+}
+
 function resolveProviderHome(value: string | undefined, fallback: string): string {
   const trimmed = value?.trim();
   return resolve(trimmed || fallback);

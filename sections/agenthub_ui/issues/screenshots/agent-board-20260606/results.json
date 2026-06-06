@@ -1,0 +1,59 @@
+{
+  "baseUrl": "http://localhost:5173",
+  "boardUrl": "http://localhost:5173/#/pages/agents/board",
+  "checks": [
+    {
+      "label": "mobile-board",
+      "url": "http://localhost:5173/#/pages/agents/board",
+      "title": "智能体看板",
+      "tabCount": 2,
+      "taskCardCount": 3,
+      "atButtonCount": 3,
+      "documentRows": 5,
+      "dialogCount": 0,
+      "viewportWidth": 375,
+      "docScrollWidth": 375,
+      "bodyScrollWidth": 375,
+      "hasHorizontalOverflow": false
+    },
+    {
+      "label": "mobile-log-page",
+      "url": "http://localhost:5173/#/pages/agents/log?boardId=board-agenthub-rd&taskId=task-rd-pm",
+      "title": "PM 智能体 · Console 日志",
+      "subtitle": "阶段验收与风险收敛",
+      "consoleTitle": "Console",
+      "consoleRows": 9,
+      "consoleText": "Consoletask-rd-pm · 3 entriesagenthub$open --board \"AgentHub 产品研发群\" --task \"task-rd-pm\"[system] INFOattached PM 智能体 @pm; status=待验收; progress=82%[goal] INFO把智能体、聊天、文件预览三个模块的验收标准整理成可执行清单，保证每个阶段都有截图与 issue 记录。[doc] INFOMD AgentHub交互验收清单.md - 主流程、移动端、截图与 issue 闭环清单[doc] INFOMD UI风险复盘.md - 记录未关闭设计确认项与复测重点[09:20] INFO拆分验收项将聊天、通讯录、智能体与文件预览拆成 4 组检查点，标注需要截图的断点。[10:45] INFO同步 issue 记录把移动端输入区和文件预览修复归档到 2026-06-06 follow-up。[13:10] INFO等待补充看板页与日志页完成后需要追加 5 秒识别记录。[summary]console output loaded: 3 logs, 2 documents",
+      "docRows": 2,
+      "dialogCount": 0,
+      "viewportWidth": 375,
+      "docScrollWidth": 375,
+      "bodyScrollWidth": 375,
+      "hasHorizontalOverflow": false
+    },
+    {
+      "label": "mobile-at-modify-after-log-page",
+      "url": "http://localhost:5173/#/pages/chat/detail?id=2",
+      "draftText": "@pm 请修改「阶段验收与风险收敛」：验收清单里缺少智能体看板入口与日志查看的 375px 移动端截图，请补充截图路径和复测结论。",
+      "containsMention": true,
+      "containsModify": true,
+      "containsTask": true
+    },
+    {
+      "label": "desktop-log-page",
+      "url": "http://localhost:5173/#/pages/agents/log?boardId=board-agenthub-rd&taskId=task-rd-codex",
+      "title": "Codex · Console 日志",
+      "subtitle": "看板页面与 at 修改入口实现",
+      "consoleTitle": "Console",
+      "consoleRows": 9,
+      "consoleText": "Consoletask-rd-codex · 3 entriesagenthub$open --board \"AgentHub 产品研发群\" --task \"task-rd-codex\"[system] INFOattached Codex @codex; status=进行中; progress=68%[goal] INFO完成按群聊分组的智能体任务看板，点击 at 按钮可以直接进入对应群聊并写入修改说明。[doc] INFOMD 智能体看板交互说明.md - 群聊看板、任务卡、Console 日志页、at 修改入口说明[doc] INFOPNG 看板视觉QA记录.png - 移动端与桌面端看板截图[11:05] INFO建立看板数据结构在 agent store 内补充 boards 数据，任务绑定 groupId 与 agentId。[11:40] INFO实现草稿注入点击 @他修改后写入群聊 draft，并跳到对应 chat/detail 页面。[12:05] INFO移动端复测确认任务卡按钮 44px，点击任务卡进入独立 Console 日志页。[summary]console output loaded: 3 logs, 2 documents",
+      "docRows": 2,
+      "dialogCount": 0,
+      "viewportWidth": 1440,
+      "docScrollWidth": 1440,
+      "bodyScrollWidth": 1440,
+      "hasHorizontalOverflow": false
+    }
+  ],
+  "status": "passed"
+}

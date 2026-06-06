@@ -1,0 +1,62 @@
+[
+  {
+    "name": "Issue 1: right panel width >= 360px",
+    "pass": true,
+    "detail": "w=421px"
+  },
+  {
+    "name": "Issue 1: group avatar height <= 70px",
+    "pass": true,
+    "detail": "h=64px"
+  },
+  {
+    "name": "Issue 1: danger action subtle bg (transparent)",
+    "pass": true,
+    "detail": "bg=rgba(0, 0, 0, 0)"
+  },
+  {
+    "name": "Issue 3: reply-ref-me right edge aligns with me bubble (within 5px)",
+    "pass": true,
+    "detail": "diff=N/Apx"
+  },
+  {
+    "name": "Issue 2: file preview uses spacer (no desktop sidebar)",
+    "pass": true,
+    "detail": "{\"hasSpacer\":true,\"hasDesktopSidebar\":false}"
+  },
+  {
+    "name": "Issue 2: file preview content rendered",
+    "pass": true,
+    "detail": ""
+  },
+  {
+    "name": "Issue 2: no horizontal overflow on preview page",
+    "pass": true,
+    "detail": ""
+  },
+  {
+    "name": "Issue 5: mobile toolbar above input box",
+    "pass": true,
+    "detail": "{\"toolbarBottom\":780,\"inputTop\":786}"
+  },
+  {
+    "name": "Issue 5: mobile input row height <= 60px",
+    "pass": true,
+    "detail": "h=50px"
+  },
+  {
+    "name": "Mobile: no horizontal overflow",
+    "pass": true,
+    "detail": ""
+  },
+  {
+    "name": "Tablet 768: no horizontal overflow",
+    "pass": true,
+    "detail": ""
+  },
+  {
+    "name": "1024x768: no horizontal overflow",
+    "pass": true,
+    "detail": ""
+  }
+]
