@@ -4,16 +4,13 @@ import path from 'node:path';
 const cwd = process.cwd();
 const env = {
   ...process.env,
-  UNI_INPUT_DIR: process.env.UNI_INPUT_DIR || cwd,
-  CHOKIDAR_USEPOLLING: process.env.CHOKIDAR_USEPOLLING || '1',
-  WATCHPACK_POLLING: process.env.WATCHPACK_POLLING || 'true'
+  NODE_ENV: 'test',
+  UNI_INPUT_DIR: process.env.UNI_INPUT_DIR || cwd
 };
 
 const isWindows = process.platform === 'win32';
-const bin = path.join(cwd, 'node_modules', '.bin', isWindows ? 'uni.cmd' : 'uni');
-const args = process.argv.slice(2);
-
-const child = spawn(bin, args, {
+const bin = path.join(cwd, 'node_modules', '.bin', isWindows ? 'vitest.cmd' : 'vitest');
+const child = spawn(bin, ['run', '--config', 'vitest.config.js'], {
   cwd,
   env,
   stdio: 'inherit',

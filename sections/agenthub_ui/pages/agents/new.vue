@@ -937,33 +937,30 @@ function leaveConfigPage(fallbackUrl = '/pages/agents/index') {
   uni.redirectTo({ url: fallbackUrl });
 }
 
-function handleCreate() {
+async function handleCreate() {
   if (!canSubmit.value) {
     uni.showToast({ title: '请完成所有检查项', icon: 'none' });
     return;
   }
   submitting.value = true;
 
-  setTimeout(() => {
-    const payload = buildAgentPayload();
+  const payload = buildAgentPayload();
+  try {
     if (isEditing.value) {
-      agentStore.updateAgent(editingAgentId.value, payload);
-      syncAgentConversation(editingAgentId.value, payload);
-      submitting.value = false;
-      uni.showToast({ title: '配置已保存', icon: 'success' });
-      setTimeout(() => {
-        leaveConfigPage();
-      }, 500);
+      uni.showToast({ title: '智能体编辑接口待接入', icon: 'none' });
       return;
     }
 
-    agentStore.createAgent(payload);
+    const agent = await agentStore.createAgent(payload);
+    if (agent?.id) syncAgentConversation(agent.id, payload);
     submitting.value = false;
     uni.showToast({ title: '智能体已部署', icon: 'success' });
-    setTimeout(() => {
-      uni.redirectTo({ url: '/pages/agents/index' });
-    }, 700);
-  }, 600);
+    uni.redirectTo({ url: '/pages/agents/index' });
+  } catch (err) {
+    uni.showToast({ title: err?.message || '智能体创建失败', icon: 'none' });
+  } finally {
+    submitting.value = false;
+  }
 }
 </script>
 

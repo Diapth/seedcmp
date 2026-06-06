@@ -317,16 +317,19 @@ function unblock() {
   uni.showToast({ title: '已移出黑名单', icon: 'success' });
 }
 
-function sendRequest() {
+async function sendRequest() {
   if (!searchResult.value) return;
   sending.value = true;
 
-  setTimeout(() => {
-    contactStore.sendFriendRequest(searchResult.value.nickname, verificationMsg.value);
+  try {
+    await contactStore.sendFriendRequest(searchResult.value.id || searchResult.value.nickname, verificationMsg.value);
     searchResult.value.relationship = 'sent';
     sending.value = false;
     uni.showToast({ title: '好友申请已发送', icon: 'success' });
-  }, 500);
+  } catch (err) {
+    sending.value = false;
+    uni.showToast({ title: err?.message || '好友申请发送失败', icon: 'none' });
+  }
 }
 
 function resetSearch() {

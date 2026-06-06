@@ -13,22 +13,23 @@
     <!-- Active Agents Status -->
     <view class="panel-section flex-column">
       <text class="sub-section-title">参与协作的智能体</text>
-      <view class="agent-status-list flex-column gap-2">
-        <view 
-          v-for="(item, idx) in activeAgents" 
-          :key="idx"
-          class="agent-status-item glass-panel flex-row align-center justify-between"
-        >
-          <view class="agent-meta flex-row align-center gap-2">
-            <AppAvatar :src="''" :text="item.name" :size="28" />
-            <text class="agent-name">{{ item.name }}</text>
-          </view>
-          <view class="status-indicator flex-row align-center gap-1">
-            <view class="pulse-dot" :class="item.status" />
-            <text class="status-label" :class="item.status">{{ getStatusLabel(item.status) }}</text>
+      <view class="agent-status-list flex-column gap-2" v-if="activeAgents.length > 0">
+          <view 
+            v-for="(item, idx) in activeAgents" 
+            :key="idx"
+            class="agent-status-item glass-panel flex-row align-center justify-between"
+          >
+            <view class="agent-meta flex-row align-center gap-2">
+              <AppAvatar :src="''" :text="item.name" :size="28" />
+              <text class="agent-name">{{ item.name }}</text>
+            </view>
+            <view class="status-indicator flex-row align-center gap-1">
+              <view class="pulse-dot" :class="item.status" />
+              <text class="status-label" :class="item.status">{{ getStatusLabel(item.status) }}</text>
+            </view>
           </view>
         </view>
-      </view>
+        <view class="empty-copy" v-else>暂无已绑定智能体，请先在智能体页连接 OAuth cat。</view>
     </view>
     
     <!-- Collaboration Threads -->
@@ -53,6 +54,7 @@
             </view>
           </view>
         </view>
+        <view class="empty-copy" v-else>暂无真实协同线程。发起任务后会从 Clowder 后端同步。</view>
       </scroll-view>
     </view>
     
@@ -75,7 +77,8 @@
 </template>
 
 <script setup>
-import { ref } from 'vue';
+import { computed, onMounted, ref } from 'vue';
+import { useClowderStore } from '@/stores/clowder.js';
 import AppIcon from '../common/AppIcon.vue';
 import AppAvatar from '../common/AppAvatar.vue';
 
@@ -87,55 +90,48 @@ const props = defineProps({
 });
 
 const newTaskTitle = ref('');
+const clowderStore = useClowderStore();
 
-const activeAgents = ref([
-  { name: 'DeepSeek-V3', status: 'thinking' },
-  { name: 'Clowder 协同猫', status: 'idle' }
-]);
+const activeAgents = computed(() => Object.values(clowderStore.agentDirectory).map((item) => ({
+  name: item.name || item.display_name || item.cat_id || '未命名智能体',
+  status: item.status === 'active' || item.status === 'online' ? 'idle' : 'offline'
+})));
 
-const threads = ref([
-  { id: 1, title: '全链路性能优化诊断', status: 'processing', progress: 60 },
-  { id: 2, title: '微信H5兼容策略审查', status: 'completed', progress: 100 }
-]);
+const threads = computed(() => Object.values(clowderStore.tasks).flat().map((item) => ({
+  id: item.id || item.task_id,
+  title: item.title || item.task || item.goal || '未命名任务',
+  status: item.status === 'done' || item.status === 'completed' ? 'completed' : 'processing',
+  progress: Number(item.progress || (item.status === 'completed' ? 100 : 0))
+})));
+
+onMounted(() => {
+  clowderStore.fetchCapabilities().catch(() => undefined);
+  clowderStore.fetchAgentDirectory().catch(() => undefined);
+  if (props.conversationId) {
+    clowderStore.fetchBinding(props.conversationId, 2).catch(() => undefined);
+  }
+});
 
 function getStatusLabel(status) {
-  return status === 'thinking' ? '思考中...' : '空闲';
+  if (status === 'thinking') return '思考中...';
+  if (status === 'offline') return '离线';
+  return '空闲';
 }
 
-function addTask() {
+async function addTask() {
   const title = newTaskTitle.value.trim();
   if (!title) return;
-  
-  const id = Date.now();
-  threads.value.unshift({
-    id,
-    title,
-    status: 'processing',
-    progress: 10
-  });
-  
-  newTaskTitle.value = '';
-  
-  // Simulate progress
-  activeAgents.value[0].status = 'thinking';
-  activeAgents.value[1].status = 'thinking';
-  
-  const timer = setInterval(() => {
-    const task = threads.value.find(t => t.id === id);
-    if (task) {
-      if (task.progress < 100) {
-        task.progress += 30;
-        if (task.progress > 100) task.progress = 100;
-      } else {
-        task.status = 'completed';
-        activeAgents.value[0].status = 'thinking';
-        activeAgents.value[1].status = 'idle';
-        clearInterval(timer);
-      }
-    } else {
-      clearInterval(timer);
-    }
-  }, 1200);
+  try {
+    await clowderStore.sendConversationMessage({
+      channelId: props.conversationId,
+      channelType: 2,
+      text: title
+    });
+    newTaskTitle.value = '';
+    uni.showToast({ title: '协同任务已发送', icon: 'success' });
+  } catch (err) {
+    uni.showToast({ title: err?.message || clowderStore.disabledReason || 'Clowder 暂不可用', icon: 'none' });
+  }
 }
 </script>
 
@@ -182,6 +178,12 @@ function addTask() {
 .agent-status-list {
   display: flex;
   flex-direction: column;
+}
+
+.empty-copy {
+  color: var(--color-text-muted);
+  font-size: 12px;
+  line-height: 1.5;
 }
 
 .agent-status-item {

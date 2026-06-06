@@ -227,20 +227,19 @@ function goRequests() {
   });
 }
 
-function sendRequest() {
+async function sendRequest() {
   if (!searchResult.value) return;
   sending.value = true;
-  
-  setTimeout(() => {
-    contactStore.sendFriendRequest(searchResult.value.nickname, verificationMsg.value);
+
+  try {
+    await contactStore.sendFriendRequest(searchResult.value.id || searchResult.value.nickname, verificationMsg.value);
     sending.value = false;
     uni.showToast({ title: '好友申请已发送', icon: 'success' });
-    
-    // Auto go back after 1.5s
-    setTimeout(() => {
-      uni.navigateBack();
-    }, 1500);
-  }, 800);
+    uni.navigateBack();
+  } catch (err) {
+    sending.value = false;
+    uni.showToast({ title: err?.message || '好友申请发送失败', icon: 'none' });
+  }
 }
 </script>
 

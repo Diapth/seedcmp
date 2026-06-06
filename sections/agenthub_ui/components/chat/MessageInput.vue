@@ -428,9 +428,7 @@ function handleInputFocus() {
 }
 
 function handleInputBlur() {
-  setTimeout(() => {
-    emit('keyboard-change', { height: 0, focused: false });
-  }, 80);
+  emit('keyboard-change', { height: 0, focused: false });
 }
 
 function handleKeyboardHeightChange(event) {

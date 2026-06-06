@@ -1,15 +1,46 @@
 <script>
 	import { initSystemNotificationClickHandler } from '@/composables/useSystemNotification';
+	import { storage } from '@/utils/storage.js';
+	import { initSdk } from '@/utils/wk-sdk.js';
+	import { useAuthStore } from '@/stores/auth.js';
+	import { useImStore } from '@/stores/im.js';
+	import { useUserStore } from '@/stores/user.js';
 
 	export default {
-		onLaunch: function() {
+		onLaunch: async function() {
 			console.log('App Launch');
-			const savedTheme = uni.getStorageSync('app_theme') || 'light';
+			const savedTheme = storage.get('app_theme') || 'light';
 			// Set initial theme class to page element for desktop/H5
 			// #ifdef H5
-			document.documentElement.className = `theme-${savedTheme}`;
+			if (typeof document !== 'undefined') {
+				document.documentElement.className = `theme-${savedTheme}`;
+			}
 			// #endif
 			initSystemNotificationClickHandler();
+			const authStore = useAuthStore();
+			const userStore = useUserStore();
+			const imStore = useImStore();
+			try {
+				const loggedIn = await authStore.bootstrap();
+				if (!loggedIn) return;
+				await userStore.fetchMe().catch((err) => {
+					console.warn('[AUTH_BOOTSTRAP] fetchMe failed', err);
+				});
+				await imStore.fetchImAddress().catch((err) => {
+					console.warn('[AUTH_BOOTSTRAP] fetchImAddress failed', err);
+				});
+				if (imStore.wsAddr) {
+					await initSdk({
+						uid: authStore.uid,
+						token: imStore.imToken || authStore.accessToken,
+						wsAddr: imStore.wsAddr
+					}).catch((err) => {
+						console.warn('[AUTH_BOOTSTRAP] initSdk failed', err);
+					});
+				}
+			} catch (err) {
+				console.warn('[AUTH_BOOTSTRAP] failed', err);
+			}
 		},
 		onShow: function() {
 			console.log('App Show');
