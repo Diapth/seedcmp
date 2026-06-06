@@ -410,6 +410,53 @@ export interface ClowderGroupCatStateResponse {
   autoReplyMode?: ClowderGroupAutoReplyMode;
 }
 
+export interface ClowderProjectGroupBinding {
+  id: string;
+  userId: string;
+  projectName: string;
+  workspaceId?: string;
+  pmDirectChannelId: string;
+  pmDirectChannelType: ClowderChannelType;
+  pmDirectThreadId?: string;
+  projectGroupNo: string;
+  projectThreadId?: string;
+  pmMemberId: string;
+  userMemberIds: string[];
+  catMemberIds: string[];
+  createdBy: 'pm' | 'system' | string;
+  createdAt: number;
+  updatedAt: number;
+  status: 'active' | 'archived' | string;
+}
+
+export interface ClowderEnsureProjectGroupRequest {
+  projectName: string;
+  workspaceId?: string;
+  pmDirectChannelId: string;
+  pmDirectChannelType: ClowderChannelType;
+  pmDirectThreadId?: string;
+  projectThreadId?: string;
+  pmMemberId?: string;
+  pmDisplayName?: string;
+  userMemberIds?: string[];
+  catMemberIds?: string[];
+  createdBy?: 'pm' | 'system' | string;
+}
+
+export interface ClowderEnsureProjectGroupResponse {
+  binding: ClowderProjectGroupBinding;
+  group: {
+    group_no: string;
+    name: string;
+    owner?: string;
+    creator?: string;
+    status?: number;
+    role?: number;
+    [key: string]: unknown;
+  };
+  reused?: boolean;
+}
+
 export interface ClowderThreadTask {
   id: string;
   kind?: string;
@@ -677,6 +724,10 @@ export const clowderApi = {
   },
   getGroupCats(params: { groupId: string }) {
     return apiClient.get<ClowderGroupCatStateResponse>('clowder/group/cats', { params });
+  },
+  async ensureProjectGroup(data: ClowderEnsureProjectGroupRequest) {
+    const response = await apiClient.post<ClowderEnsureProjectGroupResponse>('clowder/project-groups/ensure', data);
+    return unwrapApiData(response as unknown as ClowderEnsureProjectGroupResponse | { data?: ClowderEnsureProjectGroupResponse });
   },
   allowGroup(params: ClowderConversationRef) {
     return apiClient.post<IMConnectorPermission>('clowder/group/allow', params);

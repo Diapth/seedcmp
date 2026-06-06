@@ -420,6 +420,30 @@ func TestGroupCatMembershipStoreRoundTripsPromptAndCats(t *testing.T) {
 	assert.Equal(t, stored.Prompt, loaded.Prompt)
 }
 
+func TestProjectGroupBindingKeyScopesByUserDirectPMAndProject(t *testing.T) {
+	left := projectGroupBindingKey("user-1", "clowder_cat:coordinator", 1, " 婚礼 ")
+	right := projectGroupBindingKey("user-1", "clowder_cat:coordinator", 1, "婚礼")
+	otherUser := projectGroupBindingKey("user-2", "clowder_cat:coordinator", 1, "婚礼")
+	otherProject := projectGroupBindingKey("user-1", "clowder_cat:coordinator", 1, "todo")
+
+	assert.Equal(t, left, right)
+	assert.NotEqual(t, left, otherUser)
+	assert.NotEqual(t, left, otherProject)
+	assert.Contains(t, left, "clowder_cat")
+}
+
+func TestProjectGroupRequiredMembersAlwaysIncludeUserAndPM(t *testing.T) {
+	members := projectGroupRequiredMemberUIDs("user-1", defaultPMMemberID, []string{"user-1", "helper-1", defaultPMMemberID})
+
+	assert.Equal(t, []string{"user-1", defaultPMMemberID, "helper-1"}, members)
+}
+
+func TestNormalizeProjectGroupNameTrimsQuotesAndLength(t *testing.T) {
+	assert.Equal(t, "PM项目群验收", normalizeProjectGroupName("「PM项目群验收」"))
+	assert.Equal(t, "项目群聊", normalizeProjectGroupName(" "))
+	assert.Len(t, []rune(normalizeProjectGroupName("这是一个特别特别特别长的项目名称用于验证截断")), 20)
+}
+
 func TestDeleteCatFromUpstreamProxiesOwnerAndStatus(t *testing.T) {
 	var gotPath string
 	var gotUser string

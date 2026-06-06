@@ -34,7 +34,9 @@ import {
   type ClowderUpdateDeploymentRequest,
   type ClowderGroupAutoReplyMode,
   type ClowderGroupCatStateResponse,
+  type ClowderEnsureProjectGroupRequest,
   type ClowderMaomiWorkspace,
+  type ClowderProjectGroupBinding,
   type ClowderThreadTask,
   type ClowderThreadTaskDiagnostics,
   type ClowderThreadTasksRequestOptions,
@@ -271,6 +273,7 @@ export const useClowderStore = defineStore('clowder', () => {
   const groupCatMemberships = ref<Record<string, ClowderCatContact[]>>({});
   const groupPrompts = ref<Record<string, string>>({});
   const groupAutoReplyModes = ref<Record<string, ClowderGroupAutoReplyMode>>({});
+  const projectGroupBindings = ref<Record<string, ClowderProjectGroupBinding>>({});
   const threadTaskStates = ref<Record<string, ThreadTaskLoadState>>({});
   const workspaceRoot = ref<ClowderWorkspaceRootResponse | undefined>();
   const workspaces = ref<ClowderMaomiWorkspace[]>([]);
@@ -378,6 +381,59 @@ export const useClowderStore = defineStore('clowder', () => {
 
   function getActiveWorkspace(threadId?: string | null) {
     return getWorkspaceBinding(threadId)?.activeWorkspace || undefined;
+  }
+
+  function projectGroupBindingKey(input: {
+    userId?: string | null;
+    pmDirectChannelId: string;
+    pmDirectChannelType: number;
+    projectName: string;
+  }) {
+    return [
+      String(input.userId || '').trim(),
+      conversationKey(input.pmDirectChannelId, input.pmDirectChannelType),
+      String(input.projectName || '').trim().toLocaleLowerCase()
+    ].join('|');
+  }
+
+  function setProjectGroupBinding(binding: ClowderProjectGroupBinding) {
+    const key = projectGroupBindingKey({
+      userId: binding.userId,
+      pmDirectChannelId: binding.pmDirectChannelId,
+      pmDirectChannelType: binding.pmDirectChannelType,
+      projectName: binding.projectName
+    });
+    projectGroupBindings.value = {
+      ...projectGroupBindings.value,
+      [key]: binding
+    };
+    return binding;
+  }
+
+  function getProjectGroupBinding(input: {
+    userId?: string | null;
+    pmDirectChannelId: string;
+    pmDirectChannelType: number;
+    projectName: string;
+  }) {
+    return projectGroupBindings.value[projectGroupBindingKey(input)];
+  }
+
+  async function ensureProjectGroup(input: ClowderEnsureProjectGroupRequest) {
+    loading.value = true;
+    error.value = undefined;
+    try {
+      const response = await clowderApi.ensureProjectGroup(input);
+      if (response.binding) {
+        setProjectGroupBinding(response.binding);
+      }
+      return response;
+    } catch (err) {
+      error.value = err instanceof Error ? err.message : 'Clowder project group create failed';
+      throw err;
+    } finally {
+      loading.value = false;
+    }
   }
 
   async function loadWorkspaceRoot() {
@@ -1580,6 +1636,7 @@ export const useClowderStore = defineStore('clowder', () => {
     groupCatMemberships.value = {};
     groupPrompts.value = {};
     groupAutoReplyModes.value = {};
+    projectGroupBindings.value = {};
     threadTaskStates.value = {};
     workspaceRoot.value = undefined;
     workspaces.value = [];
@@ -1618,6 +1675,7 @@ export const useClowderStore = defineStore('clowder', () => {
     groupCatMemberships,
     groupPrompts,
     groupAutoReplyModes,
+    projectGroupBindings,
     threadTaskStates,
     workspaceRoot,
     workspaces,
@@ -1632,6 +1690,8 @@ export const useClowderStore = defineStore('clowder', () => {
     getThreadCoordinations,
     getWorkspaceBinding,
     getActiveWorkspace,
+    getProjectGroupBinding,
+    ensureProjectGroup,
     loadWorkspaceRoot,
     loadWorkspaces,
     loadWorkspaceBinding,

@@ -24,6 +24,7 @@ import {
   buildDeploymentTargetCandidates,
   DEFAULT_DEPLOYMENT_ENVIRONMENT_CANDIDATES,
 } from '../utils/deploymentRequestCard';
+import { isProjectStartRequest, resolveProjectGroupName } from '../utils/clowderProjectGroup';
 
 const props = defineProps<{
   channelId: string;
@@ -66,6 +67,7 @@ const SYSTEM_ROBOT_ID = 'u_10000';
 const DEEPSEEK_AI_ROBOT_ID = 'deepseek_ai_robot';
 const CLOWDER_AI_ROBOT_ID = 'clowder_ai';
 const CLOWDER_COORDINATOR_CAT_ID = 'coordinator';
+const CLOWDER_COORDINATOR_MEMBER_ID = buildClowderCatContactId(CLOWDER_COORDINATOR_CAT_ID);
 const COORDINATOR_COMMANDS = [
   { command: '/plan', label: '/plan', text: '/plan 请协调者拆解当前需求并给出分工。' },
   { command: '/dispatch', label: '/dispatch', text: '/dispatch 请协调者派发上一轮计划中的待办任务。' },
@@ -105,6 +107,11 @@ const isClowderAiConversation = computed(() => {
 
 const isClowderCatConversation = computed(() => {
   return props.channelType === 1 && isClowderCatContactId(props.channelId);
+});
+
+const isCoordinatorDirectConversation = computed(() => {
+  return isClowderCatConversation.value &&
+    getClowderCatIdFromContactId(props.channelId) === CLOWDER_COORDINATOR_CAT_ID;
 });
 
 const activeConversationDraft = computed(() => {
@@ -804,15 +811,105 @@ function scheduleClowderConversationSync(channelId: string, channelType: number)
   );
 }
 
-async function sendClowderRouteMessage(text: string, targetCatIds: string[], triggerReason?: GroupCatAutoReplyReason, replyTarget?: any) {
+function uniqueProjectWorkerCats() {
+  const seen = new Set<string>();
+  const candidates = [
+    ...(clowderStore.connectedCatContacts || []),
+    ...(clowderStore.catContactDirectory || [])
+  ];
+  return candidates.filter(cat => {
+    if (!cat?.catId || cat.catId === CLOWDER_COORDINATOR_CAT_ID || seen.has(cat.catId)) return false;
+    seen.add(cat.catId);
+    return cat.connected !== false && cat.available !== false;
+  });
+}
+
+async function ensureProjectGroupForPMDirect(text: string, targetCatIds: string[]) {
+  const projectName = resolveProjectGroupName(text, activeClowderWorkspace.value?.displayName);
+  if (clowderStore.connectedCatContacts.length === 0 && clowderStore.catContactDirectory.length === 0) {
+    await clowderStore.loadCatContactDirectory({ includeUnavailable: true }).catch(() => undefined);
+  }
+  const workerCats = uniqueProjectWorkerCats();
+  const directThreadId = clowderStore.conversations[clowderConversationKey.value]?.binding?.threadId;
+  const response = await clowderStore.ensureProjectGroup({
+    projectName,
+    workspaceId: activeClowderWorkspace.value?.workspaceId || activeClowderWorkspace.value?.id,
+    pmDirectChannelId: props.channelId,
+    pmDirectChannelType: props.channelType as 1,
+    pmDirectThreadId: directThreadId,
+    pmMemberId: CLOWDER_COORDINATOR_MEMBER_ID,
+    pmDisplayName: 'PM / 协调者',
+    userMemberIds: userStore.currentUser?.uid ? [userStore.currentUser.uid] : [],
+    catMemberIds: workerCats.map(cat => cat.catId),
+    createdBy: 'pm'
+  });
+  const groupNo = response.binding.projectGroupNo;
+  const groupName = response.binding.projectName;
+  if (response.group) {
+    groupStore.upsertGroup(response.group);
+  }
+  if (workerCats.length > 0) {
+    await clowderStore.syncMixedGroupCats({
+      groupId: groupNo,
+      groupName,
+      humanMembers: [
+        {
+          id: userStore.currentUser?.uid || 'current-user',
+          displayName: userStore.currentUser?.name || userStore.currentUser?.uid || '我',
+          role: 'owner',
+          mentionHandle: `@${userStore.currentUser?.name || userStore.currentUser?.uid || '我'}`
+        },
+        {
+          id: CLOWDER_COORDINATOR_MEMBER_ID,
+          displayName: 'PM / 协调者',
+          role: 'pm',
+          mentionHandle: '@PM'
+        }
+      ],
+      catMembers: workerCats,
+      rules: {
+        proactiveReplies: true,
+        privacy: 'PM direct chat is private; only project handoff, task summary, and explicit project context may be shared into this group.'
+      }
+    });
+  }
+  return {
+    channelId: groupNo,
+    channelType: 2 as const,
+    projectName: groupName,
+    targetCatIds: targetCatIds.length ? targetCatIds : [CLOWDER_COORDINATOR_CAT_ID]
+  };
+}
+
+async function sendClowderRouteMessage(
+  text: string,
+  targetCatIds: string[],
+  triggerReason?: GroupCatAutoReplyReason,
+  replyTarget?: any,
+  routeOverride?: { channelId: string; channelType: 1 | 2; targetCatIds?: string[] }
+) {
+  if (!routeOverride) {
+    await clowderStore.sendConversationMessage({
+      channelId: props.channelId,
+      channelType: props.channelType as 1 | 2,
+      directCatId: getClowderCatIdFromContactId(props.channelId),
+      targetCatIds,
+      promptContext: buildClowderPromptContext(text, targetCatIds, triggerReason, replyTarget)
+    }, text);
+    scheduleClowderConversationSync(props.channelId, props.channelType);
+    return;
+  }
+  const routeChannelId = routeOverride?.channelId || props.channelId;
+  const routeChannelType = routeOverride?.channelType || props.channelType as 1 | 2;
+  const routeTargetCatIds = routeOverride?.targetCatIds || targetCatIds;
   await clowderStore.sendConversationMessage({
-    channelId: props.channelId,
-    channelType: props.channelType as 1 | 2,
-    directCatId: getClowderCatIdFromContactId(props.channelId),
-    targetCatIds,
-    promptContext: buildClowderPromptContext(text, targetCatIds, triggerReason, replyTarget)
+    channelId: routeChannelId,
+    channelType: routeChannelType,
+    directCatId: routeChannelType === 1 ? getClowderCatIdFromContactId(routeChannelId) : undefined,
+    targetCatIds: routeTargetCatIds,
+    promptContext: buildClowderPromptContext(text, routeTargetCatIds, triggerReason, replyTarget)
   }, text);
-  scheduleClowderConversationSync(props.channelId, props.channelType);
+  scheduleClowderConversationSync(routeChannelId, routeChannelType);
 }
 
 async function startVoiceRecording() {
@@ -1191,6 +1288,7 @@ async function handleSend() {
     (isClowderAiConversation.value || isClowderCatConversation.value || autoReplyDecision.shouldRoute);
   const needsContextualDeploymentRoute = deploymentIntent.requiresContextResolution &&
     (isClowderAiConversation.value || isClowderCatConversation.value || autoReplyDecision.shouldRoute);
+  const shouldUseProjectGroup = isCoordinatorDirectConversation.value && isProjectStartRequest(text);
 
   if (props.channelType === 2) {
     if (text.includes('@所有人') || text.includes('@all')) {
@@ -1218,6 +1316,24 @@ async function handleSend() {
       messageStore.setReplyTarget(null);
     }
     mentionedUids.value = [];
+    let projectGroupRoute: Awaited<ReturnType<typeof ensureProjectGroupForPMDirect>> | null = null;
+    if (shouldUseProjectGroup) {
+      try {
+        projectGroupRoute = await ensureProjectGroupForPMDirect(text, targetCatIds);
+        ArcoMessage.success(`已准备项目群「${projectGroupRoute.projectName}」`);
+      } catch (projectErr) {
+        console.error('Failed to ensure PM project group', projectErr);
+        ArcoMessage.error('项目群创建失败，已避免把执行派发到 PM 直聊');
+      }
+    }
+    const allowCurrentConversationRoute = !shouldUseProjectGroup || Boolean(projectGroupRoute);
+    const clowderRouteOverride = projectGroupRoute
+      ? {
+          channelId: projectGroupRoute.channelId,
+          channelType: projectGroupRoute.channelType,
+          targetCatIds: projectGroupRoute.targetCatIds
+        }
+      : undefined;
     if (needsDeploymentConfirmation) {
       try {
         const loadedDeploymentRequest = cachedActiveDeploymentRequest || await clowderStore.loadActiveDeploymentRequest({
@@ -1244,15 +1360,23 @@ async function handleSend() {
           replyTargetSnapshot,
           sentMessage.clientMsgNo
         );
-        if (shouldRouteDeploymentPromptToClowder(text, autoReplyDecision.shouldRoute)) {
-          await sendClowderRouteMessage(text, targetCatIds, autoReplyDecision.reason, replyTargetSnapshot);
+        if (projectGroupRoute || (allowCurrentConversationRoute && shouldRouteDeploymentPromptToClowder(text, autoReplyDecision.shouldRoute))) {
+          await sendClowderRouteMessage(text, targetCatIds, autoReplyDecision.reason, replyTargetSnapshot, clowderRouteOverride);
         }
       } catch (deploymentErr) {
         console.error('Failed to sync deployment request', deploymentErr);
         ArcoMessage.error('部署请求更新失败，请稍后重试');
       }
-    } else if (needsContextualDeploymentRoute || isClowderAiConversation.value || isClowderCatConversation.value || autoReplyDecision.shouldRoute) {
-      await sendClowderRouteMessage(text, targetCatIds, autoReplyDecision.reason, replyTargetSnapshot);
+    } else if (
+      projectGroupRoute ||
+      (allowCurrentConversationRoute && (
+        needsContextualDeploymentRoute ||
+        isClowderAiConversation.value ||
+        isClowderCatConversation.value ||
+        autoReplyDecision.shouldRoute
+      ))
+    ) {
+      await sendClowderRouteMessage(text, targetCatIds, autoReplyDecision.reason, replyTargetSnapshot, clowderRouteOverride);
     }
   } catch (err) {
     console.error('Failed to send message', err);

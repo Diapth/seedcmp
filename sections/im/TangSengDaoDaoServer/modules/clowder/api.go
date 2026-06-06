@@ -18,25 +18,30 @@ import (
 	"github.com/TangSengDaoDao/TangSengDaoDaoServerLib/common"
 	"github.com/TangSengDaoDao/TangSengDaoDaoServerLib/config"
 	"github.com/TangSengDaoDao/TangSengDaoDaoServerLib/pkg/log"
+	"github.com/TangSengDaoDao/TangSengDaoDaoServerLib/pkg/util"
 	"github.com/TangSengDaoDao/TangSengDaoDaoServerLib/pkg/wkhttp"
 )
 
 type Clowder struct {
-	ctx           *config.Context
-	groupCatsMu   sync.RWMutex
-	groupCatState map[string]groupCatSyncResponse
+	ctx                  *config.Context
+	groupCatsMu          sync.RWMutex
+	groupCatState        map[string]groupCatSyncResponse
+	projectGroupMu       sync.RWMutex
+	projectGroupBindings map[string]ProjectGroupBinding
 	log.Log
 	config commonmodule.ClowderBridgeConfig
 }
 
 const clowderAIDirectChannelID = "clowder_ai"
+const defaultPMMemberID = "clowder_cat:coordinator"
 
 func New(ctx *config.Context) *Clowder {
 	return &Clowder{
-		ctx:           ctx,
-		groupCatState: map[string]groupCatSyncResponse{},
-		Log:           log.NewTLog("clowder"),
-		config:        commonmodule.ClowderBridgeConfigFromEnv(),
+		ctx:                  ctx,
+		groupCatState:        map[string]groupCatSyncResponse{},
+		projectGroupBindings: map[string]ProjectGroupBinding{},
+		Log:                  log.NewTLog("clowder"),
+		config:               commonmodule.ClowderBridgeConfigFromEnv(),
 	}
 }
 
@@ -57,6 +62,7 @@ func (c *Clowder) Route(r *wkhttp.WKHttp) {
 		auth.DELETE("/cats/:catId", c.deleteCatContact)
 		auth.POST("/group/cats/sync", c.syncGroupCats)
 		auth.GET("/group/cats", c.groupCats)
+		auth.POST("/project-groups/ensure", c.ensureProjectGroup)
 		auth.POST("/conversation/bind", c.bindConversation)
 		auth.POST("/conversation/focus", c.setFocus)
 		auth.POST("/conversation/focus/clear", c.clearFocus)
@@ -231,6 +237,45 @@ type groupCatSyncResponse struct {
 	Prompt           string         `json:"prompt"`
 	ProactiveReplies bool           `json:"proactiveReplies,omitempty"`
 	AutoReplyMode    string         `json:"autoReplyMode,omitempty"`
+}
+
+type projectGroupEnsureRequest struct {
+	ProjectName         string   `json:"projectName"`
+	WorkspaceID         string   `json:"workspaceId,omitempty"`
+	PMDirectChannelID   string   `json:"pmDirectChannelId"`
+	PMDirectChannelType uint8    `json:"pmDirectChannelType"`
+	PMDirectThreadID    string   `json:"pmDirectThreadId,omitempty"`
+	ProjectThreadID     string   `json:"projectThreadId,omitempty"`
+	PMMemberID          string   `json:"pmMemberId,omitempty"`
+	PMDisplayName       string   `json:"pmDisplayName,omitempty"`
+	UserMemberIDs       []string `json:"userMemberIds,omitempty"`
+	CatMemberIDs        []string `json:"catMemberIds,omitempty"`
+	CreatedBy           string   `json:"createdBy,omitempty"`
+}
+
+type ProjectGroupBinding struct {
+	ID                  string   `json:"id"`
+	UserID              string   `json:"userId"`
+	ProjectName         string   `json:"projectName"`
+	WorkspaceID         string   `json:"workspaceId,omitempty"`
+	PMDirectChannelID   string   `json:"pmDirectChannelId"`
+	PMDirectChannelType uint8    `json:"pmDirectChannelType"`
+	PMDirectThreadID    string   `json:"pmDirectThreadId,omitempty"`
+	ProjectGroupNo      string   `json:"projectGroupNo"`
+	ProjectThreadID     string   `json:"projectThreadId,omitempty"`
+	PMMemberID          string   `json:"pmMemberId"`
+	UserMemberIDs       []string `json:"userMemberIds"`
+	CatMemberIDs        []string `json:"catMemberIds"`
+	CreatedBy           string   `json:"createdBy"`
+	CreatedAt           int64    `json:"createdAt"`
+	UpdatedAt           int64    `json:"updatedAt"`
+	Status              string   `json:"status"`
+}
+
+type projectGroupEnsureResponse struct {
+	Binding ProjectGroupBinding    `json:"binding"`
+	Group   map[string]interface{} `json:"group"`
+	Reused  bool                   `json:"reused"`
 }
 
 func (c *Clowder) conversation(ctx *wkhttp.Context) {
@@ -859,6 +904,102 @@ func (c *Clowder) groupCats(ctx *wkhttp.Context) {
 	})
 }
 
+func (c *Clowder) ensureProjectGroup(ctx *wkhttp.Context) {
+	var req projectGroupEnsureRequest
+	if err := ctx.BindJSON(&req); err != nil {
+		ctx.JSON(http.StatusBadRequest, map[string]string{"error": "invalid_body"})
+		return
+	}
+	userID := strings.TrimSpace(ctx.GetLoginUID())
+	if userID == "" {
+		ctx.JSON(http.StatusUnauthorized, map[string]string{"error": "login_required"})
+		return
+	}
+	if c.ctx == nil {
+		ctx.JSON(http.StatusServiceUnavailable, map[string]string{"error": "im_context_unavailable"})
+		return
+	}
+	projectName := normalizeProjectGroupName(req.ProjectName)
+	pmChannelID := strings.TrimSpace(req.PMDirectChannelID)
+	if pmChannelID == "" || req.PMDirectChannelType == 0 {
+		ctx.JSON(http.StatusBadRequest, map[string]string{"error": "pm_direct_channel_required"})
+		return
+	}
+	pmMemberID := strings.TrimSpace(req.PMMemberID)
+	if pmMemberID == "" {
+		pmMemberID = defaultPMMemberID
+	}
+	pmDisplayName := strings.TrimSpace(req.PMDisplayName)
+	if pmDisplayName == "" {
+		pmDisplayName = "PM / 协调者"
+	}
+	key := projectGroupBindingKey(userID, pmChannelID, req.PMDirectChannelType, projectName)
+
+	c.projectGroupMu.Lock()
+	defer c.projectGroupMu.Unlock()
+	if c.projectGroupBindings == nil {
+		c.projectGroupBindings = map[string]ProjectGroupBinding{}
+	}
+	if binding, ok := c.projectGroupBindings[key]; ok && binding.Status == "active" {
+		binding.UpdatedAt = time.Now().UnixMilli()
+		if req.ProjectThreadID != "" {
+			binding.ProjectThreadID = strings.TrimSpace(req.ProjectThreadID)
+		}
+		c.projectGroupBindings[key] = binding
+		_ = c.ensureVirtualClowderUser(pmMemberID, pmDisplayName)
+		_ = c.ensureProjectGroupMembers(binding.ProjectGroupNo, userID, pmMemberID)
+		_ = c.sendProjectGroupHandoff(userID, req, binding, true)
+		ctx.JSON(http.StatusOK, projectGroupEnsureResponse{
+			Binding: binding,
+			Group:   projectGroupResponse(binding.ProjectGroupNo, binding.ProjectName, userID),
+			Reused:  true,
+		})
+		return
+	}
+
+	if err := c.ensureVirtualClowderUser(pmMemberID, pmDisplayName); err != nil {
+		ctx.JSON(http.StatusBadGateway, map[string]string{"error": "pm_member_prepare_failed", "message": err.Error()})
+		return
+	}
+
+	groupNo, reused, err := c.findOrCreateProjectGroup(projectName, userID, pmMemberID)
+	if err != nil {
+		ctx.JSON(http.StatusBadGateway, map[string]string{"error": "project_group_create_failed", "message": err.Error()})
+		return
+	}
+
+	now := time.Now().UnixMilli()
+	binding := ProjectGroupBinding{
+		ID:                  util.GenerUUID(),
+		UserID:              userID,
+		ProjectName:         projectName,
+		WorkspaceID:         strings.TrimSpace(req.WorkspaceID),
+		PMDirectChannelID:   pmChannelID,
+		PMDirectChannelType: req.PMDirectChannelType,
+		PMDirectThreadID:    strings.TrimSpace(req.PMDirectThreadID),
+		ProjectGroupNo:      groupNo,
+		ProjectThreadID:     strings.TrimSpace(req.ProjectThreadID),
+		PMMemberID:          pmMemberID,
+		UserMemberIDs:       projectGroupRequiredMemberUIDs(userID, pmMemberID, req.UserMemberIDs),
+		CatMemberIDs:        cleanStringList(req.CatMemberIDs),
+		CreatedBy:           "pm",
+		CreatedAt:           now,
+		UpdatedAt:           now,
+		Status:              "active",
+	}
+	if strings.TrimSpace(req.CreatedBy) != "" {
+		binding.CreatedBy = strings.TrimSpace(req.CreatedBy)
+	}
+	c.projectGroupBindings[key] = binding
+	_ = c.sendProjectGroupHandoff(userID, req, binding, reused)
+
+	ctx.JSON(http.StatusOK, projectGroupEnsureResponse{
+		Binding: binding,
+		Group:   projectGroupResponse(groupNo, projectName, userID),
+		Reused:  reused,
+	})
+}
+
 func (c *Clowder) storeGroupCats(req groupCatSyncRequest) groupCatSyncResponse {
 	groupID := strings.TrimSpace(req.GroupID)
 	autoReplyMode := normalizeGroupAutoReplyMode(req.AutoReplyMode, req.ProactiveReplies)
@@ -900,6 +1041,256 @@ func (c *Clowder) loadGroupCats(groupID string) (groupCatSyncResponse, bool) {
 	}
 	response, ok := c.groupCatState[strings.TrimSpace(groupID)]
 	return response, ok
+}
+
+func normalizeProjectGroupName(value string) string {
+	trimmed := strings.Trim(strings.TrimSpace(value), "「」『』“”\"'")
+	if trimmed == "" {
+		return "项目群聊"
+	}
+	runes := []rune(trimmed)
+	if len(runes) > 20 {
+		return string(runes[:20])
+	}
+	return trimmed
+}
+
+func projectGroupBindingKey(userID string, pmChannelID string, pmChannelType uint8, projectName string) string {
+	return strings.ToLower(strings.Join([]string{
+		strings.TrimSpace(userID),
+		externalChatIDForUser(pmChannelID, pmChannelType, userID),
+		normalizeProjectGroupName(projectName),
+	}, "|"))
+}
+
+func projectGroupRequiredMemberUIDs(userID string, pmMemberID string, extraUserIDs []string) []string {
+	return cleanStringList(append([]string{userID, pmMemberID}, extraUserIDs...))
+}
+
+func projectGroupResponse(groupNo string, groupName string, owner string) map[string]interface{} {
+	return map[string]interface{}{
+		"group_no": groupNo,
+		"name":     groupName,
+		"owner":    owner,
+		"creator":  owner,
+		"status":   1,
+		"role":     1,
+	}
+}
+
+func (c *Clowder) findOrCreateProjectGroup(projectName string, userID string, pmMemberID string) (string, bool, error) {
+	if existing, ok, err := c.findExistingProjectGroup(projectName, userID); err != nil {
+		return "", false, err
+	} else if ok {
+		if err := c.ensureProjectGroupMembers(existing, userID, pmMemberID); err != nil {
+			return "", true, err
+		}
+		return existing, true, nil
+	}
+	groupNo, err := c.createProjectGroup(projectName, userID, pmMemberID)
+	return groupNo, false, err
+}
+
+func (c *Clowder) findExistingProjectGroup(projectName string, userID string) (string, bool, error) {
+	if c.ctx == nil {
+		return "", false, fmt.Errorf("im context unavailable")
+	}
+	type row struct {
+		GroupNo string `db:"group_no"`
+	}
+	rows := make([]row, 0, 1)
+	_, err := c.ctx.DB().
+		Select("g.group_no").
+		From("`group` g").
+		Join("group_member gm", "g.group_no=gm.group_no").
+		Where("g.name=? and g.status=1 and gm.uid=? and gm.is_deleted=0 and gm.status=1", projectName, userID).
+		Limit(1).
+		Load(&rows)
+	if err != nil {
+		return "", false, err
+	}
+	if len(rows) == 0 || strings.TrimSpace(rows[0].GroupNo) == "" {
+		return "", false, nil
+	}
+	return strings.TrimSpace(rows[0].GroupNo), true, nil
+}
+
+func (c *Clowder) createProjectGroup(projectName string, userID string, pmMemberID string) (string, error) {
+	if c.ctx == nil {
+		return "", fmt.Errorf("im context unavailable")
+	}
+	groupNo := util.GenerUUID()
+	version := c.ctx.GenSeq(common.GroupSeqKey)
+	memberUIDs := projectGroupRequiredMemberUIDs(userID, pmMemberID, nil)
+
+	tx, err := c.ctx.DB().Begin()
+	if err != nil {
+		return "", err
+	}
+	defer func() {
+		if err := recover(); err != nil {
+			tx.RollbackUnlessCommitted()
+			panic(err)
+		}
+	}()
+
+	_, err = tx.InsertBySql(
+		"insert into `group` (group_no,name,creator,status,version,allow_view_history_msg) values(?,?,?,?,?,?)",
+		groupNo,
+		projectName,
+		userID,
+		1,
+		version,
+		int(common.GroupAllowViewHistoryMsgEnabled),
+	).Exec()
+	if err != nil {
+		tx.RollbackUnlessCommitted()
+		return "", err
+	}
+
+	for _, uid := range memberUIDs {
+		memberVersion := c.ctx.GenSeq(common.GroupMemberSeqKey)
+		role := 0
+		robot := 0
+		if uid == userID {
+			role = 1
+		} else if uid == pmMemberID {
+			role = 2
+			robot = 1
+		}
+		_, err = tx.InsertBySql(
+			"insert into group_member (group_no,uid,role,version,status,vercode,robot,invite_uid) values(?,?,?,?,?,?,?,?)",
+			groupNo,
+			uid,
+			role,
+			memberVersion,
+			int(common.GroupMemberStatusNormal),
+			fmt.Sprintf("%s@%d", util.GenerUUID(), common.GroupMember),
+			robot,
+			userID,
+		).Exec()
+		if err != nil {
+			tx.RollbackUnlessCommitted()
+			return "", err
+		}
+	}
+
+	if err := c.ctx.IMCreateOrUpdateChannel(&config.ChannelCreateReq{
+		ChannelID:   groupNo,
+		ChannelType: common.ChannelTypeGroup.Uint8(),
+		Subscribers: memberUIDs,
+	}); err != nil {
+		tx.RollbackUnlessCommitted()
+		return "", err
+	}
+
+	if err := tx.Commit(); err != nil {
+		tx.RollbackUnlessCommitted()
+		return "", err
+	}
+	return groupNo, nil
+}
+
+func (c *Clowder) ensureProjectGroupMembers(groupNo string, userID string, pmMemberID string) error {
+	memberUIDs := projectGroupRequiredMemberUIDs(userID, pmMemberID, nil)
+	existing := make([]string, 0, len(memberUIDs))
+	_, err := c.ctx.DB().
+		Select("uid").
+		From("group_member").
+		Where("group_no=? and uid in ? and is_deleted=0 and status=1", groupNo, memberUIDs).
+		Load(&existing)
+	if err != nil {
+		return err
+	}
+	existingSet := map[string]bool{}
+	for _, uid := range existing {
+		existingSet[strings.TrimSpace(uid)] = true
+	}
+	missing := make([]string, 0)
+	for _, uid := range memberUIDs {
+		if !existingSet[uid] {
+			missing = append(missing, uid)
+		}
+	}
+	if len(missing) == 0 {
+		return nil
+	}
+	tx, err := c.ctx.DB().Begin()
+	if err != nil {
+		return err
+	}
+	for _, uid := range missing {
+		role := 0
+		robot := 0
+		if uid == pmMemberID {
+			role = 2
+			robot = 1
+		}
+		_, err = tx.InsertBySql(
+			"insert into group_member (group_no,uid,role,version,status,vercode,robot,invite_uid) values(?,?,?,?,?,?,?,?)",
+			groupNo,
+			uid,
+			role,
+			c.ctx.GenSeq(common.GroupMemberSeqKey),
+			int(common.GroupMemberStatusNormal),
+			fmt.Sprintf("%s@%d", util.GenerUUID(), common.GroupMember),
+			robot,
+			userID,
+		).Exec()
+		if err != nil {
+			tx.RollbackUnlessCommitted()
+			return err
+		}
+	}
+	if err := c.ctx.IMAddSubscriber(&config.SubscriberAddReq{
+		ChannelID:   groupNo,
+		ChannelType: common.ChannelTypeGroup.Uint8(),
+		Subscribers: missing,
+	}); err != nil {
+		tx.RollbackUnlessCommitted()
+		return err
+	}
+	if err := tx.Commit(); err != nil {
+		tx.RollbackUnlessCommitted()
+		return err
+	}
+	return nil
+}
+
+func (c *Clowder) sendProjectGroupHandoff(userID string, req projectGroupEnsureRequest, binding ProjectGroupBinding, reused bool) error {
+	if c.ctx == nil {
+		return fmt.Errorf("im context unavailable")
+	}
+	verb := "已创建"
+	if reused {
+		verb = "会继续使用"
+	}
+	content := fmt.Sprintf("我%s项目群「%s」，你和相关猫猫都在里面。后续执行会在项目群里进行，我会在这里同步关键进度和等你反馈。", verb, binding.ProjectName)
+	msgReq, err := BuildOutboundMessageWithDefaultRecipient(OutboundPayload{
+		ConnectorID:    ConnectorID,
+		ExternalChatID: externalChatIDForUser(req.PMDirectChannelID, req.PMDirectChannelType, userID),
+		ThreadID:       binding.PMDirectThreadID,
+		CatID:          "coordinator",
+		CatDisplayName: "PM",
+		Content:        content,
+		Format:         "markdown",
+		Metadata: map[string]interface{}{
+			"project_group_no":   binding.ProjectGroupNo,
+			"project_group_name": binding.ProjectName,
+			"project_binding_id": binding.ID,
+			"project_handoff":    true,
+			"reused":             reused,
+		},
+	}, userID)
+	if err != nil {
+		return err
+	}
+	if isClowderVirtualSenderUID(msgReq.FromUID) {
+		if err := c.ensureVirtualClowderUser(msgReq.FromUID, "PM"); err != nil {
+			return err
+		}
+	}
+	return c.ctx.SendMessage(msgReq)
 }
 
 func (c *Clowder) deleteCatFromUpstream(catID string, userID string) (int, []byte, error) {
