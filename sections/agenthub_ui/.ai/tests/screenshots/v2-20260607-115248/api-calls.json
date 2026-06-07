@@ -1,0 +1,22 @@
+[
+  {
+    "method": "GET",
+    "url": "http://172.18.58.156:3000/v1/users/41232e72652648f8946988f45ba4895d",
+    "resourceType": "xhr"
+  },
+  {
+    "method": "GET",
+    "url": "http://172.18.58.156:3000/v1/users/41232e72652648f8946988f45ba4895d/im",
+    "resourceType": "xhr"
+  },
+  {
+    "method": "GET",
+    "url": "http://172.18.58.156:3000/v1/users/41232e72652648f8946988f45ba4895d",
+    "resourceType": "xhr"
+  },
+  {
+    "method": "GET",
+    "url": "http://172.18.58.156:3000/v1/users/41232e72652648f8946988f45ba4895d/im",
+    "resourceType": "xhr"
+  }
+]

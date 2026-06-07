@@ -1,0 +1,29 @@
+{
+  "A": {
+    "phone": "13733632709",
+    "password": "***",
+    "role": "existing account",
+    "uid": "41232e72652648f8946988f45ba4895d",
+    "accessToken": "a48***8d5",
+    "refreshToken": "",
+    "note": "V2-01-02 real login passed; refresh token was not present in captured localStorage."
+  },
+  "B": {
+    "phone": "13800000001",
+    "password": "***",
+    "nickname": "测试员B",
+    "uid": "a0cd1e35f2c9494d9be852004641277a",
+    "accessToken": "d73***e9e",
+    "refreshToken": "",
+    "note": "Account was created during V2-02-02 weak-password validation with a 7-character password. The intended V2-02-04 registration using Test1234! then hit HTTP 400 duplicate."
+  },
+  "C": {
+    "phone": "13800000002",
+    "password": "***",
+    "nickname": "测试员C",
+    "uid": null,
+    "accessToken": null,
+    "refreshToken": null,
+    "note": "Not attempted because V2-02 registration gate failed and B account state was polluted by the validation case."
+  }
+}
