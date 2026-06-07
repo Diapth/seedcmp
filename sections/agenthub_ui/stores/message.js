@@ -39,6 +39,67 @@ function deploymentTimestamp(request = {}) {
   return value < 1_000_000_000_000 ? value * 1000 : value;
 }
 
+function conversationRecentMessages(conversation = {}) {
+  const raw = conversation.raw || {};
+  const candidates = [
+    raw.last_message,
+    raw.lastMessage,
+    raw.last_msg,
+    raw.message,
+    ...(Array.isArray(raw.recents) ? raw.recents : []),
+    ...(Array.isArray(raw.messages) ? raw.messages : [])
+  ].filter(Boolean);
+  return [...candidates]
+    .filter((item) => {
+      const content = item.payload ?? item.content ?? item.contentObj ?? {};
+      const type = Number(item.type ?? content.type ?? item.content_type ?? item.contentType ?? 1);
+      return type !== 99 && type !== 1000;
+    })
+    .sort((a, b) => Number(a.message_seq || a.messageSeq || a.timestamp || 0) - Number(b.message_seq || b.messageSeq || b.timestamp || 0));
+}
+
+function conversationSummaryMessage(conversation = {}, channelId = '', channelType = 1) {
+  const text = String(conversation.lastMessage || '').trim();
+  if (!text) return null;
+  const messageSeq = Number(conversation.lastMessageSeq || conversation.raw?.last_msg_seq || 0);
+  const timestamp = conversation.lastTime || conversation.raw?.timestamp || Date.now();
+  const clientMsgNo = conversation.raw?.last_client_msg_no || `conversation-summary-${channelId}-${messageSeq || timestamp}`;
+  return {
+    id: `summary-${channelId}-${messageSeq || timestamp}`,
+    client_msg_no: clientMsgNo,
+    message_seq: messageSeq,
+    from_uid: conversation.raw?.last_message?.from_uid || conversation.raw?.lastMessage?.fromUID || '',
+    channel_id: channelId,
+    channel_type: channelType,
+    timestamp,
+    payload: { type: 1, text }
+  };
+}
+
+function conversationPreviewMessages(conversation = {}, channelId = '', channelType = 1) {
+  const messages = conversationRecentMessages(conversation).map((item) => createInboundMessage({
+    channel_id: channelId,
+    channel_type: channelType,
+    ...item
+  }));
+  if (messages.length) return messages;
+  const summary = conversationSummaryMessage(conversation, channelId, channelType);
+  return summary ? [createInboundMessage(summary)] : [];
+}
+
+function isSyntheticSummaryMessage(message = {}) {
+  const id = String(message.id || '');
+  const clientMsgNo = String(message.clientMsgNo || '');
+  return id.startsWith('summary-') || clientMsgNo.startsWith('conversation-summary-');
+}
+
+function getLatestPersistedMessageSeq(messages = []) {
+  return messages.reduce((max, item) => {
+    if (isSyntheticSummaryMessage(item)) return max;
+    return Math.max(max, Number(item.messageSeq || 0));
+  }, 0);
+}
+
 function deploymentCardTitle(request = {}) {
   return request.title || request.originalText || request.original_text || request.statusLabel || request.status_label || '部署请求';
 }
@@ -75,6 +136,13 @@ export const useMessageStore = defineStore('message', {
       if (direct.length || !channelType) return direct;
       return this.messages[channelKey(conversationId, channelType)] || [];
     },
+    getConversationPreviewMessages(conversation = {}) {
+      const channelId = conversation.channelId || conversation.id || conversation.raw?.channel_id || conversation.raw?.channelId || '';
+      const channelType = toBackendChannelType(conversation.channelType || conversation.type || conversation.raw?.channel_type || conversation.raw?.channelType || 1);
+      if (!channelId || !channelType) return [];
+      const hydrated = this.getMessages(channelId, channelType);
+      return hydrated.length ? hydrated : conversationPreviewMessages(conversation, channelId, channelType);
+    },
     ensureBucket(conversationId, channelType = '') {
       const key = String(conversationId);
       if (!this.messages[key]) this.messages[key] = [];
@@ -90,7 +158,8 @@ export const useMessageStore = defineStore('message', {
       const pendingKey = msg.clientMsgNo && this.pendingQueue[msg.clientMsgNo] ? msg.clientMsgNo : '';
       const existingIndex = list.findIndex((item) =>
         item.id === msg.id ||
-        (msg.clientMsgNo && item.clientMsgNo === msg.clientMsgNo)
+        (msg.clientMsgNo && item.clientMsgNo === msg.clientMsgNo) ||
+        (msg.messageSeq > 0 && item.messageSeq === msg.messageSeq)
       );
       if (existingIndex >= 0) {
         list[existingIndex] = { ...list[existingIndex], ...msg, status: 'success' };
@@ -232,22 +301,51 @@ export const useMessageStore = defineStore('message', {
     receiveMessage(conversationId, msg) {
       return this.addRealtimeMessage(conversationId, msg.channelType || 1, msg);
     },
+    hydrateFromConversationRecents(conversation = {}) {
+      const channelId = conversation.channelId || conversation.id || conversation.raw?.channel_id || conversation.raw?.channelId || '';
+      const channelType = toBackendChannelType(conversation.channelType || conversation.type || conversation.raw?.channel_type || conversation.raw?.channelType || 1);
+      if (!channelId || !channelType) return [];
+      conversationRecentMessages(conversation).forEach((item) => {
+        this.addRealtimeMessage(channelId, channelType, {
+          channel_id: channelId,
+          channel_type: channelType,
+          ...item
+        });
+      });
+      if (!this.getMessages(channelId, channelType).length) {
+        const summary = conversationSummaryMessage(conversation, channelId, channelType);
+        if (summary) this.addRealtimeMessage(channelId, channelType, summary);
+      }
+      return this.getMessages(channelId, channelType);
+    },
     async syncMessages(channelId, channelType = 1, options = {}) {
       this.loading = true;
       this.lastError = '';
       try {
+        const backendType = toBackendChannelType(channelType);
+        const convStore = useConversationStore();
+        const existingMessages = this.getMessages(channelId, backendType);
+        const latestPersistedSeq = getLatestPersistedMessageSeq(existingMessages);
+        const conversation = convStore.getConversation(channelId, backendType);
+        const latestKnownSeq = Number(options.latestMessageSeq || conversation?.lastMessageSeq || conversation?.raw?.last_msg_seq || 0);
+        const hasExplicitWindow = Object.prototype.hasOwnProperty.call(options, 'startMessageSeq') ||
+          Object.prototype.hasOwnProperty.call(options, 'pullMode');
+        const shouldLoadLatestWindow = options.hydrateVisibleHistory &&
+          !hasExplicitWindow &&
+          latestKnownSeq > 0 &&
+          (latestPersistedSeq <= 0 || latestKnownSeq - latestPersistedSeq > (options.limit || 30));
         const response = await syncApi.syncMessages({
           channel_id: channelId,
-          channel_type: toBackendChannelType(channelType),
+          channel_type: backendType,
           limit: options.limit || 30,
-          start_message_seq: options.startMessageSeq || 0,
+          start_message_seq: shouldLoadLatestWindow ? latestKnownSeq : (options.startMessageSeq || 0),
           end_message_seq: options.endMessageSeq || 0,
-          pull_mode: options.pullMode || 1
+          pull_mode: shouldLoadLatestWindow ? 0 : (options.pullMode || 1)
         });
         const data = response?.data || response || {};
         const list = data.messages || [];
-        list.forEach((item) => this.addRealtimeMessage(channelId, channelType, item));
-        return this.getMessages(channelId, channelType);
+        list.forEach((item) => this.addRealtimeMessage(channelId, backendType, item));
+        return this.getMessages(channelId, backendType);
       } catch (err) {
         this.lastError = err?.message || '同步消息失败';
         throw err;

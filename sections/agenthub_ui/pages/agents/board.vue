@@ -126,12 +126,43 @@
             </view>
           </view>
 
-          <AppEmptyState
-            v-else
-            icon="agents"
-            title="暂无智能体看板"
-            description="当前还没有按群聊归类的智能体任务"
-          />
+          <view v-else class="clowder-kanban-panel flex-column gap-3">
+            <view class="kanban-panel-head flex-row align-center justify-between">
+              <view class="flex-column">
+                <text class="kanban-panel-title">Clowder 任务看板</text>
+                <text class="kanban-panel-desc">{{ kanbanEmptyDescription }}</text>
+              </view>
+              <button class="header-action kanban-refresh flex-row align-center gap-2" title="刷新" @click="hydrateClowderTasks">
+                <AppIcon name="refresh" :size="15" color="var(--color-primary)" />
+                <text>刷新</text>
+              </button>
+            </view>
+
+            <view class="kanban-grid">
+              <view v-for="column in kanbanColumns" :key="column.key" class="kanban-column flex-column">
+                <view class="kanban-column-head flex-row align-center justify-between">
+                  <view class="flex-column">
+                    <text class="kanban-column-title">{{ column.label }}</text>
+                    <text class="kanban-key">{{ column.key }}</text>
+                  </view>
+                  <text class="kanban-count">{{ tasksByStatus(column.key).length }}</text>
+                </view>
+                <view class="kanban-card-list flex-column">
+                  <view
+                    v-for="task in tasksByStatus(column.key)"
+                    :key="task.id"
+                    class="kanban-task-card flex-column gap-1"
+                  >
+                    <text class="kanban-task-title">{{ task.title }}</text>
+                    <text class="kanban-task-meta">{{ task.assignee || '未指派' }}</text>
+                  </view>
+                  <view v-if="tasksByStatus(column.key).length === 0" class="kanban-empty">
+                    <text>暂无{{ column.label }}任务</text>
+                  </view>
+                </view>
+              </view>
+            </view>
+          </view>
         </view>
       </scroll-view>
 
@@ -142,6 +173,7 @@
 <script setup>
 import { computed, onMounted, ref } from 'vue';
 import { useAgentStore } from '@/stores/agent';
+import { useClowderStore } from '@/stores/clowder';
 import { useConversationStore } from '@/stores/conversation';
 import { useMessageStore } from '@/stores/message';
 import { useNavigationStore } from '@/stores/navigation';
@@ -151,11 +183,21 @@ import AppAvatar from '@/components/common/AppAvatar.vue';
 import AppEmptyState from '@/components/common/AppEmptyState.vue';
 
 const agentStore = useAgentStore();
+const clowderStore = useClowderStore();
 const convStore = useConversationStore();
 const messageStore = useMessageStore();
 const navStore = useNavigationStore();
 
 const activeBoardId = ref('');
+const activeThreadId = ref('');
+const clowderTasks = ref([]);
+
+const kanbanColumns = [
+  { key: 'todo', label: '待办' },
+  { key: 'doing', label: '进行中' },
+  { key: 'blocked', label: '阻塞' },
+  { key: 'done', label: '完成' }
+];
 
 const boards = computed(() => agentStore.boards || []);
 
@@ -188,9 +230,22 @@ const completedTaskCount = computed(() => {
   return activeTasks.value.filter(task => task.status === 'done').length;
 });
 
+const clowderKanbanTasks = computed(() => clowderTasks.value.map(normalizeTaskForKanban));
+
+const kanbanTasks = computed(() => {
+  if (activeTasks.value.length > 0) return activeTasks.value.map(normalizeTaskForKanban);
+  return clowderKanbanTasks.value;
+});
+
+const kanbanEmptyDescription = computed(() => {
+  if (activeThreadId.value) return `thread ${activeThreadId.value} 当前暂无任务，四态列已就绪`;
+  return '尚未绑定 Clowder thread，四态列保持可见以等待任务同步';
+});
+
 onMounted(() => {
   navStore.setActiveModule('agents');
   activeBoardId.value = resolveInitialBoardId();
+  hydrateClowderTasks();
 });
 
 function selectBoard(id) {
@@ -199,12 +254,55 @@ function selectBoard(id) {
 
 function statusText(status) {
   const map = {
+    todo: '待办',
     doing: '进行中',
-    review: '待验收',
-    blocked: '需修改',
+    review: '进行中',
+    blocked: '阻塞',
     done: '已完成'
   };
   return map[status] || '进行中';
+}
+
+function normalizeTaskForKanban(task = {}) {
+  const rawStatus = String(task.status || task.state || 'todo').toLowerCase();
+  const status = ['todo', 'doing', 'blocked', 'done'].includes(rawStatus)
+    ? rawStatus
+    : rawStatus === 'review'
+      ? 'doing'
+      : 'todo';
+  return {
+    id: task.id || task.taskId || task.task_id || `${status}-${task.title || task.task || task.goal || 'unnamed-task'}`,
+    title: task.title || task.task || task.goal || '未命名任务',
+    assignee: task.assignee || task.assigneeName || task.agent?.name || task.agentName || task.agentId || '',
+    status
+  };
+}
+
+function tasksByStatus(status) {
+  return kanbanTasks.value.filter(task => task.status === status);
+}
+
+async function hydrateClowderTasks() {
+  const pages = getCurrentPages();
+  const currentPage = pages[pages.length - 1];
+  const options = currentPage?.$page?.options || {};
+  const explicitThreadId = safeDecode(options.threadId || options.thread_id || '');
+
+  try {
+    let threadId = explicitThreadId;
+    if (!threadId) {
+      const activeGroup = await clowderStore.fetchActiveProjectGroup({}).catch(() => null);
+      threadId = activeGroup?.projectThreadId || activeGroup?.project_thread_id || activeGroup?.threadId || activeGroup?.thread_id || '';
+    }
+    activeThreadId.value = threadId || '';
+    if (!threadId) {
+      clowderTasks.value = [];
+      return;
+    }
+    clowderTasks.value = await clowderStore.fetchThreadTasks(threadId);
+  } catch (err) {
+    clowderTasks.value = [];
+  }
 }
 
 function resolveInitialBoardId() {
@@ -530,6 +628,108 @@ function goAgents() {
   transform: translateY(-1px);
 }
 
+.clowder-kanban-panel {
+  padding: 18px;
+  border-radius: 8px;
+  border: 1px solid var(--color-border);
+  background-color: var(--color-bg-surface);
+  box-sizing: border-box;
+}
+
+.kanban-panel-head {
+  gap: 12px;
+}
+
+.kanban-panel-title {
+  font-size: 16px;
+  font-weight: 800;
+  color: var(--color-text-primary);
+}
+
+.kanban-panel-desc {
+  margin-top: 3px;
+  font-size: 12px;
+  color: var(--color-text-secondary);
+  line-height: 1.45;
+}
+
+.kanban-grid {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 12px;
+}
+
+.kanban-column {
+  min-height: 260px;
+  min-width: 0;
+  padding: 12px;
+  border-radius: 8px;
+  background-color: var(--color-bg-muted);
+  border: 1px solid var(--color-border);
+  box-sizing: border-box;
+}
+
+.kanban-column-head {
+  gap: 8px;
+  margin-bottom: 10px;
+}
+
+.kanban-column-title {
+  font-size: 13px;
+  font-weight: 800;
+  color: var(--color-text-primary);
+}
+
+.kanban-key {
+  font-size: 11px;
+  color: var(--color-text-muted);
+  margin-top: 2px;
+}
+
+.kanban-count {
+  min-width: 26px;
+  height: 24px;
+  padding: 0 8px;
+  border-radius: 999px;
+  background-color: var(--color-bg-surface);
+  color: var(--color-text-secondary);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 12px;
+  font-weight: 800;
+  box-sizing: border-box;
+}
+
+.kanban-card-list {
+  gap: 8px;
+}
+
+.kanban-task-card,
+.kanban-empty {
+  min-height: 68px;
+  padding: 10px;
+  border-radius: 8px;
+  background-color: var(--color-bg-surface);
+  border: 1px solid var(--color-border);
+  box-sizing: border-box;
+}
+
+.kanban-task-title {
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--color-text-primary);
+  line-height: 1.4;
+  word-break: break-word;
+}
+
+.kanban-task-meta,
+.kanban-empty {
+  font-size: 12px;
+  color: var(--color-text-secondary);
+  line-height: 1.4;
+}
+
 .task-card-head {
   display: flex;
   gap: 12px;
@@ -810,6 +1010,32 @@ function goAgents() {
     gap: 14px;
   }
 
+  .kanban-panel-head {
+    align-items: flex-start;
+  }
+
+  .kanban-panel-head > .flex-column {
+    min-width: 0;
+  }
+
+  .kanban-refresh {
+    flex-shrink: 0;
+  }
+
+  .kanban-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 10px;
+  }
+
+  .kanban-column {
+    min-height: 176px;
+    padding: 10px;
+  }
+
+  .kanban-empty {
+    min-height: 56px;
+  }
+
   .agent-task-card {
     min-height: 0;
     padding: 16px;
@@ -842,6 +1068,12 @@ function goAgents() {
   .btn-at {
     width: 100%;
     justify-content: center;
+  }
+}
+
+@media (max-width: 360px) {
+  .kanban-grid {
+    grid-template-columns: 1fr;
   }
 }
 </style>

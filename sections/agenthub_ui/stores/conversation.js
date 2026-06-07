@@ -3,7 +3,9 @@ import { syncApi } from '@/api/sync.js';
 import { storage } from '@/utils/storage.js';
 import { buildConversationChannelCache, channelKey, toBackendChannelType, toConversationItem, toGroupConversationInput } from '@/utils/im-mappers.js';
 import { useAuthStore } from './auth.js';
+import { useContactStore } from './contact.js';
 import { useGroupStore } from './group.js';
+import { useUserStore } from './user.js';
 
 function sortConversations(list) {
   return [...list].sort((a, b) => {
@@ -39,6 +41,23 @@ function mergeConversations(primary = [], secondary = []) {
     }
   });
   return Array.from(merged.values());
+}
+
+function buildContactChannelCache(contacts = []) {
+  return contacts.reduce((cache, contact) => {
+    if (!contact?.id) return cache;
+    cache[channelKey(contact.id, 1)] = {
+      name: contact.remark || contact.nickname || contact.name || contact.id,
+      avatar: contact.avatar || '',
+      raw: contact.raw || contact
+    };
+    return cache;
+  }, {});
+}
+
+function isPlaceholderConversationName(name = '') {
+  const value = String(name || '').trim();
+  return !value || value === '未命名会话' || value === '用户';
 }
 
 export const useConversationStore = defineStore('conversation', {
@@ -84,10 +103,16 @@ export const useConversationStore = defineStore('conversation', {
         const response = await syncApi.syncConversations({ msg_count: 30 });
         const data = response?.data || response || {};
         const list = data.conversations || data.conversation_list || [];
-        const channelCache = buildConversationChannelCache(data);
+        const contactStore = useContactStore();
+        const contacts = await contactStore.fetchContacts().catch(() => contactStore.contacts);
+        const channelCache = {
+          ...buildContactChannelCache(contacts),
+          ...buildConversationChannelCache(data)
+        };
         const directConversations = list.map((item) => toConversationItem(item, channelCache));
         const groupConversations = await this.fetchGroupConversations(channelCache);
         this.conversations = mergeConversations(directConversations, groupConversations);
+        await this.resolveMissingDirectConversationIdentities();
         this.restoreDrafts();
         return this.conversations;
       } catch (err) {
@@ -124,27 +149,51 @@ export const useConversationStore = defineStore('conversation', {
         return [];
       }
     },
+    async resolveMissingDirectConversationIdentities(conversations = this.conversations) {
+      const userStore = useUserStore();
+      const missing = conversations.filter((item) => {
+        return item?.channelType === 1 &&
+          !isLocalOnlyDirectConversation(item.id, item.channelType) &&
+          isPlaceholderConversationName(item.name);
+      });
+      await Promise.all(missing.map(async (conversation) => {
+        try {
+          const user = await userStore.fetchUser(conversation.id);
+          if (!user?.uid) return;
+          this.addOrUpdateConversation(conversation.id, 1, {
+            name: user.name || user.nickname || conversation.name,
+            avatar: user.avatar || conversation.avatar
+          });
+        } catch {
+          // A missing user profile must not block message history display.
+        }
+      }));
+    },
     addOrUpdateConversation(channelId, channelType = 1, patch = {}) {
       const backendType = toBackendChannelType(channelType);
       const key = channelKey(channelId, backendType);
       const index = this.conversations.findIndex((item) => item.key === key || (item.id === String(channelId) && item.channelType === backendType));
+      const existing = index >= 0 ? this.conversations[index] : {};
+      const hasPatch = (field) => Object.prototype.hasOwnProperty.call(patch, field);
+      const defaultType = backendType === 2 ? 'group' : 'single';
       const next = {
+        ...existing,
+        ...patch,
         id: String(channelId),
         channelId: String(channelId),
         channelType: backendType,
         key,
-        name: patch.name || '未命名会话',
-        avatar: patch.avatar || '',
-        type: patch.type || (backendType === 2 ? 'group' : 'single'),
-        unread: Number(patch.unread || 0),
-        lastMessage: patch.lastMessage || '',
-        lastTime: patch.lastTime || Date.now(),
-        lastMessageSeq: Number(patch.lastMessageSeq || 0),
-        isPinned: Boolean(patch.isPinned),
-        isMuted: Boolean(patch.isMuted),
-        draft: patch.draft || this.getDraft(channelId, backendType) || '',
-        memberCount: patch.memberCount || 0,
-        ...patch
+        name: hasPatch('name') ? (patch.name || existing.name || '未命名会话') : (existing.name || '未命名会话'),
+        avatar: hasPatch('avatar') ? (patch.avatar || existing.avatar || '') : (existing.avatar || ''),
+        type: hasPatch('type') ? (patch.type || existing.type || defaultType) : (existing.type || defaultType),
+        unread: hasPatch('unread') ? Number(patch.unread || 0) : Number(existing.unread || 0),
+        lastMessage: hasPatch('lastMessage') ? (patch.lastMessage ?? '') : (existing.lastMessage || ''),
+        lastTime: hasPatch('lastTime') ? (patch.lastTime || Date.now()) : (existing.lastTime || Date.now()),
+        lastMessageSeq: hasPatch('lastMessageSeq') ? Number(patch.lastMessageSeq || 0) : Number(existing.lastMessageSeq || 0),
+        isPinned: hasPatch('isPinned') ? Boolean(patch.isPinned) : Boolean(existing.isPinned),
+        isMuted: hasPatch('isMuted') ? Boolean(patch.isMuted) : Boolean(existing.isMuted),
+        draft: hasPatch('draft') ? (patch.draft ?? '') : (existing.draft || this.getDraft(channelId, backendType) || ''),
+        memberCount: hasPatch('memberCount') ? (patch.memberCount || 0) : (existing.memberCount || 0)
       };
       if (index >= 0) {
         this.conversations[index] = { ...this.conversations[index], ...next };

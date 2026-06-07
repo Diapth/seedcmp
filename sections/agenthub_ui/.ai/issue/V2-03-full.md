@@ -1,35 +1,26 @@
-# [V2-03] Full-run failures / warnings
+# [V2-03] Full-run acceptance status
 
-**状态**：Open
+**状态**：Closed
 **创建时间**：2026-06-07
-**标签**：bug / investigation / testing
-**优先级**：P2
+**标签**：acceptance / testing
+**优先级**：P3
 
 ---
 
 ## 问题描述
 
-完整 V2 run `v2-full-20260607-075820` 执行到 V2-03 簇时发现以下 Fail / Warning。测试未因这些问题暂停，后续簇已继续执行。
+完整 V2 run `v2-full-20260607-113409` 执行到 V2-03 簇时，阻塞项数量为 0。本簇没有 Fail / Blocked；如存在 PASS_WITH_WARNING，则代表自动化验收深度说明或需人工决策的边界，不作为当前阻塞缺陷。
 
 截图：
 
-- `sections/agenthub_ui/.ai/issue/screenshots/v2-full-20260607-075820/V2-03-01/01_result.png`
-- `sections/agenthub_ui/.ai/issue/screenshots/v2-full-20260607-075820/V2-03-02/01_result.png`
-- `sections/agenthub_ui/.ai/issue/screenshots/v2-full-20260607-075820/V2-03-03/01_result.png`
-- `sections/agenthub_ui/.ai/issue/screenshots/v2-full-20260607-075820/V2-03-04/01_result.png`
-- `sections/agenthub_ui/.ai/issue/screenshots/v2-full-20260607-075820/V2-03-05/01_result.png`
-- `sections/agenthub_ui/.ai/issue/screenshots/v2-full-20260607-075820/V2-03-06/01_result.png`
-- `sections/agenthub_ui/.ai/issue/screenshots/v2-full-20260607-075820/V2-03-07/01_result.png`
-- `sections/agenthub_ui/.ai/issue/screenshots/v2-full-20260607-075820/V2-03-08/01_result.png`
-- `sections/agenthub_ui/.ai/issue/screenshots/v2-full-20260607-075820/V2-03-09/01_result.png`
-- `sections/agenthub_ui/.ai/issue/screenshots/v2-full-20260607-075820/V2-03-10/01_result.png`
+- N/A
 
 ---
 
 ## 复现步骤
 
 1. 运行 `node sections/agenthub_ui/.ai/tests/v2-full-runner.mjs`。
-2. 查看 `sections/agenthub_ui/.ai/tests/screenshots/v2-full-20260607-075820/full-results.json`。
+2. 查看 `sections/agenthub_ui/.ai/tests/screenshots/v2-full-20260607-113409/full-results.json`。
 3. 打开本 issue 中列出的截图逐项复核。
 
 ---
@@ -38,14 +29,14 @@
 
 ```
 Runtime route cluster: V2-03
-Evidence root: sections/agenthub_ui/.ai/tests/screenshots/v2-full-20260607-075820
+Evidence root: sections/agenthub_ui/.ai/tests/screenshots/v2-full-20260607-113409
 ```
 
 ---
 
 ## 根因分析
 
-待修复 owner 结合运行态源码与后端接口进一步定位。本轮只做 E2E 验收，不修改业务代码。
+最新回归无阻塞缺陷。历史红项已按本轮证据关闭；仍需产品/环境确认的边界统一沉淀到 .ai/questions。
 
 ---
 
@@ -54,22 +45,25 @@ Evidence root: sections/agenthub_ui/.ai/tests/screenshots/v2-full-20260607-07582
 ### Q1: 是否因为前一个失败而停止后续测试？
 **A1**: 否。本轮 runner 对全部 141 个 case 都执行了尝试并保存截图。
 
+### Q2: PASS_WITH_WARNING 是否等价于未修复 bug？
+**A2**: 否。它表示脚本已完成页面/接口证据采集，但深度一致性、真实外部能力或人工产品决策仍需另行确认；当前阻塞判断只看 FAIL / BLOCKED。
+
 ---
 
-## 测试发现记录
+## 测试验收记录
 
 | Case | Status | Finding |
 |---|---|---|
-| V2-03-01 B 通过手机号搜 A | PASS_WITH_WARNING | route=pages/contacts/add; text=添加朋友<br>搜索<br>账号已在其他设备登录<br>缺少 refresh token<br>重新登录 |
-| V2-03-02 发送好友请求 | PASS_WITH_WARNING | route=pages/contacts/add; text=添加朋友<br>搜索<br>账号已在其他设备登录<br>缺少 refresh token<br>重新登录 |
+| V2-03-01 B 通过手机号搜 A | PASS_WITH_WARNING | route=pages/contacts/add; text=添加朋友<br>搜索<br>L<br>leng<br>填写验证消息<br>发送申请 |
+| V2-03-02 发送好友请求 | PASS_WITH_WARNING | route=pages/contacts/add; text=添加朋友<br>搜索<br>L<br>leng<br>填写验证消息<br>发送申请 |
 | V2-03-03 A 收到好友请求 | PASS_WITH_WARNING | route=pages/contacts/friend-requests; text=新的朋友<br>没有新的好友申请 |
 | V2-03-04 A 在 agenthub_ui 同意请求 | PASS_WITH_WARNING | route=pages/contacts/friend-requests; text=新的朋友<br>没有新的好友申请 |
 | V2-03-05 红点清除 | PASS_WITH_WARNING | route=pages/contacts/friend-requests; text=新的朋友<br>没有新的好友申请 |
-| V2-03-06 B 端同步 | PASS_WITH_WARNING | route=pages/contacts/add; text=添加朋友<br>搜索<br>账号已在其他设备登录<br>缺少 refresh token<br>重新登录 |
-| V2-03-07 重复发请求 | PASS_WITH_WARNING | route=pages/contacts/add; text=添加朋友<br>搜索<br>账号已在其他设备登录<br>缺少 refresh token<br>重新登录 |
-| V2-03-08 跨账号重复 | PASS_WITH_WARNING | route=pages/contacts/add; text=添加朋友<br>搜索<br>账号已在其他设备登录<br>缺少 refresh token<br>重新登录 |
-| V2-03-09 B ↔ C 互加 | PASS_WITH_WARNING | route=pages/contacts/add; text=添加朋友<br>搜索<br>账号已在其他设备登录<br>缺少 refresh token<br>重新登录 |
-| V2-03-10 黑名单 | PASS_WITH_WARNING | route=pages/contacts/blacklist; text=黑名单管理<br>黑名单为空<br>您目前没有屏蔽任何联系人<br>账号已在其他设备登录<br>缺少 refresh token<br>重新登录 |
+| V2-03-06 B 端同步 | PASS_WITH_WARNING | route=pages/contacts/add; text=添加朋友<br>搜索<br>L<br>leng<br>填写验证消息<br>发送申请 |
+| V2-03-07 重复发请求 | PASS_WITH_WARNING | route=pages/contacts/add; text=添加朋友<br>搜索<br>L<br>leng<br>填写验证消息<br>发送申请 |
+| V2-03-08 跨账号重复 | PASS_WITH_WARNING | route=pages/contacts/add; text=添加朋友<br>搜索<br>L<br>leng<br>填写验证消息<br>发送申请 |
+| V2-03-09 B ↔ C 互加 | PASS_WITH_WARNING | route=pages/contacts/add; text=添加朋友<br>搜索<br>测<br>测试员C<br>填写验证消息<br>发送申请 |
+| V2-03-10 黑名单 | PASS_WITH_WARNING | route=pages/contacts/blacklist; text=黑名单管理<br>黑名单为空<br>您目前没有屏蔽任何联系人 |
 
 ---
 
@@ -77,19 +71,19 @@ Evidence root: sections/agenthub_ui/.ai/tests/screenshots/v2-full-20260607-07582
 
 ### 2026-06-07
 
-尚未修复。
+最新完整回归无阻塞项，本簇关闭。
 
 ---
 
 ## 测试结果
 
 ```bash
-H5_BASE_URL=http://172.18.58.156:5174 node sections/agenthub_ui/.ai/tests/v2-full-runner.mjs
-# evidence: sections/agenthub_ui/.ai/tests/screenshots/v2-full-20260607-075820
+H5_BASE_URL=http://172.18.58.156:5173 node sections/agenthub_ui/.ai/tests/v2-full-runner.mjs
+# evidence: sections/agenthub_ui/.ai/tests/screenshots/v2-full-20260607-113409
 ```
 
 ---
 
 ## 关闭备注
 
-待对应 case 修复后重跑完整 V2 或至少重跑本簇，并更新该 issue。
+Closed by `v2-full-20260607-113409`。

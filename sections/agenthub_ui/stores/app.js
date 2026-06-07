@@ -31,6 +31,9 @@ export const useAppStore = defineStore('app', {
       this.kickout = { visible: true, reason };
       this.logout();
     },
+    acknowledgeKickout() {
+      this.kickout = { visible: false, reason: '' };
+    },
     logout() {
       this.currentUser = null;
       this.token = '';

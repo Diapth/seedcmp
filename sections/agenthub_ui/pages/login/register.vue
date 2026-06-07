@@ -79,12 +79,32 @@
             <view class="input-wrapper">
               <AppIcon name="lock" :size="18" color="var(--color-text-muted)" class="input-icon" />
               <input 
-                type="password" 
+                :type="showPassword ? 'text' : 'password'" 
                 v-model="password" 
-                placeholder="密码 (不少于6位)" 
-                class="form-input" 
+                placeholder="至少 8 位，建议含字母+数字" 
+                class="form-input with-trailing-action" 
                 placeholder-style="color: var(--color-text-muted)"
               />
+              <view class="password-toggle" @click="showPassword = !showPassword">
+                <AppIcon :name="showPassword ? 'eye-off' : 'eye'" :size="16" color="var(--color-text-secondary)" />
+              </view>
+            </view>
+          </view>
+
+          <view class="input-group">
+            <text class="input-label">确认密码</text>
+            <view class="input-wrapper">
+              <AppIcon name="lock" :size="18" color="var(--color-text-muted)" class="input-icon" />
+              <input
+                :type="showConfirmPassword ? 'text' : 'password'"
+                v-model="confirmPassword"
+                placeholder="请再次输入密码"
+                class="form-input with-trailing-action"
+                placeholder-style="color: var(--color-text-muted)"
+              />
+              <view class="password-toggle" @click="showConfirmPassword = !showConfirmPassword">
+                <AppIcon :name="showConfirmPassword ? 'eye-off' : 'eye'" :size="16" color="var(--color-text-secondary)" />
+              </view>
             </view>
           </view>
           
@@ -109,6 +129,9 @@ const phone = ref('');
 const code = ref('');
 const nickname = ref('');
 const password = ref('');
+const confirmPassword = ref('');
+const showPassword = ref(false);
+const showConfirmPassword = ref(false);
 const codeCountdown = ref(0);
 const isLoading = ref(false);
 const errorMessage = ref('');
@@ -144,13 +167,23 @@ async function sendCode() {
 }
 
 async function handleRegister() {
-  if (!phone.value || !code.value || !nickname.value || !password.value) {
+  if (!phone.value || !code.value || !nickname.value || !password.value || !confirmPassword.value) {
     errorMessage.value = '请填写完整的注册信息';
     return;
   }
   
-  if (password.value.length < 6) {
-    errorMessage.value = '密码长度不能少于6位';
+  if (password.value.length < 8) {
+    errorMessage.value = '密码长度不能少于8位';
+    return;
+  }
+
+  if (!/^(?=.*[A-Za-z])(?=.*\d).{8,}$/.test(password.value)) {
+    errorMessage.value = '密码至少 8 位，且需同时包含字母和数字';
+    return;
+  }
+
+  if (password.value !== confirmPassword.value) {
+    errorMessage.value = '两次输入的密码不一致';
     return;
   }
   
@@ -309,6 +342,30 @@ async function handleRegister() {
   background-color: var(--color-bg-base);
   transition: all 0.2s ease;
 }
+
+.form-input.with-trailing-action {
+  padding-right: 48px;
+}
+
+.password-toggle {
+  position: absolute;
+  right: 10px;
+  top: 50%;
+  width: 36px;
+  height: 36px;
+  transform: translateY(-50%);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 8px;
+  cursor: pointer;
+  z-index: 2;
+}
+
+.password-toggle:active {
+  background-color: var(--color-bg-hover);
+}
+
 .form-input:focus {
   border-color: var(--color-primary);
 }

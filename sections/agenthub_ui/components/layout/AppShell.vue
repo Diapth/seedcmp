@@ -34,6 +34,17 @@
         <!-- Bottom Tab Bar Navigation -->
         <MobileTabBar v-if="!hideMobileTabBar" />
       </view>
+
+      <view v-if="appStore.kickout.visible" class="kickout-overlay">
+        <view class="kickout-dialog">
+          <view class="kickout-icon">
+            <AppIcon name="shield" :size="22" color="var(--color-error)" />
+          </view>
+          <text class="kickout-title">账号已在其他设备登录</text>
+          <text class="kickout-desc">{{ appStore.kickout.reason || '当前会话已失效，请重新登录以继续使用。' }}</text>
+          <button class="kickout-action" @click="handleKickoutConfirm">重新登录</button>
+        </view>
+      </view>
       
     </view>
   </view>
@@ -74,6 +85,11 @@ const statusBarHeight = computed(() => {
   return 0;
   // #endif
 });
+
+function handleKickoutConfirm() {
+  appStore.acknowledgeKickout();
+  uni.redirectTo({ url: '/pages/login/index' });
+}
 </script>
 
 <style scoped>
@@ -119,5 +135,70 @@ const statusBarHeight = computed(() => {
 .status-bar-placeholder {
   width: 100%;
   background-color: var(--color-bg-surface);
+}
+
+.kickout-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 1200;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 24px;
+  background-color: rgba(15, 23, 42, 0.42);
+  box-sizing: border-box;
+}
+
+.kickout-dialog {
+  width: min(360px, 100%);
+  padding: 24px;
+  border-radius: 8px;
+  background-color: var(--color-bg-surface);
+  border: 1px solid var(--color-border);
+  box-shadow: var(--shadow-lg);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 12px;
+  text-align: center;
+  box-sizing: border-box;
+}
+
+.kickout-icon {
+  width: 44px;
+  height: 44px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background-color: rgba(239, 68, 68, 0.1);
+}
+
+.kickout-title {
+  font-size: 18px;
+  font-weight: 700;
+  color: var(--color-text-primary);
+}
+
+.kickout-desc {
+  font-size: 13px;
+  line-height: 1.6;
+  color: var(--color-text-secondary);
+}
+
+.kickout-action {
+  width: 100%;
+  min-height: 44px;
+  margin-top: 4px;
+  border-radius: 8px;
+  border: none;
+  background-color: var(--color-primary);
+  color: #ffffff;
+  font-size: 15px;
+  font-weight: 700;
+}
+
+.kickout-action::after {
+  border: none;
 }
 </style>

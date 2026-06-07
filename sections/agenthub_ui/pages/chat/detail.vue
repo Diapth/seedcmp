@@ -267,6 +267,7 @@ import { useContactStore } from '@/stores/contact';
 import { useAgentStore } from '@/stores/agent';
 import { useDeploymentStore } from '@/stores/deployment.js';
 import { storage } from '@/utils/storage.js';
+import { isClowderConversation } from '@/utils/clowder-conversation.js';
 import { useResponsiveLayout } from '@/composables/useResponsiveLayout';
 import AppShell from '@/components/layout/AppShell.vue';
 import MobilePageHeader from '@/components/layout/MobilePageHeader.vue';
@@ -365,8 +366,9 @@ const activeConversation = computed(() => {
 });
 
 const messagesList = computed(() => {
-  if (!convStore.activeId) return [];
-  return messageStore.messages[convStore.activeId] || [];
+  const conv = activeConversation.value;
+  if (!conv) return [];
+  return messageStore.getConversationPreviewMessages(conv);
 });
 
 const activeConversationSubtitle = computed(() => {
@@ -438,6 +440,8 @@ const memberMenuItems = computed(() => {
 });
 
 const deploymentHydrationInFlight = new Set();
+const messageHydrationInFlight = new Set();
+const visibleHistoryTimers = [];
 
 onMounted(async () => {
   navStore.setActiveModule('chat');
@@ -445,10 +449,12 @@ onMounted(async () => {
   const currentPage = pages[pages.length - 1];
   const id = currentPage?.$page?.options?.id || '1';
   const atMemberId = currentPage?.$page?.options?.at;
-  if (convStore.conversations.length === 0) {
-    await convStore.fetchConversations().catch(() => undefined);
-  }
   convStore.setActiveId(id);
+  if (activeConversation.value) {
+    hydrateActiveMessages(activeConversation.value);
+  }
+  await convStore.fetchConversations().catch(() => undefined);
+  await hydrateActiveMessages();
   await hydrateActiveDeploymentCard();
 
   // Restore persisted draft
@@ -473,6 +479,7 @@ onMounted(async () => {
 });
 
 onBeforeUnmount(() => {
+  clearVisibleHistoryRefresh();
   if (convStore.activeId) {
     const conv = convStore.conversations.find((c) => c.id === convStore.activeId);
     if (conv?.draft) {
@@ -563,7 +570,9 @@ function navigateToConversationProfile(conversation) {
 
 function handleSelectConversation(id) {
   convStore.setActiveId(id);
-  hydrateActiveDeploymentCard();
+  const conversation = convStore.conversations.find((item) => item.id === id) || activeConversation.value;
+  hydrateActiveMessages(conversation);
+  hydrateActiveDeploymentCard(conversation);
   closeFilePreview();
   closeMemberProfile();
 }
@@ -576,7 +585,56 @@ function conversationChannelType(conversation) {
   return Number(conversation?.channelType || (conversation?.type === 'group' ? 2 : 1));
 }
 
+function shouldHydrateDeploymentCard(conversation) {
+  return isClowderConversation(conversation);
+}
+
+async function hydrateActiveMessages(conversation = activeConversation.value) {
+  const channelId = conversationChannelId(conversation);
+  const channelType = conversationChannelType(conversation);
+  if (!channelId || !channelType) return;
+  messageStore.hydrateFromConversationRecents(conversation);
+  const key = `${channelId}-${channelType}`;
+  if (messageHydrationInFlight.has(key)) {
+    scheduleVisibleHistoryRefresh(conversation);
+    return;
+  }
+  messageHydrationInFlight.add(key);
+  try {
+    await messageStore.syncMessages(channelId, channelType, { limit: 30, hydrateVisibleHistory: true });
+    scheduleVisibleHistoryRefresh(conversation);
+  } catch (err) {
+    console.warn('[chat/detail] message hydration failed', err);
+  } finally {
+    messageHydrationInFlight.delete(key);
+  }
+}
+
+function clearVisibleHistoryRefresh() {
+  while (visibleHistoryTimers.length) {
+    clearTimeout(visibleHistoryTimers.pop());
+  }
+}
+
+function scheduleVisibleHistoryRefresh(conversation = activeConversation.value) {
+  const channelId = conversationChannelId(conversation);
+  const channelType = conversationChannelType(conversation);
+  if (!channelId || !channelType) return;
+  clearVisibleHistoryRefresh();
+  [2500, 10000, 30000].forEach((delay) => {
+    const timer = setTimeout(() => {
+      const active = activeConversation.value;
+      if (conversationChannelId(active) !== channelId || conversationChannelType(active) !== channelType) return;
+      messageStore.syncMessages(channelId, channelType, { limit: 30, hydrateVisibleHistory: true }).catch((err) => {
+        console.warn('[chat/detail] visible history refresh failed', err);
+      });
+    }, delay);
+    visibleHistoryTimers.push(timer);
+  });
+}
+
 async function hydrateActiveDeploymentCard(conversation = activeConversation.value) {
+  if (!shouldHydrateDeploymentCard(conversation)) return;
   const channelId = conversationChannelId(conversation);
   const channelType = conversationChannelType(conversation);
   if (!channelId || !channelType) return;

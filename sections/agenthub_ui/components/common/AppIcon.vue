@@ -83,6 +83,7 @@ const nativeIconMap = {
   fullscreen: 'eye',
   plus: 'plus',
   search: 'search',
+  refresh: 'refresh',
   back: 'back',
   more: 'more',
   close: 'close',
@@ -247,6 +248,12 @@ const iconsDict = {
   search: [
     'M11 19a8 8 0 1 0 0-16 8 8 0 0 0 0 16z',
     'M21 21l-4.35-4.35'
+  ],
+  refresh: [
+    'M21 12a9 9 0 0 1-15.35 6.36L3 16',
+    'M3 21v-5h5',
+    'M3 12A9 9 0 0 1 18.35 5.64L21 8',
+    'M21 3v5h-5'
   ],
   back: [
     'M19 12H5',

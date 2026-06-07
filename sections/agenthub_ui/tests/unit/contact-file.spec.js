@@ -49,6 +49,34 @@ describe('contact and file user-facing stores', () => {
     await expect(useContactStore().searchUser('missing-user')).resolves.toBeNull();
   });
 
+  it('maps top-level friend/sync arrays into contacts', async () => {
+    setRequestAdapter(async ({ url }) => {
+      expect(url).toContain('/friend/sync');
+      return {
+        status: 200,
+        data: [
+          {
+            uid: 'friend-b',
+            name: '测试员B',
+            avatar: 'https://example.com/b.png',
+            remark: 'B 同学'
+          }
+        ]
+      };
+    });
+
+    const contacts = await useContactStore().fetchContacts();
+
+    expect(contacts).toEqual([
+      expect.objectContaining({
+        id: 'friend-b',
+        nickname: '测试员B',
+        avatar: 'https://example.com/b.png',
+        remark: 'B 同学'
+      })
+    ]);
+  });
+
   it('passes backend vercode when sending a friend request', async () => {
     const adapter = vi.fn(async ({ url, data }) => {
       expect(url).toContain('/friend/apply');

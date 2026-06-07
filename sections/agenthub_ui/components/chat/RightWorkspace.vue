@@ -106,6 +106,7 @@ import { computed, ref, watch } from 'vue';
 import { useMessageStore } from '@/stores/message';
 import { useGroupStore } from '@/stores/group';
 import { useClowderStore } from '@/stores/clowder.js';
+import { isClowderConversation } from '@/utils/clowder-conversation.js';
 import AppAvatar from '../common/AppAvatar.vue';
 import AppIcon from '../common/AppIcon.vue';
 import ClowderPanel from './ClowderPanel.vue';
@@ -248,7 +249,11 @@ async function hydrateGroupProjectWorkspace() {
   try {
     const state = await clowderStore.fetchBinding(groupChannelId.value, groupChannelType.value);
     let threadId = bindingThreadId(state?.binding || state || projectBinding.value || {});
-    if (!threadId) {
+    const canDiscoverProjectGroup = isClowderConversation(props.conversation) ||
+      isClowderConversation(state) ||
+      isClowderConversation(state?.binding) ||
+      isClowderConversation(projectBinding.value);
+    if (!threadId && canDiscoverProjectGroup) {
       const activeBinding = await clowderStore.fetchActiveProjectGroup({
         projectGroupNo: groupChannelId.value
       }).catch((err) => {

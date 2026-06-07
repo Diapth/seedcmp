@@ -1,9 +1,11 @@
 import { AppError } from './request.js';
 import { IM_WEB_WS_BASE, rewriteLocalhostForRemoteBrowser } from './env.js';
 import { registerCMDListeners, registerMessageListeners } from './listeners.js';
+import { useAppStore } from '@/stores/app.js';
 import { useImStore } from '@/stores/im.js';
 
 const REGISTERED = Symbol.for('agenthub.wksdk.registered');
+const CONNECT_STATUS_REGISTERED = Symbol.for('agenthub.wksdk.connectStatusRegistered');
 let sdkModulePromise = null;
 let initialized = {
   uid: '',
@@ -31,11 +33,31 @@ function resolveWsAddr(wsAddr) {
   return rewriteLocalhostForRemoteBrowser(IM_WEB_WS_BASE || wsAddr || useImStore().wsAddr || '');
 }
 
+function isKickoutStatus(status, reasonCode, sdkModule) {
+  const connectStatus = sdkModule?.ConnectStatus || sdkModule?.default?.ConnectStatus || {};
+  return status === connectStatus.ConnectKick || status === 'ConnectKick' || status === 'kicked' || reasonCode === 2;
+}
+
+function registerConnectStatusListener(shared, sdkModule) {
+  const manager = shared?.connectManager;
+  if (!manager?.addConnectStatusListener || shared[CONNECT_STATUS_REGISTERED]) return;
+  manager.addConnectStatusListener((status, reasonCode) => {
+    if (isKickoutStatus(status, reasonCode, sdkModule)) {
+      useAppStore().triggerKickout('账号已在其他设备登录');
+    }
+  });
+  shared[CONNECT_STATUS_REGISTERED] = true;
+}
+
 export async function initSdk({ uid, token, wsAddr }) {
   if (!uid || !token) {
     throw new AppError('缺少 IM uid/token，无法初始化 SDK', { code: 'SDK_AUTH_MISSING' });
   }
-  const sdk = await getWKSdk();
+  const mod = await loadSdkModule();
+  const sdk = mod.default || mod.WKSDK || mod;
+  if (!sdk?.shared) {
+    throw new AppError('WKSDK shared() 不可用', { code: 'SDK_UNAVAILABLE' });
+  }
   const shared = sdk.shared();
   const nextWsAddr = resolveWsAddr(wsAddr);
   if (initialized.uid === uid && initialized.token === token && initialized.wsAddr === nextWsAddr) {
@@ -58,6 +80,7 @@ export async function initSdk({ uid, token, wsAddr }) {
   }
   registerCMDListeners(shared);
   registerMessageListeners(shared);
+  registerConnectStatusListener(shared, mod);
   shared[REGISTERED] = true;
   shared.connect?.();
   return shared;

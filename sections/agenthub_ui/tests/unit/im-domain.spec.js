@@ -1,10 +1,12 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { createPinia, setActivePinia } from 'pinia';
+import { useContactStore } from '../../stores/contact.js';
 import { useConversationStore } from '../../stores/conversation.js';
 import { useMessageStore } from '../../stores/message.js';
 import { resetStorageForTests } from '../../utils/storage.js';
 import { resetRequestRuntimeForTests, setRequestAdapter } from '../../utils/request.js';
 import { createInboundMessage, toConversationItem } from '../../utils/im-mappers.js';
+import { isClowderConversation } from '../../utils/clowder-conversation.js';
 
 const wkSdkMock = vi.hoisted(() => ({
   sendTextMessage: vi.fn(),
@@ -46,6 +48,35 @@ describe('IM domain mapping and stores', () => {
       isMuted: false,
       draft: '稍后回复'
     });
+  });
+
+  it('only treats explicit clowder conversations as clowder-capable', () => {
+    expect(isClowderConversation({
+      id: 'ordinary-group',
+      channelType: 2,
+      type: 'group',
+      name: '普通测试群'
+    })).toBe(false);
+
+    expect(isClowderConversation({
+      id: 'a0cd1e35f2c9494d9be852004641277a',
+      channelType: 1,
+      type: 'single',
+      name: '测试员B'
+    })).toBe(false);
+
+    expect(isClowderConversation({
+      id: 'clowder_cat:coordinator',
+      channelType: 1,
+      type: 'single'
+    })).toBe(true);
+
+    expect(isClowderConversation({
+      id: 'project-group',
+      channelType: 2,
+      type: 'group',
+      raw: { binding_id: 'bind-1' }
+    })).toBe(true);
   });
 
   it('maps the real conversation/sync shape with users, recents and second timestamps', async () => {
@@ -109,6 +140,153 @@ describe('IM domain mapping and stores', () => {
       isMuted: false
     });
     expect(conversationStore.conversations[0].lastTime).toBe(1780740778000);
+  });
+
+  it('uses friend sync as the direct conversation name fallback when users are omitted', async () => {
+    setRequestAdapter(async ({ url }) => {
+      if (url.includes('/conversation/sync')) {
+        return {
+          status: 200,
+          data: {
+            conversations: [
+              {
+                channel_id: 'friend-b',
+                channel_type: 1,
+                unread: 0,
+                timestamp: 1780741200,
+                recents: [
+                  {
+                    message_seq: 12,
+                    from_uid: 'me',
+                    timestamp: 1780741200,
+                    payload: { type: 1, text: '真实留痕' }
+                  }
+                ]
+              }
+            ],
+            users: [],
+            groups: []
+          }
+        };
+      }
+
+      if (url.includes('/friend/sync')) {
+        return {
+          status: 200,
+          data: [
+            {
+              uid: 'friend-b',
+              name: '测试员B',
+              avatar: 'https://example.com/b.png'
+            }
+          ]
+        };
+      }
+
+      if (url.includes('/group/my')) {
+        return { status: 200, data: [] };
+      }
+
+      throw new Error(`Unexpected request: ${url}`);
+    });
+
+    const conversationStore = useConversationStore();
+    await conversationStore.fetchConversations();
+
+    expect(conversationStore.conversations[0]).toMatchObject({
+      id: 'friend-b',
+      name: '测试员B',
+      avatar: 'https://example.com/b.png',
+      lastMessage: '真实留痕'
+    });
+  });
+
+  it('refreshes stale friend cache before mapping direct conversation identities', async () => {
+    const contactStore = useContactStore();
+    contactStore.contacts = [{ id: 'u_10000', nickname: '系统账号', avatar: '' }];
+
+    setRequestAdapter(async ({ url }) => {
+      if (url.includes('/conversation/sync')) {
+        return {
+          status: 200,
+          data: {
+            conversations: [
+              {
+                channel_id: 'friend-b',
+                channel_type: 1,
+                timestamp: 1780741200,
+                recents: [{ message_seq: 1, timestamp: 1780741200, payload: { type: 1, text: '旧缓存复现' } }]
+              }
+            ],
+            users: [],
+            groups: []
+          }
+        };
+      }
+      if (url.includes('/friend/sync')) {
+        return {
+          status: 200,
+          data: [{ uid: 'friend-b', name: '测试员B', avatar: 'https://example.com/b.png' }]
+        };
+      }
+      if (url.includes('/group/my')) {
+        return { status: 200, data: [] };
+      }
+      throw new Error(`Unexpected request: ${url}`);
+    });
+
+    const conversationStore = useConversationStore();
+    await conversationStore.fetchConversations();
+
+    expect(conversationStore.conversations[0]).toMatchObject({
+      id: 'friend-b',
+      name: '测试员B',
+      avatar: 'https://example.com/b.png'
+    });
+  });
+
+  it('falls back to user profile lookup when conversation and friend sync omit channel identity', async () => {
+    setRequestAdapter(async ({ url }) => {
+      if (url.includes('/conversation/sync')) {
+        return {
+          status: 200,
+          data: {
+            conversations: [
+              {
+                channel_id: 'friend-b',
+                channel_type: 1,
+                timestamp: 1780741200,
+                recents: [{ message_seq: 1, timestamp: 1780741200, payload: { type: 1, text: '资料兜底' } }]
+              }
+            ],
+            users: [],
+            groups: []
+          }
+        };
+      }
+      if (url.includes('/friend/sync')) {
+        return { status: 200, data: [] };
+      }
+      if (url.includes('/users/friend-b')) {
+        return {
+          status: 200,
+          data: { uid: 'friend-b', name: '测试员B', avatar: 'https://example.com/b.png' }
+        };
+      }
+      if (url.includes('/group/my')) {
+        return { status: 200, data: [] };
+      }
+      throw new Error(`Unexpected request: ${url}`);
+    });
+
+    const conversationStore = useConversationStore();
+    await conversationStore.fetchConversations();
+
+    expect(conversationStore.conversations[0]).toMatchObject({
+      id: 'friend-b',
+      name: '测试员B',
+      avatar: 'https://example.com/b.png'
+    });
   });
 
   it('adds my groups as conversations and hydrates their latest message summary', async () => {
@@ -225,6 +403,253 @@ describe('IM domain mapping and stores', () => {
     const list = messageStore.getMessages('friend-a');
     expect(list).toHaveLength(1);
     expect(list[0]).toMatchObject({ id: 'm-1', senderId: 'friend-a', content: '真实消息' });
+  });
+
+  it('preserves conversation identity when message hydration updates only message fields', () => {
+    const conversationStore = useConversationStore();
+
+    conversationStore.addOrUpdateConversation('friend-a', 1, {
+      name: '测试员B',
+      avatar: 'https://example.com/b.png',
+      isPinned: true,
+      isMuted: true
+    });
+    conversationStore.addOrUpdateConversation('friend-a', 1, {
+      lastMessage: '最新留痕',
+      lastMessageSeq: 4,
+      lastTime: 1780741200000
+    });
+
+    expect(conversationStore.getConversation('friend-a', 1)).toMatchObject({
+      name: '测试员B',
+      avatar: 'https://example.com/b.png',
+      isPinned: true,
+      isMuted: true,
+      lastMessage: '最新留痕',
+      lastMessageSeq: 4
+    });
+  });
+
+  it('hydrates the message bucket from conversation recents as a refresh fallback', () => {
+    const conversationStore = useConversationStore();
+    const messageStore = useMessageStore();
+
+    const conversation = conversationStore.addOrUpdateConversation('friend-a', 1, {
+      name: '测试员B',
+      raw: {
+        channel_id: 'friend-a',
+        channel_type: 1,
+        recents: [
+          {
+            message_id: 'recent-1',
+            message_seq: 8,
+            from_uid: 'friend-a',
+            timestamp: 1780741200,
+            payload: { type: 1, text: '刷新兜底消息' }
+          }
+        ]
+      }
+    });
+
+    messageStore.hydrateFromConversationRecents(conversation);
+
+    expect(messageStore.getMessages('friend-a', 1)).toEqual([
+      expect.objectContaining({
+        id: 'recent-1',
+        content: '刷新兜底消息',
+        messageSeq: 8
+      })
+    ]);
+    expect(conversationStore.getConversation('friend-a', 1).name).toBe('测试员B');
+  });
+
+  it('hydrates one visible message from conversation summary when recents are missing', () => {
+    const messageStore = useMessageStore();
+    const conversation = {
+      id: 'friend-a',
+      channelId: 'friend-a',
+      channelType: 1,
+      name: '测试员B',
+      lastMessage: '左侧摘要消息',
+      lastMessageSeq: 11,
+      lastTime: 1780741300000
+    };
+
+    messageStore.hydrateFromConversationRecents(conversation);
+
+    expect(messageStore.getMessages('friend-a', 1)).toEqual([
+      expect.objectContaining({
+        content: '左侧摘要消息',
+        messageSeq: 11
+      })
+    ]);
+  });
+
+  it('replaces the summary fallback with the real synced message by message sequence', () => {
+    const messageStore = useMessageStore();
+    messageStore.hydrateFromConversationRecents({
+      id: 'friend-a',
+      channelId: 'friend-a',
+      channelType: 1,
+      lastMessage: '同一条消息',
+      lastMessageSeq: 12,
+      lastTime: 1780741300000
+    });
+
+    messageStore.addRealtimeMessage('friend-a', 1, {
+      message_id: 'real-12',
+      message_seq: 12,
+      from_uid: 'friend-a',
+      timestamp: 1780741301,
+      payload: { type: 1, text: '同一条消息' }
+    });
+
+    expect(messageStore.getMessages('friend-a', 1)).toHaveLength(1);
+    expect(messageStore.getMessages('friend-a', 1)[0]).toMatchObject({
+      id: 'real-12',
+      messageSeq: 12,
+      content: '同一条消息'
+    });
+  });
+
+  it('provides display fallback messages from the conversation summary without waiting for hydration', () => {
+    const messageStore = useMessageStore();
+
+    const list = messageStore.getConversationPreviewMessages({
+      id: 'friend-a',
+      channelId: 'friend-a',
+      channelType: 1,
+      lastMessage: '首帧摘要',
+      lastMessageSeq: 13,
+      lastTime: 1780741400000
+    });
+
+    expect(list).toEqual([
+      expect.objectContaining({
+        content: '首帧摘要',
+        messageSeq: 13
+      })
+    ]);
+    expect(messageStore.getMessages('friend-a', 1)).toHaveLength(0);
+  });
+
+  it('prefers hydrated messages over conversation summary display fallback', () => {
+    const messageStore = useMessageStore();
+    messageStore.addRealtimeMessage('friend-a', 1, {
+      message_id: 'real-13',
+      message_seq: 13,
+      from_uid: 'friend-a',
+      timestamp: 1780741401,
+      payload: { type: 1, text: '真实首帧' }
+    });
+
+    const list = messageStore.getConversationPreviewMessages({
+      id: 'friend-a',
+      channelId: 'friend-a',
+      channelType: 1,
+      lastMessage: '旧摘要',
+      lastMessageSeq: 13,
+      lastTime: 1780741400000
+    });
+
+    expect(list).toHaveLength(1);
+    expect(list[0]).toMatchObject({ id: 'real-13', content: '真实首帧' });
+  });
+
+  it('loads the latest visible history window from the conversation sequence', async () => {
+    const conversationStore = useConversationStore();
+    const messageStore = useMessageStore();
+    conversationStore.addOrUpdateConversation('friend-a', 1, {
+      name: '测试员B',
+      lastMessage: '最新窗口消息',
+      lastMessageSeq: 88,
+      lastTime: 1780741500000
+    });
+
+    const requests = [];
+    setRequestAdapter(async ({ url, data }) => {
+      if (url.includes('/message/channel/sync')) {
+        requests.push(data);
+        return {
+          status: 200,
+          data: {
+            messages: [
+              {
+                message_id: 'real-88',
+                message_seq: 88,
+                from_uid: 'friend-a',
+                timestamp: 1780741500,
+                payload: { type: 1, text: '最新窗口消息' }
+              }
+            ]
+          }
+        };
+      }
+      throw new Error(`Unexpected request: ${url}`);
+    });
+
+    await messageStore.syncMessages('friend-a', 1, { hydrateVisibleHistory: true, limit: 30 });
+
+    expect(requests[0]).toMatchObject({
+      channel_id: 'friend-a',
+      channel_type: 1,
+      start_message_seq: 88,
+      pull_mode: 0
+    });
+    expect(messageStore.getMessages('friend-a', 1)).toEqual([
+      expect.objectContaining({
+        id: 'real-88',
+        messageSeq: 88,
+        content: '最新窗口消息'
+      })
+    ]);
+  });
+
+  it('still replaces a synthetic summary when visible history hydration runs', async () => {
+    const conversationStore = useConversationStore();
+    const messageStore = useMessageStore();
+    const conversation = conversationStore.addOrUpdateConversation('friend-a', 1, {
+      name: '测试员B',
+      lastMessage: '摘要先显示',
+      lastMessageSeq: 89,
+      lastTime: 1780741510000
+    });
+    messageStore.hydrateFromConversationRecents(conversation);
+
+    const requests = [];
+    setRequestAdapter(async ({ url, data }) => {
+      if (url.includes('/message/channel/sync')) {
+        requests.push(data);
+        return {
+          status: 200,
+          data: {
+            messages: [
+              {
+                message_id: 'real-89',
+                message_seq: 89,
+                from_uid: 'friend-a',
+                timestamp: 1780741510,
+                payload: { type: 1, text: '真实消息替换摘要' }
+              }
+            ]
+          }
+        };
+      }
+      throw new Error(`Unexpected request: ${url}`);
+    });
+
+    await messageStore.syncMessages('friend-a', 1, { hydrateVisibleHistory: true, limit: 30 });
+
+    expect(requests[0]).toMatchObject({
+      start_message_seq: 89,
+      pull_mode: 0
+    });
+    expect(messageStore.getMessages('friend-a', 1)).toHaveLength(1);
+    expect(messageStore.getMessages('friend-a', 1)[0]).toMatchObject({
+      id: 'real-89',
+      content: '真实消息替换摘要',
+      messageSeq: 89
+    });
   });
 
   it('normalizes second timestamps on inbound messages for chat time display', () => {

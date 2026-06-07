@@ -37,7 +37,8 @@ export const useContactStore = defineStore('contact', {
       try {
         const response = await friendApi.syncFriends({ version: 0, limit: 200, keyword, api_version: 1 });
         const data = response?.data || response || {};
-        this.contacts = (data.friends || data.items || []).map(normalizeContact);
+        const list = Array.isArray(data) ? data : (data.friends || data.items || data.data || []);
+        this.contacts = (Array.isArray(list) ? list : []).map(normalizeContact);
         return this.contacts;
       } finally {
         this.loading = false;

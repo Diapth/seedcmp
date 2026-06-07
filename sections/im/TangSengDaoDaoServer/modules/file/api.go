@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	pathpkg "path"
 	"strconv"
 	"strings"
 
@@ -23,6 +24,15 @@ type File struct {
 	ctx *config.Context
 	log.Log
 	service IService
+}
+
+var unsupportedUploadExtensions = map[string]struct{}{
+	".exe": {},
+	".bat": {},
+	".cmd": {},
+	".sh":  {},
+	".msi": {},
+	".dll": {},
 }
 
 // New New
@@ -215,8 +225,18 @@ func (f *File) checkReq(fileType Type, path string) error {
 	if path == "" && fileType != TypeMomentCover && fileType != TypeSticker {
 		return errors.New("上传路径不能为空")
 	}
+	if isUnsupportedUploadPath(path) {
+		return errors.New("不支持的文件类型")
+	}
 	if fileType != TypeChat && fileType != TypeMoment && fileType != TypeMomentCover && fileType != TypeSticker && fileType != TypeReport && fileType != TypeChatBg && fileType != TypeCommon && fileType != TypeDownload {
 		return errors.New("文件类型错误")
 	}
 	return nil
+}
+
+func isUnsupportedUploadPath(uploadPath string) bool {
+	normalizedPath := strings.ToLower(strings.Split(strings.TrimSpace(uploadPath), "?")[0])
+	ext := pathpkg.Ext(normalizedPath)
+	_, blocked := unsupportedUploadExtensions[ext]
+	return blocked
 }
