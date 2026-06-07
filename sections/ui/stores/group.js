@@ -1,8 +1,12 @@
 import { defineStore } from 'pinia';
+import { nativeImService } from '@/services/native-im/service';
+import { useConversationStore } from '@/stores/conversation';
 
 export const useGroupStore = defineStore('group', {
   state: () => ({
     activeGroupId: null,
+    syncState: 'idle',
+    syncError: '',
     groups: [
       {
         id: '2',
@@ -29,7 +33,14 @@ export const useGroupStore = defineStore('group', {
       this.activeGroupId = id;
     },
     addGroup(group) {
-      this.groups.push(group);
+      const id = group.id || group.groupNo || group.group_no;
+      if (!id) return;
+      const existing = this.groups.find((item) => item.id === id);
+      if (existing) {
+        Object.assign(existing, { ...group, id });
+        return;
+      }
+      this.groups.push({ ...group, id });
     },
     removeGroup(id) {
       this.groups = this.groups.filter((g) => g.id !== id);
@@ -46,6 +57,42 @@ export const useGroupStore = defineStore('group', {
     },
     disbandGroup(id) {
       this.removeGroup(id);
+    },
+    async syncNativeGroups(options = {}) {
+      this.syncState = 'syncing';
+      this.syncError = '';
+      try {
+        const groups = await nativeImService.syncMyGroups();
+        groups.forEach((group) => this.addGroup(group));
+        useConversationStore().applyNativeGroups(groups);
+        this.syncState = 'success';
+        return groups;
+      } catch (error) {
+        this.syncState = 'failed';
+        this.syncError = error?.msg || error?.message || '群聊同步失败';
+        if (!options.silent) throw error;
+        return [];
+      }
+    },
+    async createNativeGroup({ name, memberIds = [] }) {
+      const group = await nativeImService.createGroup({ name, members: memberIds });
+      this.addGroup(group);
+      const conversation = useConversationStore().upsertGroupConversation(group);
+      return { group, conversation };
+    },
+    async syncNativeGroupMembers(groupId, options = {}) {
+      if (!groupId) return [];
+      try {
+        const members = await nativeImService.syncGroupMembers(groupId, options);
+        useConversationStore().initFromGroupMembers(groupId, members, members.find((item) => item.role === 'owner')?.id);
+        const group = this.groups.find((item) => item.id === groupId);
+        if (group) group.memberCount = members.length || group.memberCount || 0;
+        return members;
+      } catch (error) {
+        this.syncError = error?.msg || error?.message || '群成员同步失败';
+        if (!options.silent) throw error;
+        return [];
+      }
     }
   }
 });

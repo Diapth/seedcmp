@@ -32,6 +32,11 @@ function messageSummary(message) {
   return message.content || '收到一条新消息';
 }
 
+function isLocalMediaUrl(url = '') {
+  return /^(blob:|file:|wxfile:|http:\/\/tmp|https:\/\/tmp)/i.test(String(url || ''))
+    || (!/^https?:\/\//i.test(String(url || '')) && String(url || '').trim() !== '');
+}
+
 function updateConversationSummary(conversation, message, currentUser = {}) {
   if (!conversation || !message) return;
   conversation.lastMessage = conversationSummaryForMessage(message, currentUser, conversation);
@@ -138,8 +143,12 @@ export const useMessageStore = defineStore('message', {
         mentions: payload.mentions || [],
         fileName: payload.fileName,
         fileSize: payload.fileSize,
+        fileSizeBytes: payload.fileSizeBytes || 0,
         previewContent: payload.previewContent || '',
         fileType: payload.fileType || '',
+        mimeType: payload.mimeType || '',
+        path: payload.path || '',
+        file: payload.file,
         url: payload.url || ''
       });
 
@@ -149,9 +158,63 @@ export const useMessageStore = defineStore('message', {
       }
 
       if (payload.type !== 'text') {
-        setTimeout(() => {
-          local.status = 'success';
-        }, 500);
+        try {
+          let remoteUrl = payload.url || payload.content || '';
+          const needsUpload = payload.file || payload.path || isLocalMediaUrl(remoteUrl);
+          if (needsUpload) {
+            const uploaded = await nativeImService.uploadChatFile({
+              channelId: identity.channelId,
+              channelType: identity.channelType,
+              file: {
+                ...(payload.file || {}),
+                path: payload.path || payload.file?.path || payload.file?.tempFilePath || remoteUrl,
+                tempFilePath: payload.path || payload.file?.tempFilePath || remoteUrl,
+                name: payload.fileName || payload.file?.name || (payload.type === 'image' ? 'image.png' : 'file'),
+                size: payload.fileSizeBytes || payload.file?.size || 0,
+                type: payload.mimeType || payload.file?.type || ''
+              }
+            });
+            remoteUrl = uploaded.url;
+            local.url = remoteUrl;
+            if (payload.type === 'image') local.content = remoteUrl;
+            if (payload.type === 'file') {
+              local.fileName = uploaded.fileName || uploaded.name || local.fileName;
+              local.fileSize = payload.fileSize || local.fileSize;
+            }
+          }
+          const sent = await nativeImService.sendMediaMessage({
+            channelId: identity.channelId,
+            channelType: identity.channelType,
+            mediaType: payload.type,
+            url: remoteUrl,
+            fileName: payload.fileName || local.fileName,
+            fileSize: payload.fileSizeBytes || 0
+          });
+          const sentMessage = defaultMsg({
+            ...sent,
+            id: sent.id || local.id,
+            senderId: selfSender.id,
+            senderName: selfSender.name,
+            senderAvatar: selfSender.avatar,
+            status: sent.status || 'sending',
+            time: sent.time || local.time,
+            content: payload.type === 'image' ? (sent.url || remoteUrl) : (payload.content || sent.content || payload.fileName),
+            url: sent.url || remoteUrl,
+            fileName: payload.fileName || sent.fileName || local.fileName,
+            fileSize: payload.fileSize || local.fileSize,
+            fileType: payload.fileType || local.fileType,
+            previewContent: payload.previewContent || local.previewContent
+          });
+          this.messages[conversationId] = mergeNativeMessageIntoList(
+            this.messages[conversationId] || [],
+            sentMessage,
+            { currentUser, conversation }
+          );
+        } catch (error) {
+          local.status = 'failed';
+          local.nativeError = errorText(error);
+          this.syncError = errorText(error);
+        }
         return local;
       }
 

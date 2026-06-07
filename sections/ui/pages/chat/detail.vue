@@ -264,6 +264,7 @@ import { useConversationStore } from '@/stores/conversation';
 import { useMessageStore } from '@/stores/message';
 import { useContactStore } from '@/stores/contact';
 import { useAgentStore } from '@/stores/agent';
+import { useGroupStore } from '@/stores/group';
 import { useResponsiveLayout } from '@/composables/useResponsiveLayout';
 import AppShell from '@/components/layout/AppShell.vue';
 import MobilePageHeader from '@/components/layout/MobilePageHeader.vue';
@@ -295,6 +296,7 @@ const appStore = useAppStore();
 const navStore = useNavigationStore();
 const contactStore = useContactStore();
 const agentStore = useAgentStore();
+const groupStore = useGroupStore();
 
 const selfReactionId = computed(() => resolveSelfId(appStore.currentUser || {}));
 
@@ -454,6 +456,7 @@ onMounted(() => {
   convStore.setActiveId(id);
   syncActiveMessages({ silent: true });
   appStore.bootstrapNativeSession();
+  groupStore.syncNativeGroups({ silent: true });
 
   // Restore persisted draft
   const persistedDraft = uni.getStorageSync(`draft:${id}`);
@@ -575,6 +578,9 @@ function handleSelectConversation(id) {
 async function syncActiveMessages(options = {}) {
   const conv = activeConversation.value;
   if (!conv) return;
+  if (conv.type === 'group') {
+    groupStore.syncNativeGroupMembers(conv.id, { silent: true });
+  }
   try {
     await messageStore.syncNativeMessages(conv, options);
   } catch {
@@ -582,7 +588,7 @@ async function syncActiveMessages(options = {}) {
   }
 }
 
-async function handleSendMessage({ type, content, fileName, fileSize, replyRef, previewContent, fileType, url }) {
+async function handleSendMessage({ type, content, fileName, fileSize, fileSizeBytes, replyRef, previewContent, fileType, mimeType, path, file, url }) {
   const sender = {
     id: appStore.currentUser?.id || 'me',
     name: appStore.currentUser?.nickname || '我'
@@ -619,9 +625,13 @@ async function handleSendMessage({ type, content, fileName, fileSize, replyRef, 
     content,
     fileName,
     fileSize,
+    fileSizeBytes,
     replyRef,
     previewContent,
     fileType,
+    mimeType,
+    path,
+    file,
     url,
     mentions: extra.mentions || []
   }, sender);
@@ -1007,7 +1017,9 @@ function startDirectChat(member) {
 .workbench-list {
   border-right: 1px solid var(--color-border);
   height: 100%;
+  min-height: 0;
   width: 320px;
+  overflow: hidden;
 }
 @media (max-width: 768px) {
   .workbench-list {
@@ -1019,6 +1031,8 @@ function startDirectChat(member) {
   position: relative;
   background-color: var(--color-bg-base);
   height: 100%;
+  min-height: 0;
+  overflow: hidden;
 }
 
 .chat-body-stack {
@@ -1064,6 +1078,7 @@ function startDirectChat(member) {
 .chat-messages-area {
   overflow: hidden;
   position: relative;
+  min-height: 0;
 }
 
 .workbench-right {

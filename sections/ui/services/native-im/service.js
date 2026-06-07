@@ -1,5 +1,9 @@
 import { createNativeApiClient } from './api-client.js';
 import {
+  normalizeNativeGroup,
+  normalizeNativeGroupMember
+} from './conversation-state.js';
+import {
   normalizeConversation,
   normalizeFriend,
   normalizeFriendRequest,
@@ -165,6 +169,66 @@ function contentToNativeText(content = '') {
   return JSON.stringify({ type: 1, content: String(content || '') });
 }
 
+function firstNonEmpty(...values) {
+  for (const value of values) {
+    if (value === undefined || value === null) continue;
+    const text = String(value).trim();
+    if (text) return text;
+  }
+  return '';
+}
+
+function safeFileName(name = 'file') {
+  return String(name || 'file').replace(/[\\/:*?"<>|\u0000-\u001f]/g, '_').slice(0, 160) || 'file';
+}
+
+function extractUploadUrl(resp = {}) {
+  return firstNonEmpty(resp.url, resp.upload_url, resp.uploadUrl, resp.data?.url, resp.data?.upload_url, resp.data?.uploadUrl);
+}
+
+function extractUploadedPath(resp = {}, fallback = '') {
+  return firstNonEmpty(resp.path, resp.url, resp.data?.path, resp.data?.url, fallback);
+}
+
+function resolveFileName(file = {}) {
+  return safeFileName(file.name || file.fileName || file.tempFilePath?.split('/').pop() || file.path?.split('/').pop() || 'file');
+}
+
+function defaultUploadRequest({ url, file, fieldName = 'file' }) {
+  if (!url) return Promise.reject(new Error('upload url is empty'));
+  if (typeof FormData !== 'undefined' && typeof fetch === 'function' && (file.file || file.blob || file instanceof Blob)) {
+    const form = new FormData();
+    form.append(fieldName, file.file || file.blob || file, resolveFileName(file));
+    return fetch(url, { method: 'POST', body: form }).then(async (response) => {
+      const text = await response.text();
+      if (!response.ok) throw new Error(text || `upload failed (${response.status})`);
+      try {
+        return text ? JSON.parse(text) : {};
+      } catch {
+        return { path: text };
+      }
+    });
+  }
+  if (typeof uni !== 'undefined' && typeof uni.uploadFile === 'function' && (file.path || file.tempFilePath || file.url)) {
+    return new Promise((resolve, reject) => {
+      uni.uploadFile({
+        url,
+        filePath: file.path || file.tempFilePath || file.url,
+        name: fieldName,
+        success: (res) => {
+          try {
+            resolve(res.data ? JSON.parse(res.data) : {});
+          } catch {
+            resolve({ path: res.data });
+          }
+        },
+        fail: reject
+      });
+    });
+  }
+  return Promise.reject(new Error('no supported upload runtime'));
+}
+
 export function createNativeImService(options = {}) {
   const client = options.client || createNativeApiClient({
     baseUrl: options.baseUrl || resolveDefaultBaseUrl(),
@@ -172,6 +236,7 @@ export function createNativeImService(options = {}) {
     request: options.request
   });
   const deviceFactory = options.deviceFactory || defaultDeviceFactory;
+  const uploadRequest = options.uploadRequest || defaultUploadRequest;
 
   let sdkModule = null;
   let sdkShared = null;
@@ -193,6 +258,7 @@ export function createNativeImService(options = {}) {
         WKSDK,
         Channel: mod.Channel,
         MessageText: mod.MessageText,
+        MessageImage: mod.MessageImage,
         MessageContentType: mod.MessageContentType,
         ChannelTypePerson: mod.ChannelTypePerson || CHANNEL_TYPE_PERSON,
         ChannelTypeGroup: mod.ChannelTypeGroup || CHANNEL_TYPE_GROUP
@@ -366,6 +432,81 @@ export function createNativeImService(options = {}) {
     }
   }
 
+  async function updateConversationExtra({ channelId, channelType = CHANNEL_TYPE_PERSON, draft, browseTo, keepMessageSeq, keepOffsetY } = {}) {
+    if (!channelId) throw { msg: 'channelId不能为空' };
+    const payload = {
+      channel_id: String(channelId),
+      channel_type: Number(channelType)
+    };
+    if (draft !== undefined) payload.draft = String(draft || '');
+    if (browseTo !== undefined) payload.browse_to = browseTo;
+    if (keepMessageSeq !== undefined) payload.keep_message_seq = keepMessageSeq;
+    if (keepOffsetY !== undefined) payload.keep_offset_y = keepOffsetY;
+    return client.post(`conversations/${encodeURIComponent(String(channelId))}/${Number(channelType)}/extra`, payload);
+  }
+
+  async function uploadChatFile({ channelId, channelType = CHANNEL_TYPE_PERSON, file, type = 'chat' } = {}) {
+    if (!channelId) throw { msg: 'channelId不能为空' };
+    if (!file) throw { msg: '请选择文件' };
+    const name = resolveFileName(file);
+    const uploadPath = `chat/${String(channelId)}/${Number(channelType)}/${name}`;
+    const uploadMeta = await client.get('file/upload', { path: uploadPath, type });
+    const uploadUrl = extractUploadUrl(uploadMeta);
+    if (!uploadUrl) throw { msg: '未获取到上传地址' };
+    const uploaded = await uploadRequest({ url: uploadUrl, file: { ...file, name }, fieldName: 'file' });
+    const url = extractUploadedPath(uploaded, extractUploadedPath(uploadMeta));
+    if (!url) throw { msg: '文件上传失败' };
+    return {
+      url,
+      name,
+      fileName: name,
+      size: file.size || file.fileSize || 0,
+      mimeType: file.type || file.mimeType || '',
+      raw: uploaded
+    };
+  }
+
+  async function sendMediaMessage({ channelId, channelType = CHANNEL_TYPE_PERSON, mediaType, url, fileName, fileSize = 0 } = {}) {
+    if (!channelId) throw { msg: 'channelId不能为空' };
+    if (!url) throw { msg: '媒体地址不能为空' };
+    await importSdk();
+    const shared = getShared();
+    if (!shared) throw { msg: 'WKSDK.shared 不可用', sdkUnavailable: true };
+    const channel = sdkModule.Channel
+      ? new sdkModule.Channel(channelId, channelType)
+      : { channelID: channelId, channelId, channelType };
+    let content = null;
+    if (mediaType === 'image' && sdkModule.MessageImage) {
+      content = new sdkModule.MessageImage(undefined, 0, 0);
+      content.url = url;
+    } else if (shared.getMessageContent) {
+      const contentType = mediaType === 'image' ? 2 : 8;
+      content = shared.getMessageContent(contentType);
+      content.url = url;
+      content.name = fileName;
+      content.size = fileSize;
+      content.content = mediaType === 'image' ? '[图片]' : `[文件] ${fileName || ''}`.trim();
+    } else {
+      content = {
+        contentType: mediaType === 'image' ? 2 : 8,
+        type: mediaType === 'image' ? 2 : 8,
+        url,
+        name: fileName,
+        size: fileSize,
+        content: mediaType === 'image' ? '[图片]' : `[文件] ${fileName || ''}`.trim()
+      };
+    }
+    const sent = await shared.chatManager?.send?.(content, channel);
+    return {
+      ...normalizeMessage(sent || { payload: { type: mediaType === 'image' ? 2 : 8, url, name: fileName, size: fileSize } }),
+      channelId: String(channelId),
+      channelType: Number(channelType),
+      url,
+      fileName,
+      fileSize
+    };
+  }
+
   async function syncFriends(params = {}) {
     const resp = await client.get('friend/sync', {
       version: params.version || 0,
@@ -406,6 +547,30 @@ export function createNativeImService(options = {}) {
     return client.delete(`friend/apply/${encodeURIComponent(toUid)}`);
   }
 
+  async function createGroup({ name, members = [] } = {}) {
+    const trimmedName = String(name || '').trim();
+    if (!trimmedName) throw { msg: '请输入群聊名称' };
+    const resp = await client.post('group/create', {
+      name: trimmedName,
+      members: members.map(String)
+    });
+    return normalizeNativeGroup(resp.data || resp.group || resp);
+  }
+
+  async function syncMyGroups() {
+    const resp = await client.get('group/my');
+    return firstArray(resp, resp.groups, resp.list, resp.data, resp.data?.groups).map(normalizeNativeGroup);
+  }
+
+  async function syncGroupMembers(groupNo, params = {}) {
+    if (!groupNo) return [];
+    const resp = await client.get(`groups/${encodeURIComponent(String(groupNo))}/membersync`, {
+      version: params.version || 0,
+      limit: params.limit || 1000
+    });
+    return firstArray(resp, resp.members, resp.list, resp.data, resp.data?.members).map(normalizeNativeGroupMember);
+  }
+
   function disconnect() {
     try {
       getShared()?.disconnect?.();
@@ -423,12 +588,18 @@ export function createNativeImService(options = {}) {
     syncConversations,
     syncMessages,
     sendTextMessage,
+    sendMediaMessage,
+    uploadChatFile,
     updateConversationSettings,
+    updateConversationExtra,
     syncFriends,
     searchUser,
     applyFriend,
     fetchFriendRequests,
     approveFriendRequest,
+    createGroup,
+    syncMyGroups,
+    syncGroupMembers,
     disconnect,
     get sdkReady() {
       return Boolean(sdkShared);

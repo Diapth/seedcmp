@@ -228,7 +228,9 @@ function openGlobalSearch() {
 .conversation-list-container {
   width: 100%;
   height: 100%;
+  min-height: 0;
   background-color: var(--color-bg-surface);
+  overflow: hidden;
 }
 
 .list-search-bar {
@@ -293,6 +295,8 @@ function openGlobalSearch() {
 
 .list-scroll {
   height: 100%;
+  min-height: 0;
+  overflow: hidden;
 }
 
 .empty-padding {

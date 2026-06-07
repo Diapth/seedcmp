@@ -67,18 +67,20 @@
 <script setup>
 import { onMounted, ref } from 'vue';
 import { useContactStore } from '@/stores/contact';
-import { useConversationStore } from '@/stores/conversation';
 import { useMessageStore } from '@/stores/message';
 import { useNavigationStore } from '@/stores/navigation';
+import { useGroupStore } from '@/stores/group';
+import { useConversationStore } from '@/stores/conversation';
 import AppSubpageShell from '@/components/layout/AppSubpageShell.vue';
 import AppIcon from '@/components/common/AppIcon.vue';
 import AppAvatar from '@/components/common/AppAvatar.vue';
 import AppEmptyState from '@/components/common/AppEmptyState.vue';
 
 const contactStore = useContactStore();
-const convStore = useConversationStore();
 const msgStore = useMessageStore();
 const navStore = useNavigationStore();
+const groupStore = useGroupStore();
+const convStore = useConversationStore();
 
 onMounted(() => {
   // Group subpages are currently attached to the contacts module (no group tab in MobileTabBar).
@@ -101,7 +103,7 @@ function toggleSelect(id) {
   }
 }
 
-function handleCreate() {
+async function handleCreate() {
   const name = groupName.value.trim();
   if (!name) {
     uni.showToast({ title: '请输入群聊名称', icon: 'none' });
@@ -113,46 +115,31 @@ function handleCreate() {
     return;
   }
   
-  const newGroupId = 'group_' + Date.now();
-  
-  // 1. Add to conversation store
-  const newConv = {
-    id: newGroupId,
-    name: name,
-    avatar: '',
-    type: 'group',
-    unread: 0,
-    lastMessage: '你创建了群聊',
-    lastTime: Date.now(),
-    isPinned: false,
-    isMuted: false,
-    draft: ''
-  };
-  convStore.conversations.push(newConv);
-  
-  // 2. Add system welcome message
-  msgStore.messages[newGroupId] = [
-    {
-      id: Date.now().toString(),
-      senderId: 'system',
-      senderName: '系统',
-      content: `你创建了群聊 "${name}"`,
-      type: 'system',
-      time: Date.now(),
-      status: 'success'
-    }
-  ];
-  
-  // 3. Set active and jump
-  convStore.setActiveId(newGroupId);
-  
-  uni.showToast({ title: '群聊创建成功', icon: 'success' });
-  
-  setTimeout(() => {
-    uni.redirectTo({
-      url: `/pages/chat/detail?id=${newGroupId}`
+  try {
+    const { group, conversation } = await groupStore.createNativeGroup({
+      name,
+      memberIds: selectedFriends.value
     });
-  }, 800);
+    const groupId = conversation?.id || group.id;
+    convStore.setActiveId(groupId);
+    msgStore.messages[groupId] = msgStore.messages[groupId] || [
+      {
+        id: Date.now().toString(),
+        senderId: 'system',
+        senderName: '系统',
+        content: `你创建了群聊 "${name}"`,
+        type: 'system',
+        time: Date.now(),
+        status: 'success'
+      }
+    ];
+    uni.showToast({ title: '群聊创建成功', icon: 'success' });
+    setTimeout(() => {
+      uni.redirectTo({ url: `/pages/chat/detail?id=${groupId}` });
+    }, 500);
+  } catch (error) {
+    uni.showToast({ title: error?.msg || error?.message || '群聊创建失败', icon: 'none' });
+  }
 }
 </script>
 

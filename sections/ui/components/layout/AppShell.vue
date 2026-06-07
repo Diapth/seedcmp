@@ -80,6 +80,15 @@ const statusBarHeight = computed(() => {
 .app-shell {
   width: 100vw;
   height: 100vh;
+  min-height: 0;
+  overflow: hidden;
+}
+
+.app-container,
+.desktop-layout,
+.mobile-layout,
+.desktop-main {
+  min-height: 0;
   overflow: hidden;
 }
 
@@ -113,6 +122,7 @@ const statusBarHeight = computed(() => {
 
 .mobile-main {
   position: relative;
+  min-height: 0;
   overflow: hidden;
 }
 

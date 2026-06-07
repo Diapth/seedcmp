@@ -62,14 +62,12 @@ defineProps({
 
 defineEmits(['select', 'contextmenu']);
 
-function formatDraftPreview(value, maxLength = 80) {
+function formatDraftPreview(value) {
   const normalized = String(value || '')
     .replace(/\s+/g, ' ')
     .trim();
   const prefix = '[草稿] ';
-  if (!normalized) return prefix.trim();
-  if (normalized.length <= maxLength) return `${prefix}${normalized}`;
-  return `${prefix}${normalized.slice(0, maxLength - 3)}...`;
+  return normalized ? `${prefix}${normalized}` : prefix.trim();
 }
 </script>
 
@@ -108,6 +106,7 @@ function formatDraftPreview(value, maxLength = 80) {
 .item-info {
   height: 44px;
   min-width: 0;
+  width: 0;
   overflow: hidden;
 }
 
@@ -152,7 +151,8 @@ function formatDraftPreview(value, maxLength = 80) {
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
-  max-width: 180px;
+  width: 0;
+  max-width: none;
   line-height: 18px;
 }
 
@@ -166,7 +166,8 @@ function formatDraftPreview(value, maxLength = 80) {
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
-  max-width: 180px;
+  width: 0;
+  max-width: none;
   line-height: 18px;
 }
 

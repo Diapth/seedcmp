@@ -29,10 +29,10 @@
         <view class="toolbar-btn" title="表情" @click="handleOpenEmoji">
           <AppIcon name="smile" :size="21" color="var(--color-text-secondary)" />
         </view>
-        <view class="toolbar-btn" title="图片" @click="sendMockImage">
+        <view class="toolbar-btn" title="图片" @click="chooseAlbumImage">
           <AppIcon name="image" :size="21" color="var(--color-text-secondary)" />
         </view>
-        <view class="toolbar-btn" title="文件" @click="sendMockFile">
+        <view class="toolbar-btn" title="文件" @click="chooseFile">
           <AppIcon name="files" :size="21" color="var(--color-text-secondary)" />
         </view>
         <view class="toolbar-btn" title="语音" @click="sendMockVoice">
@@ -267,8 +267,11 @@ function chooseAlbumImage() {
 function chooseImage(sourceType) {
   showAttachPanel.value = false;
   voiceMode.value = false;
+  if (sourceType === 'album' && typeof uni.chooseImage !== 'function' && pickFileWithInput('image/*', handlePickedImageFile)) {
+    return;
+  }
   if (typeof uni.chooseImage !== 'function') {
-    sendMockImage();
+    uni.showToast({ title: '当前环境无法选择图片', icon: 'none' });
     return;
   }
   uni.chooseImage({
@@ -277,9 +280,17 @@ function chooseImage(sourceType) {
     success: (res) => {
       const path = res.tempFilePaths?.[0] || res.tempFiles?.[0]?.path || '';
       if (!path) return;
+      const file = res.tempFiles?.[0] || {};
       emit('send', {
         type: 'image',
-        content: path
+        content: path,
+        url: path,
+        path,
+        file,
+        fileName: file.name || path.split('/').pop() || 'image',
+        fileSize: formatFileSize(file.size),
+        fileSizeBytes: file.size || 0,
+        mimeType: file.type || 'image/*'
       });
     },
     fail: (error) => {
@@ -289,18 +300,28 @@ function chooseImage(sourceType) {
   });
 }
 
-function sendMockImage() {
+function handlePickedImageFile(file) {
+  const url = createObjectUrl(file);
   emit('send', {
     type: 'image',
-    content: 'https://images.unsplash.com/photo-1579202673506-ca3ce28943ef?auto=format&fit=crop&w=400&q=80'
+    content: url,
+    url,
+    file,
+    fileName: file.name || 'image',
+    fileSize: formatFileSize(file.size),
+    fileSizeBytes: file.size || 0,
+    mimeType: file.type || 'image/*'
   });
 }
 
 function chooseFile() {
   showAttachPanel.value = false;
   voiceMode.value = false;
+  if (typeof uni.chooseFile !== 'function' && pickFileWithInput('*/*', handlePickedGenericFile)) {
+    return;
+  }
   if (typeof uni.chooseFile !== 'function') {
-    sendMockFile();
+    uni.showToast({ title: '当前环境无法选择文件', icon: 'none' });
     return;
   }
   uni.chooseFile({
@@ -308,13 +329,18 @@ function chooseFile() {
     success: (res) => {
       const file = res.tempFiles?.[0];
       if (!file) return;
+      const path = file.path || file.tempFilePath || '';
       emit('send', {
         type: 'file',
         content: file.name || '未命名文件',
         fileName: file.name || '未命名文件',
         fileSize: formatFileSize(file.size),
+        fileSizeBytes: file.size || 0,
         fileType: getFileType(file.name),
-        url: file.path || '',
+        mimeType: file.type || '',
+        path,
+        file,
+        url: path,
         previewContent: ''
       });
     },
@@ -325,13 +351,19 @@ function chooseFile() {
   });
 }
 
-function sendMockFile() {
+function handlePickedGenericFile(file) {
+  const url = createObjectUrl(file);
   emit('send', {
     type: 'file',
-    content: 'AgentHub_IM_Preview_Guide.docx',
-    fileName: 'AgentHub_IM_Preview_Guide.docx',
-    fileSize: '4.8 MB',
-    previewContent: 'AgentHub IM 文件预览方案\n\n1. 右侧信息栏与预览栏二选一展示。\n2. 文件卡片提供查看和预览两个入口。\n3. 移动端通过新页面承载预览。'
+    content: file.name || '未命名文件',
+    fileName: file.name || '未命名文件',
+    fileSize: formatFileSize(file.size),
+    fileSizeBytes: file.size || 0,
+    fileType: getFileType(file.name),
+    mimeType: file.type || '',
+    file,
+    url,
+    previewContent: ''
   });
 }
 
@@ -450,6 +482,35 @@ function formatFileSize(size) {
 function getFileType(name) {
   const match = String(name || '').toLowerCase().match(/\.([a-z0-9]+)$/);
   return match?.[1] || '';
+}
+
+function pickFileWithInput(accept, onPick) {
+  // #ifdef H5
+  if (typeof document === 'undefined') return false;
+  const input = document.createElement('input');
+  input.type = 'file';
+  input.accept = accept || '';
+  input.style.position = 'fixed';
+  input.style.left = '-9999px';
+  input.addEventListener('change', () => {
+    const file = input.files?.[0];
+    input.remove();
+    if (file) onPick(file);
+  }, { once: true });
+  document.body.appendChild(input);
+  input.click();
+  return true;
+  // #endif
+  return false;
+}
+
+function createObjectUrl(file) {
+  // #ifdef H5
+  if (typeof URL !== 'undefined' && typeof URL.createObjectURL === 'function' && file) {
+    return URL.createObjectURL(file);
+  }
+  // #endif
+  return file?.path || file?.tempFilePath || '';
 }
 
 </script>

@@ -47,6 +47,7 @@
 import { computed, onMounted } from 'vue';
 import { useNavigationStore } from '@/stores/navigation';
 import { useConversationStore } from '@/stores/conversation';
+import { useGroupStore } from '@/stores/group';
 import AppShell from '@/components/layout/AppShell.vue';
 import AppEmptyState from '@/components/common/AppEmptyState.vue';
 import AppAvatar from '@/components/common/AppAvatar.vue';
@@ -54,9 +55,11 @@ import AppIcon from '@/components/common/AppIcon.vue';
 
 const navStore = useNavigationStore();
 const convStore = useConversationStore();
+const groupStore = useGroupStore();
 
 onMounted(() => {
   navStore.setActiveModule('group');
+  groupStore.syncNativeGroups({ silent: true });
 });
 
 const groupChats = computed(() => {

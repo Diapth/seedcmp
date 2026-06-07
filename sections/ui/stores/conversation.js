@@ -1,7 +1,13 @@
 import { defineStore } from 'pinia';
 import { nativeImService } from '@/services/native-im/service';
 import { isAuthExpiredError } from '@/services/native-im/api-client';
-import { dropMockConversations } from '@/services/native-im/conversation-state';
+import {
+  applyDraftToConversationList,
+  conversationDraftKey,
+  dropMockConversations,
+  mergeRemoteDrafts,
+  upsertGroupConversation
+} from '@/services/native-im/conversation-state';
 
 function channelTypeFromConversation(conversation = {}) {
   if (conversation.channelType) return Number(conversation.channelType);
@@ -20,12 +26,48 @@ function errorText(error) {
   return error?.msg || error?.message || '同步失败';
 }
 
+function readCurrentUserId() {
+  if (typeof uni === 'undefined' || typeof uni.getStorageSync !== 'function') return 'anonymous';
+  try {
+    const raw = uni.getStorageSync('app_user');
+    const user = raw ? JSON.parse(raw) : {};
+    return String(user.id || user.uid || user.raw?.uid || uni.getStorageSync('app_user_uid') || 'anonymous');
+  } catch {
+    return 'anonymous';
+  }
+}
+
+function draftStorageKey() {
+  return `agenthub:conversation-drafts:${readCurrentUserId()}`;
+}
+
+function readDraftCache() {
+  if (typeof uni === 'undefined' || typeof uni.getStorageSync !== 'function') return {};
+  try {
+    const raw = uni.getStorageSync(draftStorageKey());
+    return raw ? JSON.parse(raw) : {};
+  } catch {
+    return {};
+  }
+}
+
+function writeDraftCache(cache) {
+  if (typeof uni === 'undefined' || typeof uni.setStorageSync !== 'function') return;
+  try {
+    uni.setStorageSync(draftStorageKey(), JSON.stringify(cache || {}));
+  } catch {
+    // local draft storage must never block typing
+  }
+}
+
 export const useConversationStore = defineStore('conversation', {
   state: () => ({
     activeId: '',
     syncState: 'idle',
     syncError: '',
     lastNativeSyncAt: 0,
+    draftDirtyKeys: {},
+    draftSyncTimers: {},
     conversations: [
       {
         id: '1',
@@ -142,11 +184,43 @@ export const useConversationStore = defineStore('conversation', {
         conv.unread = 0;
       }
     },
-    updateConversationDraft(id, draftText) {
-      const conv = this.conversations.find((c) => c.id === id);
-      if (conv) {
-        conv.draft = draftText;
+    updateConversationDraft(id, draftText, options = {}) {
+      const identity = this.getConversationIdentity(id);
+      const key = conversationDraftKey(identity.channelId, identity.channelType);
+      const normalizedDraft = String(draftText || '');
+      this.conversations = applyDraftToConversationList(
+        this.conversations,
+        identity.channelId,
+        identity.channelType,
+        normalizedDraft
+      );
+
+      const cache = readDraftCache();
+      if (normalizedDraft) {
+        cache[key] = normalizedDraft;
+      } else {
+        delete cache[key];
       }
+      writeDraftCache(cache);
+
+      if (options.persist === false || !identity.channelId) return;
+      this.draftDirtyKeys[key] = true;
+      if (this.draftSyncTimers[key]) {
+        clearTimeout(this.draftSyncTimers[key]);
+      }
+      this.draftSyncTimers[key] = setTimeout(async () => {
+        delete this.draftSyncTimers[key];
+        try {
+          await nativeImService.updateConversationExtra({
+            channelId: identity.channelId,
+            channelType: identity.channelType,
+            draft: normalizedDraft
+          });
+          delete this.draftDirtyKeys[key];
+        } catch (error) {
+          this.syncError = errorText(error);
+        }
+      }, options.delayMs ?? 600);
     },
     // PR-9 新增 actions
     pinConversation(id, pinned) {
@@ -275,13 +349,23 @@ export const useConversationStore = defineStore('conversation', {
       if (options.replaceMock || list.length > 0) {
         this.conversations = dropMockConversations(this.conversations);
       }
+      const draftCache = readDraftCache();
       list.forEach((nativeConversation) => {
         const existing = this.conversations.find((item) => {
           if (nativeConversation.key && item.key === nativeConversation.key) return true;
           return item.id === nativeConversation.id && channelTypeFromConversation(item) === nativeConversation.channelType;
         });
         if (existing) {
-          const draft = existing.draft || nativeConversation.draft || '';
+          const key = conversationDraftKey(
+            nativeConversation.channelId || nativeConversation.id,
+            nativeConversation.channelType || channelTypeFromConversation(nativeConversation)
+          );
+          const hasRemoteDraft = Object.prototype.hasOwnProperty.call(nativeConversation, 'draft');
+          const draft = this.draftDirtyKeys[key]
+            ? existing.draft || ''
+            : hasRemoteDraft
+              ? String(nativeConversation.draft || '')
+              : (draftCache[key] || existing.draft || '');
           const localHidden = this.isHidden.includes(existing.id);
           Object.assign(existing, nativeConversation, {
             draft,
@@ -294,10 +378,13 @@ export const useConversationStore = defineStore('conversation', {
             unread: 0,
             isPinned: false,
             isMuted: false,
-            draft: '',
+            draft: draftCache[conversationDraftKey(nativeConversation.channelId || nativeConversation.id, nativeConversation.channelType)] || nativeConversation.draft || '',
             ...nativeConversation
           });
         }
+      });
+      this.conversations = mergeRemoteDrafts(this.conversations, list, {
+        dirtyKeys: new Set(Object.keys(this.draftDirtyKeys))
       });
       this.conversations = sortConversations(this.conversations);
       this.lastNativeSyncAt = Date.now();
@@ -334,6 +421,27 @@ export const useConversationStore = defineStore('conversation', {
       };
       this.applyNativeConversations([normalized]);
       return this.conversations.find((item) => item.id === normalized.id) || null;
+    },
+    upsertGroupConversation(group) {
+      this.conversations = upsertGroupConversation(this.conversations, group);
+      return this.conversations.find((item) => item.id === (group.id || group.groupNo || group.group_no)) || null;
+    },
+    applyNativeGroups(groups = []) {
+      groups.forEach((group) => {
+        this.conversations = upsertGroupConversation(this.conversations, group);
+      });
+      this.conversations = sortConversations(this.conversations);
+    },
+    async syncNativeGroups(options = {}) {
+      try {
+        const groups = await nativeImService.syncMyGroups();
+        this.applyNativeGroups(groups);
+        return groups;
+      } catch (error) {
+        this.syncError = errorText(error);
+        if (!options.silent) throw error;
+        return [];
+      }
     },
     getConversationIdentity(conversationOrId) {
       const conversation = typeof conversationOrId === 'string'
