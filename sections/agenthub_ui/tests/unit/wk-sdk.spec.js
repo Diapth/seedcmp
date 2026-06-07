@@ -12,6 +12,11 @@ const sdkMock = vi.hoisted(() => {
   const channel = { channelID: 'clowder_cat:codex', channelType: 1 };
   const sendResult = { clientSeq: 7, clientMsgNo: 'sdk-generated' };
   const shared = {
+    config: {
+      provider: {}
+    },
+    connect: vi.fn(),
+    disconnect: vi.fn(),
     newMessageText: vi.fn(() => textContent),
     newChannel: vi.fn(() => channel),
     chatManager: {
@@ -33,6 +38,8 @@ describe('WKSDK adapter', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     vi.resetModules();
+    vi.unstubAllGlobals();
+    sdkMock.shared.config = { provider: {} };
   });
 
   it('sends text through WKSDK using positional content and channel arguments', async () => {
@@ -63,5 +70,21 @@ describe('WKSDK adapter', () => {
     expect(content).toBeInstanceOf(sdkMock.CMDContent);
     expect(content).toMatchObject({ cmd: 'typing', param: {} });
     expect(channel).toBe(sdkMock.channel);
+  });
+
+  it('rewrites local websocket addresses for remote browser hosts', async () => {
+    vi.stubGlobal('location', { hostname: '172.18.58.156' });
+    const { initSdk } = await import('../../utils/wk-sdk.js');
+
+    await initSdk({
+      uid: 'remote-user',
+      token: 'remote-token',
+      wsAddr: 'ws://0.0.0.0:5200'
+    });
+
+    const callback = vi.fn();
+    sdkMock.shared.config.provider.connectAddrCallback(callback);
+
+    expect(callback).toHaveBeenCalledWith('ws://172.18.58.156:5200/');
   });
 });

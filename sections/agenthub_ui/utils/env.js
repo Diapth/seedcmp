@@ -20,7 +20,7 @@ function isLocalHost(hostname) {
   return host === 'localhost' || host === '127.0.0.1' || host === '0.0.0.0' || host === '::1';
 }
 
-function rewriteLocalhostForRemoteBrowser(value) {
+export function rewriteLocalhostForRemoteBrowser(value) {
   if (!value) return value;
   const hostname = globalThis?.location?.hostname || '';
   if (!hostname || isLocalHost(hostname)) return value;

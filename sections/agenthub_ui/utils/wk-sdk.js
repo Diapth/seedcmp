@@ -1,4 +1,5 @@
 import { AppError } from './request.js';
+import { IM_WEB_WS_BASE, rewriteLocalhostForRemoteBrowser } from './env.js';
 import { registerCMDListeners, registerMessageListeners } from './listeners.js';
 import { useImStore } from '@/stores/im.js';
 
@@ -27,8 +28,7 @@ export async function getWKSdk() {
 }
 
 function resolveWsAddr(wsAddr) {
-  if (wsAddr) return wsAddr;
-  return useImStore().wsAddr || '';
+  return rewriteLocalhostForRemoteBrowser(IM_WEB_WS_BASE || wsAddr || useImStore().wsAddr || '');
 }
 
 export async function initSdk({ uid, token, wsAddr }) {
