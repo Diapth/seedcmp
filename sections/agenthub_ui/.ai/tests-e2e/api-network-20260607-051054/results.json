@@ -1,0 +1,233 @@
+{
+  "apiBaseUrl": "http://172.18.58.156:3000/v1",
+  "generatedAt": "2026-06-07T05:10:54.053Z",
+  "tokenAcquired": true,
+  "results": [
+    {
+      "name": "health",
+      "method": "GET",
+      "path": "/v1/health",
+      "category": "required",
+      "safe": true,
+      "status": 200,
+      "ok": true,
+      "expectedStatuses": [
+        200
+      ],
+      "responsePreview": "{\"db\":\"up\",\"redis\":\"up\",\"status\":\"up\"}"
+    },
+    {
+      "name": "appconfig",
+      "method": "GET",
+      "path": "/v1/common/appconfig",
+      "category": "required",
+      "safe": true,
+      "status": 200,
+      "ok": true,
+      "expectedStatuses": [
+        200
+      ],
+      "responsePreview": "{\"version\":1,\"web_url\":\"http://127.0.0.1:82\",\"phone_search_off\":0,\"shortno_edit_off\":0,\"revoke_second\":-1,\"apple_sign_in\":0,\"register_invite_on\":0,\"send_welcome_message_on\":0,\"invite_system_account_join_group_on\":0,\"register_user_must_complete_info_on\":0,\"can_modify_api_url\":0}"
+    },
+    {
+      "name": "login",
+      "method": "POST",
+      "path": "/v1/user/login",
+      "category": "required",
+      "safe": true,
+      "status": 200,
+      "ok": true,
+      "expectedStatuses": [
+        200
+      ],
+      "responsePreview": "{\"uid\":\"41232e72***\",\"app_id\":\"\",\"name\":\"leng\",\"username\":\"008613733632709\",\"sex\":1,\"category\":\"\",\"short_no\":\"ywwM9Vjs\",\"zone\":\"0086\",\"phone\":\"13733632709\",\"token\":\"***\",\"chat_pwd\":\"\",\"lock_screen_pwd\":\"\",\"lock_after_minute\":0,\"setting\":{\"search_by_phone\":1,\"search_by_short\":1,\"new_msg_notice\":1,\"msg_show_detail\":1,\"voice_on\":1,\"shock_on\":1,\"offline_protection\":0,\"device_lock\":0,\"mute_of_app\":0},\"rsa_public_key\":\"LS0tLS1C***==\",\"short_status\":0,\"msg_expire_second\":0}",
+      "loginVariant": "008613733632709"
+    },
+    {
+      "name": "appversion-web",
+      "method": "GET",
+      "path": "/v1/common/appversion/web/1.0.0",
+      "category": "diagnostic",
+      "safe": true,
+      "status": 200,
+      "ok": true,
+      "expectedStatuses": [
+        200,
+        400,
+        404
+      ],
+      "responsePreview": "{}"
+    },
+    {
+      "name": "devices",
+      "method": "GET",
+      "path": "/v1/user/devices",
+      "category": "required",
+      "safe": true,
+      "status": 200,
+      "ok": true,
+      "expectedStatuses": [
+        200
+      ],
+      "responsePreview": "[{\"id\":204,\"device_id\":\"agenthub***\",\"device_name\":\"agenthub***（本机）\",\"device_model\":\"node-fetch\",\"last_login\":\"2026-06-07 13:10\",\"self\":1},{\"id\":203,\"device_id\":\"agenthub***\",\"device_name\":\"node\",\"device_model\":\"node\",\"last_login\":\"2026-06-07 13:09\",\"self\":0},{\"id\":202,\"device_id\":\"agenthub***\",\"device_name\":\"agenthub***\",\"device_model\":\"node-fetch\",\"last_login\":\"2026-06-07 13:08\",\"self\":0},{\"id\":196,\"device_id\":\"17808054***\",\"device_name\":\"chrome\",\"device_model\":\"PC\",\"last_login\":\"2026-06-07 12:11\",\"self\":0},{\"id\":193,\"device_id\":\"178080548914659998\",\"device_name\":\"chrome\",\"device_model\":\"PC\",\"last_login\":\"2026-06-07 12:11\",\"self\":0},{\"id\":192,\"device_id\":\"17808043***\",\"device_name\":\"chrome..."
+    },
+    {
+      "name": "my-qrcode",
+      "method": "GET",
+      "path": "/v1/user/qrcode",
+      "category": "required",
+      "safe": true,
+      "status": 200,
+      "ok": true,
+      "expectedStatuses": [
+        200
+      ],
+      "responsePreview": "{\"data\":\"http://127.0.0.1:8090/v1/qrcode/vercode_***@3\"}"
+    },
+    {
+      "name": "friend-sync",
+      "method": "GET",
+      "path": "/v1/friend/sync?version=0&api_version=1",
+      "category": "required",
+      "safe": true,
+      "status": 200,
+      "ok": true,
+      "expectedStatuses": [
+        200
+      ],
+      "responsePreview": "[{\"uid\":\"u_10000\",\"name\":\"系统账号\",\"username\":\"\",\"mute\":0,\"top\":0,\"sex\":0,\"category\":\"system\",\"short_no\":\"10000\",\"chat_pwd_on\":0,\"screenshot\":0,\"revoke_remind\":1,\"receipt\":0,\"online\":0,\"last_offline\":0,\"device_flag\":0,\"follow\":1,\"be_deleted\":1,\"be_blacklist\":0,\"code\":\"\",\"vercode\":\"\",\"source_desc\":\"\",\"remark\":\"\",\"is_upload_avatar\":1,\"status\":1,\"robot\":1,\"is_destroy\":0,\"flame\":0,\"flame_second\":0,\"join_group_invite_uid\":\"\",\"join_group_invite_name\":\"\",\"join_group_time\":\"\",\"created_at\":\"\",\"updated_at\":\"\",\"is_deleted\":0,\"version\":1001001},{\"uid\":\"fileHelper\",\"name\":\"文件传输助手\",\"username\":\"\",\"mute\":0,\"top\":0,\"sex\":0,\"category\":\"system\",\"short_no\":\"20000\",\"chat_pwd_on\":0,\"screenshot\":0,\"revoke_remind\":1,\"..."
+    },
+    {
+      "name": "friend-apply-list",
+      "method": "GET",
+      "path": "/v1/friend/apply",
+      "category": "required",
+      "safe": true,
+      "status": 200,
+      "ok": true,
+      "expectedStatuses": [
+        200
+      ],
+      "responsePreview": "[]"
+    },
+    {
+      "name": "group-my",
+      "method": "GET",
+      "path": "/v1/group/my?limit=10",
+      "category": "required",
+      "safe": true,
+      "status": 200,
+      "ok": true,
+      "expectedStatuses": [
+        200
+      ],
+      "responsePreview": "[]"
+    },
+    {
+      "name": "conversation-sync",
+      "method": "POST",
+      "path": "/v1/conversation/sync",
+      "category": "required",
+      "safe": true,
+      "status": 200,
+      "ok": true,
+      "expectedStatuses": [
+        200
+      ],
+      "responsePreview": "{\"uid\":\"41232e72***\",\"conversations\":[],\"users\":[],\"groups\":[],\"channel_status\":[]}"
+    },
+    {
+      "name": "conversation-extra-sync",
+      "method": "POST",
+      "path": "/v1/conversation/extra/sync",
+      "category": "required",
+      "safe": true,
+      "status": 200,
+      "ok": true,
+      "expectedStatuses": [
+        200
+      ],
+      "responsePreview": "[]"
+    },
+    {
+      "name": "message-reminder-sync",
+      "method": "POST",
+      "path": "/v1/message/reminder/sync",
+      "category": "required",
+      "safe": true,
+      "status": 200,
+      "ok": true,
+      "expectedStatuses": [
+        200
+      ],
+      "responsePreview": "[]"
+    },
+    {
+      "name": "global-search",
+      "method": "POST",
+      "path": "/v1/search/global",
+      "category": "backend-dependent",
+      "safe": true,
+      "status": 400,
+      "ok": true,
+      "expectedStatuses": [
+        200,
+        400
+      ],
+      "responsePreview": "{\"msg\":\"查询悟空IM消息错误\",\"status\":400}"
+    },
+    {
+      "name": "favorite-my",
+      "method": "GET",
+      "path": "/v1/favorite/my?page_index=1&page_size=1",
+      "category": "frontend-dependency",
+      "safe": true,
+      "status": 404,
+      "ok": true,
+      "expectedStatuses": [
+        200,
+        404,
+        501
+      ],
+      "responsePreview": "404 page not found"
+    },
+    {
+      "name": "sticker-category",
+      "method": "GET",
+      "path": "/v1/sticker/user/category",
+      "category": "frontend-dependency",
+      "safe": true,
+      "status": 404,
+      "ok": true,
+      "expectedStatuses": [
+        200,
+        404,
+        501
+      ],
+      "responsePreview": "404 page not found"
+    },
+    {
+      "name": "organization-joined",
+      "method": "GET",
+      "path": "/v1/organization/joined",
+      "category": "frontend-dependency",
+      "safe": true,
+      "status": 404,
+      "ok": true,
+      "expectedStatuses": [
+        200,
+        404,
+        501
+      ],
+      "responsePreview": "404 page not found"
+    }
+  ],
+  "summary": {
+    "total": 16,
+    "passed": 16,
+    "failed": 0,
+    "requiredFailures": 0,
+    "frontendDependencyWarnings": 3,
+    "backendDependencyWarnings": 1
+  }
+}
