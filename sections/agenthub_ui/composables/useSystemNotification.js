@@ -1,20 +1,21 @@
 import { useSettingsStore } from '@/stores/settings';
+import { storage } from '@/utils/storage.js';
 
 const PERMISSION_STORAGE_KEY = 'notification_permission_status';
 
 function setPermissionStatus(status) {
   const settingsStore = useSettingsStore();
   settingsStore.updateNotificationSettings({ permissionStatus: status });
-  uni.setStorageSync(PERMISSION_STORAGE_KEY, status);
+  storage.set(PERMISSION_STORAGE_KEY, status);
 }
 
 function getStoredPermissionStatus() {
-  return uni.getStorageSync(PERMISSION_STORAGE_KEY) || 'default';
+  return storage.get(PERMISSION_STORAGE_KEY) || 'default';
 }
 
 function openConversationFromNotification(conversationId) {
   if (!conversationId) return;
-  uni.setStorageSync('active_conversation_id', conversationId);
+  storage.set('active_conversation_id', conversationId);
 
   let isDesktop = false;
   try {

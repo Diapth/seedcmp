@@ -210,29 +210,7 @@ function handleMenuClick(action) {
       url: '/pages/group/create'
     });
   } else if (action === 'create-tag') {
-    uni.showModal({
-      title: '创建分组',
-      editable: true,
-      placeholderText: '请输入新分组的名称',
-      success: (res) => {
-        if (res.confirm) {
-          const name = (res.content || '').trim();
-          if (!name) {
-            uni.showToast({ title: '分组名不能为空', icon: 'none' });
-            return;
-          }
-          if (contactGroups.value.some(g => g.name === name)) {
-            uni.showToast({ title: '该分组已存在', icon: 'none' });
-            return;
-          }
-          contactGroups.value.push({
-            name,
-            count: Math.floor(Math.random() * 11) + 5
-          });
-          uni.showToast({ title: '分组创建成功', icon: 'success' });
-        }
-      }
-    });
+    uni.showToast({ title: '联系人分组需接入真实接口', icon: 'none' });
   }
 }
 

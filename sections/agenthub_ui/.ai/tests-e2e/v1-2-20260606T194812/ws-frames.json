@@ -1,0 +1,106 @@
+[
+  {
+    "at": "2026-06-06T19:48:12.953Z",
+    "page": "agenthub_ui",
+    "direction": "received",
+    "url": "ws://localhost:5173/?token=Yk_DDzKwGumy",
+    "size": 20,
+    "payload": "{\"type\":\"connected\"}"
+  },
+  {
+    "at": "2026-06-06T19:48:13.265Z",
+    "page": "agenthub_ui",
+    "direction": "sent",
+    "url": "ws://0.0.0.0:5200/",
+    "size": 170,
+    "payload": "\u0010�\u0001\u0005\u0001\u0000!08e4099ddeb8d9ef5338c99f8235de0dW\u0000 edbb4e4566f840f4a6f14b9f9cf01c22\u0000 01aef87939124bad97bcab6c4d6d320f\u0000\u0000\u0001��z�N\u0000,o+cdjlq92GThly5pga1i90lBqgz5Yu14uV/tVOanlQk="
+  },
+  {
+    "at": "2026-06-06T19:48:13.266Z",
+    "page": "agenthub_ui",
+    "direction": "received",
+    "url": "ws://0.0.0.0:5200/",
+    "size": 84,
+    "payload": "!R\u0005\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0002\u0001\u0000,zgQ6wXJ2HqBR9GSU8VtYAAUP0R7IMlYS0Uzssj9guHs=\u0000\u0010Myl60T9nOWxe06E4\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0001"
+  },
+  {
+    "at": "2026-06-06T19:48:13.964Z",
+    "page": "im_web",
+    "direction": "received",
+    "url": "ws://localhost:3000/",
+    "size": 20,
+    "payload": "{\"type\":\"connected\"}"
+  },
+  {
+    "at": "2026-06-06T19:48:14.261Z",
+    "page": "im_web",
+    "direction": "sent",
+    "url": "ws://127.0.0.1:5200/",
+    "size": 170,
+    "payload": "\u0010�\u0001\u0005\u0001\u0000!0e3d7484f97fe6f5f35e599a1926e4acW\u0000 edbb4e4566f840f4a6f14b9f9cf01c22\u0000 01aef87939124bad97bcab6c4d6d320f\u0000\u0000\u0001��z�4\u0000,N0uiIxgX4dNVD1w+P1u2jZ4p4j6leCQ86S+/vZe4DFA="
+  },
+  {
+    "at": "2026-06-06T19:48:14.264Z",
+    "page": "im_web",
+    "direction": "received",
+    "url": "ws://127.0.0.1:5200/",
+    "size": 84,
+    "payload": "!R\u0005\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0001\u0001\u0000,9HFlqtQ8kRFKe6pe8xdGhbMDKikWEe5mdAJ/IYAoKDk=\u0000\u0010eG0IjTDHt9gk7RY1\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0001"
+  },
+  {
+    "at": "2026-06-06T19:48:14.895Z",
+    "page": "agenthub_ui",
+    "direction": "sent",
+    "url": "ws://0.0.0.0:5200/",
+    "size": 321,
+    "payload": "2}\u0000\u0000\u0000\u0000\u0001\u0000$de0f4af065ed85a58813f3f3b4b2ffbd_0_3\u0000\u0011clowder_cat:codex\u0001\u0000\u0000\u0000\u0000\u0000 76d1bad54a1782c667ba682a50393478PhxtyngHazZfBgQsmDVJIA==2�\u0001\u0000\u0000\u0000\u0000\u0002\u0000$b38b4c26f9744492ebf542e859bf8e41_0_3\u0000\u0011clowd"
+  },
+  {
+    "at": "2026-06-06T19:48:14.903Z",
+    "page": "agenthub_ui",
+    "direction": "received",
+    "url": "ws://0.0.0.0:5200/",
+    "size": 61,
+    "payload": "@7\u001c�{d�@\u0010\u0000\u0000\u0000\u0000\u0001\u0000\u0000\u0000A\u0001\u0000$de0f4af065ed85a58813f3f3b4b2ffbd_0_3"
+  },
+  {
+    "at": "2026-06-06T19:48:14.906Z",
+    "page": "im_web",
+    "direction": "received",
+    "url": "ws://127.0.0.1:5200/",
+    "size": 180,
+    "payload": "R�\u0001\u0000\u0000 07870a94dfe77271d2f6864fbd269d29\u0000 edbb4e4566f840f4a6f14b9f9cf01c22\u0000\u0011clowder_cat:codex\u0001\u0000\u0000\u0000\u0000\u0000$de0f4af065ed85a58813f3f3b4b2ffbd_0_3\u001c�{d�@\u0010\u0000\u0000\u0000\u0000Aj$y~41Dx769CzyPMtOv3jWOC9w=="
+  },
+  {
+    "at": "2026-06-06T19:48:14.906Z",
+    "page": "im_web",
+    "direction": "sent",
+    "url": "ws://127.0.0.1:5200/",
+    "size": 18,
+    "payload": "b\f\u001c�{d�@\u0010\u0000\u0000\u0000\u0000A"
+  },
+  {
+    "at": "2026-06-06T19:48:14.909Z",
+    "page": "agenthub_ui",
+    "direction": "received",
+    "url": "ws://0.0.0.0:5200/",
+    "size": 61,
+    "payload": "@7\u001c�{d�@\u0010\u0000\u0000\u0000\u0000\u0002\u0000\u0000\u0000B\u0001\u0000$b38b4c26f9744492ebf542e859bf8e41_0_3"
+  },
+  {
+    "at": "2026-06-06T19:48:14.910Z",
+    "page": "im_web",
+    "direction": "received",
+    "url": "ws://127.0.0.1:5200/",
+    "size": 244,
+    "payload": "R�\u0001\u0000\u0000 a518e1599e28acb5e89b75a20ae714f5\u0000 edbb4e4566f840f4a6f14b9f9cf01c22\u0000\u0011clowder_cat:codex\u0001\u0000\u0000\u0000\u0000\u0000$b38b4c26f9744492ebf542e859bf8e41_0_3\u001c�{d�@\u0010\u0000\u0000\u0000\u0000Bj$y~OdTNGjg7mF+KZN+VC5MBkk4yG72cCe"
+  },
+  {
+    "at": "2026-06-06T19:48:14.910Z",
+    "page": "im_web",
+    "direction": "sent",
+    "url": "ws://127.0.0.1:5200/",
+    "size": 18,
+    "payload": "b\f\u001c�{d�@\u0010\u0000\u0000\u0000\u0000B"
+  }
+]

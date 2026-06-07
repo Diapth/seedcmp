@@ -92,7 +92,7 @@
         </view>
 
         <view class="qr-container flex-column align-center" v-else>
-          <view class="qr-frame">
+          <view class="qr-frame" :class="{ unavailable: !qrAvailable }">
             <view class="qr-box">
               <view class="qr-finder-corner top-left"></view>
               <view class="qr-finder-corner top-right"></view>
@@ -102,7 +102,7 @@
               <AppIcon name="chat" :size="48" color="var(--color-primary)" />
             </view>
           </view>
-          <text class="qr-tip">请使用手机端 App 扫码登录</text>
+          <text class="qr-tip">{{ qrTip }}</text>
         </view>
 
         <view class="login-footer-links">
@@ -115,11 +115,20 @@
 </template>
 
 <script setup>
-import { ref } from 'vue';
-import { useAppStore } from '@/stores/app';
+import { computed, ref, watch } from 'vue';
+import { useAuthStore } from '@/stores/auth';
+import { useConversationStore } from '@/stores/conversation';
+import { useImStore } from '@/stores/im';
+import { useSettingsStore } from '@/stores/settings';
+import { useUserStore } from '@/stores/user';
+import { initSdk } from '@/utils/wk-sdk.js';
 import AppIcon from '@/components/common/AppIcon.vue';
 
-const appStore = useAppStore();
+const authStore = useAuthStore();
+const conversationStore = useConversationStore();
+const userStore = useUserStore();
+const imStore = useImStore();
+const settingsStore = useSettingsStore();
 
 const loginMode = ref('password'); // 'password' | 'qr'
 const phone = ref('');
@@ -128,6 +137,17 @@ const showPassword = ref(false);
 const rememberMe = ref(true);
 const isLoading = ref(false);
 const errorMessage = ref('');
+const qrMessage = ref('二维码登录后端能力待确认');
+
+const qrAvailable = computed(() => settingsStore.qrLogin.available);
+const qrTip = computed(() => qrAvailable.value ? '请使用手机端 App 扫码登录' : qrMessage.value);
+
+watch(loginMode, async (mode) => {
+  errorMessage.value = '';
+  if (mode !== 'qr') return;
+  const result = await settingsStore.generateQrLoginToken();
+  qrMessage.value = result.message || (result.available ? '请使用手机端 App 扫码登录' : '二维码登录后端能力待确认');
+});
 
 function toggleLoginMode() {
   loginMode.value = loginMode.value === 'password' ? 'qr' : 'password';
@@ -142,38 +162,42 @@ function navigateToRegister() {
 
 function handleForgotPassword() {
   uni.showToast({
-    title: '密码找回流程已打开',
+    title: '密码找回后端能力待确认',
     icon: 'none'
   });
 }
 
-function handleLogin() {
+async function handleLogin() {
   if (!phone.value || !password.value) {
-    errorMessage.value = '请填写手机号和密码';
-    return;
-  }
-  
-  if (phone.value.length < 11) {
-    errorMessage.value = '手机号格式不正确';
+    errorMessage.value = '请填写账号和密码';
     return;
   }
   
   errorMessage.value = '';
   isLoading.value = true;
-  
-  setTimeout(() => {
-    isLoading.value = false;
-    appStore.setCurrentUser({
-      id: 'me',
-      nickname: '测试用户',
-      avatar: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=150&q=80',
-      phone: phone.value
-    }, 'mock_token_abc123');
-    
+  try {
+    const loginResult = await authStore.login({
+      username: phone.value,
+      password: password.value
+    });
+    await userStore.fetchMe().catch(() => undefined);
+    await imStore.fetchImAddress(loginResult.uid).catch(() => undefined);
+    await conversationStore.fetchConversations().catch(() => undefined);
+    if (imStore.wsAddr) {
+      await initSdk({
+        uid: loginResult.uid,
+        token: imStore.imToken || authStore.accessToken,
+        wsAddr: imStore.wsAddr
+      }).catch(() => undefined);
+    }
     uni.reLaunch({
       url: '/pages/chat/index'
     });
-  }, 1200);
+  } catch (err) {
+    errorMessage.value = err?.message || '登录失败';
+  } finally {
+    isLoading.value = false;
+  }
 }
 </script>
 
@@ -460,6 +484,11 @@ function handleLogin() {
   display: flex;
   align-items: center;
   justify-content: center;
+}
+
+.qr-frame.unavailable {
+  opacity: 0.55;
+  filter: grayscale(1);
 }
 
 .qr-box {

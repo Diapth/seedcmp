@@ -4,7 +4,9 @@ import path from 'node:path';
 const cwd = process.cwd();
 const env = {
   ...process.env,
-  UNI_INPUT_DIR: process.env.UNI_INPUT_DIR || cwd
+  UNI_INPUT_DIR: process.env.UNI_INPUT_DIR || cwd,
+  CHOKIDAR_USEPOLLING: process.env.CHOKIDAR_USEPOLLING || '1',
+  WATCHPACK_POLLING: process.env.WATCHPACK_POLLING || 'true'
 };
 
 const isWindows = process.platform === 'win32';

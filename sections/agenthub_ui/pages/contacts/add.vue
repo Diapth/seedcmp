@@ -119,7 +119,7 @@ function goBack() {
   uni.navigateBack();
 }
 
-function handleSearch() {
+async function handleSearch() {
   const query = searchQuery.value.trim();
   if (!query) {
     uni.showToast({ title: '请输入搜索内容', icon: 'none' });
@@ -173,18 +173,11 @@ function handleSearch() {
     return;
   }
   
-  // 4. Mock a new user if search string matches some criteria
-  // If query length >= 2, we let them search and add
-  if (query.length >= 2) {
-    searchResult.value = {
-      id: String(Date.now()),
-      nickname: query,
-      phone: query.match(/^\d+$/) ? query : '139' + Math.floor(Math.random() * 90000000 + 10000000),
-      avatar: '',
-      relationship: 'stranger'
-    };
-  } else {
+  try {
+    searchResult.value = await contactStore.searchUser(query);
+  } catch (err) {
     searchResult.value = null;
+    uni.showToast({ title: err?.message || '搜索用户失败', icon: 'none' });
   }
 }
 
@@ -227,20 +220,23 @@ function goRequests() {
   });
 }
 
-function sendRequest() {
+async function sendRequest() {
   if (!searchResult.value) return;
   sending.value = true;
-  
-  setTimeout(() => {
-    contactStore.sendFriendRequest(searchResult.value.nickname, verificationMsg.value);
+
+  try {
+    await contactStore.sendFriendRequest(
+      searchResult.value.id || searchResult.value.nickname,
+      verificationMsg.value,
+      searchResult.value.vercode
+    );
     sending.value = false;
     uni.showToast({ title: '好友申请已发送', icon: 'success' });
-    
-    // Auto go back after 1.5s
-    setTimeout(() => {
-      uni.navigateBack();
-    }, 1500);
-  }, 800);
+    uni.navigateBack();
+  } catch (err) {
+    sending.value = false;
+    uni.showToast({ title: err?.message || '好友申请发送失败', icon: 'none' });
+  }
 }
 </script>
 

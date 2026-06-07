@@ -1,0 +1,145 @@
+{
+  "login": {
+    "uid": "edbb4e4566f840f4a6f14b9f9cf01c22",
+    "token": "01aef8...6d320f"
+  },
+  "cat": {
+    "catId": "final418z",
+    "agent": {
+      "catId": "final418z",
+      "displayName": "终验猫5418Z",
+      "aliases": [
+        "@final418Z"
+      ],
+      "mentionPatterns": [
+        "@final418Z"
+      ],
+      "capabilitySummary": "V1-3验收、项目工作台",
+      "available": true,
+      "availabilityState": "available",
+      "source": "runtime-created",
+      "connected": true
+    }
+  },
+  "projectGroup": {
+    "binding": {
+      "id": "b864ed32f22547b98f24a149e39983fc",
+      "userId": "edbb4e4566f840f4a6f14b9f9cf01c22",
+      "projectName": "V13工作台终验T215418",
+      "pmDirectChannelId": "clowder_cat:coordinator",
+      "pmDirectChannelType": 1,
+      "projectGroupNo": "347dfdbc00004d22868a87e5b4f0b02c",
+      "projectThreadId": "v1-3-workspace-final-20260606T215418Z",
+      "pmMemberId": "clowder_cat:coordinator",
+      "userMemberIds": [
+        "edbb4e4566f840f4a6f14b9f9cf01c22",
+        "clowder_cat:coordinator"
+      ],
+      "catMemberIds": [
+        "final418z"
+      ],
+      "createdBy": "pm",
+      "createdAt": 1780782859166,
+      "updatedAt": 1780782859166,
+      "status": "active"
+    },
+    "activeBinding": {
+      "id": "b864ed32f22547b98f24a149e39983fc",
+      "userId": "edbb4e4566f840f4a6f14b9f9cf01c22",
+      "projectName": "V13工作台终验T215418",
+      "pmDirectChannelId": "clowder_cat:coordinator",
+      "pmDirectChannelType": 1,
+      "projectGroupNo": "347dfdbc00004d22868a87e5b4f0b02c",
+      "projectThreadId": "v1-3-workspace-final-20260606T215418Z",
+      "pmMemberId": "clowder_cat:coordinator",
+      "userMemberIds": [
+        "edbb4e4566f840f4a6f14b9f9cf01c22",
+        "clowder_cat:coordinator"
+      ],
+      "catMemberIds": [
+        "final418z"
+      ],
+      "createdBy": "pm",
+      "createdAt": 1780782859166,
+      "updatedAt": 1780782859166,
+      "status": "active"
+    }
+  },
+  "artifact": {
+    "task": {
+      "id": "0001780782859231-000003-1e39ccee",
+      "kind": "work",
+      "threadId": "v1-3-workspace-final-20260606T215418Z",
+      "subjectKey": null,
+      "title": "final418z 的产出文件",
+      "ownerCatId": "final418z",
+      "status": "todo",
+      "why": "AgentHub V1 acceptance report used for workspace visual proof",
+      "createdBy": "system",
+      "createdAt": 1780782859231,
+      "updatedAt": 1780782859231,
+      "userId": "edbb4e4566f840f4a6f14b9f9cf01c22",
+      "artifactRefs": [
+        "artifact:{\"path\":\"/home/yunyi/Desktop/Bytedance_cmp/seedcmp-wt-agenthub-ui-v1-exec/sections/agenthub_ui/.ai/acceptance-report-v1.md\",\"kind\":\"doc\",\"description\":\"AgentHub V1 acceptance report used for workspace visual proof\"}"
+      ]
+    },
+    "artifact": {
+      "path": "/home/yunyi/Desktop/Bytedance_cmp/seedcmp-wt-agenthub-ui-v1-exec/sections/agenthub_ui/.ai/acceptance-report-v1.md",
+      "kind": "doc",
+      "description": "AgentHub V1 acceptance report used for workspace visual proof"
+    }
+  },
+  "thread": {
+    "threadId": "v1-3-workspace-final-20260606T215418Z",
+    "tasks": {
+      "threadId": "v1-3-workspace-final-20260606T215418Z",
+      "tasks": [
+        {
+          "id": "0001780782859231-000003-1e39ccee",
+          "kind": "work",
+          "threadId": "v1-3-workspace-final-20260606T215418Z",
+          "subjectKey": null,
+          "title": "final418z 的产出文件",
+          "ownerCatId": "final418z",
+          "status": "todo",
+          "why": "AgentHub V1 acceptance report used for workspace visual proof",
+          "createdBy": "system",
+          "createdAt": 1780782859231,
+          "updatedAt": 1780782859231,
+          "userId": "edbb4e4566f840f4a6f14b9f9cf01c22",
+          "artifactRefs": [
+            "artifact:{\"path\":\"/home/yunyi/Desktop/Bytedance_cmp/seedcmp-wt-agenthub-ui-v1-exec/sections/agenthub_ui/.ai/acceptance-report-v1.md\",\"kind\":\"doc\",\"description\":\"AgentHub V1 acceptance report used for workspace visual proof\"}"
+          ]
+        }
+      ],
+      "diagnostics": {
+        "state": "ok",
+        "taskCount": 1,
+        "queryThreadId": "v1-3-workspace-final-20260606T215418Z",
+        "activeWorkspaceId": null,
+        "observedTaskIds": [],
+        "missingTaskIds": [],
+        "mismatchedTasks": [],
+        "workspaceMismatchedTaskIds": []
+      }
+    },
+    "artifacts": {
+      "artifacts": [
+        {
+          "path": "/home/yunyi/Desktop/Bytedance_cmp/seedcmp-wt-agenthub-ui-v1-exec/sections/agenthub_ui/.ai/acceptance-report-v1.md",
+          "absolutePath": "/home/yunyi/Desktop/Bytedance_cmp/seedcmp-wt-agenthub-ui-v1-exec/sections/agenthub_ui/.ai/acceptance-report-v1.md",
+          "kind": "doc",
+          "description": "AgentHub V1 acceptance report used for workspace visual proof",
+          "ownerCatId": "final418z",
+          "taskId": "0001780782859231-000003-1e39ccee",
+          "createdAt": 1780782859231,
+          "source": "declared",
+          "status": "available"
+        }
+      ],
+      "diagnostics": {
+        "available": 1
+      }
+    }
+  }
+}

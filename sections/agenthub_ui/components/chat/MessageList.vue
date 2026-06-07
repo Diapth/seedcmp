@@ -77,9 +77,9 @@ watch(() => props.bottomAnchorKey, () => {
 function scrollToBottom() {
   nextTick(() => {
     scrollToId.value = '';
-    setTimeout(() => {
+    nextTick(() => {
       scrollToId.value = 'bottom-anchor';
-    }, 150);
+    });
   });
 }
 

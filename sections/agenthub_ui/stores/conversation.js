@@ -1,98 +1,61 @@
 import { defineStore } from 'pinia';
+import { syncApi } from '@/api/sync.js';
+import { storage } from '@/utils/storage.js';
+import { buildConversationChannelCache, channelKey, toBackendChannelType, toConversationItem, toGroupConversationInput } from '@/utils/im-mappers.js';
+import { useAuthStore } from './auth.js';
+import { useGroupStore } from './group.js';
+
+function sortConversations(list) {
+  return [...list].sort((a, b) => {
+    if (a.isPinned !== b.isPinned) return a.isPinned ? -1 : 1;
+    return Number(b.lastTime || 0) - Number(a.lastTime || 0);
+  });
+}
+
+function draftsKey(uid) {
+  return `conversationDrafts:${uid || 'anonymous'}`;
+}
+
+function hiddenKey(uid) {
+  return `conversationHidden:${uid || 'anonymous'}`;
+}
+
+function isLocalOnlyDirectConversation(channelId, channelType) {
+  const id = String(channelId || '');
+  return toBackendChannelType(channelType) === 1 &&
+    (id === 'deepseek_ai_robot' ||
+      id === 'clowder_ai' ||
+      id.startsWith('clowder:') ||
+      id.startsWith('clowder_cat:'));
+}
+
+function mergeConversations(primary = [], secondary = []) {
+  const merged = new Map();
+  [...primary, ...secondary].forEach((item) => {
+    if (!item?.key) return;
+    const existing = merged.get(item.key);
+    if (!existing || Number(item.lastTime || 0) >= Number(existing.lastTime || 0)) {
+      merged.set(item.key, existing ? { ...existing, ...item } : item);
+    }
+  });
+  return Array.from(merged.values());
+}
 
 export const useConversationStore = defineStore('conversation', {
   state: () => ({
     activeId: '',
-    conversations: [
-      {
-        id: '1',
-        name: '张伟',
-        avatar: '',
-        type: 'single',
-        unread: 2,
-        lastMessage: '下午的会议材料准备好了吗？',
-        lastTime: 1780490000000,
-        isPinned: false,
-        isMuted: false,
-        draft: ''
-      },
-      {
-        id: '2',
-        name: 'AgentHub 产品研发群',
-        avatar: '',
-        type: 'group',
-        unread: 0,
-        lastMessage: '王五: [文件] usv_layout_front_view.png',
-        lastTime: 1780490300000,
-        isPinned: true,
-        isMuted: true,
-        draft: ''
-      },
-      {
-        id: 'agent-review',
-        name: '智能体方案评审群',
-        avatar: '',
-        type: 'group',
-        unread: 1,
-        lastMessage: 'Codex: Console 日志页已经切换为完整页面',
-        lastTime: 1780490800000,
-        memberCount: 6,
-        isPinned: true,
-        isMuted: false,
-        draft: ''
-      },
-      {
-        id: '3',
-        name: 'DeepSeek 智能体',
-        avatar: '',
-        type: 'robot',
-        unread: 0,
-        lastMessage: '我是您的AI小助手，随时为您服务',
-        lastTime: 1780489000000,
-        isPinned: false,
-        isMuted: false,
-        draft: ''
-      }
-    ],
-    // PR-9 新增: 群成员/公告/创建者/隐藏
-    members: {
-      // 群 id '2' (AgentHub 产品研发群) 默认成员
-      '2': [
-        { id: 'me', nickname: '我', avatar: '', role: 'owner', isMuted: false },
-        { id: '1', nickname: '张伟', avatar: '', role: 'admin', isMuted: false },
-        { id: '4', nickname: '李四', avatar: '', role: 'member', isMuted: false },
-        { id: '5', nickname: '王五', avatar: '', role: 'member', isMuted: true }
-      ],
-      'agent-review': [
-        { id: 'me', nickname: '我', avatar: '', role: 'owner', isMuted: false },
-        { id: 'pm-agent', nickname: 'PM 智能体', avatar: '', role: 'admin', isMuted: false },
-        { id: 'codex', nickname: 'Codex', avatar: '', role: 'member', isMuted: false },
-        { id: 'claude-code', nickname: 'Claude Code', avatar: '', role: 'member', isMuted: false },
-        { id: 'logic-weaver', nickname: '逻辑编织者', avatar: '', role: 'member', isMuted: false },
-        { id: 'clowder', nickname: 'Clowder 协同猫', avatar: '', role: 'member', isMuted: false }
-      ]
-    },
-    announcements: {
-      '2': {
-        text: '欢迎来到 AgentHub 产品研发群，本周目标：完成阶段 9 的所有 PR 🎉',
-        publisherId: 'me',
-        publishTime: 1780400000000
-      },
-      'agent-review': {
-        text: '本群用于多智能体协作评审：任务进展看看板，过程输出看 Console 日志。',
-        publisherId: 'me',
-        publishTime: 1780490400000
-      }
-    },
-    creatorIds: {
-      '2': 'me',
-      'agent-review': 'me'
-    },
-    isHidden: []
+    currentUid: storage.get('auth.uid') || '',
+    conversations: [],
+    members: {},
+    announcements: {},
+    creatorIds: {},
+    isHidden: storage.get(hiddenKey(storage.get('auth.uid'))) || [],
+    loading: false,
+    lastError: ''
   }),
   getters: {
     visibleConversations(state) {
-      return state.conversations.filter((c) => !state.isHidden.includes(c.id));
+      return sortConversations(state.conversations.filter((c) => !state.isHidden.includes(c.id)));
     },
     hiddenConversations(state) {
       return state.conversations.filter((c) => state.isHidden.includes(c.id));
@@ -105,80 +68,203 @@ export const useConversationStore = defineStore('conversation', {
     }
   },
   actions: {
+    setCurrentUid(uid) {
+      this.currentUid = uid || '';
+      this.isHidden = storage.get(hiddenKey(this.currentUid)) || [];
+      this.restoreDrafts();
+    },
+    getConversation(id, channelType = '') {
+      const type = channelType ? toBackendChannelType(channelType) : null;
+      return this.conversations.find((item) => item.id === id && (!type || item.channelType === type));
+    },
+    async fetchConversations() {
+      this.loading = true;
+      this.lastError = '';
+      try {
+        const response = await syncApi.syncConversations({ msg_count: 30 });
+        const data = response?.data || response || {};
+        const list = data.conversations || data.conversation_list || [];
+        const channelCache = buildConversationChannelCache(data);
+        const directConversations = list.map((item) => toConversationItem(item, channelCache));
+        const groupConversations = await this.fetchGroupConversations(channelCache);
+        this.conversations = mergeConversations(directConversations, groupConversations);
+        this.restoreDrafts();
+        return this.conversations;
+      } catch (err) {
+        this.lastError = err?.message || '同步会话失败';
+        throw err;
+      } finally {
+        this.loading = false;
+      }
+    },
+    async fetchGroupConversations(channelCache = {}) {
+      const groupStore = useGroupStore();
+      try {
+        const groups = await groupStore.fetchMyGroups();
+        const conversations = await Promise.all(groups.map(async (group) => {
+          let messages = [];
+          try {
+            const response = await syncApi.syncMessages({
+              channel_id: group.id,
+              channel_type: 2,
+              limit: 10,
+              start_message_seq: 0,
+              end_message_seq: 0,
+              pull_mode: 1
+            });
+            const data = response?.data || response || {};
+            messages = data.messages || [];
+          } catch {
+            messages = [];
+          }
+          return toConversationItem(toGroupConversationInput(group, messages), channelCache);
+        }));
+        return conversations;
+      } catch {
+        return [];
+      }
+    },
+    addOrUpdateConversation(channelId, channelType = 1, patch = {}) {
+      const backendType = toBackendChannelType(channelType);
+      const key = channelKey(channelId, backendType);
+      const index = this.conversations.findIndex((item) => item.key === key || (item.id === String(channelId) && item.channelType === backendType));
+      const next = {
+        id: String(channelId),
+        channelId: String(channelId),
+        channelType: backendType,
+        key,
+        name: patch.name || '未命名会话',
+        avatar: patch.avatar || '',
+        type: patch.type || (backendType === 2 ? 'group' : 'single'),
+        unread: Number(patch.unread || 0),
+        lastMessage: patch.lastMessage || '',
+        lastTime: patch.lastTime || Date.now(),
+        lastMessageSeq: Number(patch.lastMessageSeq || 0),
+        isPinned: Boolean(patch.isPinned),
+        isMuted: Boolean(patch.isMuted),
+        draft: patch.draft || this.getDraft(channelId, backendType) || '',
+        memberCount: patch.memberCount || 0,
+        ...patch
+      };
+      if (index >= 0) {
+        this.conversations[index] = { ...this.conversations[index], ...next };
+      } else {
+        this.conversations.unshift(next);
+      }
+      return next;
+    },
     setActiveId(id) {
       this.activeId = id;
       this.clearUnread(id);
+      storage.set('active_conversation_id', id);
     },
-    clearUnread(id) {
-      const conv = this.conversations.find((c) => c.id === id);
+    async clearUnread(id, channelType = '') {
+      const conv = this.getConversation(id, channelType) || this.conversations.find((c) => c.id === id);
       if (conv) {
         conv.unread = 0;
+        try {
+          await syncApi.clearUnread(conv.channelId || conv.id, conv.channelType || toBackendChannelType(conv.type), conv.lastMessageSeq || 0);
+        } catch {
+          // Local clear is allowed to stay; backend will re-sync if rejected.
+        }
       }
+    },
+    getDraft(channelId, channelType = 1) {
+      const drafts = storage.get(draftsKey(this.currentUid || useAuthStore().uid)) || {};
+      return drafts[channelKey(channelId, channelType)] || '';
+    },
+    persistDraft(channelId, channelType, draftText) {
+      const key = draftsKey(this.currentUid || useAuthStore().uid);
+      const drafts = storage.get(key) || {};
+      drafts[channelKey(channelId, channelType)] = draftText;
+      storage.set(key, drafts);
+    },
+    restoreDrafts() {
+      const drafts = storage.get(draftsKey(this.currentUid || useAuthStore().uid)) || {};
+      this.conversations.forEach((conv) => {
+        conv.draft = drafts[channelKey(conv.channelId || conv.id, conv.channelType || conv.type)] || conv.draft || '';
+      });
+    },
+    setDraft(channelId, channelType, draftText) {
+      const backendType = toBackendChannelType(channelType);
+      const normalizedDraft = String(draftText || '');
+      const existing = this.getConversation(channelId, backendType) || this.conversations.find((c) => c.id === String(channelId));
+      const previousDraft = existing?.draft ?? this.getDraft(channelId, backendType) ?? '';
+      if (String(previousDraft || '') === normalizedDraft) {
+        return existing || null;
+      }
+
+      const conv = this.addOrUpdateConversation(channelId, backendType, { draft: normalizedDraft });
+      conv.draft = normalizedDraft;
+      this.persistDraft(channelId, backendType, normalizedDraft);
+      if (isLocalOnlyDirectConversation(channelId, backendType)) {
+        return conv;
+      }
+      if (normalizedDraft === '' && !previousDraft) {
+        return conv;
+      }
+      syncApi.updateConversationExtra(channelId, backendType, { draft: normalizedDraft }).catch(() => undefined);
+      return conv;
     },
     updateConversationDraft(id, draftText) {
-      const conv = this.conversations.find((c) => c.id === id);
-      if (conv) {
-        conv.draft = draftText;
-      }
+      const conv = this.conversations.find((item) => item.id === id);
+      this.setDraft(id, conv?.channelType || conv?.type || 1, draftText);
     },
-    // PR-9 新增 actions
-    pinConversation(id, pinned) {
+    async pinConversation(id, pinned) {
       const conv = this.conversations.find((c) => c.id === id);
-      if (conv) conv.isPinned = !!pinned;
+      if (!conv) return;
+      conv.isPinned = Boolean(pinned);
+      await syncApi.updateConversationExtra(conv.id, conv.channelType, { top: pinned ? 1 : 0 }).catch(() => undefined);
     },
-    muteConversation(id, muted) {
+    async muteConversation(id, muted) {
       const conv = this.conversations.find((c) => c.id === id);
-      if (conv) conv.isMuted = !!muted;
+      if (!conv) return;
+      conv.isMuted = Boolean(muted);
+      await syncApi.updateConversationExtra(conv.id, conv.channelType, { mute: muted ? 1 : 0 }).catch(() => undefined);
     },
     hideConversation(id) {
-      if (!this.isHidden.includes(id)) this.isHidden.push(id);
+      if (!this.isHidden.includes(id)) {
+        this.isHidden.push(id);
+        storage.set(hiddenKey(this.currentUid || useAuthStore().uid), this.isHidden);
+      }
     },
     unhideConversation(id) {
       this.isHidden = this.isHidden.filter((x) => x !== id);
+      storage.set(hiddenKey(this.currentUid || useAuthStore().uid), this.isHidden);
     },
-    deleteConversation(id) {
+    async deleteConversation(id) {
+      const conv = this.conversations.find((c) => c.id === id);
       this.conversations = this.conversations.filter((c) => c.id !== id);
       this.isHidden = this.isHidden.filter((x) => x !== id);
       if (this.activeId === id) this.activeId = '';
+      if (conv) {
+        await syncApi.deleteConversation(conv.id, conv.channelType).catch(() => undefined);
+      }
     },
     setAnnouncement(convId, text) {
       this.announcements[convId] = {
         text,
-        publisherId: 'me',
+        publisherId: this.currentUid || useAuthStore().uid,
         publishTime: Date.now()
       };
     },
     updateMemberRole(convId, memberId, role) {
-      const list = this.members[convId];
-      if (!list) return;
-      const m = list.find((x) => x.id === memberId);
-      if (m) m.role = role;
+      const member = this.members[convId]?.find((item) => item.id === memberId);
+      if (member) member.role = role;
     },
     updateMemberRemark(convId, memberId, remark) {
-      const list = this.members[convId];
-      if (!list) return;
-      const m = list.find((x) => x.id === memberId);
-      if (m) m.remark = remark;
+      const member = this.members[convId]?.find((item) => item.id === memberId);
+      if (member) member.remark = remark;
     },
     upsertDirectConversation(member) {
-      if (!member?.id || member.id === 'me') return null;
-      let conv = this.conversations.find((c) => c.id === member.id);
-      if (!conv) {
-        conv = {
-          id: member.id,
-          name: member.remark || member.nickname || member.name || '用户',
-          avatar: member.avatar || '',
-          type: 'single',
-          unread: 0,
-          lastMessage: '可以开始聊天了',
-          lastTime: Date.now(),
-          isPinned: false,
-          isMuted: false,
-          draft: ''
-        };
-        this.conversations.unshift(conv);
-      }
-      return conv;
+      if (!member?.id || member.id === (this.currentUid || useAuthStore().uid)) return null;
+      return this.addOrUpdateConversation(member.id, 1, {
+        name: member.remark || member.nickname || member.name || '用户',
+        avatar: member.avatar || '',
+        type: 'single',
+        lastMessage: '可以开始聊天了',
+        lastTime: Date.now()
+      });
     },
     addMember(convId, member) {
       if (!this.members[convId]) this.members[convId] = [];
@@ -193,6 +279,19 @@ export const useConversationStore = defineStore('conversation', {
     initFromGroupMembers(convId, members, creatorId) {
       this.members[convId] = members.map((m) => ({ isMuted: false, role: 'member', ...m }));
       if (creatorId) this.creatorIds[convId] = creatorId;
+    },
+    async recoverAfterReconnect() {
+      await this.fetchConversations();
+    },
+    reset() {
+      this.activeId = '';
+      this.conversations = [];
+      this.members = {};
+      this.announcements = {};
+      this.creatorIds = {};
+      this.isHidden = [];
+      this.loading = false;
+      this.lastError = '';
     }
   }
 });

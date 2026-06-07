@@ -1,0 +1,90 @@
+import { beforeEach, describe, expect, it, vi } from 'vitest';
+
+const sdkMock = vi.hoisted(() => {
+  const textContent = { kind: 'text-content', encode: vi.fn(() => new Uint8Array()) };
+  class CMDContent {
+    constructor() {
+      this.kind = 'cmd-content';
+      this.cmd = '';
+      this.param = {};
+    }
+  }
+  const channel = { channelID: 'clowder_cat:codex', channelType: 1 };
+  const sendResult = { clientSeq: 7, clientMsgNo: 'sdk-generated' };
+  const shared = {
+    config: {
+      provider: {}
+    },
+    connect: vi.fn(),
+    disconnect: vi.fn(),
+    newMessageText: vi.fn(() => textContent),
+    newChannel: vi.fn(() => channel),
+    chatManager: {
+      send: vi.fn(async () => sendResult)
+    }
+  };
+  return { CMDContent, textContent, channel, sendResult, shared };
+});
+
+vi.mock('wukongimjssdk', () => ({
+  default: {
+    shared: () => sdkMock.shared,
+    CMDContent: sdkMock.CMDContent
+  },
+  CMDContent: sdkMock.CMDContent
+}));
+
+describe('WKSDK adapter', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    vi.resetModules();
+    vi.unstubAllGlobals();
+    sdkMock.shared.config = { provider: {} };
+  });
+
+  it('sends text through WKSDK using positional content and channel arguments', async () => {
+    const { sendTextMessage } = await import('../../utils/wk-sdk.js');
+
+    const result = await sendTextMessage({
+      channelId: 'clowder_cat:codex',
+      channelType: 1,
+      text: 'hello from agenthub',
+      clientMsgNo: 'agenthub-client-1'
+    });
+
+    expect(sdkMock.shared.newMessageText).toHaveBeenCalledWith('hello from agenthub');
+    expect(sdkMock.shared.newChannel).toHaveBeenCalledWith('clowder_cat:codex', 1);
+    expect(sdkMock.shared.chatManager.send).toHaveBeenCalledWith(sdkMock.textContent, sdkMock.channel);
+    expect(result.clientMsgNo).toBe('agenthub-client-1');
+  });
+
+  it('sends typing as a WKSDK command content', async () => {
+    const { sendTypingCommand } = await import('../../utils/wk-sdk.js');
+
+    await sendTypingCommand({
+      channelId: 'clowder_cat:codex',
+      channelType: 1
+    });
+
+    const [content, channel] = sdkMock.shared.chatManager.send.mock.calls[0];
+    expect(content).toBeInstanceOf(sdkMock.CMDContent);
+    expect(content).toMatchObject({ cmd: 'typing', param: {} });
+    expect(channel).toBe(sdkMock.channel);
+  });
+
+  it('rewrites local websocket addresses for remote browser hosts', async () => {
+    vi.stubGlobal('location', { hostname: '172.18.58.156' });
+    const { initSdk } = await import('../../utils/wk-sdk.js');
+
+    await initSdk({
+      uid: 'remote-user',
+      token: 'remote-token',
+      wsAddr: 'ws://0.0.0.0:5200'
+    });
+
+    const callback = vi.fn();
+    sdkMock.shared.config.provider.connectAddrCallback(callback);
+
+    expect(callback).toHaveBeenCalledWith('ws://172.18.58.156:5200/');
+  });
+});

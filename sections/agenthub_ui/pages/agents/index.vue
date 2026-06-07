@@ -63,7 +63,7 @@
             <scroll-view scroll-x class="skills-scroll">
               <view class="skills-grid">
                 <view
-                  v-for="skill in userSkills"
+                  v-for="skill in previewSkills"
                   :key="skill.id"
                   class="skill-card"
                   :class="skill.tone"
@@ -207,6 +207,8 @@ const filteredAgents = computed(() => {
 
 const userSkills = computed(() => agentStore.userSkills || []);
 
+const previewSkills = computed(() => userSkills.value.slice(0, 10));
+
 const ownedAgentCount = computed(() => {
   const ids = new Set();
   userSkills.value.forEach((skill) => {
@@ -217,6 +219,12 @@ const ownedAgentCount = computed(() => {
 
 onMounted(() => {
   navStore.setActiveModule('agents');
+  agentStore.fetchAgentDirectory().catch((err) => {
+    console.warn('[agents] fetchAgentDirectory failed', err);
+  });
+  agentStore.fetchSkills().catch((err) => {
+    console.warn('[agents] fetchSkills failed', err);
+  });
 });
 
 function goCreate() {

@@ -76,6 +76,7 @@
           @draft-change="handleDraftChange"
           @cancel-reply="replyTarget = null"
           @open-emoji="openInputEmojiPicker"
+          @typing="handleTyping"
           @keyboard-change="handleKeyboardChange"
         />
 
@@ -264,6 +265,8 @@ import { useConversationStore } from '@/stores/conversation';
 import { useMessageStore } from '@/stores/message';
 import { useContactStore } from '@/stores/contact';
 import { useAgentStore } from '@/stores/agent';
+import { useDeploymentStore } from '@/stores/deployment.js';
+import { storage } from '@/utils/storage.js';
 import { useResponsiveLayout } from '@/composables/useResponsiveLayout';
 import AppShell from '@/components/layout/AppShell.vue';
 import MobilePageHeader from '@/components/layout/MobilePageHeader.vue';
@@ -289,6 +292,7 @@ const appStore = useAppStore();
 const navStore = useNavigationStore();
 const contactStore = useContactStore();
 const agentStore = useAgentStore();
+const deploymentStore = useDeploymentStore();
 
 const showRightPane = ref(false);
 
@@ -433,16 +437,22 @@ const memberMenuItems = computed(() => {
   return [{ label: '@ 他', icon: 'at', action: 'mention' }];
 });
 
-onMounted(() => {
+const deploymentHydrationInFlight = new Set();
+
+onMounted(async () => {
   navStore.setActiveModule('chat');
   const pages = getCurrentPages();
   const currentPage = pages[pages.length - 1];
   const id = currentPage?.$page?.options?.id || '1';
   const atMemberId = currentPage?.$page?.options?.at;
+  if (convStore.conversations.length === 0) {
+    await convStore.fetchConversations().catch(() => undefined);
+  }
   convStore.setActiveId(id);
+  await hydrateActiveDeploymentCard();
 
   // Restore persisted draft
-  const persistedDraft = uni.getStorageSync(`draft:${id}`);
+  const persistedDraft = storage.get(`draft:${id}`);
   if (persistedDraft && !convStore.conversations.find((c) => c.id === id)?.draft) {
     convStore.updateConversationDraft(id, persistedDraft);
   }
@@ -466,9 +476,9 @@ onBeforeUnmount(() => {
   if (convStore.activeId) {
     const conv = convStore.conversations.find((c) => c.id === convStore.activeId);
     if (conv?.draft) {
-      uni.setStorageSync(`draft:${convStore.activeId}`, conv.draft);
+      storage.set(`draft:${convStore.activeId}`, conv.draft);
     } else {
-      uni.removeStorageSync(`draft:${convStore.activeId}`);
+      storage.remove(`draft:${convStore.activeId}`);
     }
   }
 });
@@ -553,11 +563,43 @@ function navigateToConversationProfile(conversation) {
 
 function handleSelectConversation(id) {
   convStore.setActiveId(id);
+  hydrateActiveDeploymentCard();
   closeFilePreview();
   closeMemberProfile();
 }
 
+function conversationChannelId(conversation) {
+  return String(conversation?.channelId || conversation?.id || '');
+}
+
+function conversationChannelType(conversation) {
+  return Number(conversation?.channelType || (conversation?.type === 'group' ? 2 : 1));
+}
+
+async function hydrateActiveDeploymentCard(conversation = activeConversation.value) {
+  const channelId = conversationChannelId(conversation);
+  const channelType = conversationChannelType(conversation);
+  if (!channelId || !channelType) return;
+  const key = `${channelId}-${channelType}`;
+  if (deploymentHydrationInFlight.has(key)) return;
+  deploymentHydrationInFlight.add(key);
+  try {
+    const request = await deploymentStore.fetchActive({ channelId, channelType });
+    if (request) messageStore.addDeploymentRequestCard(request);
+  } catch (err) {
+    if (err?.status && err.status !== 404) {
+      console.warn('[chat/detail] active deployment request hydration failed', err);
+    }
+  } finally {
+    deploymentHydrationInFlight.delete(key);
+  }
+}
+
 function handleSendMessage({ type, content, fileName, fileSize, replyRef, previewContent, fileType, url }) {
+  if (type !== 'text') {
+    uni.showToast({ title: '图片、文件和语音发送需接入真实上传能力', icon: 'none' });
+    return;
+  }
   const sender = {
     id: 'me',
     name: appStore.currentUser?.nickname || '我'
@@ -612,6 +654,13 @@ function handleSendMessage({ type, content, fileName, fileSize, replyRef, previe
 
 function handleDraftChange(draftVal) {
   convStore.updateConversationDraft(convStore.activeId, draftVal);
+}
+
+function handleTyping() {
+  const conv = activeConversation.value;
+  if (!conv) return;
+  const channelType = conv.channelType || (conv.type === 'group' ? 2 : 1);
+  messageStore.sendTyping(conv.id, channelType).catch(() => undefined);
 }
 
 function updateConversationField(fields) {
@@ -974,7 +1023,7 @@ function startDirectChat(member) {
   const conv = convStore.upsertDirectConversation(member);
   if (!conv) return;
   convStore.setActiveId(conv.id);
-  uni.setStorageSync('active_conversation_id', conv.id);
+  storage.set('active_conversation_id', conv.id);
   if (!isDesktop.value) {
     uni.redirectTo({ url: `/pages/chat/detail?id=${conv.id}` });
   }

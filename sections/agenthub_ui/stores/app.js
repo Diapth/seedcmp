@@ -1,30 +1,40 @@
 import { defineStore } from 'pinia';
+import { storage } from '@/utils/storage.js';
 
 export const useAppStore = defineStore('app', {
   state: () => ({
-    theme: uni.getStorageSync('app_theme') || 'light',
-    token: uni.getStorageSync('app_token') || '',
-    currentUser: uni.getStorageSync('app_user') ? JSON.parse(uni.getStorageSync('app_user')) : null
+    theme: storage.get('app_theme') || 'light',
+    token: storage.get('app_token') || storage.get('auth.accessToken') || '',
+    currentUser: storage.get('app_user') || null,
+    kickout: {
+      visible: false,
+      reason: ''
+    }
   }),
   actions: {
     setTheme(newTheme) {
       this.theme = newTheme;
-      uni.setStorageSync('app_theme', newTheme);
+      storage.set('app_theme', newTheme);
       // #ifdef H5
-      document.documentElement.className = `theme-${newTheme}`;
+      if (typeof document !== 'undefined') {
+        document.documentElement.className = `theme-${newTheme}`;
+      }
       // #endif
     },
     setCurrentUser(user, token = '') {
       this.currentUser = user;
-      this.token = token;
-      uni.setStorageSync('app_user', JSON.stringify(user));
-      uni.setStorageSync('app_token', token);
+      this.token = token || this.token;
+      storage.set('app_user', user);
+      if (token) storage.set('app_token', token);
+    },
+    triggerKickout(reason = '登录状态已失效，请重新登录') {
+      this.kickout = { visible: true, reason };
+      this.logout();
     },
     logout() {
       this.currentUser = null;
       this.token = '';
-      uni.removeStorageSync('app_user');
-      uni.removeStorageSync('app_token');
+      storage.clear();
     }
   }
 });

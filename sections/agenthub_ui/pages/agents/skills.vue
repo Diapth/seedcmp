@@ -16,7 +16,7 @@
             <AppIcon name="agents" :size="16" color="var(--color-primary)" />
             <text>智能体库</text>
           </button>
-          <button class="header-action primary flex-row align-center gap-2" @click="showUiToast('上传技能包')">
+          <button class="header-action primary flex-row align-center gap-2" @click="showSkillUploadUnavailable">
             <AppIcon name="upload" :size="16" color="#ffffff" />
             <text>上传技能包</text>
           </button>
@@ -34,21 +34,21 @@
                   </view>
                   <view class="flex-column">
                     <text class="panel-title">上传打包好的 Skill</text>
-                    <text class="panel-subtitle">支持 .skill.zip / .zip 包，当前为 UI 占位</text>
+                    <text class="panel-subtitle">支持 .skill.zip / .zip 包；真实上传接入前暂不可用</text>
                   </view>
                 </view>
-                <text class="ui-only-badge">UI only</text>
+                <text class="ui-only-badge">Unavailable</text>
               </view>
 
-              <view class="upload-dropzone flex-column align-center justify-center" @click="showUiToast('选择技能包')">
+              <view class="upload-dropzone flex-column align-center justify-center" @click="showSkillUploadUnavailable">
                 <view class="upload-icon">
                   <AppIcon name="upload" :size="28" color="var(--color-primary)" />
                 </view>
                 <text class="upload-title">拖入或选择 skill 压缩包</text>
-                <text class="upload-desc">示例：ui-review.skill.zip，上传后会在这里展示解析结果</text>
+                <text class="upload-desc">{{ settingsStore.skillUpload.message || '文件选择与上传接口完成后会展示真实解析结果' }}</text>
                 <view class="upload-actions flex-row gap-2">
-                  <button class="upload-btn primary" @click.stop="showUiToast('选择技能包')">选择包</button>
-                  <button class="upload-btn secondary" @click.stop="showUiToast('导入技能')">导入到本地</button>
+                  <button class="upload-btn primary" @click.stop="showSkillUploadUnavailable">选择包</button>
+                  <button class="upload-btn secondary" @click.stop="showSkillUploadUnavailable">导入到本地</button>
                 </view>
               </view>
             </view>
@@ -153,8 +153,8 @@
                   </view>
                 </view>
                 <view class="detail-actions flex-row gap-2">
-                  <button class="detail-btn" @click="showUiToast('启用状态')">启用</button>
-                  <button class="detail-btn primary" @click="showUiToast('绑定智能体')">绑定智能体</button>
+                  <button class="detail-btn" @click="showCapabilityUnavailable('启用状态')">启用</button>
+                  <button class="detail-btn primary" @click="showCapabilityUnavailable('绑定智能体')">绑定智能体</button>
                 </view>
               </view>
 
@@ -271,12 +271,14 @@ import { computed, onMounted, ref, watch } from 'vue';
 import MarkdownIt from 'markdown-it';
 import { useAgentStore } from '@/stores/agent';
 import { useNavigationStore } from '@/stores/navigation';
+import { useSettingsStore } from '@/stores/settings';
 import AppSubpageShell from '@/components/layout/AppSubpageShell.vue';
 import AppIcon from '@/components/common/AppIcon.vue';
 import AppEmptyState from '@/components/common/AppEmptyState.vue';
 
 const agentStore = useAgentStore();
 const navStore = useNavigationStore();
+const settingsStore = useSettingsStore();
 
 const markdown = new MarkdownIt({
   html: false,
@@ -358,6 +360,9 @@ watch(activeSkill, (skill) => {
 
 onMounted(() => {
   navStore.setActiveModule('agents');
+  agentStore.fetchSkills().catch((err) => {
+    console.warn('[skills] fetchSkills failed', err);
+  });
   const pages = getCurrentPages();
   const currentPage = pages[pages.length - 1];
   const initialSkillId = safeDecode(currentPage?.$page?.options?.skillId || '');
@@ -376,9 +381,21 @@ function selectDoc(id) {
   showSource.value = false;
 }
 
-function showUiToast(action) {
+function showSkillUploadUnavailable() {
+  settingsStore.skillUpload = {
+    available: false,
+    status: 'unavailable',
+    message: '技能上传需要真实文件选择与后端 Skill API，当前暂不可用'
+  };
   uni.showToast({
-    title: `${action}为界面示意`,
+    title: settingsStore.skillUpload.message,
+    icon: 'none'
+  });
+}
+
+function showCapabilityUnavailable(action) {
+  uni.showToast({
+    title: `${action}后端能力待接入`,
     icon: 'none'
   });
 }
