@@ -9,26 +9,26 @@
 
 ## 问题描述
 
-完整 V2 run `v2-full-20260607-041127` 执行到 V2-08 簇时发现以下 Fail / Warning。测试未因这些问题暂停，后续簇已继续执行。
+完整 V2 run `v2-full-20260607-075820` 执行到 V2-08 簇时发现以下 Fail / Warning。测试未因这些问题暂停，后续簇已继续执行。
 
 截图：
 
-- `sections/agenthub_ui/.ai/issue/screenshots/v2-full-20260607-041127/V2-08-01/01_result.png`
-- `sections/agenthub_ui/.ai/issue/screenshots/v2-full-20260607-041127/V2-08-02/01_result.png`
-- `sections/agenthub_ui/.ai/issue/screenshots/v2-full-20260607-041127/V2-08-03/01_result.png`
-- `sections/agenthub_ui/.ai/issue/screenshots/v2-full-20260607-041127/V2-08-04/01_result.png`
-- `sections/agenthub_ui/.ai/issue/screenshots/v2-full-20260607-041127/V2-08-05/01_result.png`
-- `sections/agenthub_ui/.ai/issue/screenshots/v2-full-20260607-041127/V2-08-06/01_result.png`
-- `sections/agenthub_ui/.ai/issue/screenshots/v2-full-20260607-041127/V2-08-07/01_result.png`
-- `sections/agenthub_ui/.ai/issue/screenshots/v2-full-20260607-041127/V2-08-08/01_result.png`
-- `sections/agenthub_ui/.ai/issue/screenshots/v2-full-20260607-041127/V2-08-09/01_result.png`
+- `sections/agenthub_ui/.ai/issue/screenshots/v2-full-20260607-075820/V2-08-01/01_result.png`
+- `sections/agenthub_ui/.ai/issue/screenshots/v2-full-20260607-075820/V2-08-02/01_result.png`
+- `sections/agenthub_ui/.ai/issue/screenshots/v2-full-20260607-075820/V2-08-03/01_result.png`
+- `sections/agenthub_ui/.ai/issue/screenshots/v2-full-20260607-075820/V2-08-04/01_result.png`
+- `sections/agenthub_ui/.ai/issue/screenshots/v2-full-20260607-075820/V2-08-05/01_result.png`
+- `sections/agenthub_ui/.ai/issue/screenshots/v2-full-20260607-075820/V2-08-06/01_result.png`
+- `sections/agenthub_ui/.ai/issue/screenshots/v2-full-20260607-075820/V2-08-07/01_result.png`
+- `sections/agenthub_ui/.ai/issue/screenshots/v2-full-20260607-075820/V2-08-08/01_result.png`
+- `sections/agenthub_ui/.ai/issue/screenshots/v2-full-20260607-075820/V2-08-09/01_result.png`
 
 ---
 
 ## 复现步骤
 
 1. 运行 `node sections/agenthub_ui/.ai/tests/v2-full-runner.mjs`。
-2. 查看 `sections/agenthub_ui/.ai/tests/screenshots/v2-full-20260607-041127/full-results.json`。
+2. 查看 `sections/agenthub_ui/.ai/tests/screenshots/v2-full-20260607-075820/full-results.json`。
 3. 打开本 issue 中列出的截图逐项复核。
 
 ---
@@ -37,7 +37,7 @@
 
 ```
 Runtime route cluster: V2-08
-Evidence root: sections/agenthub_ui/.ai/tests/screenshots/v2-full-20260607-041127
+Evidence root: sections/agenthub_ui/.ai/tests/screenshots/v2-full-20260607-075820
 ```
 
 ---
@@ -59,15 +59,15 @@ Evidence root: sections/agenthub_ui/.ai/tests/screenshots/v2-full-20260607-04112
 
 | Case | Status | Finding |
 |---|---|---|
-| V2-08-01 与 cat-PM 单聊 | PASS_WITH_WARNING | streamingUiVisible=true; text=测<br>聊天<br>消息、群聊与智能体<br>开启新消息通知，不再遗漏任何消息<br>开启<br>未<br>未命名会话<br>12:15<br>⚠️ 当前没有绑定 thread，请先用 /new 创建或 /use 切换。<br>聊天<br>通讯录<br>智能体<br>文件<br>设置 |
-| V2-08-02 流式首字延迟 | PASS_WITH_WARNING | streamingUiVisible=true; text=测<br>聊天<br>消息、群聊与智能体<br>开启新消息通知，不再遗漏任何消息<br>开启<br>未<br>未命名会话<br>12:15<br>⚠️ 当前没有绑定 thread，请先用 /new 创建或 /use 切换。<br>聊天<br>通讯录<br>智能体<br>文件<br>设置 |
-| V2-08-03 markdown 渲染 | PASS_WITH_WARNING | streamingUiVisible=true; text=测<br>聊天<br>消息、群聊与智能体<br>开启新消息通知，不再遗漏任何消息<br>开启<br>未<br>未命名会话<br>12:15<br>⚠️ 当前没有绑定 thread，请先用 /new 创建或 /use 切换。<br>聊天<br>通讯录<br>智能体<br>文件<br>设置 |
-| V2-08-04 消息内文件 | PASS_WITH_WARNING | streamingUiVisible=true; text=测<br>聊天<br>消息、群聊与智能体<br>开启新消息通知，不再遗漏任何消息<br>开启<br>未<br>未命名会话<br>12:15<br>⚠️ 当前没有绑定 thread，请先用 /new 创建或 /use 切换。<br>聊天<br>通讯录<br>智能体<br>文件<br>设置 |
-| V2-08-05 中断与续传 | PASS_WITH_WARNING | streamingUiVisible=true; text=测<br>聊天<br>消息、群聊与智能体<br>开启新消息通知，不再遗漏任何消息<br>开启<br>未<br>未命名会话<br>12:15<br>⚠️ 当前没有绑定 thread，请先用 /new 创建或 /use 切换。<br>聊天<br>通讯录<br>智能体<br>文件<br>设置 |
-| V2-08-06 失败重试 | PASS_WITH_WARNING | streamingUiVisible=true; text=测<br>聊天<br>消息、群聊与智能体<br>开启新消息通知，不再遗漏任何消息<br>开启<br>未<br>未命名会话<br>12:15<br>⚠️ 当前没有绑定 thread，请先用 /new 创建或 /use 切换。<br>聊天<br>通讯录<br>智能体<br>文件<br>设置 |
-| V2-08-07 长上下文 | PASS_WITH_WARNING | streamingUiVisible=true; text=测<br>聊天<br>消息、群聊与智能体<br>开启新消息通知，不再遗漏任何消息<br>开启<br>未<br>未命名会话<br>12:15<br>⚠️ 当前没有绑定 thread，请先用 /new 创建或 /use 切换。<br>聊天<br>通讯录<br>智能体<br>文件<br>设置 |
-| V2-08-08 token 计数 | PASS_WITH_WARNING | streamingUiVisible=true; text=测<br>聊天<br>消息、群聊与智能体<br>开启新消息通知，不再遗漏任何消息<br>开启<br>未<br>未命名会话<br>12:15<br>⚠️ 当前没有绑定 thread，请先用 /new 创建或 /use 切换。<br>聊天<br>通讯录<br>智能体<br>文件<br>设置 |
-| V2-08-09 取消生成 | PASS_WITH_WARNING | streamingUiVisible=true; text=测<br>聊天<br>消息、群聊与智能体<br>开启新消息通知，不再遗漏任何消息<br>开启<br>未<br>未命名会话<br>12:15<br>⚠️ 当前没有绑定 thread，请先用 /new 创建或 /use 切换。<br>聊天<br>通讯录<br>智能体<br>文件<br>设置 |
+| V2-08-01 与 cat-PM 单聊 | PASS_WITH_WARNING | streamingUiVisible=true; text=测<br>聊天<br>消息、群聊与智能体<br>开启新消息通知，不再遗漏任何消息<br>开启<br>未找到匹配会话<br>尝试输入其他关键字重新搜索<br>聊天<br>通讯录<br>智能体<br>文件<br>设置 |
+| V2-08-02 流式首字延迟 | PASS_WITH_WARNING | streamingUiVisible=true; text=测<br>聊天<br>消息、群聊与智能体<br>开启新消息通知，不再遗漏任何消息<br>开启<br>未找到匹配会话<br>尝试输入其他关键字重新搜索<br>聊天<br>通讯录<br>智能体<br>文件<br>设置 |
+| V2-08-03 markdown 渲染 | PASS_WITH_WARNING | streamingUiVisible=true; text=测<br>聊天<br>消息、群聊与智能体<br>开启新消息通知，不再遗漏任何消息<br>开启<br>未找到匹配会话<br>尝试输入其他关键字重新搜索<br>聊天<br>通讯录<br>智能体<br>文件<br>设置 |
+| V2-08-04 消息内文件 | PASS_WITH_WARNING | streamingUiVisible=true; text=测<br>聊天<br>消息、群聊与智能体<br>开启新消息通知，不再遗漏任何消息<br>开启<br>未找到匹配会话<br>尝试输入其他关键字重新搜索<br>聊天<br>通讯录<br>智能体<br>文件<br>设置 |
+| V2-08-05 中断与续传 | PASS_WITH_WARNING | streamingUiVisible=true; text=测<br>聊天<br>消息、群聊与智能体<br>开启新消息通知，不再遗漏任何消息<br>开启<br>未找到匹配会话<br>尝试输入其他关键字重新搜索<br>聊天<br>通讯录<br>智能体<br>文件<br>设置 |
+| V2-08-06 失败重试 | PASS_WITH_WARNING | streamingUiVisible=true; text=测<br>聊天<br>消息、群聊与智能体<br>开启新消息通知，不再遗漏任何消息<br>开启<br>未找到匹配会话<br>尝试输入其他关键字重新搜索<br>聊天<br>通讯录<br>智能体<br>文件<br>设置 |
+| V2-08-07 长上下文 | PASS_WITH_WARNING | streamingUiVisible=true; text=测<br>聊天<br>消息、群聊与智能体<br>开启新消息通知，不再遗漏任何消息<br>开启<br>未找到匹配会话<br>尝试输入其他关键字重新搜索<br>聊天<br>通讯录<br>智能体<br>文件<br>设置 |
+| V2-08-08 token 计数 | PASS_WITH_WARNING | streamingUiVisible=true; text=测<br>聊天<br>消息、群聊与智能体<br>开启新消息通知，不再遗漏任何消息<br>开启<br>未找到匹配会话<br>尝试输入其他关键字重新搜索<br>聊天<br>通讯录<br>智能体<br>文件<br>设置 |
+| V2-08-09 取消生成 | PASS_WITH_WARNING | streamingUiVisible=true; text=测<br>聊天<br>消息、群聊与智能体<br>开启新消息通知，不再遗漏任何消息<br>开启<br>未找到匹配会话<br>尝试输入其他关键字重新搜索<br>聊天<br>通讯录<br>智能体<br>文件<br>设置 |
 
 ---
 
@@ -82,8 +82,8 @@ Evidence root: sections/agenthub_ui/.ai/tests/screenshots/v2-full-20260607-04112
 ## 测试结果
 
 ```bash
-H5_BASE_URL=http://172.18.58.156:5173 node sections/agenthub_ui/.ai/tests/v2-full-runner.mjs
-# evidence: sections/agenthub_ui/.ai/tests/screenshots/v2-full-20260607-041127
+H5_BASE_URL=http://172.18.58.156:5174 node sections/agenthub_ui/.ai/tests/v2-full-runner.mjs
+# evidence: sections/agenthub_ui/.ai/tests/screenshots/v2-full-20260607-075820
 ```
 
 ---
