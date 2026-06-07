@@ -3,34 +3,6 @@ __pycache__/
 *.py[codz]
 *$py.class
 
-sections/agenthub_ui/.ai/issue/screenshots/
-sections/agenthub_ui/.ai/tests/screenshots/
-sections/agenthub_ui/.ai/tests/probe-*.png
-sections/agenthub_ui/.ai/tests/trace-*/
-sections/agenthub_ui/.ai/tests/trace-*.png
-
-# UI frontend local dependencies/build/test evidence
-sections/ui/node_modules/
-sections/ui/dist/
-sections/ui/build/
-sections/ui/unpackage/
-sections/ui/.hbuilderx/
-sections/ui/.ai/
-sections/ui/**/*.log
-sections/ui/issues/screenshots/
-sections/ui/issues/prototypes/
-sections/ui/**/screenshots/
-sections/ui/tests/
-sections/ui/tests-e2e/
-sections/ui/test-results/
-sections/ui/coverage/
-sections/ui/scripts/baseline.mjs
-sections/ui/scripts/inspect*.mjs
-sections/ui/scripts/phase*-verify*.mjs
-sections/ui/scripts/verify-*.mjs
-sections/ui/scripts/smoke-test.js
-
-
 # other config
 .claude/
 .codex/
@@ -39,10 +11,9 @@ sections/ui/scripts/smoke-test.js
 .specify/
 .seedcmp-run/
 .pnpm-home/
-.clowder/
-**/.clowder/
-manual-test-artifacts/
-maomi_workspace/
+
+sections/im_web/assets
+
 # IM backend sources are tracked for V2/V3 integration.
 sections/im/*
 !sections/im/TangSengDaoDaoServer/
