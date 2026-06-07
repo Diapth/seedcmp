@@ -105,6 +105,7 @@
 import { computed, ref, watch } from 'vue';
 import { useMessageStore } from '@/stores/message';
 import { useGroupStore } from '@/stores/group';
+import { useConversationStore } from '@/stores/conversation';
 import { useClowderStore } from '@/stores/clowder.js';
 import { isClowderConversation } from '@/utils/clowder-conversation.js';
 import AppAvatar from '../common/AppAvatar.vue';
@@ -125,6 +126,7 @@ const emit = defineEmits(['close', 'update-conversation', 'preview-file', 'membe
 
 const messageStore = useMessageStore();
 const groupStore = useGroupStore();
+const convStore = useConversationStore();
 const clowderStore = useClowderStore();
 const groupWorkspaceMode = ref('info');
 const projectWorkspaceTab = ref('kanban');
@@ -146,14 +148,22 @@ const convTypeLabel = computed(() => {
 // PR-11: 群数据从 groupStore 读取, 缺省用 conversation 字段
 const groupData = computed(() => {
   if (props.conversation.type !== 'group') return null;
-  return groupStore.groups.find((g) => g.id === props.conversation.id) || {
+  const groupId = props.conversation.id;
+  const members = groupStore.members[groupId] || convStore.groupMembers(groupId) || [];
+  const storeGroup = groupStore.groups.find((g) => g.id === groupId);
+  const fallback = {
     id: props.conversation.id,
     name: props.conversation.name,
     avatar: props.conversation.avatar,
-    memberCount: 0,
+    memberCount: props.conversation.memberCount || 0,
     announcement: '',
     creatorId: 'me',
     createTime: 0
+  };
+  return {
+    ...fallback,
+    ...(storeGroup || {}),
+    memberCount: members.length || storeGroup?.memberCount || props.conversation.memberCount || 0
   };
 });
 
@@ -222,6 +232,7 @@ watch(
   () => {
     groupWorkspaceMode.value = 'info';
     projectWorkspaceTab.value = 'kanban';
+    hydrateGroupMembers();
     hydrateGroupProjectWorkspace();
   },
   { immediate: true }
@@ -274,6 +285,19 @@ async function hydrateGroupProjectWorkspace() {
     }
   } finally {
     projectWorkspaceLoading.value = false;
+  }
+}
+
+async function hydrateGroupMembers() {
+  if (props.conversation.type !== 'group' || !groupChannelId.value) return;
+  try {
+    const members = await groupStore.fetchMembers(groupChannelId.value);
+    if (members.length) {
+      convStore.initFromGroupMembers(groupChannelId.value, members, groupData.value?.creatorId);
+      convStore.addOrUpdateConversation(groupChannelId.value, 2, { memberCount: members.length });
+    }
+  } catch (err) {
+    console.warn('[RightWorkspace] group member hydration failed', err);
   }
 }
 

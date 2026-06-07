@@ -3,6 +3,7 @@ import { syncApi } from '@/api/sync.js';
 import { AppError } from '@/utils/request.js';
 import { channelKey, createInboundMessage, messageSummary, toBackendChannelType } from '@/utils/im-mappers.js';
 import { notifyMessage } from '@/composables/useSystemNotification';
+import { useAppStore } from './app.js';
 import { useAuthStore } from './auth.js';
 import { useConversationStore } from './conversation.js';
 
@@ -76,15 +77,15 @@ function conversationSummaryMessage(conversation = {}, channelId = '', channelTy
   };
 }
 
-function conversationPreviewMessages(conversation = {}, channelId = '', channelType = 1) {
-  const messages = conversationRecentMessages(conversation).map((item) => createInboundMessage({
+function conversationPreviewMessages(conversation = {}, channelId = '', channelType = 1, displayContext = {}) {
+  const messages = conversationRecentMessages(conversation).map((item) => createDisplayInboundMessage({
     channel_id: channelId,
     channel_type: channelType,
     ...item
-  }));
+  }, displayContext.userCache, displayContext.currentUser));
   if (messages.length) return messages;
   const summary = conversationSummaryMessage(conversation, channelId, channelType);
-  return summary ? [createInboundMessage(summary)] : [];
+  return summary ? [createDisplayInboundMessage(summary, displayContext.userCache, displayContext.currentUser)] : [];
 }
 
 function isSyntheticSummaryMessage(message = {}) {
@@ -102,6 +103,85 @@ function getLatestPersistedMessageSeq(messages = []) {
 
 function deploymentCardTitle(request = {}) {
   return request.title || request.originalText || request.original_text || request.statusLabel || request.status_label || '部署请求';
+}
+
+function currentUserProfile() {
+  const authStore = useAuthStore();
+  const appStore = useAppStore();
+  const currentUser = appStore.currentUser || {};
+  const uid = String(authStore.uid || currentUser.uid || currentUser.id || currentUser.user_id || currentUser.username || '');
+  const name = currentUser.nickname || currentUser.name || currentUser.displayName || currentUser.username || uid || '我';
+  return {
+    id: uid,
+    uid,
+    name,
+    nickname: currentUser.nickname || name,
+    avatar: currentUser.avatar || currentUser.logo || ''
+  };
+}
+
+function putProfile(cache, id, profile = {}) {
+  const uid = String(id || profile.uid || profile.id || '');
+  if (!uid) return;
+  cache[uid] = {
+    id: uid,
+    uid,
+    name: profile.remark || profile.name || profile.nickname || uid,
+    nickname: profile.nickname || profile.name || profile.remark || uid,
+    avatar: profile.avatar || profile.logo || '',
+    raw: profile.raw || profile
+  };
+}
+
+function memberId(member = {}) {
+  return member.id || member.uid || member.user_id || member.userId || member.member_uid || member.memberUid || member.username || '';
+}
+
+function buildMessageDisplayContext(channelId, channelType) {
+  const convStore = useConversationStore();
+  const userCache = {};
+  const currentUser = currentUserProfile();
+  putProfile(userCache, currentUser.uid, currentUser);
+
+  const backendType = toBackendChannelType(channelType);
+  const conversation = convStore.getConversation(channelId, backendType);
+  if (conversation?.channelType === 1 || backendType === 1) {
+    putProfile(userCache, conversation?.id || channelId, {
+      name: conversation?.name,
+      nickname: conversation?.name,
+      avatar: conversation?.avatar
+    });
+  }
+
+  if (backendType === 2) {
+    convStore.groupMembers(String(channelId)).forEach((member) => {
+      putProfile(userCache, memberId(member), {
+        name: member.remark || member.nickname || member.name,
+        nickname: member.nickname || member.name || member.remark,
+        avatar: member.avatar || '',
+        raw: member
+      });
+    });
+  }
+
+  return { userCache, currentUser };
+}
+
+function createDisplayInboundMessage(raw = {}, userCache = {}, currentUser = {}) {
+  const message = createInboundMessage(raw, userCache);
+  const currentUid = String(currentUser.uid || currentUser.id || '');
+  const isMe = message.senderId === 'me' || (currentUid && message.senderId === currentUid);
+  if (!isMe) return { ...message, isMe: false };
+  return {
+    ...message,
+    isMe: true,
+    senderName: message.senderName && message.senderName !== message.senderId ? message.senderName : (currentUser.name || currentUser.nickname || '我'),
+    senderAvatar: message.senderAvatar || currentUser.avatar || ''
+  };
+}
+
+function conversationMessageSummary(message = {}, channelType = 1) {
+  return messageSummary(message, { withSender: toBackendChannelType(channelType) === 2 });
 }
 
 async function sendSdkTextMessage() {
@@ -141,7 +221,7 @@ export const useMessageStore = defineStore('message', {
       const channelType = toBackendChannelType(conversation.channelType || conversation.type || conversation.raw?.channel_type || conversation.raw?.channelType || 1);
       if (!channelId || !channelType) return [];
       const hydrated = this.getMessages(channelId, channelType);
-      return hydrated.length ? hydrated : conversationPreviewMessages(conversation, channelId, channelType);
+      return hydrated.length ? hydrated : conversationPreviewMessages(conversation, channelId, channelType, buildMessageDisplayContext(channelId, channelType));
     },
     ensureBucket(conversationId, channelType = '') {
       const key = String(conversationId);
@@ -153,7 +233,9 @@ export const useMessageStore = defineStore('message', {
       return this.messages[key];
     },
     addRealtimeMessage(channelId, channelType, rawMessage) {
-      const msg = createInboundMessage(rawMessage);
+      const backendType = toBackendChannelType(channelType);
+      const displayContext = buildMessageDisplayContext(channelId, backendType);
+      const msg = createDisplayInboundMessage(rawMessage, displayContext.userCache, displayContext.currentUser);
       const list = this.ensureBucket(channelId, channelType);
       const pendingKey = msg.clientMsgNo && this.pendingQueue[msg.clientMsgNo] ? msg.clientMsgNo : '';
       const existingIndex = list.findIndex((item) =>
@@ -170,7 +252,7 @@ export const useMessageStore = defineStore('message', {
 
       const convStore = useConversationStore();
       const conv = convStore.addOrUpdateConversation(channelId, channelType, {
-        lastMessage: messageSummary(msg),
+        lastMessage: conversationMessageSummary(msg, backendType),
         lastTime: msg.time,
         lastMessageSeq: msg.messageSeq
       });
@@ -250,12 +332,15 @@ export const useMessageStore = defineStore('message', {
       const conv = convStore.conversations.find((item) => item.id === conversationId);
       const channelType = toBackendChannelType(conv?.channelType || conv?.type || extra.channelType || 1);
       const authStore = useAuthStore();
+      const profile = currentUserProfile();
       const clientMsgNo = extra.clientMsgNo || newClientMsgNo();
       const msg = defaultMsg({
         id: clientMsgNo,
         clientMsgNo,
-        senderId: sender?.id || authStore.uid || 'me',
-        senderName: sender?.name || '我',
+        senderId: sender?.id || authStore.uid || profile.uid || 'me',
+        senderName: sender?.name || profile.name || '我',
+        senderAvatar: sender?.avatar || profile.avatar || '',
+        isMe: true,
         content: text,
         type,
         time: Date.now(),
@@ -265,7 +350,7 @@ export const useMessageStore = defineStore('message', {
       this.addMessage(conversationId, msg, channelType);
       this.pendingQueue[clientMsgNo] = msg;
       convStore.addOrUpdateConversation(conversationId, channelType, {
-        lastMessage: messageSummary(msg),
+        lastMessage: conversationMessageSummary(msg, channelType),
         lastTime: msg.time
       });
 

@@ -320,6 +320,14 @@ async function loginH5(page) {
 
 async function verifyH5(page, groupNo) {
   await screenshot(page, '02-conversation-list-multi');
+  const currentUserName = await page.evaluate(() => {
+    try {
+      const user = JSON.parse(localStorage.getItem('app_user') || '{}');
+      return user.nickname || user.name || user.username || 'leng';
+    } catch {
+      return 'leng';
+    }
+  });
   const listText = await page.locator('body').innerText({ timeout: 5000 });
   const listOk = listText.includes(accountB.name) &&
     listText.includes(directTrace) &&
@@ -333,7 +341,16 @@ async function verifyH5(page, groupNo) {
   });
   if (!listOk) throw new Error('Conversation list does not show both traces');
 
-  await page.getByText(groupName).first().click({ force: true });
+  const groupPreview = `${currentUserName}: ${groupTrace}`;
+  const groupPreviewOk = listText.includes(groupPreview);
+  step('h5-group-list-preview-prefixes-sender-nickname', groupPreviewOk ? 'PASS' : 'FAIL', {
+    expected: groupPreview,
+    currentUserName,
+    preview: listText.slice(0, 800)
+  });
+  if (!groupPreviewOk) throw new Error('Group list preview does not prefix sender nickname');
+
+  await page.locator('.conversation-item', { hasText: groupName }).first().click({ force: true });
   await page.waitForTimeout(3000);
   await screenshot(page, '03-group-chat-detail');
   const groupDetailText = await page.locator('.chat-messages-area').innerText({ timeout: 5000 }).catch(() => '');
@@ -341,13 +358,28 @@ async function verifyH5(page, groupNo) {
   step('h5-group-detail-shows-trace', groupOk ? 'PASS' : 'FAIL', { groupNo, preview: groupDetailText.slice(0, 500) });
   if (!groupOk) throw new Error('Group detail does not show trace');
 
-  await page.getByText(accountB.name).first().click({ force: true });
+  const groupPageText = await page.locator('body').innerText({ timeout: 5000 });
+  const memberCountOk = /[1-9]\d* 位成员/.test(groupPageText) && !groupPageText.includes('0 位成员');
+  step('h5-group-detail-member-count-is-not-zero', memberCountOk ? 'PASS' : 'FAIL', {
+    groupNo,
+    preview: groupPageText.slice(0, 800)
+  });
+  if (!memberCountOk) throw new Error('Group detail still shows zero members');
+
+  await page.locator('.conversation-item', { hasText: accountB.name }).first().click({ force: true });
   await page.waitForTimeout(3000);
   await screenshot(page, '04-direct-chat-detail');
   const directDetailText = await page.locator('.chat-messages-area').innerText({ timeout: 5000 }).catch(() => '');
   const directOk = directDetailText.includes(directTrace);
   step('h5-direct-detail-shows-trace', directOk ? 'PASS' : 'FAIL', { preview: directDetailText.slice(0, 500) });
   if (!directOk) throw new Error('Direct detail does not show trace');
+
+  const directAvatarTexts = await page.locator('.chat-messages-area .message-avatar .fallback-text').allInnerTexts().catch(() => []);
+  const directAvatarOk = !directAvatarTexts.includes('4');
+  step('h5-direct-message-avatars-use-display-names', directAvatarOk ? 'PASS' : 'FAIL', {
+    avatarTexts: directAvatarTexts
+  });
+  if (!directAvatarOk) throw new Error('Direct message avatar still uses raw uid initial');
 
   const active404s = network.filter((item) => item.status === 404 && (
     String(item.url || '').includes('/clowder/conversation/deployment-request/active') ||

@@ -24,6 +24,29 @@ function normalizeGroup(input = {}) {
   };
 }
 
+function normalizeRole(input = {}) {
+  if (input.role === 'owner' || input.role === 'admin' || input.role === 'member') return input.role;
+  if (input.is_creator || input.isCreator || input.creator === 1) return 'owner';
+  if (Number(input.member_role || input.memberRole || 0) === 1) return 'owner';
+  if (Number(input.member_role || input.memberRole || 0) === 2) return 'admin';
+  return 'member';
+}
+
+function normalizeGroupMember(input = {}) {
+  const id = input.uid || input.id || input.user_id || input.userId || input.member_uid || input.memberUid || input.username || '';
+  const nickname = input.remark || input.name || input.nickname || input.display_name || input.displayName || input.username || id;
+  return {
+    id,
+    uid: id,
+    nickname,
+    name: input.name || nickname,
+    remark: input.remark || '',
+    avatar: input.avatar || input.logo || input.face || input.face_url || input.faceUrl || '',
+    role: normalizeRole(input),
+    raw: input
+  };
+}
+
 export const useGroupStore = defineStore('group', {
   state: () => ({
     activeGroupId: null,
@@ -52,7 +75,16 @@ export const useGroupStore = defineStore('group', {
     },
     addGroup(group) {
       const normalized = normalizeGroup(group);
-      if (!this.groups.some((item) => item.id === normalized.id)) this.groups.push(normalized);
+      const index = this.groups.findIndex((item) => item.id === normalized.id);
+      if (index >= 0) {
+        this.groups[index] = {
+          ...this.groups[index],
+          ...normalized,
+          memberCount: normalized.memberCount || this.groups[index].memberCount || 0
+        };
+        return this.groups[index];
+      }
+      if (normalized.id) this.groups.push(normalized);
       return normalized;
     },
     removeGroup(id) {
@@ -74,7 +106,10 @@ export const useGroupStore = defineStore('group', {
     async fetchMembers(groupNo) {
       const response = await groupApi.getGroupMembers(groupNo, { page: 1, limit: 200 });
       const data = response?.data || response || {};
-      this.members[groupNo] = data.members || data.items || [];
+      const list = Array.isArray(data) ? data : (data.members || data.items || data.list || data.users || []);
+      this.members[groupNo] = list.map(normalizeGroupMember).filter((member) => member.id);
+      const group = this.groups.find((item) => item.id === groupNo);
+      if (group) group.memberCount = Math.max(group.memberCount || 0, this.members[groupNo].length);
       return this.members[groupNo];
     },
     reset() {

@@ -1,7 +1,8 @@
 import { defineStore } from 'pinia';
 import { syncApi } from '@/api/sync.js';
 import { storage } from '@/utils/storage.js';
-import { buildConversationChannelCache, channelKey, toBackendChannelType, toConversationItem, toGroupConversationInput } from '@/utils/im-mappers.js';
+import { buildConversationChannelCache, buildConversationUserCache, channelKey, toBackendChannelType, toConversationItem, toGroupConversationInput } from '@/utils/im-mappers.js';
+import { useAppStore } from './app.js';
 import { useAuthStore } from './auth.js';
 import { useContactStore } from './contact.js';
 import { useGroupStore } from './group.js';
@@ -50,6 +51,55 @@ function buildContactChannelCache(contacts = []) {
       name: contact.remark || contact.nickname || contact.name || contact.id,
       avatar: contact.avatar || '',
       raw: contact.raw || contact
+    };
+    return cache;
+  }, {});
+}
+
+function buildContactUserCache(contacts = []) {
+  return contacts.reduce((cache, contact) => {
+    if (!contact?.id) return cache;
+    cache[contact.id] = {
+      id: contact.id,
+      uid: contact.id,
+      name: contact.remark || contact.nickname || contact.name || contact.id,
+      nickname: contact.nickname || contact.name || contact.remark || contact.id,
+      avatar: contact.avatar || '',
+      raw: contact.raw || contact
+    };
+    return cache;
+  }, {});
+}
+
+function buildCurrentUserCache() {
+  const authStore = useAuthStore();
+  const currentUser = useAppStore().currentUser || {};
+  const uid = String(authStore.uid || currentUser.uid || currentUser.id || currentUser.user_id || currentUser.username || '');
+  if (!uid) return {};
+  const name = currentUser.nickname || currentUser.name || currentUser.displayName || currentUser.username || uid;
+  return {
+    [uid]: {
+      id: uid,
+      uid,
+      name,
+      nickname: currentUser.nickname || name,
+      avatar: currentUser.avatar || currentUser.logo || '',
+      raw: currentUser
+    }
+  };
+}
+
+function buildMemberUserCache(members = []) {
+  return members.reduce((cache, member) => {
+    const id = member.id || member.uid || member.user_id || member.userId || member.member_uid || member.memberUid || member.username || '';
+    if (!id) return cache;
+    cache[id] = {
+      id,
+      uid: id,
+      name: member.remark || member.nickname || member.name || member.username || id,
+      nickname: member.nickname || member.name || member.remark || id,
+      avatar: member.avatar || member.logo || '',
+      raw: member.raw || member
     };
     return cache;
   }, {});
@@ -109,8 +159,13 @@ export const useConversationStore = defineStore('conversation', {
           ...buildContactChannelCache(contacts),
           ...buildConversationChannelCache(data)
         };
-        const directConversations = list.map((item) => toConversationItem(item, channelCache));
-        const groupConversations = await this.fetchGroupConversations(channelCache);
+        const userCache = {
+          ...buildContactUserCache(contacts),
+          ...buildConversationUserCache(data),
+          ...buildCurrentUserCache()
+        };
+        const directConversations = list.map((item) => toConversationItem(item, channelCache, userCache));
+        const groupConversations = await this.fetchGroupConversations(channelCache, userCache);
         this.conversations = mergeConversations(directConversations, groupConversations);
         await this.resolveMissingDirectConversationIdentities();
         this.restoreDrafts();
@@ -122,12 +177,21 @@ export const useConversationStore = defineStore('conversation', {
         this.loading = false;
       }
     },
-    async fetchGroupConversations(channelCache = {}) {
+    async fetchGroupConversations(channelCache = {}, baseUserCache = {}) {
       const groupStore = useGroupStore();
       try {
         const groups = await groupStore.fetchMyGroups();
         const conversations = await Promise.all(groups.map(async (group) => {
           let messages = [];
+          let members = [];
+          try {
+            members = await groupStore.fetchMembers(group.id);
+            if (members.length) {
+              this.initFromGroupMembers(group.id, members, group.creatorId);
+            }
+          } catch {
+            members = [];
+          }
           try {
             const response = await syncApi.syncMessages({
               channel_id: group.id,
@@ -142,7 +206,15 @@ export const useConversationStore = defineStore('conversation', {
           } catch {
             messages = [];
           }
-          return toConversationItem(toGroupConversationInput(group, messages), channelCache);
+          const groupWithCount = {
+            ...group,
+            memberCount: Math.max(group.memberCount || 0, members.length)
+          };
+          return toConversationItem(
+            toGroupConversationInput(groupWithCount, messages),
+            channelCache,
+            { ...baseUserCache, ...buildMemberUserCache(members) }
+          );
         }));
         return conversations;
       } catch {
@@ -328,6 +400,9 @@ export const useConversationStore = defineStore('conversation', {
     initFromGroupMembers(convId, members, creatorId) {
       this.members[convId] = members.map((m) => ({ isMuted: false, role: 'member', ...m }));
       if (creatorId) this.creatorIds[convId] = creatorId;
+      if (this.members[convId].length) {
+        this.addOrUpdateConversation(convId, 2, { memberCount: this.members[convId].length });
+      }
     },
     async recoverAfterReconnect() {
       await this.fetchConversations();

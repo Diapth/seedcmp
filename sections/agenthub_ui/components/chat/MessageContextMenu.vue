@@ -46,6 +46,8 @@
 
 <script setup>
 import { computed } from 'vue';
+import { useAppStore } from '@/stores/app';
+import { useAuthStore } from '@/stores/auth';
 import AppIcon from '../common/AppIcon.vue';
 
 const props = defineProps({
@@ -62,8 +64,15 @@ const quickEmojis = ['👍', '❤️', '😂', '😮', '🙏', '🎉'];
 
 function noop() {}
 
+const authStore = useAuthStore();
+const appStore = useAppStore();
+
 const isDesktopMode = computed(() => props.isDesktop);
-const isMyMsg = computed(() => props.msg && props.msg.senderId === 'me');
+const isMyMsg = computed(() => {
+  if (!props.msg) return false;
+  const currentUid = authStore.uid || appStore.currentUser?.uid || appStore.currentUser?.id || '';
+  return Boolean(props.msg.isMe || props.msg.senderId === 'me' || (currentUid && props.msg.senderId === currentUid));
+});
 const isRevoked = computed(() => props.msg?.status === 'revoked' || props.msg?.type === 'system');
 const canReact = computed(() => !!props.msg && !isRevoked.value);
 

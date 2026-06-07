@@ -1,4 +1,6 @@
 import { useSettingsStore } from '@/stores/settings';
+import { useAuthStore } from '@/stores/auth';
+import { useAppStore } from '@/stores/app';
 import { storage } from '@/utils/storage.js';
 
 const PERMISSION_STORAGE_KEY = 'notification_permission_status';
@@ -159,9 +161,12 @@ export async function requestNotificationPermission() {
 export function notifyMessage({ conversation, message, force = false }) {
   const settingsStore = useSettingsStore();
   const settings = settingsStore.notificationSettings;
+  const authStore = useAuthStore();
+  const appStore = useAppStore();
+  const currentUid = authStore.uid || appStore.currentUser?.uid || appStore.currentUser?.id || '';
 
   if (!settings.enableSystemNotifications || settings.doNotDisturb) return false;
-  if (!conversation || !message || message.senderId === 'me') return false;
+  if (!conversation || !message || message.isMe || message.senderId === 'me' || (currentUid && message.senderId === currentUid)) return false;
   if (shouldSkipForegroundNotification(force)) return false;
 
   const notification = buildMessageNotification(conversation, message, settings.showPreview);

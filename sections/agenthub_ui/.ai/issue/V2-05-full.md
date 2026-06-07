@@ -9,7 +9,7 @@
 
 ## 问题描述
 
-完整 V2 run `v2-full-20260607-113409` 执行到 V2-05 簇时，阻塞项数量为 0。本簇没有 Fail / Blocked；如存在 PASS_WITH_WARNING，则代表自动化验收深度说明或需人工决策的边界，不作为当前阻塞缺陷。
+完整 V2 run `v2-full-20260607-122547` 执行到 V2-05 簇时，阻塞项数量为 0。本簇没有 Fail / Blocked；如存在 PASS_WITH_WARNING，则代表自动化验收深度说明或需人工决策的边界，不作为当前阻塞缺陷。
 
 截图：
 
@@ -20,7 +20,7 @@
 ## 复现步骤
 
 1. 运行 `node sections/agenthub_ui/.ai/tests/v2-full-runner.mjs`。
-2. 查看 `sections/agenthub_ui/.ai/tests/screenshots/v2-full-20260607-113409/full-results.json`。
+2. 查看 `sections/agenthub_ui/.ai/tests/screenshots/v2-full-20260607-122547/full-results.json`。
 3. 打开本 issue 中列出的截图逐项复核。
 
 ---
@@ -29,7 +29,7 @@
 
 ```
 Runtime route cluster: V2-05
-Evidence root: sections/agenthub_ui/.ai/tests/screenshots/v2-full-20260607-113409
+Evidence root: sections/agenthub_ui/.ai/tests/screenshots/v2-full-20260607-122547
 ```
 
 ---
@@ -54,17 +54,17 @@ Evidence root: sections/agenthub_ui/.ai/tests/screenshots/v2-full-20260607-11340
 
 | Case | Status | Finding |
 |---|---|---|
-| V2-05-01 文本消息 | PASS_WITH_WARNING | route=pages/chat/index; text=测<br>聊天<br>消息、群聊与智能体<br>开启新消息通知，不再遗漏任何消息<br>开启<br>L<br>leng<br>19:29<br>AgentHub 13733632709 visible trace 2026-06-07T11-29-54-443Z<br>15<br>A<br>AgentHub同步测试群-112924<br>19:29<br>AgentHub 13733632709 multi group trace 2026-06-07T11-29-24-487Z<br>A<br>AgentHub同步测试群-112508<br>19:25<br>AgentHub 13733632709 multi group trace 2026-06-07T11-25-08-039Z<br>A<br>AgentHub同步测试群-112436<br>19:24<br>AgentHub 13733632709 multi group trace 2026-06-07T11-24-36-323Z<br>C<br>Clowder AI<br>16:31<br>⚠️ 当前没有绑定 thread，请先用 /new 创建或 /use 切换。<br>2<br>17<br>聊天<br>通讯录<br>智能体<br>文件<br>设置 |
-| V2-05-02 表情 / emoji | PASS_WITH_WARNING | route=pages/chat/index; text=测<br>聊天<br>消息、群聊与智能体<br>开启新消息通知，不再遗漏任何消息<br>开启<br>L<br>leng<br>19:29<br>AgentHub 13733632709 visible trace 2026-06-07T11-29-54-443Z<br>15<br>A<br>AgentHub同步测试群-112924<br>19:29<br>AgentHub 13733632709 multi group trace 2026-06-07T11-29-24-487Z<br>A<br>AgentHub同步测试群-112508<br>19:25<br>AgentHub 13733632709 multi group trace 2026-06-07T11-25-08-039Z<br>A<br>AgentHub同步测试群-112436<br>19:24<br>AgentHub 13733632709 multi group trace 2026-06-07T11-24-36-323Z<br>C<br>Clowder AI<br>16:31<br>⚠️ 当前没有绑定 thread，请先用 /new 创建或 /use 切换。<br>2<br>17<br>聊天<br>通讯录<br>智能体<br>文件<br>设置 |
-| V2-05-03 消息撤回 | PASS_WITH_WARNING | route=pages/chat/index; text=测<br>聊天<br>消息、群聊与智能体<br>开启新消息通知，不再遗漏任何消息<br>开启<br>L<br>leng<br>19:29<br>AgentHub 13733632709 visible trace 2026-06-07T11-29-54-443Z<br>15<br>A<br>AgentHub同步测试群-112924<br>19:29<br>AgentHub 13733632709 multi group trace 2026-06-07T11-29-24-487Z<br>A<br>AgentHub同步测试群-112508<br>19:25<br>AgentHub 13733632709 multi group trace 2026-06-07T11-25-08-039Z<br>A<br>AgentHub同步测试群-112436<br>19:24<br>AgentHub 13733632709 multi group trace 2026-06-07T11-24-36-323Z<br>C<br>Clowder AI<br>16:31<br>⚠️ 当前没有绑定 thread，请先用 /new 创建或 /use 切换。<br>2<br>17<br>聊天<br>通讯录<br>智能体<br>文件<br>设置 |
-| V2-05-04 消息编辑 | PASS_WITH_WARNING | route=pages/chat/index; text=测<br>聊天<br>消息、群聊与智能体<br>开启新消息通知，不再遗漏任何消息<br>开启<br>L<br>leng<br>19:29<br>AgentHub 13733632709 visible trace 2026-06-07T11-29-54-443Z<br>15<br>A<br>AgentHub同步测试群-112924<br>19:29<br>AgentHub 13733632709 multi group trace 2026-06-07T11-29-24-487Z<br>A<br>AgentHub同步测试群-112508<br>19:25<br>AgentHub 13733632709 multi group trace 2026-06-07T11-25-08-039Z<br>A<br>AgentHub同步测试群-112436<br>19:24<br>AgentHub 13733632709 multi group trace 2026-06-07T11-24-36-323Z<br>C<br>Clowder AI<br>16:31<br>⚠️ 当前没有绑定 thread，请先用 /new 创建或 /use 切换。<br>2<br>17<br>聊天<br>通讯录<br>智能体<br>文件<br>设置 |
-| V2-05-05 reaction | PASS_WITH_WARNING | route=pages/chat/index; text=测<br>聊天<br>消息、群聊与智能体<br>开启新消息通知，不再遗漏任何消息<br>开启<br>L<br>leng<br>19:29<br>AgentHub 13733632709 visible trace 2026-06-07T11-29-54-443Z<br>15<br>A<br>AgentHub同步测试群-112924<br>19:29<br>AgentHub 13733632709 multi group trace 2026-06-07T11-29-24-487Z<br>A<br>AgentHub同步测试群-112508<br>19:25<br>AgentHub 13733632709 multi group trace 2026-06-07T11-25-08-039Z<br>A<br>AgentHub同步测试群-112436<br>19:24<br>AgentHub 13733632709 multi group trace 2026-06-07T11-24-36-323Z<br>C<br>Clowder AI<br>16:31<br>⚠️ 当前没有绑定 thread，请先用 /new 创建或 /use 切换。<br>2<br>17<br>聊天<br>通讯录<br>智能体<br>文件<br>设置 |
-| V2-05-06 typing | PASS_WITH_WARNING | route=pages/chat/index; text=测<br>聊天<br>消息、群聊与智能体<br>开启新消息通知，不再遗漏任何消息<br>开启<br>L<br>leng<br>19:29<br>AgentHub 13733632709 visible trace 2026-06-07T11-29-54-443Z<br>15<br>A<br>AgentHub同步测试群-112924<br>19:29<br>AgentHub 13733632709 multi group trace 2026-06-07T11-29-24-487Z<br>A<br>AgentHub同步测试群-112508<br>19:25<br>AgentHub 13733632709 multi group trace 2026-06-07T11-25-08-039Z<br>A<br>AgentHub同步测试群-112436<br>19:24<br>AgentHub 13733632709 multi group trace 2026-06-07T11-24-36-323Z<br>C<br>Clowder AI<br>16:31<br>⚠️ 当前没有绑定 thread，请先用 /new 创建或 /use 切换。<br>2<br>17<br>聊天<br>通讯录<br>智能体<br>文件<br>设置 |
-| V2-05-07 回复 / Reply | PASS_WITH_WARNING | route=pages/chat/index; text=测<br>聊天<br>消息、群聊与智能体<br>开启新消息通知，不再遗漏任何消息<br>开启<br>L<br>leng<br>19:29<br>AgentHub 13733632709 visible trace 2026-06-07T11-29-54-443Z<br>15<br>A<br>AgentHub同步测试群-112924<br>19:29<br>AgentHub 13733632709 multi group trace 2026-06-07T11-29-24-487Z<br>A<br>AgentHub同步测试群-112508<br>19:25<br>AgentHub 13733632709 multi group trace 2026-06-07T11-25-08-039Z<br>A<br>AgentHub同步测试群-112436<br>19:24<br>AgentHub 13733632709 multi group trace 2026-06-07T11-24-36-323Z<br>C<br>Clowder AI<br>16:31<br>⚠️ 当前没有绑定 thread，请先用 /new 创建或 /use 切换。<br>2<br>17<br>聊天<br>通讯录<br>智能体<br>文件<br>设置 |
-| V2-05-08 @ 提及 | PASS_WITH_WARNING | route=pages/chat/index; text=测<br>聊天<br>消息、群聊与智能体<br>开启新消息通知，不再遗漏任何消息<br>开启<br>L<br>leng<br>19:29<br>AgentHub 13733632709 visible trace 2026-06-07T11-29-54-443Z<br>15<br>A<br>AgentHub同步测试群-112924<br>19:29<br>AgentHub 13733632709 multi group trace 2026-06-07T11-29-24-487Z<br>A<br>AgentHub同步测试群-112508<br>19:25<br>AgentHub 13733632709 multi group trace 2026-06-07T11-25-08-039Z<br>A<br>AgentHub同步测试群-112436<br>19:24<br>AgentHub 13733632709 multi group trace 2026-06-07T11-24-36-323Z<br>C<br>Clowder AI<br>16:31<br>⚠️ 当前没有绑定 thread，请先用 /new 创建或 /use 切换。<br>2<br>17<br>聊天<br>通讯录<br>智能体<br>文件<br>设置 |
-| V2-05-9 跨端已读一致性 | PASS_WITH_WARNING | route=pages/chat/index; text=测<br>聊天<br>消息、群聊与智能体<br>开启新消息通知，不再遗漏任何消息<br>开启<br>L<br>leng<br>19:29<br>AgentHub 13733632709 visible trace 2026-06-07T11-29-54-443Z<br>15<br>A<br>AgentHub同步测试群-112924<br>19:29<br>AgentHub 13733632709 multi group trace 2026-06-07T11-29-24-487Z<br>A<br>AgentHub同步测试群-112508<br>19:25<br>AgentHub 13733632709 multi group trace 2026-06-07T11-25-08-039Z<br>A<br>AgentHub同步测试群-112436<br>19:24<br>AgentHub 13733632709 multi group trace 2026-06-07T11-24-36-323Z<br>C<br>Clowder AI<br>16:31<br>⚠️ 当前没有绑定 thread，请先用 /new 创建或 /use 切换。<br>2<br>17<br>聊天<br>通讯录<br>智能体<br>文件<br>设置 |
-| V2-05-10 长消息 / 折叠 | PASS_WITH_WARNING | route=pages/chat/index; text=测<br>聊天<br>消息、群聊与智能体<br>开启新消息通知，不再遗漏任何消息<br>开启<br>L<br>leng<br>19:29<br>AgentHub 13733632709 visible trace 2026-06-07T11-29-54-443Z<br>15<br>A<br>AgentHub同步测试群-112924<br>19:29<br>AgentHub 13733632709 multi group trace 2026-06-07T11-29-24-487Z<br>A<br>AgentHub同步测试群-112508<br>19:25<br>AgentHub 13733632709 multi group trace 2026-06-07T11-25-08-039Z<br>A<br>AgentHub同步测试群-112436<br>19:24<br>AgentHub 13733632709 multi group trace 2026-06-07T11-24-36-323Z<br>C<br>Clowder AI<br>16:31<br>⚠️ 当前没有绑定 thread，请先用 /new 创建或 /use 切换。<br>2<br>17<br>聊天<br>通讯录<br>智能体<br>文件<br>设置 |
-| V2-05-11 离线消息 | PASS_WITH_WARNING | route=pages/chat/index; text=测<br>聊天<br>消息、群聊与智能体<br>开启新消息通知，不再遗漏任何消息<br>开启<br>L<br>leng<br>19:29<br>AgentHub 13733632709 visible trace 2026-06-07T11-29-54-443Z<br>15<br>A<br>AgentHub同步测试群-112924<br>19:29<br>AgentHub 13733632709 multi group trace 2026-06-07T11-29-24-487Z<br>A<br>AgentHub同步测试群-112508<br>19:25<br>AgentHub 13733632709 multi group trace 2026-06-07T11-25-08-039Z<br>A<br>AgentHub同步测试群-112436<br>19:24<br>AgentHub 13733632709 multi group trace 2026-06-07T11-24-36-323Z<br>C<br>Clowder AI<br>16:31<br>⚠️ 当前没有绑定 thread，请先用 /new 创建或 /use 切换。<br>2<br>17<br>聊天<br>通讯录<br>智能体<br>文件<br>设置 |
+| V2-05-01 文本消息 | PASS_WITH_WARNING | route=pages/chat/index; text=测<br>聊天<br>消息、群聊与智能体<br>开启新消息通知，不再遗漏任何消息<br>开启<br>未找到匹配会话<br>尝试输入其他关键字重新搜索<br>聊天<br>通讯录<br>智能体<br>文件<br>设置 |
+| V2-05-02 表情 / emoji | PASS_WITH_WARNING | route=pages/chat/index; text=测<br>聊天<br>消息、群聊与智能体<br>开启新消息通知，不再遗漏任何消息<br>开启<br>未找到匹配会话<br>尝试输入其他关键字重新搜索<br>聊天<br>通讯录<br>智能体<br>文件<br>设置 |
+| V2-05-03 消息撤回 | PASS_WITH_WARNING | route=pages/chat/index; text=测<br>聊天<br>消息、群聊与智能体<br>开启新消息通知，不再遗漏任何消息<br>开启<br>未找到匹配会话<br>尝试输入其他关键字重新搜索<br>聊天<br>通讯录<br>智能体<br>文件<br>设置 |
+| V2-05-04 消息编辑 | PASS_WITH_WARNING | route=pages/chat/index; text=测<br>聊天<br>消息、群聊与智能体<br>开启新消息通知，不再遗漏任何消息<br>开启<br>未找到匹配会话<br>尝试输入其他关键字重新搜索<br>聊天<br>通讯录<br>智能体<br>文件<br>设置 |
+| V2-05-05 reaction | PASS_WITH_WARNING | route=pages/chat/index; text=测<br>聊天<br>消息、群聊与智能体<br>开启新消息通知，不再遗漏任何消息<br>开启<br>未找到匹配会话<br>尝试输入其他关键字重新搜索<br>聊天<br>通讯录<br>智能体<br>文件<br>设置 |
+| V2-05-06 typing | PASS_WITH_WARNING | route=pages/chat/index; text=测<br>聊天<br>消息、群聊与智能体<br>开启新消息通知，不再遗漏任何消息<br>开启<br>未找到匹配会话<br>尝试输入其他关键字重新搜索<br>聊天<br>通讯录<br>智能体<br>文件<br>设置 |
+| V2-05-07 回复 / Reply | PASS_WITH_WARNING | route=pages/chat/index; text=测<br>聊天<br>消息、群聊与智能体<br>开启新消息通知，不再遗漏任何消息<br>开启<br>未找到匹配会话<br>尝试输入其他关键字重新搜索<br>聊天<br>通讯录<br>智能体<br>文件<br>设置 |
+| V2-05-08 @ 提及 | PASS_WITH_WARNING | route=pages/chat/index; text=测<br>聊天<br>消息、群聊与智能体<br>开启新消息通知，不再遗漏任何消息<br>开启<br>未找到匹配会话<br>尝试输入其他关键字重新搜索<br>聊天<br>通讯录<br>智能体<br>文件<br>设置 |
+| V2-05-9 跨端已读一致性 | PASS_WITH_WARNING | route=pages/chat/index; text=测<br>聊天<br>消息、群聊与智能体<br>开启新消息通知，不再遗漏任何消息<br>开启<br>未找到匹配会话<br>尝试输入其他关键字重新搜索<br>聊天<br>通讯录<br>智能体<br>文件<br>设置 |
+| V2-05-10 长消息 / 折叠 | PASS_WITH_WARNING | route=pages/chat/index; text=测<br>聊天<br>消息、群聊与智能体<br>开启新消息通知，不再遗漏任何消息<br>开启<br>未找到匹配会话<br>尝试输入其他关键字重新搜索<br>聊天<br>通讯录<br>智能体<br>文件<br>设置 |
+| V2-05-11 离线消息 | PASS_WITH_WARNING | route=pages/chat/index; text=测<br>聊天<br>消息、群聊与智能体<br>开启新消息通知，不再遗漏任何消息<br>开启<br>未找到匹配会话<br>尝试输入其他关键字重新搜索<br>聊天<br>通讯录<br>智能体<br>文件<br>设置 |
 
 ---
 
@@ -80,11 +80,11 @@ Evidence root: sections/agenthub_ui/.ai/tests/screenshots/v2-full-20260607-11340
 
 ```bash
 H5_BASE_URL=http://172.18.58.156:5173 node sections/agenthub_ui/.ai/tests/v2-full-runner.mjs
-# evidence: sections/agenthub_ui/.ai/tests/screenshots/v2-full-20260607-113409
+# evidence: sections/agenthub_ui/.ai/tests/screenshots/v2-full-20260607-122547
 ```
 
 ---
 
 ## 关闭备注
 
-Closed by `v2-full-20260607-113409`。
+Closed by `v2-full-20260607-122547`。

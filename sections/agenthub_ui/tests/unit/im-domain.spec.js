@@ -1,7 +1,10 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { createPinia, setActivePinia } from 'pinia';
+import { useAppStore } from '../../stores/app.js';
+import { useAuthStore } from '../../stores/auth.js';
 import { useContactStore } from '../../stores/contact.js';
 import { useConversationStore } from '../../stores/conversation.js';
+import { useGroupStore } from '../../stores/group.js';
 import { useMessageStore } from '../../stores/message.js';
 import { resetStorageForTests } from '../../utils/storage.js';
 import { resetRequestRuntimeForTests, setRequestAdapter } from '../../utils/request.js';
@@ -403,6 +406,86 @@ describe('IM domain mapping and stores', () => {
     const list = messageStore.getMessages('friend-a');
     expect(list).toHaveLength(1);
     expect(list[0]).toMatchObject({ id: 'm-1', senderId: 'friend-a', content: '真实消息' });
+  });
+
+  it('marks real uid messages from the logged-in user as mine and keeps the display profile', () => {
+    const authStore = useAuthStore();
+    const appStore = useAppStore();
+    const messageStore = useMessageStore();
+
+    authStore.setTokens({ uid: '41232e72652648f8946988f45ba4895d', accessToken: 'token-a' });
+    appStore.setCurrentUser({
+      uid: '41232e72652648f8946988f45ba4895d',
+      nickname: 'leng',
+      name: 'leng',
+      avatar: 'https://example.com/me.png'
+    }, 'token-a');
+
+    const msg = messageStore.addRealtimeMessage('friend-b', 1, {
+      message_id: 'm-self',
+      message_seq: 21,
+      from_uid: '41232e72652648f8946988f45ba4895d',
+      timestamp: 1780741700,
+      payload: { type: 1, text: '自己的真实 UID 消息' }
+    });
+
+    expect(msg).toMatchObject({
+      senderId: '41232e72652648f8946988f45ba4895d',
+      senderName: 'leng',
+      senderAvatar: 'https://example.com/me.png',
+      isMe: true
+    });
+  });
+
+  it('prefixes group conversation preview with the sender nickname', () => {
+    const authStore = useAuthStore();
+    const appStore = useAppStore();
+    const conversationStore = useConversationStore();
+    const messageStore = useMessageStore();
+
+    authStore.setTokens({ uid: 'u-me', accessToken: 'token-a' });
+    appStore.setCurrentUser({ uid: 'u-me', nickname: 'leng', name: 'leng' }, 'token-a');
+    conversationStore.addOrUpdateConversation('group-a', 2, {
+      type: 'group',
+      name: '同步测试群',
+      memberCount: 2
+    });
+
+    messageStore.addRealtimeMessage('group-a', 2, {
+      message_id: 'm-group-self',
+      message_seq: 22,
+      from_uid: 'u-me',
+      timestamp: 1780741800,
+      payload: { type: 1, text: '群内留痕' }
+    });
+
+    expect(conversationStore.getConversation('group-a', 2).lastMessage).toBe('leng: 群内留痕');
+  });
+
+  it('normalizes group members from backend list shapes and updates member count', async () => {
+    setRequestAdapter(async ({ url }) => {
+      expect(url).toContain('/groups/group-a/members');
+      return {
+        status: 200,
+        data: {
+          list: [
+            { uid: 'u-me', name: 'leng', avatar: 'https://example.com/me.png' },
+            { member_uid: 'friend-b', nickname: '测试员B', avatar: 'https://example.com/b.png' }
+          ]
+        }
+      };
+    });
+
+    const groupStore = useGroupStore();
+    groupStore.addGroup({ group_no: 'group-a', name: '同步测试群', member_count: 0 });
+
+    const members = await groupStore.fetchMembers('group-a');
+
+    expect(members).toEqual([
+      expect.objectContaining({ id: 'u-me', nickname: 'leng', avatar: 'https://example.com/me.png' }),
+      expect.objectContaining({ id: 'friend-b', nickname: '测试员B', avatar: 'https://example.com/b.png' })
+    ]);
+    expect(groupStore.groups.find((group) => group.id === 'group-a')?.memberCount).toBe(2);
   });
 
   it('preserves conversation identity when message hydration updates only message fields', () => {

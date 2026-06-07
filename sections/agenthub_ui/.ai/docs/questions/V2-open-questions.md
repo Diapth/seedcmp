@@ -1,7 +1,7 @@
 # V2 Open Questions
 
 记录时间：2026-06-07  
-关联 run：`v2-full-20260607-082703`
+关联 run：`v2-full-20260607-122547`
 
 ## Q1. PASS_WITH_WARNING 的验收口径
 
@@ -23,9 +23,9 @@
 
 ## Q4. im_web 深度一致性
 
-runner 已确认 im_web 端可达，但 V2-16 没有逐字段比较同一会话、群、未读、设备、Clowder 状态。
+runner 已支持通过 `IM_WEB_BASE_URL` 配置 im_web 端地址。本轮未提供独立 im_web URL，因此 V2-16 只记录 AgentHub 侧证据并降级为 `PASS_WITH_WARNING`，没有逐字段比较同一会话、群、未读、设备、Clowder 状态。
 
-需要确认：是否需要新增 dedicated consistency runner，绑定同一 channel/group/thread，采集两端 DOM 和接口快照后做结构化 diff。
+需要确认：是否提供稳定 `IM_WEB_BASE_URL`，并新增 dedicated consistency runner，绑定同一 channel/group/thread，采集两端 DOM 和接口快照后做结构化 diff。
 
 ## Q5. 媒体测试资产真实性
 
@@ -59,6 +59,12 @@ Clowder API 当前由 TangSeng 在本机桥接调用，服务直接绑定 `127.0
 
 ## Q10. 临时测试群成员数口径
 
-13733632709 多会话留痕脚本通过 `POST /v1/group/create` 创建仅包含测试员B的临时群，API 创建成功且群聊消息可发送/同步/展示；但 H5 群信息面板显示 `0 位成员`，创建接口响应中的 `member_count` 也为 0。
+13733632709 多会话留痕脚本通过 `POST /v1/group/create` 创建仅包含测试员B的临时群。前端已在群详情打开时额外调用 `GET /v1/groups/:group_no/members` 并回填成员数，本轮 `trace-13733632709-multi-20260607-121224` 已显示 `2 位成员`。
 
-需要确认：这是后端创建群响应未即时更新成员数、`GET /v1/groups/:group_no/members` 同步口径问题，还是前端群信息面板需要在创建后额外拉成员列表并回填 `memberCount`。
+需要确认：创建接口响应中的 `member_count` 是否也应即时返回 2；如果后端约定创建响应可为 0，则当前前端补拉成员列表是最终策略。
+
+## Q11. V2-16 跨端一致性 runner 配置
+
+本轮 full runner 发现早期脚本把 im_web 探测地址误用为 `apiBase`，导致 API 端口 404 被计为 V2-16 失败。脚本已改为仅在显式配置 `IM_WEB_BASE_URL` 时探测 im_web；未配置时不把对端不可达计为阻塞。
+
+需要确认：团队统一的 im_web 验收地址是什么，以及是否要把 `IM_WEB_BASE_URL` 写入 CI/本地验收环境变量。

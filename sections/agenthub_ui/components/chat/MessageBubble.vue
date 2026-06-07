@@ -137,8 +137,8 @@
       @longpress.stop="handleAvatarContextMenu"
     >
       <AppAvatar
-        :src="myAvatar"
-        :text="data.senderName"
+        :src="data.senderAvatar || myAvatar"
+        :text="data.senderName || myName"
         :size="38"
         class="message-avatar"
       />
@@ -150,6 +150,7 @@
 <script setup>
 import { computed } from 'vue';
 import { useAppStore } from '@/stores/app';
+import { useAuthStore } from '@/stores/auth';
 import AppAvatar from '../common/AppAvatar.vue';
 import AppIcon from '../common/AppIcon.vue';
 import FileCard from './FileCard.vue';
@@ -182,13 +183,19 @@ const emit = defineEmits([
 ]);
 
 const appStore = useAppStore();
+const authStore = useAuthStore();
 
 const isMe = computed(() => {
-  return props.data.senderId === 'me';
+  const currentUid = authStore.uid || appStore.currentUser?.uid || appStore.currentUser?.id || '';
+  return Boolean(props.data.isMe || props.data.senderId === 'me' || (currentUid && props.data.senderId === currentUid));
 });
 
 const myAvatar = computed(() => {
   return appStore.currentUser?.avatar || '';
+});
+
+const myName = computed(() => {
+  return appStore.currentUser?.nickname || appStore.currentUser?.name || '我';
 });
 
 // 拆分文本为 mention 段(高亮) + 普通段

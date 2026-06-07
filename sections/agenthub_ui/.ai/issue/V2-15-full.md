@@ -9,7 +9,7 @@
 
 ## 问题描述
 
-完整 V2 run `v2-full-20260607-113409` 执行到 V2-15 簇时，阻塞项数量为 0。本簇没有 Fail / Blocked；如存在 PASS_WITH_WARNING，则代表自动化验收深度说明或需人工决策的边界，不作为当前阻塞缺陷。
+完整 V2 run `v2-full-20260607-122547` 执行到 V2-15 簇时，阻塞项数量为 0。本簇没有 Fail / Blocked；如存在 PASS_WITH_WARNING，则代表自动化验收深度说明或需人工决策的边界，不作为当前阻塞缺陷。
 
 截图：
 
@@ -20,7 +20,7 @@
 ## 复现步骤
 
 1. 运行 `node sections/agenthub_ui/.ai/tests/v2-full-runner.mjs`。
-2. 查看 `sections/agenthub_ui/.ai/tests/screenshots/v2-full-20260607-113409/full-results.json`。
+2. 查看 `sections/agenthub_ui/.ai/tests/screenshots/v2-full-20260607-122547/full-results.json`。
 3. 打开本 issue 中列出的截图逐项复核。
 
 ---
@@ -29,7 +29,7 @@
 
 ```
 Runtime route cluster: V2-15
-Evidence root: sections/agenthub_ui/.ai/tests/screenshots/v2-full-20260607-113409
+Evidence root: sections/agenthub_ui/.ai/tests/screenshots/v2-full-20260607-122547
 ```
 
 ---
@@ -74,11 +74,11 @@ Evidence root: sections/agenthub_ui/.ai/tests/screenshots/v2-full-20260607-11340
 
 ```bash
 H5_BASE_URL=http://172.18.58.156:5173 node sections/agenthub_ui/.ai/tests/v2-full-runner.mjs
-# evidence: sections/agenthub_ui/.ai/tests/screenshots/v2-full-20260607-113409
+# evidence: sections/agenthub_ui/.ai/tests/screenshots/v2-full-20260607-122547
 ```
 
 ---
 
 ## 关闭备注
 
-Closed by `v2-full-20260607-113409`。
+Closed by `v2-full-20260607-122547`。

@@ -109,19 +109,62 @@ function pickConversationLastMessage(raw = {}) {
   return candidates.find(isDigestSource) || candidates[0] || {};
 }
 
-export function messageSummary(message = {}) {
+function pickUserId(user = {}) {
+  return user.uid || user.id || user.user_id || user.userId || user.member_uid || user.memberUid || user.username || '';
+}
+
+function pickUserName(user = {}, fallback = '') {
+  return user.remark || user.name || user.nickname || user.display_name || user.displayName || user.username || fallback || '';
+}
+
+function pickUserAvatar(user = {}) {
+  return user.avatar || user.logo || user.face || user.face_url || user.faceUrl || '';
+}
+
+function putUserCache(cache, user = {}) {
+  const id = String(pickUserId(user) || '');
+  if (!id) return cache;
+  cache[id] = {
+    id,
+    uid: id,
+    name: pickUserName(user, id),
+    nickname: user.nickname || user.name || user.remark || user.username || id,
+    avatar: pickUserAvatar(user),
+    raw: user
+  };
+  return cache;
+}
+
+export function buildConversationUserCache(data = {}) {
+  const cache = {};
+  const users = Array.isArray(data.users) ? data.users : [];
+  const members = Array.isArray(data.members) ? data.members : [];
+  const items = Array.isArray(data.items) ? data.items : [];
+  [...users, ...members, ...items].forEach((user) => putUserCache(cache, user));
+  return cache;
+}
+
+export function messageSummary(message = {}, options = {}) {
   const type = message.type || pickMessageType(message.content, message);
-  if (type === 'image') return '[图片]';
-  if (type === 'voice') return '[语音]';
-  if (type === 'file') return `[文件] ${message.fileName || message.name || pickContentText(message.content) || ''}`.trim();
-  if (type === 'system') return message.content || '系统消息';
-  return message.content || pickContentText(message.content) || '收到一条新消息';
+  let summary = '';
+  if (type === 'image') summary = '[图片]';
+  else if (type === 'voice') summary = '[语音]';
+  else if (type === 'file') summary = `[文件] ${message.fileName || message.name || pickContentText(message.content) || ''}`.trim();
+  else if (type === 'system') summary = message.content || '系统消息';
+  else summary = message.content || pickContentText(message.content) || '收到一条新消息';
+
+  if (!options.withSender) return summary;
+  const senderId = String(message.senderId || '');
+  const senderName = String(options.senderName || message.senderName || '').trim();
+  if (!senderId || !senderName || senderName === senderId || senderName === '未知用户') return summary;
+  return `${senderName}: ${summary}`;
 }
 
 export function createInboundMessage(raw = {}, userCache = {}) {
   const content = normalizePayload(raw.content ?? raw.payload ?? raw.contentObj, raw.type || 1);
   const senderId = raw.from_uid || raw.fromUID || raw.senderId || raw.uid || '';
   const cachedUser = userCache[senderId] || {};
+  const rawSenderName = raw.from_name || raw.senderName || '';
   const type = pickMessageType(content, raw);
   const deployment = type === 'deployment' ? normalizeDeployment(content, raw) : null;
   const text = deployment?.title || pickContentText(content);
@@ -130,7 +173,7 @@ export function createInboundMessage(raw = {}, userCache = {}) {
     clientMsgNo: raw.client_msg_no || raw.clientMsgNo || '',
     messageSeq: Number(raw.message_seq || raw.messageSeq || 0),
     senderId,
-    senderName: raw.from_name || raw.senderName || cachedUser.name || cachedUser.nickname || senderId || '未知用户',
+    senderName: (rawSenderName && rawSenderName !== senderId ? rawSenderName : '') || cachedUser.name || cachedUser.nickname || senderId || '未知用户',
     senderAvatar: raw.from_avatar || raw.senderAvatar || cachedUser.avatar || '',
     content: text,
     type,
@@ -218,7 +261,7 @@ export function toGroupConversationInput(group = {}, latestMessages = []) {
   };
 }
 
-export function toConversationItem(raw = {}, channelCache = {}) {
+export function toConversationItem(raw = {}, channelCache = {}, userCache = {}) {
   const channelId = raw.channel_id || raw.channelId || raw.id || '';
   const channelType = Number(raw.channel_type || raw.channelType || toBackendChannelType(raw.type));
   const key = channelKey(channelId, channelType);
@@ -229,6 +272,7 @@ export function toConversationItem(raw = {}, channelCache = {}) {
   const rawLastTime = raw.last_msg_time || raw.lastMsgTime || raw.timestamp || raw.last_time || raw.lastTime || lastMessage.timestamp || lastMessage.time;
   const rawTop = cached.top ?? extra.top ?? raw.top ?? raw.stick ?? raw.isPinned ?? 0;
   const rawMute = cached.mute ?? extra.mute ?? raw.mute ?? raw.isMuted ?? 0;
+  const inboundLastMessage = typeof lastMessage === 'string' ? null : createInboundMessage(lastMessage, userCache);
   return {
     id: String(channelId),
     channelId: String(channelId),
@@ -238,7 +282,9 @@ export function toConversationItem(raw = {}, channelCache = {}) {
     avatar: raw.channel_logo || raw.avatar || channel.channel_logo || channel.logo || channel.avatar || cached.avatar || '',
     type: raw.type || toVisualConversationType(channelType),
     unread: Number(raw.unread || 0),
-    lastMessage: typeof lastMessage === 'string' ? lastMessage : messageSummary(createInboundMessage(lastMessage)),
+    lastMessage: typeof lastMessage === 'string'
+      ? lastMessage
+      : messageSummary(inboundLastMessage, { withSender: channelType === 2 }),
     lastTime: normalizeTimestamp(rawLastTime),
     lastMessageSeq: Number(raw.last_msg_seq || raw.lastMessageSeq || lastMessage.message_seq || lastMessage.messageSeq || 0),
     isPinned: Number(rawTop) === 1 || rawTop === true,
