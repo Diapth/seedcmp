@@ -45,7 +45,7 @@
           v-else
           :group="groupData"
           :project-thread-id="projectThreadId"
-          :project-workspace-loading="projectWorkspaceLoading"
+          :project-workspace-loading="visibleProjectWorkspaceLoading"
           @open-members="openGroupMembers"
           @open-qrcode="openGroupQrcode"
           @open-project-workspace="openProjectWorkspace"
@@ -107,7 +107,7 @@ import { useMessageStore } from '@/stores/message';
 import { useGroupStore } from '@/stores/group';
 import { useConversationStore } from '@/stores/conversation';
 import { useClowderStore } from '@/stores/clowder.js';
-import { isClowderConversation } from '@/utils/clowder-conversation.js';
+import { isClowderConversation, shouldShowProjectWorkspaceLoading } from '@/utils/clowder-conversation.js';
 import AppAvatar from '../common/AppAvatar.vue';
 import AppIcon from '../common/AppIcon.vue';
 import ClowderPanel from './ClowderPanel.vue';
@@ -211,6 +211,16 @@ const projectBinding = computed(() => {
 });
 
 const projectThreadId = computed(() => bindingThreadId(projectBinding.value || {}));
+const visibleProjectWorkspaceLoading = computed(() => shouldShowProjectWorkspaceLoading(
+  props.conversation,
+  {
+    loading: projectWorkspaceLoading.value,
+    state: clowderConversation.value,
+    binding: channelBinding.value,
+    projectBinding: projectBinding.value,
+    projectThreadId: projectThreadId.value
+  }
+));
 const projectWorkspaceTitle = computed(() => (
   projectBinding.value?.projectName ||
   projectBinding.value?.project_name ||

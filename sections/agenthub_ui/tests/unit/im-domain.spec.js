@@ -9,7 +9,7 @@ import { useMessageStore } from '../../stores/message.js';
 import { resetStorageForTests } from '../../utils/storage.js';
 import { resetRequestRuntimeForTests, setRequestAdapter } from '../../utils/request.js';
 import { createInboundMessage, toConversationItem } from '../../utils/im-mappers.js';
-import { isClowderConversation } from '../../utils/clowder-conversation.js';
+import { isClowderConversation, shouldShowProjectWorkspaceLoading } from '../../utils/clowder-conversation.js';
 
 const wkSdkMock = vi.hoisted(() => ({
   sendTextMessage: vi.fn(),
@@ -79,6 +79,31 @@ describe('IM domain mapping and stores', () => {
       channelType: 2,
       type: 'group',
       raw: { binding_id: 'bind-1' }
+    })).toBe(true);
+  });
+
+  it('keeps ordinary group info panels stable during silent project binding discovery', () => {
+    expect(shouldShowProjectWorkspaceLoading({
+      id: 'ordinary-group',
+      channelType: 2,
+      type: 'group',
+      name: '普通测试群'
+    }, { loading: true })).toBe(false);
+
+    expect(shouldShowProjectWorkspaceLoading({
+      id: 'clowder:project-group',
+      channelType: 2,
+      type: 'group',
+      name: 'Clowder 项目群'
+    }, { loading: true })).toBe(true);
+
+    expect(shouldShowProjectWorkspaceLoading({
+      id: 'ordinary-group',
+      channelType: 2,
+      type: 'group'
+    }, {
+      loading: true,
+      binding: { thread_id: 'thread-1' }
     })).toBe(true);
   });
 
