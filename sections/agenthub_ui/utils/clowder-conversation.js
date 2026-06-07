@@ -25,3 +25,14 @@ export function isClowderConversation(conversation = {}) {
   const category = String(conversation.category || conversation.raw?.category || '').toLowerCase();
   return category.includes('clowder');
 }
+
+export function shouldShowProjectWorkspaceLoading(conversation = {}, context = {}) {
+  if (!context.loading) return false;
+  return Boolean(
+    context.projectThreadId ||
+    isClowderConversation(conversation) ||
+    isClowderConversation(context.state) ||
+    isClowderConversation(context.binding) ||
+    isClowderConversation(context.projectBinding)
+  );
+}
