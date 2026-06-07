@@ -107,6 +107,7 @@
           @draft-change="handleDraftChange"
           @cancel-reply="replyTarget = null"
           @open-emoji="openInputEmojiPicker"
+          @typing="handleTyping"
         />
       </template>
 
@@ -276,7 +277,7 @@
 </template>
 
 <script setup>
-import { ref, computed, onMounted, nextTick } from 'vue';
+import { ref, computed, onMounted, onBeforeUnmount, nextTick } from 'vue';
 import { useResponsiveLayout } from '@/composables/useResponsiveLayout';
 import { getNotificationPermissionState, requestNotificationPermission as requestSystemNotificationPermission } from '@/composables/useSystemNotification';
 import { useAppStore } from '@/stores/app';
@@ -285,6 +286,9 @@ import { useConversationStore } from '@/stores/conversation';
 import { useMessageStore } from '@/stores/message';
 import { useContactStore } from '@/stores/contact';
 import { useAgentStore } from '@/stores/agent';
+import { useDeploymentStore } from '@/stores/deployment.js';
+import { storage } from '@/utils/storage.js';
+import { isClowderConversation } from '@/utils/clowder-conversation.js';
 import AppShell from '@/components/layout/AppShell.vue';
 import MobilePageHeader from '@/components/layout/MobilePageHeader.vue';
 import ConversationList from '@/components/chat/ConversationList.vue';
@@ -310,6 +314,7 @@ const convStore = useConversationStore();
 const messageStore = useMessageStore();
 const contactStore = useContactStore();
 const agentStore = useAgentStore();
+const deploymentStore = useDeploymentStore();
 
 const showNotificationBanner = ref(true);
 const showRightPane = ref(true);
@@ -374,8 +379,9 @@ const activeConversation = computed(() => {
 });
 
 const messagesList = computed(() => {
-  if (!convStore.activeId) return [];
-  return messageStore.messages[convStore.activeId] || [];
+  const conv = activeConversation.value;
+  if (!conv) return [];
+  return messageStore.getConversationPreviewMessages(conv);
 });
 
 const mentionCandidates = computed(() => {
@@ -421,31 +427,124 @@ const memberMenuItems = computed(() => {
   return [{ label: '@ 他', icon: 'at', action: 'mention' }];
 });
 
-onMounted(() => {
+const deploymentHydrationInFlight = new Set();
+const messageHydrationInFlight = new Set();
+const visibleHistoryTimers = [];
+
+onMounted(async () => {
   navStore.setActiveModule('chat');
-  
-  if (uni.getStorageSync('hide_notification_banner')) {
+
+  if (storage.get('hide_notification_banner')) {
     showNotificationBanner.value = false;
   }
   if (getNotificationPermissionState() === 'granted') {
     showNotificationBanner.value = false;
   }
   
-  const persistedId = uni.getStorageSync('active_conversation_id');
+  const persistedId = storage.get('active_conversation_id');
   if (persistedId) {
     convStore.setActiveId(persistedId);
   }
+  if (activeConversation.value) {
+    hydrateActiveMessages(activeConversation.value);
+  }
+  await convStore.fetchConversations().catch(() => undefined);
+  await hydrateActiveMessages();
+  await hydrateActiveDeploymentCard();
+});
+
+onBeforeUnmount(() => {
+  clearVisibleHistoryRefresh();
 });
 
 function handleSelectConversation(id) {
-  uni.setStorageSync('active_conversation_id', id);
+  storage.set('active_conversation_id', id);
   convStore.setActiveId(id);
+  const conversation = convStore.conversations.find((item) => item.id === id) || activeConversation.value;
+  hydrateActiveMessages(conversation);
+  hydrateActiveDeploymentCard(conversation);
   closeFilePreview();
   closeMemberProfile();
   if (!isDesktop.value) {
     uni.navigateTo({
       url: `/pages/chat/detail?id=${id}`
     });
+  }
+}
+
+function conversationChannelId(conversation) {
+  return String(conversation?.channelId || conversation?.id || '');
+}
+
+function conversationChannelType(conversation) {
+  return Number(conversation?.channelType || (conversation?.type === 'group' ? 2 : 1));
+}
+
+function shouldHydrateDeploymentCard(conversation) {
+  return isClowderConversation(conversation);
+}
+
+async function hydrateActiveMessages(conversation = activeConversation.value) {
+  const channelId = conversationChannelId(conversation);
+  const channelType = conversationChannelType(conversation);
+  if (!channelId || !channelType) return;
+  messageStore.hydrateFromConversationRecents(conversation);
+  const key = `${channelId}-${channelType}`;
+  if (messageHydrationInFlight.has(key)) {
+    scheduleVisibleHistoryRefresh(conversation);
+    return;
+  }
+  messageHydrationInFlight.add(key);
+  try {
+    await messageStore.syncMessages(channelId, channelType, { limit: 30, hydrateVisibleHistory: true });
+    scheduleVisibleHistoryRefresh(conversation);
+  } catch (err) {
+    console.warn('[chat] message hydration failed', err);
+  } finally {
+    messageHydrationInFlight.delete(key);
+  }
+}
+
+function clearVisibleHistoryRefresh() {
+  while (visibleHistoryTimers.length) {
+    clearTimeout(visibleHistoryTimers.pop());
+  }
+}
+
+function scheduleVisibleHistoryRefresh(conversation = activeConversation.value) {
+  const channelId = conversationChannelId(conversation);
+  const channelType = conversationChannelType(conversation);
+  if (!channelId || !channelType) return;
+  clearVisibleHistoryRefresh();
+  [2500, 10000, 30000].forEach((delay) => {
+    const timer = setTimeout(() => {
+      const active = activeConversation.value;
+      if (conversationChannelId(active) !== channelId || conversationChannelType(active) !== channelType) return;
+      messageStore.syncMessages(channelId, channelType, { limit: 30, hydrateVisibleHistory: true }).catch((err) => {
+        console.warn('[chat] visible history refresh failed', err);
+      });
+    }, delay);
+    visibleHistoryTimers.push(timer);
+  });
+}
+
+async function hydrateActiveDeploymentCard(conversation = activeConversation.value) {
+  if (!shouldHydrateDeploymentCard(conversation)) return;
+  const channelId = conversationChannelId(conversation);
+  const channelType = conversationChannelType(conversation);
+  if (!channelId || !channelType) return;
+  const key = `${channelId}-${channelType}`;
+  if (deploymentHydrationInFlight.has(key)) return;
+  deploymentHydrationInFlight.add(key);
+  try {
+    const request = await deploymentStore.fetchActive({ channelId, channelType });
+    if (request) messageStore.addDeploymentRequestCard(request);
+  } catch (err) {
+    if (err?.status && err.status !== 404) {
+      console.warn('[chat] active deployment request hydration failed', err);
+    }
+  } finally {
+    deploymentHydrationInFlight.delete(key);
   }
 }
 
@@ -533,6 +632,10 @@ function normalizeAgentName(name = '') {
 }
 
 function handleSendMessage({ type, content, fileName, fileSize, replyRef, previewContent, fileType, url }) {
+  if (type !== 'text') {
+    uni.showToast({ title: '图片、文件和语音发送需接入真实上传能力', icon: 'none' });
+    return;
+  }
   const sender = {
     id: 'me',
     name: appStore.currentUser?.nickname || '我'
@@ -584,6 +687,13 @@ function handleSendMessage({ type, content, fileName, fileSize, replyRef, previe
 
 function handleDraftChange(draftVal) {
   convStore.updateConversationDraft(convStore.activeId, draftVal);
+}
+
+function handleTyping() {
+  const conv = activeConversation.value;
+  if (!conv) return;
+  const channelType = conv.channelType || (conv.type === 'group' ? 2 : 1);
+  messageStore.sendTyping(conv.id, channelType).catch(() => undefined);
 }
 
 function updateConversationField(fields) {
@@ -859,7 +969,7 @@ function startDirectChat(member) {
   const conv = convStore.upsertDirectConversation(member);
   if (!conv) return;
   convStore.setActiveId(conv.id);
-  uni.setStorageSync('active_conversation_id', conv.id);
+  storage.set('active_conversation_id', conv.id);
   uni.showToast({ title: `已切换到 ${conv.name}`, icon: 'none' });
 }
 
@@ -938,7 +1048,7 @@ function requestNotificationPermission() {
     if (status === 'granted') {
       uni.showToast({ title: '通知权限已开启', icon: 'success' });
       showNotificationBanner.value = false;
-      uni.setStorageSync('hide_notification_banner', true);
+      storage.set('hide_notification_banner', true);
       return;
     }
     const title = status === 'denied' ? '请在系统设置中开启通知权限' : '当前环境不支持系统通知';

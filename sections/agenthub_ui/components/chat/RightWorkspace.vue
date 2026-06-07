@@ -14,7 +14,7 @@
         <ClowderPanel :conversation-id="conversation.id" />
       </template>
       <template v-else-if="conversation.type === 'group'">
-        <view v-if="groupWorkspaceMode === 'board' && agentBoard" class="inline-board flex-column">
+        <view v-if="groupWorkspaceMode === 'project' && projectThreadId" class="project-workspace flex-column">
           <view class="board-topbar flex-row align-center justify-between">
             <button class="board-back flex-row align-center" @click="showGroupInfo">
               <AppIcon name="back" :size="16" color="var(--color-text-primary)" />
@@ -22,100 +22,33 @@
             </button>
             <view class="board-status flex-row align-center">
               <AppIcon name="briefcase" :size="15" color="var(--color-primary)" />
-              <text>{{ inlineBoardTasks.length }} 个任务</text>
+              <text>{{ projectBindingStatus }}</text>
             </view>
           </view>
 
           <view class="board-summary-card flex-column">
-            <text class="board-title">{{ agentBoard.groupName }}</text>
-            <text class="board-desc">{{ agentBoard.summary }}</text>
-            <view class="board-stats">
-              <view class="board-stat flex-column">
-                <text class="stat-value">{{ inlineBoardTasks.length }}</text>
-                <text class="stat-label">智能体</text>
-              </view>
-              <view class="board-stat flex-column">
-                <text class="stat-value">{{ inlineDocumentCount }}</text>
-                <text class="stat-label">文档</text>
-              </view>
-              <view class="board-stat flex-column">
-                <text class="stat-value">{{ inlineCompletedCount }}</text>
-                <text class="stat-label">完成</text>
-              </view>
-            </view>
+            <text class="board-title">{{ projectWorkspaceTitle }}</text>
+            <text class="board-desc">{{ projectThreadId }}</text>
           </view>
 
-          <view class="inline-task-list flex-column">
-            <view
-              v-for="task in inlineBoardTasks"
-              :key="task.id"
-              class="inline-task-card flex-column"
-              @click="openBoardTaskLog(task)"
-            >
-              <view class="task-head flex-row align-center justify-between">
-                <view class="agent-meta flex-row align-center">
-                  <AppAvatar :text="task.agent?.name || 'AI'" :src="task.agent?.avatar || ''" :size="40" :is-circle="false" />
-                  <view class="agent-title flex-column">
-                    <text class="agent-name">{{ task.agent?.name || '未知智能体' }}</text>
-                    <text class="agent-alias">{{ task.agent?.alias || '@agent' }}</text>
-                  </view>
-                </view>
-                <view class="task-status" :class="task.status">
-                  <text>{{ statusText(task.status) }}</text>
-                </view>
-              </view>
+          <view class="project-tabs flex-row">
+            <button class="project-tab" :class="{ active: projectWorkspaceTab === 'kanban' }" @click="projectWorkspaceTab = 'kanban'">看板</button>
+            <button class="project-tab" :class="{ active: projectWorkspaceTab === 'artifacts' }" @click="projectWorkspaceTab = 'artifacts'">产物</button>
+          </view>
 
-              <view class="task-main flex-column">
-                <text class="task-title">{{ task.task }}</text>
-                <text class="task-goal">{{ task.goal }}</text>
-              </view>
-
-              <view class="progress-block flex-column">
-                <view class="progress-top flex-row align-center justify-between">
-                  <text>目标进度</text>
-                  <text>{{ task.progress }}%</text>
-                </view>
-                <view class="progress-track">
-                  <view class="progress-fill" :class="task.status" :style="{ width: task.progress + '%' }" />
-                </view>
-              </view>
-
-              <view class="document-block flex-column">
-                <view class="document-title flex-row align-center">
-                  <AppIcon name="files" :size="14" color="var(--color-text-secondary)" />
-                  <text>产出文档</text>
-                </view>
-                <view v-if="task.documents.length" class="document-list flex-column">
-                  <view v-for="doc in task.documents" :key="doc.id" class="document-row flex-row align-center">
-                    <text class="doc-type">{{ doc.type.toUpperCase() }}</text>
-                    <view class="doc-meta flex-column flex-1">
-                      <text class="doc-name">{{ doc.name }}</text>
-                      <text class="doc-summary">{{ doc.summary }}</text>
-                    </view>
-                  </view>
-                </view>
-                <text v-else class="empty-docs">暂无产出文档</text>
-              </view>
-
-              <view class="task-footer flex-row align-center justify-between">
-                <view class="log-count flex-row align-center">
-                  <AppIcon name="clock" :size="14" color="var(--color-text-muted)" />
-                  <text>{{ task.logs.length }} 条 Console 日志</text>
-                </view>
-                <button class="at-modify-btn flex-row align-center justify-center" @click.stop="atModify(task)">
-                  <AppIcon name="at" :size="15" color="#ffffff" />
-                  <text>@他修改</text>
-                </button>
-              </view>
-            </view>
+          <view class="project-panel flex-column">
+            <ProjectKanbanPanel v-if="projectWorkspaceTab === 'kanban'" :thread-id="projectThreadId" />
+            <ProjectArtifactsPanel v-else :thread-id="projectThreadId" />
           </view>
         </view>
         <GroupInfoPanel
           v-else
           :group="groupData"
+          :project-thread-id="projectThreadId"
+          :project-workspace-loading="projectWorkspaceLoading"
           @open-members="openGroupMembers"
           @open-qrcode="openGroupQrcode"
-          @open-board="openGroupBoard"
+          @open-project-workspace="openProjectWorkspace"
           @preview-file="$emit('preview-file', $event)"
           @select-member="$emit('select-member', $event)"
           @member-contextmenu="$emit('member-contextmenu', $event)"
@@ -172,12 +105,14 @@
 import { computed, ref, watch } from 'vue';
 import { useMessageStore } from '@/stores/message';
 import { useGroupStore } from '@/stores/group';
-import { useAgentStore } from '@/stores/agent';
-import { useConversationStore } from '@/stores/conversation';
+import { useClowderStore } from '@/stores/clowder.js';
+import { isClowderConversation } from '@/utils/clowder-conversation.js';
 import AppAvatar from '../common/AppAvatar.vue';
 import AppIcon from '../common/AppIcon.vue';
 import ClowderPanel from './ClowderPanel.vue';
 import GroupInfoPanel from './GroupInfoPanel.vue';
+import ProjectArtifactsPanel from './ProjectArtifactsPanel.vue';
+import ProjectKanbanPanel from './ProjectKanbanPanel.vue';
 
 const props = defineProps({
   conversation: {
@@ -190,13 +125,14 @@ const emit = defineEmits(['close', 'update-conversation', 'preview-file', 'membe
 
 const messageStore = useMessageStore();
 const groupStore = useGroupStore();
-const agentStore = useAgentStore();
-const convStore = useConversationStore();
+const clowderStore = useClowderStore();
 const groupWorkspaceMode = ref('info');
+const projectWorkspaceTab = ref('kanban');
+const projectWorkspaceLoading = ref(false);
 
 const headerTitle = computed(() => {
   if (props.conversation.id === 'clowder') return 'Clowder AI 详情';
-  if (props.conversation.type === 'group' && groupWorkspaceMode.value === 'board') return '智能体看板';
+  if (props.conversation.type === 'group' && groupWorkspaceMode.value === 'project') return '项目工作台';
   if (props.conversation.type === 'group') return '群聊信息';
   return '会话详情';
 });
@@ -226,31 +162,70 @@ const sharedFiles = computed(() => {
   return msgs.filter((m) => m.type === 'file');
 });
 
-const agentBoard = computed(() => {
-  if (props.conversation.type !== 'group') return null;
-  return agentStore.boards.find((board) => board.groupId === props.conversation.id) || null;
+const groupChannelId = computed(() => String(props.conversation?.channelId || props.conversation?.id || ''));
+const groupChannelType = computed(() => Number(props.conversation?.channelType || 2));
+const groupConversationKey = computed(() => `${groupChannelId.value}-${groupChannelType.value}`);
+const clowderConversation = computed(() => clowderStore.conversations[groupConversationKey.value] || null);
+const channelBinding = computed(() => clowderStore.bindings[groupConversationKey.value] || clowderConversation.value?.binding || null);
+
+function matchesGroup(binding = {}) {
+  const groupId = groupChannelId.value;
+  return [
+    binding.projectGroupNo,
+    binding.project_group_no,
+    binding.projectGroupId,
+    binding.project_group_id,
+    binding.groupNo,
+    binding.group_no,
+    binding.channelId,
+    binding.channel_id
+  ].some((value) => String(value || '') === groupId);
+}
+
+function bindingThreadId(binding = {}) {
+  return String(binding.threadId || binding.thread_id || binding.projectThreadId || binding.project_thread_id || '');
+}
+
+const projectGroupBinding = computed(() => {
+  return Object.values(clowderStore.projectGroups).find((binding) => matchesGroup(binding)) || null;
 });
 
-const inlineBoardTasks = computed(() => {
-  if (!agentBoard.value) return [];
-  return agentBoard.value.tasks.map((task) => ({
-    ...task,
-    board: agentBoard.value,
-    agent: agentStore.agents.find((agent) => agent.id === task.agentId) || null
-  }));
+const projectBinding = computed(() => {
+  const candidates = [
+    channelBinding.value,
+    clowderConversation.value?.projectGroup,
+    clowderConversation.value?.project_group,
+    projectGroupBinding.value
+  ].filter(Boolean);
+  return candidates.find((binding) => bindingThreadId(binding)) || candidates[0] || null;
 });
 
-const inlineDocumentCount = computed(() => {
-  return inlineBoardTasks.value.reduce((total, task) => total + task.documents.length, 0);
-});
-
-const inlineCompletedCount = computed(() => {
-  return inlineBoardTasks.value.filter((task) => task.status === 'done').length;
+const projectThreadId = computed(() => bindingThreadId(projectBinding.value || {}));
+const projectWorkspaceTitle = computed(() => (
+  projectBinding.value?.projectName ||
+  projectBinding.value?.project_name ||
+  props.conversation.name ||
+  'Clowder 项目'
+));
+const projectBindingStatus = computed(() => {
+  if (projectWorkspaceLoading.value) return '同步中';
+  return projectBinding.value?.status || 'active';
 });
 
 watch(() => props.conversation.id, () => {
   groupWorkspaceMode.value = 'info';
+  projectWorkspaceTab.value = 'kanban';
 });
+
+watch(
+  () => [props.conversation.id, props.conversation.channelId, props.conversation.channelType, props.conversation.type],
+  () => {
+    groupWorkspaceMode.value = 'info';
+    projectWorkspaceTab.value = 'kanban';
+    hydrateGroupProjectWorkspace();
+  },
+  { immediate: true }
+);
 
 function togglePinned(e) {
   emit('update-conversation', { isPinned: e.detail.value });
@@ -268,43 +243,50 @@ function openGroupQrcode() {
   uni.navigateTo({ url: '/pages/group/qrcode' });
 }
 
-function openGroupBoard(board) {
-  if (board || agentBoard.value) {
-    groupWorkspaceMode.value = 'board';
+async function hydrateGroupProjectWorkspace() {
+  if (props.conversation.type !== 'group' || !groupChannelId.value) return;
+  projectWorkspaceLoading.value = true;
+  try {
+    const state = await clowderStore.fetchBinding(groupChannelId.value, groupChannelType.value);
+    let threadId = bindingThreadId(state?.binding || state || projectBinding.value || {});
+    const canDiscoverProjectGroup = isClowderConversation(props.conversation) ||
+      isClowderConversation(state) ||
+      isClowderConversation(state?.binding) ||
+      isClowderConversation(projectBinding.value);
+    if (!threadId && canDiscoverProjectGroup) {
+      const activeBinding = await clowderStore.fetchActiveProjectGroup({
+        projectGroupNo: groupChannelId.value
+      }).catch((err) => {
+        if (err?.status === 404) return null;
+        throw err;
+      });
+      threadId = bindingThreadId(activeBinding || projectBinding.value || {});
+    }
+    if (threadId) {
+      await Promise.all([
+        clowderStore.fetchThreadTasks(threadId).catch(() => undefined),
+        clowderStore.fetchThreadArtifacts(threadId).catch(() => undefined)
+      ]);
+    }
+  } catch (err) {
+    if (err?.status && err.status !== 404) {
+      console.warn('[RightWorkspace] project workspace hydration failed', err);
+    }
+  } finally {
+    projectWorkspaceLoading.value = false;
+  }
+}
+
+async function openProjectWorkspace() {
+  if (!projectThreadId.value) await hydrateGroupProjectWorkspace();
+  if (projectThreadId.value) {
+    groupWorkspaceMode.value = 'project';
+    projectWorkspaceTab.value = 'kanban';
   }
 }
 
 function showGroupInfo() {
   groupWorkspaceMode.value = 'info';
-}
-
-function statusText(status) {
-  const map = {
-    doing: '进行中',
-    review: '待验收',
-    blocked: '需修改',
-    done: '已完成'
-  };
-  return map[status] || '进行中';
-}
-
-function openBoardTaskLog(task) {
-  const board = task.board || agentBoard.value;
-  if (!board) return;
-  uni.navigateTo({
-    url: `/pages/agents/log?boardId=${encodeURIComponent(board.id)}&taskId=${encodeURIComponent(task.id)}`
-  });
-}
-
-function atModify(task) {
-  const board = task.board || agentBoard.value;
-  if (!board) return;
-  const alias = task.agent?.alias || `@${task.agent?.name || '智能体'}`;
-  const mentionText = `${alias} 请修改「${task.task}」：${task.modifyHint}`;
-  const currentDraft = convStore.conversations.find((conv) => conv.id === board.groupId)?.draft || '';
-  const spacer = currentDraft && !currentDraft.endsWith('\n') ? '\n' : '';
-  convStore.updateConversationDraft(board.groupId, `${currentDraft}${spacer}${mentionText}`);
-  uni.showToast({ title: '已写入群聊草稿', icon: 'none' });
 }
 
 </script>
@@ -350,6 +332,7 @@ function atModify(task) {
   border-bottom: 1px solid var(--color-border);
 }
 
+.project-workspace,
 .inline-board {
   width: 100%;
   min-height: 100%;
@@ -357,6 +340,48 @@ function atModify(task) {
   gap: 14px;
   box-sizing: border-box;
   background-color: var(--color-bg-base);
+}
+
+.project-tabs {
+  min-height: 40px;
+  padding: 4px;
+  gap: 4px;
+  border: 1px solid var(--color-border);
+  border-radius: 8px;
+  background-color: var(--color-bg-surface);
+  box-sizing: border-box;
+}
+
+.project-tab {
+  flex: 1;
+  min-width: 0;
+  height: 32px;
+  margin: 0;
+  padding: 0 10px;
+  border: none;
+  border-radius: 6px;
+  background-color: transparent;
+  color: var(--color-text-secondary);
+  font-size: 13px;
+  font-weight: 700;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.project-tab::after {
+  border: none;
+}
+
+.project-tab.active {
+  background-color: var(--color-primary);
+  color: #ffffff;
+}
+
+.project-panel {
+  min-height: 220px;
+  gap: 12px;
+  overflow: hidden;
 }
 
 .board-topbar {

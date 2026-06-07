@@ -1,91 +1,125 @@
 import { defineStore } from 'pinia';
+import { friendApi } from '@/api/friend.js';
+
+function normalizeContact(input = {}) {
+  return {
+    id: input.uid || input.id || '',
+    nickname: input.name || input.nickname || input.remark || '未命名联系人',
+    avatar: input.avatar || input.logo || '',
+    pinyin: input.pinyin || input.name || input.nickname || '',
+    phone: input.phone || '',
+    remark: input.remark || '',
+    status: input.status || 'offline',
+    raw: input
+  };
+}
+
+function normalizeSearchUser(input = {}) {
+  const normalized = normalizeContact(input);
+  return {
+    ...normalized,
+    relationship: input.relationship || input.relation || 'stranger',
+    vercode: input.vercode || input.verify_code || input.verification_code || input.token || ''
+  };
+}
 
 export const useContactStore = defineStore('contact', {
   state: () => ({
-    contacts: [
-      { id: '1', nickname: '张伟', avatar: '', pinyin: 'zhangwei', phone: '13800000001', remark: '伟哥', status: 'online' },
-      { id: '4', nickname: '李四', avatar: '', pinyin: 'lisi', phone: '13800000002', remark: '研发', status: 'offline' },
-      { id: '5', nickname: '王五', avatar: '', pinyin: 'wangwu', phone: '13800000003', remark: '架构', status: 'away' }
-    ],
-    friendRequests: [
-      { id: '1001', nickname: '赵六', message: '我是隔壁王经理介绍的', time: 1780480000000, status: 'pending' }
-    ],
-    blacklist: [
-      { id: '99', nickname: '推销小助手', avatar: '' }
-    ]
+    contacts: [],
+    friendRequests: [],
+    blacklist: [],
+    loading: false,
+    lastError: ''
   }),
   actions: {
-    addContact(contact) {
-      this.contacts.push(contact);
-    },
-    acceptRequest(requestId) {
-      const idx = this.friendRequests.findIndex(r => r.id === requestId);
-      if (idx !== -1) {
-        const req = this.friendRequests[idx];
-        req.status = 'accepted';
-        this.addContact({
-          id: req.id,
-          nickname: req.nickname,
-          avatar: '',
-          pinyin: req.nickname,
-          phone: '',
-          remark: '',
-          status: 'offline'
-        });
+    async fetchContacts(keyword = '') {
+      this.loading = true;
+      try {
+        const response = await friendApi.syncFriends({ version: 0, limit: 200, keyword, api_version: 1 });
+        const data = response?.data || response || {};
+        const list = Array.isArray(data) ? data : (data.friends || data.items || data.data || []);
+        this.contacts = (Array.isArray(list) ? list : []).map(normalizeContact);
+        return this.contacts;
+      } finally {
+        this.loading = false;
       }
+    },
+    addContact(contact) {
+      const normalized = normalizeContact(contact);
+      if (!this.contacts.some((item) => item.id === normalized.id)) this.contacts.push(normalized);
+      return normalized;
+    },
+    async acceptRequest(requestId) {
+      const req = this.friendRequests.find((item) => item.id === requestId);
+      if (!req) return;
+      if (req.token) await friendApi.approveFriend(req.token);
+      req.status = 'accepted';
+      this.addContact(req);
     },
     rejectRequest(requestId) {
-      const req = this.friendRequests.find(r => r.id === requestId);
-      if (req) {
-        req.status = 'rejected';
-      }
+      const req = this.friendRequests.find((item) => item.id === requestId);
+      if (req) req.status = 'rejected';
     },
-    updateRemark(contactId, remark) {
-      const c = this.contacts.find((item) => item.id === contactId);
-      if (c) c.remark = remark;
+    async updateRemark(contactId, remark) {
+      await friendApi.updateRemark({ uid: contactId, remark });
+      const contact = this.contacts.find((item) => item.id === contactId);
+      if (contact) contact.remark = remark;
     },
     upsertContactFromMember(member, remark = '') {
       if (!member?.id || member.id === 'me') return null;
-      let contact = this.contacts.find((item) => item.id === member.id);
-      if (!contact) {
-        contact = {
-          id: member.id,
-          nickname: member.nickname || member.name || '用户',
-          avatar: member.avatar || '',
-          pinyin: member.nickname || member.name || '',
-          phone: '',
-          remark,
-          status: member.status || 'offline'
-        };
-        this.contacts.push(contact);
-      } else if (remark !== undefined) {
-        contact.remark = remark;
+      const existing = this.contacts.find((item) => item.id === member.id);
+      if (existing) {
+        existing.remark = remark;
+        return existing;
       }
-      return contact;
+      return this.addContact({ ...member, remark });
     },
-    addToBlacklist(contactId) {
-      const c = this.contacts.find(item => item.id === contactId);
-      if (c && !this.blacklist.some(b => b.id === contactId)) {
-        this.blacklist.push(c);
-        this.contacts = this.contacts.filter(item => item.id !== contactId);
-      }
+    async addToBlacklist(contactId) {
+      await friendApi.addBlacklist(contactId);
+      const contact = this.contacts.find((item) => item.id === contactId);
+      if (contact && !this.blacklist.some((item) => item.id === contactId)) this.blacklist.push(contact);
+      this.contacts = this.contacts.filter((item) => item.id !== contactId);
     },
-    removeFromBlacklist(contactId) {
-      const b = this.blacklist.find(item => item.id === contactId);
-      if (b) {
-        this.blacklist = this.blacklist.filter(item => item.id !== contactId);
-        this.contacts.push({ ...b, pinyin: b.nickname, status: 'offline' });
-      }
+    async removeFromBlacklist(contactId) {
+      await friendApi.removeBlacklist(contactId).catch(() => undefined);
+      const item = this.blacklist.find((entry) => entry.id === contactId);
+      this.blacklist = this.blacklist.filter((entry) => entry.id !== contactId);
+      if (item) this.addContact(item);
     },
-    sendFriendRequest(nickname, message) {
-      const id = String(Date.now());
-      this.friendRequests.unshift({
-        id,
-        nickname,
+    async sendFriendRequest(toUidOrNickname, message, vercode = '') {
+      const payload = {
+        to_uid: toUidOrNickname,
+        remark: message || '你好，我想添加你为好友'
+      };
+      if (vercode) payload.vercode = vercode;
+
+      const response = await friendApi.applyFriend(payload);
+      const data = response?.data || response || {};
+      const request = {
+        id: data.id || data.to_uid || toUidOrNickname,
+        nickname: data.name || data.nickname || toUidOrNickname,
         message: message || '你好，我想添加你为好友',
         time: Date.now(),
-        status: 'pending'
-      });
+        status: 'pending',
+        token: data.token || ''
+      };
+      this.friendRequests.unshift(request);
+      return request;
+    },
+    async searchUser(keyword) {
+      const response = await friendApi.searchUser(keyword);
+      const data = response?.data || response || {};
+      if (data.exist === 0 || data.exist === false) return null;
+      const user = data.user || data.data || data;
+      if (!user || (typeof user === 'object' && Object.keys(user).length === 0)) return null;
+      return normalizeSearchUser(user);
+    },
+    reset() {
+      this.contacts = [];
+      this.friendRequests = [];
+      this.blacklist = [];
+      this.loading = false;
+      this.lastError = '';
     }
   }
 });

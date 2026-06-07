@@ -55,7 +55,7 @@
       </view>
 
       <!-- 滚动视图区 -->
-      <scroll-view scroll-y class="preview-scroll flex-1">
+      <view class="preview-scroll flex-1">
         <view
           ref="previewBodyRef"
           class="preview-body"
@@ -382,7 +382,41 @@
               />
             </view>
 
-            <!-- 9. 降级渲染 -->
+            <!-- 9. 视频预览 -->
+            <view class="media-preview flex-column align-center justify-center" v-else-if="previewKind === 'video'">
+              <video
+                v-if="mediaPreviewUrl"
+                class="preview-video"
+                :src="mediaPreviewUrl"
+                controls
+              />
+              <AppEmptyState
+                v-else
+                icon="files"
+                title="无法预览视频"
+                description="未找到可播放的视频地址，请下载后查看。"
+              />
+            </view>
+
+            <!-- 10. 音频预览 -->
+            <view class="media-preview audio flex-column align-center justify-center" v-else-if="previewKind === 'audio'">
+              <iframe
+                v-if="mediaPreviewUrl"
+                class="preview-audio-frame"
+                :srcdoc="audioPreviewHtml"
+                sandbox="allow-scripts"
+                referrerpolicy="no-referrer"
+                frameborder="0"
+              ></iframe>
+              <AppEmptyState
+                v-else
+                icon="files"
+                title="无法预览音频"
+                description="未找到可播放的音频地址，请下载后查看。"
+              />
+            </view>
+
+            <!-- 11. 降级渲染 -->
             <view class="fallback-preview flex-column align-center" v-else>
               <view class="fallback-icon">
                 <AppIcon name="files" :size="42" color="var(--color-primary)" />
@@ -394,7 +428,7 @@
           </template>
           
         </view>
-      </scroll-view>
+      </view>
     </view>
 
     <view
@@ -736,6 +770,7 @@ const fileTypeTheme = computed(() => {
 
 const previewKind = computed(() => {
   const type = normalizedFile.value.type;
+  if (isBlockedExecutableName(normalizedFile.value.name || normalizedFile.value.url || '')) return 'blocked';
   if (['md', 'markdown'].includes(type)) return 'markdown';
   if (['html', 'htm'].includes(type)) return 'html';
   if (type === 'pdf') return 'pdf';
@@ -743,6 +778,8 @@ const previewKind = computed(() => {
   if (['ppt', 'pptx'].includes(type)) return 'presentation';
   if (['xls', 'xlsx', 'csv'].includes(type)) return 'sheet';
   if (['png', 'jpg', 'jpeg', 'gif', 'webp', 'svg'].includes(type)) return 'image';
+  if (['mp4', 'webm', 'mov', 'm4v', 'ogg'].includes(type)) return 'video';
+  if (['mp3', 'wav', 'm4a', 'aac', 'flac', 'oga'].includes(type)) return 'audio';
   if (['zip', 'rar', '7z', 'tar', 'gz', 'bz2', 'xz'].includes(type)) return 'archive';
   if (['txt', 'text', 'json', 'js', 'ts', 'jsx', 'tsx', 'css', 'less', 'scss', 'vue', 'py', 'java', 'cpp', 'c', 'go', 'sql', 'sh', 'xml', 'yaml', 'yml'].includes(type)) return 'code';
   return 'fallback';
@@ -800,8 +837,8 @@ async function loadSourceFileContent() {
   imageLoadError.value = false;
   if (!name) return;
 
-  // 图片、pdf、压缩包和未知类型不做正文加载
-  if (['image', 'pdf', 'archive', 'fallback'].includes(previewKind.value)) {
+  // 图片、媒体、pdf、压缩包、危险文件和未知类型不做正文加载
+  if (['image', 'video', 'audio', 'pdf', 'archive', 'blocked', 'fallback'].includes(previewKind.value)) {
     return;
   }
 
@@ -1127,6 +1164,50 @@ function resolveFileUrl(name) {
   }
 
   return `/assets/${encodeURIComponent(name)}`;
+}
+
+function resolveMediaPreviewUrl() {
+  const source = props.file || {};
+  const candidates = [
+    normalizedFile.value.url,
+    source.previewUrl,
+    source.mediaUrl,
+    source.src,
+    source.path,
+    normalizedFile.value.name
+  ];
+
+  for (const candidate of candidates) {
+    const resolved = normalizeMediaSource(candidate);
+    if (resolved) return resolved;
+  }
+
+  return '';
+}
+
+function normalizeMediaSource(value) {
+  const rawSrc = String(value || '').trim();
+  if (!rawSrc || /^javascript:/i.test(rawSrc) || /^data:/i.test(rawSrc)) return '';
+  if (/^(https?:|blob:|file:)/i.test(rawSrc)) return rawSrc;
+  if (rawSrc.startsWith('/static/')) return rawSrc;
+
+  const suffixStart = rawSrc.search(/[?#]/);
+  const pathPart = suffixStart >= 0 ? rawSrc.slice(0, suffixStart) : rawSrc;
+  const suffix = suffixStart >= 0 ? rawSrc.slice(suffixStart) : '';
+  const normalizedPath = pathPart.replace(/\\/g, '/').replace(/^\.?\//, '');
+  const assetName = normalizedPath.split('/').pop();
+  if (!/\.(mp4|webm|mov|m4v|ogg|mp3|wav|m4a|aac|flac|oga)$/i.test(assetName || '')) return '';
+
+  const bundledUrl = getBundledAssetUrl(assetName);
+  if (bundledUrl) return `${bundledUrl}${suffix}`;
+
+  if (rawSrc.startsWith('/')) return rawSrc;
+
+  if (normalizedPath.startsWith('assets/')) {
+    return `/${normalizedPath.split('/').map(encodeURIComponent).join('/')}${suffix}`;
+  }
+
+  return `/assets/${encodeURIComponent(assetName)}${suffix}`;
 }
 
 function resolveImagePreviewUrl() {
@@ -2126,7 +2207,10 @@ const previewContent = computed(() => {
 const renderedMarkdown = computed(() => markdown.render(previewContent.value));
 
 const sandboxedHtmlContent = computed(() => buildSandboxedHtmlContent(previewContent.value));
+const audioPreviewHtml = computed(() => buildAudioPreviewHtml(mediaPreviewUrl.value));
 const safeWordHtmlContent = computed(() => sanitizeHtmlFragment(docxHtmlContent.value));
+const isBlockedExecutable = computed(() => isBlockedExecutableName(normalizedFile.value.name || normalizedFile.value.url || ''));
+const mediaPreviewUrl = computed(() => resolveMediaPreviewUrl());
 const imagePreviewUrl = computed(() => resolveImagePreviewUrl());
 
 const imagePreviewEmptyDesc = computed(() => {
@@ -2201,12 +2285,15 @@ const codeLines = computed(() => {
 
 const typeLabel = computed(() => {
   const type = normalizedFile.value.type;
+  if (isBlockedExecutable.value) return '已阻止';
   if (['md', 'markdown'].includes(type)) return 'Markdown';
   if (type === 'pdf') return 'PDF 文档';
   if (['docx', 'doc'].includes(type)) return 'Word 文档';
   if (['xlsx', 'xls', 'csv'].includes(type)) return '表格';
   if (['pptx', 'ppt'].includes(type)) return '演示文稿';
   if (['html', 'htm'].includes(type)) return 'HTML 页面';
+  if (previewKind.value === 'video') return '视频';
+  if (previewKind.value === 'audio') return '音频';
   if (['zip', 'rar', '7z', 'tar', 'gz', 'bz2', 'xz'].includes(type)) return '压缩包';
   if (previewKind.value === 'image') return '图片';
   if (previewKind.value === 'code') return '代码文件';
@@ -2221,11 +2308,15 @@ const wordPreviewEmptyDesc = computed(() => {
 });
 
 const fallbackTitle = computed(() => {
+  if (isBlockedExecutable.value) return '危险文件已阻止';
   if (previewKind.value === 'archive') return '压缩包仅支持下载';
   return '暂不支持该文件格式预览';
 });
 
 const fallbackDesc = computed(() => {
+  if (isBlockedExecutable.value) {
+    return '该文件类型可能执行本地代码，已按安全策略阻止预览和上传。';
+  }
   if (previewKind.value === 'archive') {
     return 'zip、rar、7z 等压缩包无法在聊天内直接展开，请下载到本地后查看。';
   }
@@ -2233,7 +2324,7 @@ const fallbackDesc = computed(() => {
 });
 
 const canSelectPreviewText = computed(() => {
-  if (['pdf', 'presentation', 'image', 'archive', 'fallback'].includes(previewKind.value)) {
+  if (['pdf', 'presentation', 'image', 'video', 'audio', 'archive', 'blocked', 'fallback'].includes(previewKind.value)) {
     return false;
   }
   return ['markdown', 'html', 'word', 'sheet', 'code'].includes(previewKind.value);
@@ -2652,20 +2743,30 @@ function getTypeFromName(name) {
   return match ? match[1].toLowerCase() : 'file';
 }
 
+function isBlockedExecutableName(name) {
+  return /\.(exe|bat|cmd|sh|msi|dll)$/i.test(String(name || '').split('?')[0]);
+}
+
 function startDownload() {
-  if (isDownloading.value) return;
-  isDownloading.value = true;
-  progress.value = 0;
+  if (isBlockedExecutable.value) {
+    uni.showToast({ title: '危险文件已阻止', icon: 'none' });
+    return;
+  }
+  if (!normalizedFile.value.url) {
+    showDownloadUnavailable();
+    return;
+  }
+  isDownloaded.value = true;
+  // #ifdef H5
+  if (typeof window !== 'undefined') window.open(normalizedFile.value.url, '_blank');
+  // #endif
+  // #ifndef H5
+  uni.showToast({ title: '请在 Web 端打开文件链接', icon: 'none' });
+  // #endif
+}
 
-  const timer = setInterval(() => {
-    progress.value = Math.min(100, progress.value + 12);
-    if (progress.value < 100) return;
-
-    clearInterval(timer);
-    isDownloading.value = false;
-    isDownloaded.value = true;
-    uni.showToast({ title: '下载已完成', icon: 'success' });
-  }, 120);
+function showDownloadUnavailable() {
+  uni.showToast({ title: '文件下载需接入真实下载能力', icon: 'none' });
 }
 
 function handleImageLoad() {
@@ -2706,6 +2807,11 @@ function buildSandboxedHtmlContent(value) {
     return html.replace(/<\/html>/i, `${bridge}</html>`);
   }
   return `${html}${bridge}`;
+}
+
+function buildAudioPreviewHtml(src) {
+  const safeSrc = escapeHtmlAttr(src);
+  return `<!doctype html><html><head><meta charset="utf-8"><style>html,body{margin:0;width:100%;height:100%;display:flex;align-items:center;justify-content:center;background:#f8fafc;font-family:sans-serif}audio{width:min(560px,calc(100% - 32px));max-width:100%;}</style></head><body><audio src="${safeSrc}" controls></audio></body></html>`;
 }
 
 function buildHtmlSelectionBridge() {
@@ -2773,6 +2879,10 @@ function escapeHtml(value) {
     .replace(/>/g, '&gt;')
     .replace(/"/g, '&quot;')
     .replace(/'/g, '&#39;');
+}
+
+function escapeHtmlAttr(value) {
+  return escapeHtml(value);
 }
 </script>
 
@@ -2978,6 +3088,8 @@ function escapeHtml(value) {
 .preview-scroll {
   height: 100%;
   min-height: 0;
+  overflow: auto;
+  -webkit-overflow-scrolling: touch;
 }
 
 .preview-body {
@@ -3799,7 +3911,39 @@ function escapeHtml(value) {
   background-color: rgba(248, 250, 252, 0.82);
 }
 
-/* 9. 降级渲染 */
+/* 9/10. 媒体预览 */
+.media-preview {
+  width: 100%;
+  height: 100%;
+  min-height: 220px;
+  padding: 20px;
+  box-sizing: border-box;
+  background-color: #0f172a;
+  overflow: hidden;
+}
+
+.media-preview.audio {
+  min-height: 180px;
+  background-color: #f8fafc;
+}
+
+.preview-video {
+  width: 100%;
+  height: 100%;
+  max-height: 68vh;
+  border-radius: 6px;
+  background-color: #000000;
+}
+
+.preview-audio-frame {
+  width: min(560px, 100%);
+  height: 96px;
+  border: 0;
+  border-radius: 8px;
+  background-color: #f8fafc;
+}
+
+/* 11. 降级渲染 */
 .fallback-preview {
   text-align: center;
   background-color: #ffffff;

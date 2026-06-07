@@ -1080,18 +1080,12 @@ func (u *User) execLogin(userInfo *Model, flag config.DeviceFlag, device *device
 		tokenSpan.Finish()
 		return nil, errors.New("获取旧token错误")
 	}
-	if flag == config.APP {
-		if oldToken != "" {
-			err = u.ctx.Cache().Delete(u.ctx.GetConfig().Cache.TokenCachePrefix + oldToken)
-			if err != nil {
-				u.Error("清除旧token数据错误", zap.Error(err))
-				tokenSpan.Finish()
-				return nil, errors.New("清除旧token数据错误")
-			}
-		}
-	} else { // PC暂时不执行删除操作，因为PC可以同时登陆
-		if strings.TrimSpace(oldToken) != "" { // 如果是web或pc类设备 因为支持多登所以这里依然使用老token
-			token = oldToken
+	if oldToken != "" {
+		err = u.ctx.Cache().Delete(u.ctx.GetConfig().Cache.TokenCachePrefix + oldToken)
+		if err != nil {
+			u.Error("清除旧token数据错误", zap.Error(err))
+			tokenSpan.Finish()
+			return nil, errors.New("清除旧token数据错误")
 		}
 	}
 
@@ -1948,6 +1942,13 @@ func (u *User) sendRegisterCode(c *wkhttp.Context) {
 		})
 		return
 	}
+	if strings.TrimSpace(u.ctx.GetConfig().SMSCode) != "" {
+		c.Response(map[string]interface{}{
+			"exist": 0,
+			"mock":  1,
+		})
+		return
+	}
 	err = u.smsServie.SendVerifyCode(spanCtx, req.Zone, req.Phone, commonapi.CodeTypeRegister)
 	if err != nil {
 		u.Error("发送短信验证码失败", zap.Error(err))
@@ -2742,8 +2743,8 @@ func (r registerReq) CheckRegister() error {
 	if strings.TrimSpace(r.Password) == "" {
 		return errors.New("密码不能为空！")
 	}
-	if len(r.Password) < 6 {
-		return errors.New("密码长度必须大于6位！")
+	if len(r.Password) < 8 {
+		return errors.New("密码长度必须不少于8位！")
 	}
 	return nil
 }

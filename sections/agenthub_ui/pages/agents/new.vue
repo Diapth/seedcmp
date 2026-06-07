@@ -141,6 +141,11 @@
                 <text class="card-title">模型设置</text>
               </view>
 
+              <view class="capability-banner flex-row align-center gap-2" :class="{ warning: !!clowderStore.disabledReason }">
+                <AppIcon name="info" :size="14" color="var(--color-primary)" />
+                <text class="capability-text">Clowder capabilities · {{ capabilityStatusText }}</text>
+              </view>
+
               <view class="form-grid">
                 <view class="input-group flex-column gap-1">
                   <text class="input-label">运行平台</text>
@@ -228,6 +233,7 @@
                     <AppIcon name="lock" :size="12" color="var(--color-text-muted)" />
                     <text class="input-hint">密钥将加密保存于本地，仅在调用模型时使用</text>
                   </view>
+                  <text v-if="apiKeyValidationError" class="field-error">{{ apiKeyValidationError }}</text>
                 </view>
 
                 <view class="form-grid">
@@ -518,6 +524,7 @@
 <script setup>
 import { computed, onMounted, ref } from 'vue';
 import { useAgentStore } from '@/stores/agent';
+import { useClowderStore } from '@/stores/clowder';
 import { useConversationStore } from '@/stores/conversation';
 import { useNavigationStore } from '@/stores/navigation';
 import { useResponsiveLayout } from '@/composables/useResponsiveLayout';
@@ -527,13 +534,21 @@ import AppAvatar from '@/components/common/AppAvatar.vue';
 import AppDialog from '@/components/common/AppDialog.vue';
 
 const agentStore = useAgentStore();
+const clowderStore = useClowderStore();
 const convStore = useConversationStore();
 const navStore = useNavigationStore();
 const { isDesktop } = useResponsiveLayout();
 
 onMounted(() => {
   navStore.setActiveModule('agents');
-  loadEditingAgent();
+  Promise.allSettled([
+    clowderStore.fetchCapabilities(),
+    agentStore.fetchAgentDirectory({ includeUnavailable: true }),
+    agentStore.fetchSkills()
+  ]).finally(() => {
+    syncDefaultModel();
+    loadEditingAgent();
+  });
 });
 
 function createDefaultForm() {
@@ -541,12 +556,12 @@ function createDefaultForm() {
     name: '',
     aliasRaw: '',
     desc: '',
-    roleTemplate: 'reviewer',
-    capabilityTags: ['自动化测试', '回归验证', '质量门禁', '测试策略'],
-    platform: 'codex',
-    accessMode: 'api-key',
-    model: 'DeepSeek V3',
-    accountRef: 'openai-prod',
+    roleTemplate: 'general',
+    capabilityTags: [],
+    platform: 'claude-code',
+    accessMode: 'oauth',
+    model: '',
+    accountRef: defaultAccountRef('claude-code'),
     apiKey: '',
     apiUrl: '',
     customModel: '',
@@ -575,7 +590,7 @@ const customTemplates = ref([
   }
 ]);
 
-const roleTemplates = [
+const fallbackRoleTemplates = [
   { value: 'general', label: '通用助手', description: '通用助手：知识问答、写作润色、信息整理，适用于日常协作。' },
   { value: 'reviewer', label: '续闺猫（审查官）', description: '严谨认真，注重细节，会直言不讳地指出问题。' },
   { value: 'engineer', label: '工程师', description: '专注代码生成、重构与单元测试，适合敏捷开发协作。' },
@@ -594,7 +609,7 @@ const accessModes = [
   { value: 'oauth', label: 'OAuth' }
 ];
 
-const models = ['DeepSeek V3', 'DeepSeek R1', 'GPT-4o', 'Claude 3.5 Sonnet', 'Claude 3 Opus', '自定义'];
+const fallbackModels = ['claude-opus-4-7[1m]', 'claude-sonnet-4-6', 'gpt-5.2-codex', '自定义'];
 
 const presetTemplates = [
   {
@@ -641,7 +656,21 @@ const templateOptions = computed(() => [
   ...customTemplates.value
 ]);
 
-const modelOptions = computed(() => models);
+const roleTemplates = computed(() => (
+  agentStore.roleTemplates.length > 0 ? agentStore.roleTemplates : fallbackRoleTemplates
+));
+
+const modelOptions = computed(() => {
+  const direct = agentStore.platformModelOptions[form.value.platform] || [];
+  const platformAlias = form.value.platform === 'claude-code'
+    ? agentStore.platformModelOptions.claude || agentStore.platformModelOptions.anthropic || []
+    : form.value.platform === 'codex'
+      ? agentStore.platformModelOptions.codex || agentStore.platformModelOptions.openai || []
+      : [];
+  const source = direct.length > 0 ? direct : platformAlias;
+  const models = source.map((item) => item.label || item.id).filter(Boolean);
+  return models.length > 0 ? Array.from(new Set(models)) : fallbackModels;
+});
 
 const roleIndex = ref(0);
 const modelIndex = ref(0);
@@ -666,8 +695,17 @@ const resetActionText = computed(() => (isEditing.value ? '还原' : '清空'));
 const submitText = computed(() => (isEditing.value ? '保存配置' : '创建并部署'));
 const helpTitle = computed(() => (isEditing.value ? '智能体配置帮助' : '创建智能体帮助'));
 
+const capabilityStatusText = computed(() => {
+  const caps = clowderStore.capabilities || {};
+  if (clowderStore.disabledReason) return clowderStore.disabledReason;
+  const oauth = caps.oauthEnabled ? 'OAuth 可用' : 'OAuth 不可用';
+  const runtime = caps.runtimeAvailable ? 'runtime 可达' : 'runtime 不可达';
+  const queue = caps.queueFull ? '队列已满' : '队列正常';
+  return `${oauth} / ${runtime} / ${queue}`;
+});
+
 const currentRole = computed(() => {
-  return roleTemplates.find(r => r.value === form.value.roleTemplate) || roleTemplates[0];
+  return roleTemplates.value.find(r => r.value === form.value.roleTemplate) || roleTemplates.value[0];
 });
 
 const currentPlatform = computed(() => {
@@ -681,19 +719,37 @@ const effectiveModel = computed(() => {
   return form.value.model;
 });
 
+const apiKeyValidationError = computed(() => {
+  if (form.value.accessMode !== 'api-key') return '';
+  if (isEditing.value && !form.value.apiKey.trim()) return '';
+  const key = form.value.apiKey.trim();
+  if (!key) return '请输入 API Key';
+  if (!isValidApiKey(key)) return 'API Key 格式无效，请检查后再提交';
+  return '';
+});
+
 const checkList = computed(() => [
   { key: 'name', label: '基础信息已填写', passed: !!form.value.name.trim() },
   { key: 'role', label: '角色模板已选择', passed: !!form.value.roleTemplate },
-  { key: 'model', label: '模型账号可用', passed: !!form.value.accountRef.trim() && !!effectiveModel.value },
-  { key: 'tags', label: '能力标签已同步', passed: form.value.capabilityTags.length > 0 },
-  { key: 'api', label: 'API 配置完整', passed: form.value.accessMode !== 'api-key' || ((isEditing.value || !!form.value.apiKey.trim()) && !!form.value.apiUrl.trim()) }
+  { key: 'model', label: '模型账号可用', passed: !!effectiveModel.value && (form.value.accessMode === 'oauth' || !!form.value.accountRef.trim()) },
+  { key: 'tags', label: '能力标签已同步', passed: form.value.accessMode === 'oauth' || form.value.capabilityTags.length > 0 },
+  { key: 'api', label: 'API 配置完整', passed: form.value.accessMode !== 'api-key' || (!apiKeyValidationError.value && !!form.value.apiUrl.trim()) }
 ]);
 
 const canSubmit = computed(() => {
   return checkList.value.every(c => c.passed);
 });
 
-function onFormChange() {}
+function onFormChange() {
+  form.value.accountRef = defaultAccountRef(form.value.platform);
+  syncDefaultModel();
+}
+
+function defaultAccountRef(platform) {
+  if (platform === 'claude-code') return 'claude';
+  if (platform === 'codex') return 'codex';
+  return '';
+}
 
 function loadEditingAgent() {
   const pages = getCurrentPages();
@@ -717,7 +773,7 @@ function loadEditingAgent() {
 }
 
 function hydrateFormFromAgent(agent) {
-  const modelExists = models.includes(agent.model);
+  const modelExists = modelOptions.value.includes(agent.model);
   form.value = {
     name: agent.name || '',
     aliasRaw: (agent.alias || '').replace(/^@/, ''),
@@ -740,11 +796,20 @@ function hydrateFormFromAgent(agent) {
 }
 
 function syncSelectorIndexes() {
-  const nextRoleIndex = roleTemplates.findIndex(role => role.value === form.value.roleTemplate);
+  const nextRoleIndex = roleTemplates.value.findIndex(role => role.value === form.value.roleTemplate);
   roleIndex.value = nextRoleIndex >= 0 ? nextRoleIndex : 0;
 
-  const nextModelIndex = models.findIndex(model => model === form.value.model);
+  const nextModelIndex = modelOptions.value.findIndex(model => model === form.value.model);
   modelIndex.value = nextModelIndex >= 0 ? nextModelIndex : 0;
+}
+
+function syncDefaultModel() {
+  if (form.value.model && modelOptions.value.includes(form.value.model)) {
+    syncSelectorIndexes();
+    return;
+  }
+  form.value.model = modelOptions.value[0] || '';
+  syncSelectorIndexes();
 }
 
 function onAliasInput(e) {
@@ -755,7 +820,8 @@ function onAliasInput(e) {
 function onRoleChange(e) {
   const idx = e.detail.value;
   roleIndex.value = idx;
-  const role = roleTemplates[idx];
+  const role = roleTemplates.value[idx];
+  if (!role) return;
   form.value.roleTemplate = role.value;
   const autoTplId = roleToTemplateId[role.value] || 'reviewer';
   if (form.value.templateId !== 'tpl-custom-product' && !form.value.templateId?.startsWith('tpl-custom-')) {
@@ -768,7 +834,7 @@ function onRoleChange(e) {
 function onModelChange(e) {
   const idx = e.detail.value;
   modelIndex.value = idx;
-  form.value.model = models[idx];
+  form.value.model = modelOptions.value[idx] || '';
 }
 
 function applyTemplate(id) {
@@ -900,6 +966,13 @@ function maskKey(k) {
   return k.slice(0, 4) + '••••••••' + k.slice(-4);
 }
 
+function isValidApiKey(key) {
+  const value = String(key || '').trim();
+  if (!value || /\s/.test(value)) return false;
+  if (/^(sk|sk-ant|sk-proj|claude|codex)-[A-Za-z0-9._-]{16,}$/.test(value)) return true;
+  return /^[A-Za-z0-9_-]{32,}$/.test(value);
+}
+
 function buildAgentPayload() {
   return {
     name: form.value.name.trim(),
@@ -937,33 +1010,34 @@ function leaveConfigPage(fallbackUrl = '/pages/agents/index') {
   uni.redirectTo({ url: fallbackUrl });
 }
 
-function handleCreate() {
+async function handleCreate() {
+  if (apiKeyValidationError.value) {
+    uni.showToast({ title: apiKeyValidationError.value, icon: 'none' });
+    return;
+  }
   if (!canSubmit.value) {
     uni.showToast({ title: '请完成所有检查项', icon: 'none' });
     return;
   }
   submitting.value = true;
 
-  setTimeout(() => {
-    const payload = buildAgentPayload();
+  const payload = buildAgentPayload();
+  try {
     if (isEditing.value) {
-      agentStore.updateAgent(editingAgentId.value, payload);
-      syncAgentConversation(editingAgentId.value, payload);
-      submitting.value = false;
-      uni.showToast({ title: '配置已保存', icon: 'success' });
-      setTimeout(() => {
-        leaveConfigPage();
-      }, 500);
+      uni.showToast({ title: '智能体编辑接口待接入', icon: 'none' });
       return;
     }
 
-    agentStore.createAgent(payload);
+    const agent = await agentStore.createAgent(payload);
+    if (agent?.id) syncAgentConversation(agent.id, payload);
     submitting.value = false;
     uni.showToast({ title: '智能体已部署', icon: 'success' });
-    setTimeout(() => {
-      uni.redirectTo({ url: '/pages/agents/index' });
-    }, 700);
-  }, 600);
+    uni.redirectTo({ url: '/pages/agents/index' });
+  } catch (err) {
+    uni.showToast({ title: err?.message || '智能体创建失败', icon: 'none' });
+  } finally {
+    submitting.value = false;
+  }
 }
 </script>
 
@@ -1086,6 +1160,28 @@ function handleCreate() {
   color: var(--color-text-primary);
 }
 
+.capability-banner {
+  min-height: 36px;
+  padding: 8px 10px;
+  border-radius: 8px;
+  border: 1px solid rgba(0, 74, 198, 0.16);
+  background-color: var(--color-primary-light);
+  box-sizing: border-box;
+}
+
+.capability-banner.warning {
+  border-color: rgba(245, 158, 11, 0.28);
+  background-color: rgba(245, 158, 11, 0.08);
+}
+
+.capability-text {
+  min-width: 0;
+  font-size: 12px;
+  line-height: 1.45;
+  color: var(--color-text-secondary);
+  word-break: break-word;
+}
+
 .form-grid {
   display: grid;
   grid-template-columns: 1fr 1fr;
@@ -1103,6 +1199,12 @@ function handleCreate() {
   font-size: 11px;
   color: var(--color-text-muted);
   margin-top: 4px;
+}
+.field-error {
+  font-size: 12px;
+  line-height: 1.4;
+  color: var(--color-error);
+  word-break: break-word;
 }
 .hint-right { text-align: right; }
 

@@ -504,6 +504,54 @@ func TestFindActiveProjectGroupBindingReturnsLatestForDirect(t *testing.T) {
 	assert.Equal(t, "binding-old", named.ID)
 }
 
+func TestFindActiveProjectGroupBindingByGroupNo(t *testing.T) {
+	c := New(nil)
+	c.projectGroupBindings = map[string]ProjectGroupBinding{
+		"target": {
+			ID:                  "binding-target",
+			UserID:              "user-1",
+			ProjectName:         "验收项目",
+			PMDirectChannelID:   "clowder_cat:coordinator",
+			PMDirectChannelType: 1,
+			ProjectGroupNo:      "group-target",
+			ProjectThreadID:     "thread-target",
+			UpdatedAt:           200,
+			Status:              "active",
+		},
+		"other-user": {
+			ID:                  "binding-other-user",
+			UserID:              "user-2",
+			ProjectName:         "验收项目",
+			PMDirectChannelID:   "clowder_cat:coordinator",
+			PMDirectChannelType: 1,
+			ProjectGroupNo:      "group-target",
+			ProjectThreadID:     "thread-wrong-user",
+			UpdatedAt:           300,
+			Status:              "active",
+		},
+		"archived": {
+			ID:                  "binding-archived",
+			UserID:              "user-1",
+			ProjectName:         "归档项目",
+			PMDirectChannelID:   "clowder_cat:coordinator",
+			PMDirectChannelType: 1,
+			ProjectGroupNo:      "group-archived",
+			ProjectThreadID:     "thread-archived",
+			UpdatedAt:           400,
+			Status:              "archived",
+		},
+	}
+
+	binding, ok := c.findActiveProjectGroupBindingByGroupNo("user-1", "group-target")
+
+	require.True(t, ok)
+	assert.Equal(t, "binding-target", binding.ID)
+	assert.Equal(t, "thread-target", binding.ProjectThreadID)
+
+	_, ok = c.findActiveProjectGroupBindingByGroupNo("user-1", "group-archived")
+	assert.False(t, ok)
+}
+
 func TestUpdateProjectGroupBindingThreadPersistsThreadID(t *testing.T) {
 	c := New(nil)
 	key := projectGroupBindingKey("user-1", "clowder_cat:coordinator", 1, "婚礼")
@@ -674,4 +722,26 @@ func TestBuildCreateCatCommandRequiresAndNormalizesClientPlatform(t *testing.T) 
 
 	_, ok = buildCreateCatCommand(createCatRequest{Name: "无认证猫", ClientID: "openai"})
 	assert.False(t, ok)
+}
+
+func TestCreatedCatContactsPrependFallbackCatsToDirectory(t *testing.T) {
+	c := New(nil)
+	fallback := fallbackCreatedCatResponse(createCatRequest{
+		Name:         "V13验收猫",
+		Alias:        "@v13cat",
+		Personality:  "live proof",
+		Capabilities: []string{"项目拆解"},
+	}, "@v13cat")
+	c.storeCreatedCatContact("user-1", fallback.Agent)
+
+	merged := c.mergeCreatedCatContacts("user-1", []ClowderAgent{
+		{CatID: "coordinator", DisplayName: "PM", Available: true, Source: "existing"},
+	})
+
+	require.Len(t, merged, 2)
+	assert.Equal(t, "v13cat", merged[0].CatID)
+	assert.Equal(t, "V13验收猫", merged[0].DisplayName)
+	assert.Equal(t, "runtime-created", merged[0].Source)
+	assert.True(t, merged[0].Connected)
+	assert.Equal(t, "coordinator", merged[1].CatID)
 }

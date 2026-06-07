@@ -37,12 +37,12 @@
           <view class="profile-grid">
             <view class="info-panel">
               <text class="panel-title">我的二维码</text>
-              <text class="qr-demo-caption">演示用二维码 · 扫码可扫描占位 URL</text>
-              <view class="qr-box">
-                <view v-for="n in 49" :key="n" class="qr-cell" :class="{ active: qrPattern(n) }"></view>
+              <text class="qr-demo-caption">二维码后端能力待接入</text>
+              <view class="qr-box unavailable">
+                <AppIcon name="info" :size="28" color="var(--color-text-muted)" />
               </view>
-              <text class="qr-desc">用于面对面添加好友，30 分钟内有效。</text>
-              <button class="btn-primary" @click="refreshQr">刷新二维码</button>
+              <text class="qr-desc">接入真实 token 与二维码生成接口后可用于面对面添加好友。</text>
+              <button class="btn-primary" @click="showQrUnavailable">暂不可用</button>
             </view>
 
             <view class="info-panel">
@@ -93,7 +93,6 @@ import ContactCard from '@/components/contacts/ContactCard.vue';
 const appStore = useAppStore();
 const navStore = useNavigationStore();
 const contactStore = useContactStore();
-const qrSeed = ref(0);
 const routeOptions = ref({});
 
 const user = computed(() => {
@@ -147,20 +146,8 @@ function readOption(key) {
   }
 }
 
-function qrPattern(index) {
-  const row = Math.floor((index - 1) / 7);
-  const col = (index - 1) % 7;
-  const isCorner =
-    (row <= 1 && col <= 1) ||
-    (row <= 1 && col >= 5) ||
-    (row >= 5 && col <= 1);
-  return isCorner || ((row * 3 + col * 5 + qrSeed.value) % 4 === 0);
-}
-
-function refreshQr() {
-  // TODO: 接入真实 token + QR 库,当前只切换本地种子
-  qrSeed.value += 1;
-  uni.showToast({ title: '二维码已刷新', icon: 'success' });
+function showQrUnavailable() {
+  uni.showToast({ title: '二维码能力待接入真实接口', icon: 'none' });
 }
 
 function editProfile() {

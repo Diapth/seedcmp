@@ -26,19 +26,11 @@
         <text class="file-type">{{ typeLabel(item.type) }}</text>
         <text class="file-size">{{ item.size }}</text>
         <text class="file-time">{{ formatTime(item.time) }}</text>
-        
+
         <view class="file-right">
-          <!-- Download progress -->
-          <view class="download-progress flex-column align-end" v-if="downloadingId === item.id">
-            <progress :percent="progress" stroke-width="3" activeColor="var(--color-primary)" backgroundColor="var(--color-border)" class="progress-bar" />
-            <text class="progress-text">{{ progress }}%</text>
-          </view>
-          
           <button
-            class="btn-action" 
-            :disabled="downloadingId !== ''" 
+            class="btn-action"
             @click="handleAction(item)"
-            v-else
           >
             {{ isPreviewable(item.type) ? '预览' : '下载' }}
           </button>
@@ -53,8 +45,6 @@
 </template>
 
 <script setup>
-import { ref } from 'vue';
-import { useConfirm } from '@/composables/useConfirm';
 import AppIcon from '../common/AppIcon.vue';
 import AppEmptyState from '../common/AppEmptyState.vue';
 
@@ -66,10 +56,6 @@ const props = defineProps({
 });
 
 const emit = defineEmits(['preview']);
-
-const { confirm } = useConfirm();
-const downloadingId = ref('');
-const progress = ref(0);
 
 function getFileIconColor(type) {
   if (type === 'pdf') return 'hsl(350, 89%, 60%)';
@@ -94,30 +80,15 @@ function formatTime(timestamp) {
 }
 
 function handleAction(item) {
-  downloadingId.value = item.id;
-  progress.value = 0;
+  if (isPreviewable(item.type)) {
+    emit('preview', item);
+    return;
+  }
+  showDownloadUnavailable();
+}
 
-  const timer = setInterval(() => {
-    if (progress.value < 100) {
-      progress.value += 10;
-    } else {
-      clearInterval(timer);
-      downloadingId.value = '';
-
-      if (isPreviewable(item.type)) {
-        uni.showToast({ title: '加载成功，正在预览...', icon: 'none' });
-        emit('preview', item);
-      } else {
-        // PR-15: 替换为 useConfirm
-        confirm(`文件 ${item.name} 已保存到本地临时目录。是否直接打开？`, {
-          title: '下载成功',
-          confirmText: '打开'
-        }).then((ok) => {
-          if (ok) uni.showToast({ title: '文件已打开', icon: 'success' });
-        });
-      }
-    }
-  }, 100);
+function showDownloadUnavailable() {
+  uni.showToast({ title: '文件下载需接入真实下载能力', icon: 'none' });
 }
 
 function isPreviewable(type) {

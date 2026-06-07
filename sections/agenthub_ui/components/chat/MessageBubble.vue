@@ -104,6 +104,16 @@
             :is-me="isMe"
           />
 
+          <!-- Deployment Card -->
+          <DeploymentCard
+            v-else-if="data.type === 'deployment'"
+            :request-id="data.deploymentRequestId"
+            :title="data.deployment?.title || data.content"
+            :status="data.deployment?.status"
+            :channel-id="data.channelId"
+            :channel-type="data.channelType"
+          />
+
         </view>
 
       </view>
@@ -145,6 +155,7 @@ import AppIcon from '../common/AppIcon.vue';
 import FileCard from './FileCard.vue';
 import VoiceCard from './VoiceCard.vue';
 import MessageReactions from './MessageReactions.vue';
+import DeploymentCard from './DeploymentCard.vue';
 
 const props = defineProps({
   data: {

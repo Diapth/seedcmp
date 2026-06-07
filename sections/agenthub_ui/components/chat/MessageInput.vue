@@ -29,13 +29,13 @@
         <view class="toolbar-btn" title="表情" @click="handleOpenEmoji">
           <AppIcon name="smile" :size="21" color="var(--color-text-secondary)" />
         </view>
-        <view class="toolbar-btn" title="图片" @click="sendMockImage">
+        <view class="toolbar-btn" title="图片" @click="chooseAlbumImage">
           <AppIcon name="image" :size="21" color="var(--color-text-secondary)" />
         </view>
-        <view class="toolbar-btn" title="文件" @click="sendMockFile">
+        <view class="toolbar-btn" title="文件" @click="chooseFile">
           <AppIcon name="files" :size="21" color="var(--color-text-secondary)" />
         </view>
-        <view class="toolbar-btn" title="语音" @click="sendMockVoice">
+        <view class="toolbar-btn" title="语音" @click="showMediaUnavailable('语音发送需接入真实录音上传能力')">
           <AppIcon name="mic" :size="21" color="var(--color-text-secondary)" />
         </view>
       </view>
@@ -152,7 +152,7 @@ const props = defineProps({
   isDesktop: { type: Boolean, default: true }
 });
 
-const emit = defineEmits(['send', 'draft-change', 'cancel-reply', 'open-emoji', 'keyboard-change']);
+const emit = defineEmits(['send', 'draft-change', 'cancel-reply', 'open-emoji', 'keyboard-change', 'typing']);
 
 const text = ref('');
 const isComposing = ref(false);
@@ -167,6 +167,8 @@ const voiceCanceling = ref(false);
 const keyboardHeight = ref(0);
 const voiceCancelThreshold = 46;
 const fallbackKeyboardHeight = 280;
+const typingEmitInterval = 2000;
+let lastTypingEmitAt = 0;
 
 const attachActions = [
   { key: 'image', label: '图片', icon: 'image' },
@@ -217,12 +219,22 @@ onBeforeUnmount(() => {
 function handleInput() {
   if (isComposing.value) return;
   emit('draft-change', text.value);
+  emitTyping();
 }
 
 function handleCompositionEnd(event) {
   isComposing.value = false;
   text.value = event.detail.value || text.value;
   emit('draft-change', text.value);
+  emitTyping();
+}
+
+function emitTyping() {
+  if (!text.value.trim()) return;
+  const now = Date.now();
+  if (now - lastTypingEmitAt < typingEmitInterval) return;
+  lastTypingEmitAt = now;
+  emit('typing');
 }
 
 function handleSend() {
@@ -267,72 +279,13 @@ function chooseAlbumImage() {
 function chooseImage(sourceType) {
   showAttachPanel.value = false;
   voiceMode.value = false;
-  if (typeof uni.chooseImage !== 'function') {
-    sendMockImage();
-    return;
-  }
-  uni.chooseImage({
-    count: 1,
-    sourceType: [sourceType],
-    success: (res) => {
-      const path = res.tempFilePaths?.[0] || res.tempFiles?.[0]?.path || '';
-      if (!path) return;
-      emit('send', {
-        type: 'image',
-        content: path
-      });
-    },
-    fail: (error) => {
-      if (String(error?.errMsg || '').includes('cancel')) return;
-      uni.showToast({ title: sourceType === 'camera' ? '无法打开相机' : '无法选择图片', icon: 'none' });
-    }
-  });
-}
-
-function sendMockImage() {
-  emit('send', {
-    type: 'image',
-    content: 'https://images.unsplash.com/photo-1579202673506-ca3ce28943ef?auto=format&fit=crop&w=400&q=80'
-  });
+  showMediaUnavailable(sourceType === 'camera' ? '拍摄发送需接入真实上传能力' : '图片发送需接入真实上传能力');
 }
 
 function chooseFile() {
   showAttachPanel.value = false;
   voiceMode.value = false;
-  if (typeof uni.chooseFile !== 'function') {
-    sendMockFile();
-    return;
-  }
-  uni.chooseFile({
-    count: 1,
-    success: (res) => {
-      const file = res.tempFiles?.[0];
-      if (!file) return;
-      emit('send', {
-        type: 'file',
-        content: file.name || '未命名文件',
-        fileName: file.name || '未命名文件',
-        fileSize: formatFileSize(file.size),
-        fileType: getFileType(file.name),
-        url: file.path || '',
-        previewContent: ''
-      });
-    },
-    fail: (error) => {
-      if (String(error?.errMsg || '').includes('cancel')) return;
-      uni.showToast({ title: '无法选择文件', icon: 'none' });
-    }
-  });
-}
-
-function sendMockFile() {
-  emit('send', {
-    type: 'file',
-    content: 'AgentHub_IM_Preview_Guide.docx',
-    fileName: 'AgentHub_IM_Preview_Guide.docx',
-    fileSize: '4.8 MB',
-    previewContent: 'AgentHub IM 文件预览方案\n\n1. 右侧信息栏与预览栏二选一展示。\n2. 文件卡片提供查看和预览两个入口。\n3. 移动端通过新页面承载预览。'
-  });
+  showMediaUnavailable('文件发送需接入真实上传能力');
 }
 
 function toggleVoiceMode() {
@@ -387,15 +340,7 @@ function getPointerY(event) {
 
 function sendVoice(duration = 5) {
   showAttachPanel.value = false;
-  emit('send', {
-    type: 'voice',
-    content: '',
-    duration
-  });
-}
-
-function sendMockVoice() {
-  sendVoice(5);
+  showMediaUnavailable('语音发送需接入真实录音上传能力');
 }
 
 function handleOpenCamera() {
@@ -428,9 +373,7 @@ function handleInputFocus() {
 }
 
 function handleInputBlur() {
-  setTimeout(() => {
-    emit('keyboard-change', { height: 0, focused: false });
-  }, 80);
+  emit('keyboard-change', { height: 0, focused: false });
 }
 
 function handleKeyboardHeightChange(event) {
@@ -450,6 +393,10 @@ function formatFileSize(size) {
 function getFileType(name) {
   const match = String(name || '').toLowerCase().match(/\.([a-z0-9]+)$/);
   return match?.[1] || '';
+}
+
+function showMediaUnavailable(title) {
+  uni.showToast({ title, icon: 'none' });
 }
 
 </script>

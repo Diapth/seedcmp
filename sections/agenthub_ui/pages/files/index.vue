@@ -114,22 +114,16 @@ function focusSearch() {
 
 const uploadSheetVisible = ref(false);
 const uploadSheetItems = [
-  { label: '上传图片', onClick: () => doUpload('fig') },
-  { label: '上传PDF文档', onClick: () => doUpload('pdf') },
-  { label: '上传Word文件', onClick: () => doUpload('docx') }
+  { label: '上传图片', onClick: markUnavailable },
+  { label: '上传PDF文档', onClick: markUnavailable },
+  { label: '上传Word文件', onClick: markUnavailable }
 ];
 
-function doUpload(type) {
-  let mockFile = null;
-  if (type === 'fig') {
-    mockFile = { name: 'IMG_' + Date.now() + '.fig', size: '2.5 MB', type: 'fig', url: '' };
-  } else if (type === 'pdf') {
-    mockFile = { name: '开发说明文档_' + Math.floor(Math.random() * 100) + '.pdf', size: '1.8 MB', type: 'pdf', url: '' };
-  } else {
-    mockFile = { name: '测试需求说明书.docx', size: '512 KB', type: 'docx', url: '' };
-  }
-  fileStore.uploadFile(mockFile);
-  uni.showToast({ title: '上传成功', icon: 'success' });
+function markUnavailable() {
+  const reason = '文件上传需接入真实选择与上传能力';
+  uploadSheetVisible.value = false;
+  fileStore.markUnavailable(reason);
+  uni.showToast({ title: reason, icon: 'none' });
 }
 
 function handleUpload() {
