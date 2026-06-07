@@ -8,6 +8,10 @@ export default defineConfig({
   plugins: [
     uni()
   ],
+  server: {
+    port: 5174,
+    host: true
+  },
   build: {
     minify: false,
     sourcemap: true
