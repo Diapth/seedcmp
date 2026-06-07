@@ -212,9 +212,17 @@ export const useMessageStore = defineStore('message', {
   }),
   actions: {
     getMessages(conversationId, channelType = '') {
-      const direct = this.messages[conversationId] || [];
-      if (direct.length || !channelType) return direct;
-      return this.messages[channelKey(conversationId, channelType)] || [];
+      if (channelType) {
+        const backendType = toBackendChannelType(channelType);
+        const typedKey = channelKey(conversationId, backendType);
+        if (this.messages[typedKey]) return this.messages[typedKey];
+        return backendType === 1 ? (this.messages[String(conversationId)] || []) : [];
+      }
+      const legacy = this.messages[String(conversationId)];
+      if (legacy) return legacy;
+      const typedBuckets = [channelKey(conversationId, 1), channelKey(conversationId, 2)]
+        .filter((key) => this.messages[key]);
+      return typedBuckets.length === 1 ? this.messages[typedBuckets[0]] : [];
     },
     getConversationPreviewMessages(conversation = {}) {
       const channelId = conversation.channelId || conversation.id || conversation.raw?.channel_id || conversation.raw?.channelId || '';
@@ -225,11 +233,14 @@ export const useMessageStore = defineStore('message', {
     },
     ensureBucket(conversationId, channelType = '') {
       const key = String(conversationId);
-      if (!this.messages[key]) this.messages[key] = [];
       if (channelType) {
-        const typedKey = channelKey(conversationId, channelType);
-        if (!this.messages[typedKey]) this.messages[typedKey] = this.messages[key];
+        const backendType = toBackendChannelType(channelType);
+        const typedKey = channelKey(conversationId, backendType);
+        if (!this.messages[typedKey]) this.messages[typedKey] = [];
+        if (backendType === 1 && !this.messages[key]) this.messages[key] = this.messages[typedKey];
+        return this.messages[typedKey];
       }
+      if (!this.messages[key]) this.messages[key] = [];
       return this.messages[key];
     },
     addRealtimeMessage(channelId, channelType, rawMessage) {
@@ -256,7 +267,8 @@ export const useMessageStore = defineStore('message', {
         lastTime: msg.time,
         lastMessageSeq: msg.messageSeq
       });
-      if (convStore.activeId !== String(channelId)) {
+      const activeMessageKey = convStore.activeKey || (convStore.activeId === String(channelId) ? channelKey(channelId, backendType) : '');
+      if (activeMessageKey !== channelKey(channelId, backendType)) {
         conv.unread = (conv.unread || 0) + 1;
       }
       if (!conv.isMuted) {
@@ -329,8 +341,10 @@ export const useMessageStore = defineStore('message', {
         throw new AppError('图片、文件和语音发送需先接入真实上传能力', { code: 'MEDIA_SEND_UNAVAILABLE' });
       }
       const convStore = useConversationStore();
-      const conv = convStore.conversations.find((item) => item.id === conversationId);
-      const channelType = toBackendChannelType(conv?.channelType || conv?.type || extra.channelType || 1);
+      const conv = extra.channelType
+        ? convStore.getConversation(conversationId, extra.channelType)
+        : convStore.conversations.find((item) => item.key === extra.conversationKey) || convStore.conversations.find((item) => item.id === conversationId);
+      const channelType = toBackendChannelType(extra.channelType || conv?.channelType || conv?.type || 1);
       const authStore = useAuthStore();
       const profile = currentUserProfile();
       const clientMsgNo = extra.clientMsgNo || newClientMsgNo();
@@ -345,6 +359,7 @@ export const useMessageStore = defineStore('message', {
         type,
         time: Date.now(),
         status: 'sending',
+        channelType,
         ...extra
       });
       this.addMessage(conversationId, msg, channelType);
@@ -499,13 +514,21 @@ export const useMessageStore = defineStore('message', {
       }).catch(() => undefined);
       return true;
     },
-    deleteMessage(conversationId, messageId) {
-      const list = this.messages[conversationId];
+    deleteMessage(conversationId, messageId, channelType = '') {
+      const list = this.getMessages(conversationId, channelType);
       if (!list) return;
-      this.messages[conversationId] = list.filter((m) => m.id !== messageId);
+      const next = list.filter((m) => m.id !== messageId);
+      if (channelType) {
+        this.messages[channelKey(conversationId, channelType)] = next;
+        if (toBackendChannelType(channelType) === 1 && this.messages[String(conversationId)] === list) {
+          this.messages[String(conversationId)] = next;
+        }
+        return;
+      }
+      this.messages[String(conversationId)] = next;
     },
-    async editMessage(conversationId, messageId, newContent) {
-      const list = this.messages[conversationId];
+    async editMessage(conversationId, messageId, newContent, channelType = '') {
+      const list = this.getMessages(conversationId, channelType);
       if (!list) return;
       const msg = list.find((m) => m.id === messageId);
       if (!msg) return;

@@ -98,8 +98,8 @@
           <view class="tag-section flex-column gap-2">
             <text class="tag-label">标签</text>
             <view class="tag-list flex-row flex-wrap gap-1">
-              <view 
-                v-for="tag in defaultTags" 
+              <view
+                v-for="tag in defaultTags"
                 :key="tag.text"
                 class="tag-badge"
                 :class="tag.type"
@@ -204,17 +204,16 @@ function getAvatarBg(item) {
   if (firstChar === '张') return '#22c55e'; // 绿色
   if (firstChar === '李') return '#ea580c'; // 橙色
   if (firstChar === '王') return '#e11d48'; // 红色
-  
+
   const colors = ['#22c55e', '#ea580c', '#e11d48', '#2563eb', '#7c3aed'];
   const code = (item.id && item.id.charCodeAt(0)) || 0;
   return colors[code % colors.length];
 }
 
 function startChat() {
-  let conv = convStore.conversations.find((c) => c.id === props.contact.id);
+  let conv = convStore.getConversation(props.contact.id, 1);
   if (!conv) {
-    conv = {
-      id: props.contact.id,
+    conv = convStore.addOrUpdateConversation(props.contact.id, 1, {
       name: props.contact.nickname,
       avatar: props.contact.avatar,
       type: 'single',
@@ -224,11 +223,10 @@ function startChat() {
       isPinned: false,
       isMuted: false,
       draft: ''
-    };
-    convStore.conversations.push(conv);
+    });
   }
 
-  convStore.setActiveId(props.contact.id);
+  convStore.setActiveId(props.contact.id, 1);
   uni.setStorageSync('active_conversation_id', props.contact.id);
   uni.redirectTo({ url: '/pages/chat/index' });
 }

@@ -189,9 +189,8 @@ function matchText(queryText, ...parts) {
 function openResult(item) {
   if (item.type === 'agent') {
     const agent = agentStore.agents.find(agentItem => agentItem.id === item.id);
-    if (agent && !convStore.conversations.some(conversation => conversation.id === agent.id)) {
-      convStore.conversations.push({
-        id: agent.id,
+    if (agent && !convStore.getConversation(agent.id, 1)) {
+      convStore.addOrUpdateConversation(agent.id, 1, {
         name: agent.name,
         avatar: agent.avatar,
         type: 'robot',
@@ -203,24 +202,23 @@ function openResult(item) {
         draft: ''
       });
     }
-    if (agent && !messageStore.messages[agent.id]) {
-      messageStore.messages[agent.id] = [
-        {
-          id: Date.now().toString(),
-          senderId: agent.id,
-          senderName: agent.name,
-          content: `你好！我是 "${agent.name}"，很高兴为您服务。${agent.desc}`,
-          type: 'text',
-          time: Date.now(),
-          status: 'success'
-        }
-      ];
+    if (agent && !messageStore.getMessages(agent.id, 1).length) {
+      messageStore.addMessage(agent.id, {
+        id: Date.now().toString(),
+        senderId: agent.id,
+        senderName: agent.name,
+        content: `你好！我是 "${agent.name}"，很高兴为您服务。${agent.desc}`,
+        type: 'text',
+        time: Date.now(),
+        status: 'success',
+        channelType: 1
+      }, 1);
     }
-    convStore.setActiveId(item.id);
+    convStore.setActiveId(item.id, 1);
     uni.setStorageSync('active_conversation_id', item.id);
     uni.redirectTo({ url: '/pages/chat/index' });
   } else if (item.type === 'conversation') {
-    convStore.setActiveId(item.id);
+    convStore.setActiveId(item.id, item.channelType || item.type || 1);
     uni.setStorageSync('active_conversation_id', item.id);
     uni.redirectTo({ url: '/pages/chat/index' });
   } else if (item.type === 'files') {

@@ -113,6 +113,7 @@ function isPlaceholderConversationName(name = '') {
 export const useConversationStore = defineStore('conversation', {
   state: () => ({
     activeId: '',
+    activeKey: storage.get('active_conversation_key') || '',
     currentUid: storage.get('auth.uid') || '',
     conversations: [],
     members: {},
@@ -134,6 +135,13 @@ export const useConversationStore = defineStore('conversation', {
     },
     isGroupCreator(state) {
       return (convId, userId) => state.creatorIds[convId] === userId;
+    },
+    activeConversation(state) {
+      if (state.activeKey) {
+        const byKey = state.conversations.find((item) => item.key === state.activeKey);
+        if (byKey) return byKey;
+      }
+      return state.conversations.find((item) => item.id === state.activeId) || null;
     }
   },
   actions: {
@@ -274,10 +282,23 @@ export const useConversationStore = defineStore('conversation', {
       }
       return next;
     },
-    setActiveId(id) {
-      this.activeId = id;
-      this.clearUnread(id);
-      storage.set('active_conversation_id', id);
+    setActiveId(id, channelType = '') {
+      const normalizedId = String(id || '');
+      const explicitType = channelType ? toBackendChannelType(channelType) : 0;
+      const conversation = explicitType
+        ? this.getConversation(normalizedId, explicitType)
+        : this.conversations.find((item) => item.key === normalizedId) || this.conversations.find((item) => item.id === normalizedId);
+      const activeId = conversation?.id || normalizedId;
+      const activeType = conversation?.channelType || explicitType;
+      this.activeId = activeId;
+      this.activeKey = conversation?.key || (activeId && activeType ? channelKey(activeId, activeType) : '');
+      this.clearUnread(activeId, activeType || '');
+      storage.set('active_conversation_id', activeId);
+      if (this.activeKey) {
+        storage.set('active_conversation_key', this.activeKey);
+      } else {
+        storage.remove('active_conversation_key');
+      }
     },
     async clearUnread(id, channelType = '') {
       const conv = this.getConversation(id, channelType) || this.conversations.find((c) => c.id === id);
@@ -327,9 +348,13 @@ export const useConversationStore = defineStore('conversation', {
       syncApi.updateConversationExtra(channelId, backendType, { draft: normalizedDraft }).catch(() => undefined);
       return conv;
     },
-    updateConversationDraft(id, draftText) {
-      const conv = this.conversations.find((item) => item.id === id);
-      this.setDraft(id, conv?.channelType || conv?.type || 1, draftText);
+    updateConversationDraft(id, draftText, channelType = '') {
+      const conv = channelType
+        ? this.getConversation(id, channelType)
+        : (this.activeId === String(id) && this.activeKey
+            ? this.conversations.find((item) => item.key === this.activeKey)
+            : this.conversations.find((item) => item.id === id));
+      this.setDraft(id, conv?.channelType || channelType || conv?.type || 1, draftText);
     },
     async pinConversation(id, pinned) {
       const conv = this.conversations.find((c) => c.id === id);
@@ -357,7 +382,12 @@ export const useConversationStore = defineStore('conversation', {
       const conv = this.conversations.find((c) => c.id === id);
       this.conversations = this.conversations.filter((c) => c.id !== id);
       this.isHidden = this.isHidden.filter((x) => x !== id);
-      if (this.activeId === id) this.activeId = '';
+      if (this.activeId === id) {
+        this.activeId = '';
+        this.activeKey = '';
+        storage.remove('active_conversation_id');
+        storage.remove('active_conversation_key');
+      }
       if (conv) {
         await syncApi.deleteConversation(conv.id, conv.channelType).catch(() => undefined);
       }
@@ -409,6 +439,7 @@ export const useConversationStore = defineStore('conversation', {
     },
     reset() {
       this.activeId = '';
+      this.activeKey = '';
       this.conversations = [];
       this.members = {};
       this.announcements = {};

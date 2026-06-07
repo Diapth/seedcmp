@@ -246,7 +246,7 @@ function handleGroupClick(groupName) {
 
 function handleSelectGroupConv(conv) {
   // 如果是桌面端，切换至对应的群聊详情；如果是移动端，切换至群会话。
-  convStore.setActiveId(conv.id);
+  convStore.setActiveId(conv.id, conv.channelType || conv.type || 2);
   uni.setStorageSync('active_conversation_id', conv.id);
   uni.redirectTo({ url: '/pages/chat/index' });
 }

@@ -125,10 +125,10 @@ async function handleCreate() {
       lastMessage: '你创建了群聊',
       lastTime: Date.now()
     });
-    convStore.setActiveId(groupId);
+    convStore.setActiveId(groupId, 2);
     uni.showToast({ title: '群聊创建成功', icon: 'success' });
     uni.redirectTo({
-      url: `/pages/chat/detail?id=${groupId}`
+      url: `/pages/chat/detail?id=${groupId}&channelType=2`
     });
   } catch (err) {
     uni.showToast({ title: err?.message || '群聊创建失败', icon: 'none' });

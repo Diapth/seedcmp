@@ -375,7 +375,7 @@ const remarkDialogVisible = ref(false);
 const remarkDraft = ref('');
 
 const activeConversation = computed(() => {
-  return convStore.conversations.find(c => c.id === convStore.activeId) || null;
+  return convStore.activeConversation || null;
 });
 
 const messagesList = computed(() => {
@@ -441,14 +441,18 @@ onMounted(async () => {
     showNotificationBanner.value = false;
   }
   
+  const persistedKey = storage.get('active_conversation_key');
   const persistedId = storage.get('active_conversation_id');
-  if (persistedId) {
-    convStore.setActiveId(persistedId);
+  if (persistedKey || persistedId) {
+    convStore.setActiveId(persistedKey || persistedId);
   }
   if (activeConversation.value) {
     hydrateActiveMessages(activeConversation.value);
   }
   await convStore.fetchConversations().catch(() => undefined);
+  if (persistedKey || persistedId) {
+    convStore.setActiveId(persistedKey || persistedId);
+  }
   await hydrateActiveMessages();
   await hydrateActiveDeploymentCard();
 });
@@ -457,17 +461,21 @@ onBeforeUnmount(() => {
   clearVisibleHistoryRefresh();
 });
 
-function handleSelectConversation(id) {
-  storage.set('active_conversation_id', id);
-  convStore.setActiveId(id);
-  const conversation = convStore.conversations.find((item) => item.id === id) || activeConversation.value;
+function handleSelectConversation(payload) {
+  const conversation = typeof payload === 'object' && payload
+    ? payload
+    : convStore.conversations.find((item) => item.key === payload) || convStore.conversations.find((item) => item.id === payload) || activeConversation.value;
+  if (!conversation) return;
+  const id = conversationChannelId(conversation);
+  const channelType = conversationChannelType(conversation);
+  convStore.setActiveId(id, channelType);
   hydrateActiveMessages(conversation);
   hydrateActiveDeploymentCard(conversation);
   closeFilePreview();
   closeMemberProfile();
   if (!isDesktop.value) {
     uni.navigateTo({
-      url: `/pages/chat/detail?id=${id}`
+      url: `/pages/chat/detail?id=${id}&channelType=${channelType}`
     });
   }
 }
@@ -641,9 +649,13 @@ function handleSendMessage({ type, content, fileName, fileSize, replyRef, previe
     name: appStore.currentUser?.nickname || '我'
   };
 
-  const extra = {};
-  if (type === 'text' && activeConversation.value?.type === 'group') {
-    const members = convStore.groupMembers(activeConversation.value.id);
+  const conv = activeConversation.value;
+  if (!conv) return;
+  const channelId = conversationChannelId(conv);
+  const channelType = conversationChannelType(conv);
+  const extra = { channelType, conversationKey: conv.key };
+  if (type === 'text' && conv.type === 'group') {
+    const members = convStore.groupMembers(conv.id);
     const mentions = [];
     let cursor = 0;
     while (cursor < content.length) {
@@ -665,7 +677,7 @@ function handleSendMessage({ type, content, fileName, fileSize, replyRef, previe
   }
   if (replyRef) extra.replyRef = replyRef;
 
-  const newMsg = messageStore.sendMessage(convStore.activeId, content, sender, type, extra);
+  const newMsg = messageStore.sendMessage(channelId, content, sender, type, extra);
   if (type === 'file') {
     newMsg.fileName = fileName;
     newMsg.fileSize = fileSize;
@@ -674,7 +686,6 @@ function handleSendMessage({ type, content, fileName, fileSize, replyRef, previe
     newMsg.url = url || '';
   }
 
-  const conv = activeConversation.value;
   if (conv) {
     if (type === 'text') conv.lastMessage = content;
     else if (type === 'image') conv.lastMessage = '[图片]';
@@ -686,7 +697,9 @@ function handleSendMessage({ type, content, fileName, fileSize, replyRef, previe
 }
 
 function handleDraftChange(draftVal) {
-  convStore.updateConversationDraft(convStore.activeId, draftVal);
+  const conv = activeConversation.value;
+  if (!conv) return;
+  convStore.updateConversationDraft(conversationChannelId(conv), draftVal, conversationChannelType(conv));
 }
 
 function handleTyping() {
@@ -712,13 +725,17 @@ function openContextMenu({ event, msg }) {
 }
 
 function handleMenuAction({ action, msg, emoji }) {
+  const conv = activeConversation.value;
+  const channelId = conversationChannelId(conv);
+  const channelType = conversationChannelType(conv);
+  if (!channelId || !channelType) return;
   if (action === 'react-emoji') {
-    messageStore.reactMessage(convStore.activeId, msg.id, emoji, 'me');
+    messageStore.reactMessage(channelId, msg.id, emoji, 'me', channelType);
   } else if (action === 'delete') {
-    messageStore.deleteMessage(convStore.activeId, msg.id);
+    messageStore.deleteMessage(channelId, msg.id, channelType);
   } else if (action === 'revoke') {
     if (msg.senderId !== 'me') return;
-    messageStore.revokeMessage(convStore.activeId, msg.id);
+    messageStore.revokeMessage(channelId, msg.id, channelType);
   } else if (action === 'reply') {
     replyTarget.value = {
       id: msg.id,
@@ -742,7 +759,8 @@ function handleFilePreviewQuote(payload) {
 
 function handleEmojiSelect(emoji) {
   if (emojiPickerMode.value === 'reaction' && selectedMenuMsg.value) {
-    messageStore.reactMessage(convStore.activeId, selectedMenuMsg.value.id, emoji, 'me');
+    const conv = activeConversation.value;
+    if (conv) messageStore.reactMessage(conversationChannelId(conv), selectedMenuMsg.value.id, emoji, 'me', conversationChannelType(conv));
     emojiPickerVisible.value = false;
     return;
   }
@@ -751,7 +769,8 @@ function handleEmojiSelect(emoji) {
 }
 
 function handleMessageReact({ msg, emoji }) {
-  messageStore.reactMessage(convStore.activeId, msg.id, emoji, 'me');
+  const conv = activeConversation.value;
+  if (conv) messageStore.reactMessage(conversationChannelId(conv), msg.id, emoji, 'me', conversationChannelType(conv));
 }
 
 function handleShowReactionUsers({ msg, emoji }) {
@@ -773,9 +792,10 @@ function openInputEmojiPicker() {
 }
 
 function appendToDraft(text) {
-  if (!activeConversation.value) return;
-  const current = activeConversation.value.draft || '';
-  convStore.updateConversationDraft(activeConversation.value.id, `${current}${text}`);
+  const conv = activeConversation.value;
+  if (!conv) return;
+  const current = conv.draft || '';
+  convStore.updateConversationDraft(conversationChannelId(conv), `${current}${text}`, conversationChannelType(conv));
 }
 
 function openMemberContextMenu({ event, member }) {
@@ -943,11 +963,12 @@ function handleMemberMenuSelect(item) {
 }
 
 function insertMention(member) {
-  if (!activeConversation.value || activeConversation.value.type !== 'group') return;
+  const conv = activeConversation.value;
+  if (!conv || conv.type !== 'group') return;
   const name = member.nickname || member.name;
-  const current = activeConversation.value.draft || '';
+  const current = conv.draft || '';
   const prefix = current && !current.endsWith(' ') ? ' ' : '';
-  convStore.updateConversationDraft(activeConversation.value.id, `${current}${prefix}@${name} `);
+  convStore.updateConversationDraft(conversationChannelId(conv), `${current}${prefix}@${name} `, conversationChannelType(conv));
   uni.showToast({ title: `已 @${name}`, icon: 'none' });
 }
 
@@ -968,8 +989,7 @@ function saveMemberRemark() {
 function startDirectChat(member) {
   const conv = convStore.upsertDirectConversation(member);
   if (!conv) return;
-  convStore.setActiveId(conv.id);
-  storage.set('active_conversation_id', conv.id);
+  convStore.setActiveId(conv.id, conv.channelType || 1);
   uni.showToast({ title: `已切换到 ${conv.name}`, icon: 'none' });
 }
 

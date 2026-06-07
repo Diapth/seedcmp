@@ -341,19 +341,18 @@ function atModify(task) {
   const mentionText = `${alias} 请修改「${task.task}」：${task.modifyHint}`;
   const currentDraft = convStore.conversations.find(conv => conv.id === board.groupId)?.draft || '';
   const spacer = currentDraft && !currentDraft.endsWith('\n') ? '\n' : '';
-  convStore.updateConversationDraft(board.groupId, `${currentDraft}${spacer}${mentionText}`);
-  convStore.setActiveId(board.groupId);
+  convStore.updateConversationDraft(board.groupId, `${currentDraft}${spacer}${mentionText}`, 2);
+  convStore.setActiveId(board.groupId, 2);
   uni.setStorageSync('active_conversation_id', board.groupId);
   uni.navigateTo({
-    url: `/pages/chat/detail?id=${encodeURIComponent(board.groupId)}`
+    url: `/pages/chat/detail?id=${encodeURIComponent(board.groupId)}&channelType=2`
   });
 }
 
 function ensureGroupConversation(board, task) {
-  let conv = convStore.conversations.find(item => item.id === board.groupId);
+  let conv = convStore.getConversation(board.groupId, 2);
   if (!conv) {
-    conv = {
-      id: board.groupId,
+    conv = convStore.addOrUpdateConversation(board.groupId, 2, {
       name: board.groupName,
       avatar: '',
       type: 'group',
@@ -364,8 +363,7 @@ function ensureGroupConversation(board, task) {
       isPinned: false,
       isMuted: false,
       draft: ''
-    };
-    convStore.conversations.unshift(conv);
+    });
   } else {
     conv.type = 'group';
     conv.memberCount = conv.memberCount || board.memberCount;
@@ -373,9 +371,7 @@ function ensureGroupConversation(board, task) {
     conv.lastTime = Date.now();
   }
 
-  if (!messageStore.messages[board.groupId]) {
-    messageStore.messages[board.groupId] = [];
-  }
+  messageStore.ensureBucket(board.groupId, 2);
 }
 
 function goBack() {

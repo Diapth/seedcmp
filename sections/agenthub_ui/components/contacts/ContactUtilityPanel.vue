@@ -285,10 +285,9 @@ async function handleSearch() {
 function goChat() {
   if (!searchResult.value) return;
 
-  let conv = convStore.conversations.find(item => item.id === searchResult.value.id);
+  let conv = convStore.getConversation(searchResult.value.id, 1);
   if (!conv) {
-    conv = {
-      id: searchResult.value.id,
+    conv = convStore.addOrUpdateConversation(searchResult.value.id, 1, {
       name: searchResult.value.nickname,
       avatar: searchResult.value.avatar,
       type: 'single',
@@ -298,11 +297,10 @@ function goChat() {
       isPinned: false,
       isMuted: false,
       draft: ''
-    };
-    convStore.conversations.push(conv);
+    });
   }
 
-  convStore.setActiveId(searchResult.value.id);
+  convStore.setActiveId(searchResult.value.id, 1);
   uni.setStorageSync('active_conversation_id', searchResult.value.id);
   uni.redirectTo({ url: '/pages/chat/index' });
 }
