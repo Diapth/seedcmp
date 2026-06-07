@@ -55,9 +55,9 @@
       <view v-if="sortedConversations.length > 0">
         <ConversationItem
           v-for="item in sortedConversations"
-          :key="item.id"
+          :key="item.key || item.id"
           :data="item"
-          :active="convStore.activeId === item.id"
+          :active="convStore.activeKey ? convStore.activeKey === item.key : convStore.activeId === item.id"
           @select="handleSelect"
           @contextmenu="openContextMenu"
         />
@@ -198,9 +198,9 @@ function exitOrDisband(conv, isCreator) {
   });
 }
 
-function handleSelect(id) {
-  convStore.setActiveId(id);
-  emit('select', id);
+function handleSelect(conversation) {
+  convStore.setActiveId(conversation.id, conversation.channelType || conversation.type);
+  emit('select', conversation);
 }
 
 function openContextMenu(payload) {

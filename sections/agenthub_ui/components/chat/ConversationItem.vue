@@ -2,7 +2,7 @@
   <view
     class="conversation-item"
     :class="{ active: active, pinned: data.isPinned }"
-    @click="$emit('select', data.id)"
+    @click="$emit('select', data)"
     @contextmenu.prevent="$emit('contextmenu', { event: $event, conv: data })"
     @longpress="$emit('contextmenu', { event: $event, conv: data })"
   >

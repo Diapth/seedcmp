@@ -49,7 +49,7 @@ const navStore = useNavigationStore();
 const convStore = useConversationStore();
 
 const groupInfo = computed(() => {
-  return convStore.conversations.find(item => item.id === convStore.activeId) || {
+  return convStore.activeConversation || convStore.conversations.find(item => item.id === convStore.activeId && item.channelType === 2) || {
     id: convStore.activeId || '',
     name: '群聊',
     avatar: ''

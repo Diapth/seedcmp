@@ -362,7 +362,7 @@ const keyboardInset = ref(0);
 const keyboardPanelHeight = ref(280);
 
 const activeConversation = computed(() => {
-  return convStore.conversations.find((c) => c.id === convStore.activeId) || null;
+  return convStore.activeConversation || null;
 });
 
 const messagesList = computed(() => {
@@ -448,19 +448,21 @@ onMounted(async () => {
   const pages = getCurrentPages();
   const currentPage = pages[pages.length - 1];
   const id = currentPage?.$page?.options?.id || '1';
+  const channelType = currentPage?.$page?.options?.channelType || '';
   const atMemberId = currentPage?.$page?.options?.at;
-  convStore.setActiveId(id);
+  convStore.setActiveId(id, channelType);
   if (activeConversation.value) {
     hydrateActiveMessages(activeConversation.value);
   }
   await convStore.fetchConversations().catch(() => undefined);
+  convStore.setActiveId(id, channelType);
   await hydrateActiveMessages();
   await hydrateActiveDeploymentCard();
 
   // Restore persisted draft
-  const persistedDraft = storage.get(`draft:${id}`);
-  if (persistedDraft && !convStore.conversations.find((c) => c.id === id)?.draft) {
-    convStore.updateConversationDraft(id, persistedDraft);
+  const persistedDraft = storage.get(`draft:${id}-${channelType || activeConversation.value?.channelType || 1}`) || storage.get(`draft:${id}`);
+  if (persistedDraft && !activeConversation.value?.draft) {
+    convStore.updateConversationDraft(id, persistedDraft, channelType || activeConversation.value?.channelType);
   }
 
   // 移动端长按群成员跳入 chat: query.at=memberId -> 自动 @ 成员
@@ -468,8 +470,9 @@ onMounted(async () => {
     const member = convStore.groupMembers(activeConversation.value.id).find((m) => m.id === atMemberId);
     if (member) {
       // 通过 draft 注入 @昵称 占位
-      const cur = convStore.conversations.find((c) => c.id === id)?.draft || '';
-      convStore.updateConversationDraft(id, cur ? `${cur}@${member.nickname} ` : `@${member.nickname} `);
+      const conv = activeConversation.value;
+      const cur = conv?.draft || '';
+      convStore.updateConversationDraft(id, cur ? `${cur}@${member.nickname} ` : `@${member.nickname} `, channelType || conv?.channelType);
     }
   }
 
@@ -480,12 +483,13 @@ onMounted(async () => {
 
 onBeforeUnmount(() => {
   clearVisibleHistoryRefresh();
-  if (convStore.activeId) {
-    const conv = convStore.conversations.find((c) => c.id === convStore.activeId);
+  const conv = activeConversation.value;
+  if (conv) {
+    const draftKey = `draft:${conversationChannelId(conv)}-${conversationChannelType(conv)}`;
     if (conv?.draft) {
-      storage.set(`draft:${convStore.activeId}`, conv.draft);
+      storage.set(draftKey, conv.draft);
     } else {
-      storage.remove(`draft:${convStore.activeId}`);
+      storage.remove(draftKey);
     }
   }
 });
@@ -568,9 +572,12 @@ function navigateToConversationProfile(conversation) {
   uni.navigateTo({ url: `/pages/profile/index?${params}` });
 }
 
-function handleSelectConversation(id) {
-  convStore.setActiveId(id);
-  const conversation = convStore.conversations.find((item) => item.id === id) || activeConversation.value;
+function handleSelectConversation(payload) {
+  const conversation = typeof payload === 'object' && payload
+    ? payload
+    : convStore.conversations.find((item) => item.key === payload) || convStore.conversations.find((item) => item.id === payload) || activeConversation.value;
+  if (!conversation) return;
+  convStore.setActiveId(conversationChannelId(conversation), conversationChannelType(conversation));
   hydrateActiveMessages(conversation);
   hydrateActiveDeploymentCard(conversation);
   closeFilePreview();
@@ -663,10 +670,14 @@ function handleSendMessage({ type, content, fileName, fileSize, replyRef, previe
     name: appStore.currentUser?.nickname || '我'
   };
 
+  const conv = activeConversation.value;
+  if (!conv) return;
+  const channelId = conversationChannelId(conv);
+  const channelType = conversationChannelType(conv);
   // 解析 mentions: 从当前 text 提取 @昵称 -> 对应 groupMembers
-  const extra = {};
-  if (type === 'text' && activeConversation.value?.type === 'group') {
-    const members = convStore.groupMembers(activeConversation.value.id);
+  const extra = { channelType, conversationKey: conv.key };
+  if (type === 'text' && conv.type === 'group') {
+    const members = convStore.groupMembers(conv.id);
     const mentions = [];
     let cursor = 0;
     while (cursor < content.length) {
@@ -689,7 +700,7 @@ function handleSendMessage({ type, content, fileName, fileSize, replyRef, previe
   }
   if (replyRef) extra.replyRef = replyRef;
 
-  const newMsg = messageStore.sendMessage(convStore.activeId, content, sender, type, extra);
+  const newMsg = messageStore.sendMessage(channelId, content, sender, type, extra);
 
   if (type === 'file') {
     newMsg.fileName = fileName;
@@ -699,7 +710,6 @@ function handleSendMessage({ type, content, fileName, fileSize, replyRef, previe
     newMsg.url = url || '';
   }
 
-  const conv = activeConversation.value;
   if (conv) {
     if (type === 'text') conv.lastMessage = content;
     else if (type === 'image') conv.lastMessage = '[图片]';
@@ -711,7 +721,9 @@ function handleSendMessage({ type, content, fileName, fileSize, replyRef, previe
 }
 
 function handleDraftChange(draftVal) {
-  convStore.updateConversationDraft(convStore.activeId, draftVal);
+  const conv = activeConversation.value;
+  if (!conv) return;
+  convStore.updateConversationDraft(conversationChannelId(conv), draftVal, conversationChannelType(conv));
 }
 
 function handleTyping() {
@@ -735,14 +747,18 @@ function openContextMenu({ event, msg }) {
 }
 
 function handleMenuAction({ action, msg, emoji }) {
+  const conv = activeConversation.value;
+  const channelId = conversationChannelId(conv);
+  const channelType = conversationChannelType(conv);
+  if (!channelId || !channelType) return;
   if (action === 'react-emoji') {
-    messageStore.reactMessage(convStore.activeId, msg.id, emoji, 'me');
+    messageStore.reactMessage(channelId, msg.id, emoji, 'me', channelType);
   } else if (action === 'delete') {
-    messageStore.deleteMessage(convStore.activeId, msg.id);
+    messageStore.deleteMessage(channelId, msg.id, channelType);
   } else if (action === 'revoke') {
     // 权限检查: 仅自己消息
     if (msg.senderId !== 'me') return;
-    messageStore.revokeMessage(convStore.activeId, msg.id);
+    messageStore.revokeMessage(channelId, msg.id, channelType);
   } else if (action === 'reply') {
     replyTarget.value = {
       id: msg.id,
@@ -766,7 +782,8 @@ function handleFilePreviewQuote(payload) {
 
 function handleEmojiSelect(emoji) {
   if (emojiPickerMode.value === 'reaction' && selectedMenuMsg.value) {
-    messageStore.reactMessage(convStore.activeId, selectedMenuMsg.value.id, emoji, 'me');
+    const conv = activeConversation.value;
+    if (conv) messageStore.reactMessage(conversationChannelId(conv), selectedMenuMsg.value.id, emoji, 'me', conversationChannelType(conv));
     emojiPickerVisible.value = false;
     return;
   }
@@ -845,7 +862,8 @@ function resolveName(uid) {
 }
 
 function handleMessageReact({ msg, emoji }) {
-  messageStore.reactMessage(convStore.activeId, msg.id, emoji, 'me');
+  const conv = activeConversation.value;
+  if (conv) messageStore.reactMessage(conversationChannelId(conv), msg.id, emoji, 'me', conversationChannelType(conv));
 }
 
 function handleShowReactionUsers({ msg, emoji }) {
@@ -884,9 +902,10 @@ function handleKeyboardChange({ height = 0, focused = false } = {}) {
 }
 
 function appendToDraft(text) {
-  if (!activeConversation.value) return;
-  const current = activeConversation.value.draft || '';
-  convStore.updateConversationDraft(activeConversation.value.id, `${current}${text}`);
+  const conv = activeConversation.value;
+  if (!conv) return;
+  const current = conv.draft || '';
+  convStore.updateConversationDraft(conversationChannelId(conv), `${current}${text}`, conversationChannelType(conv));
 }
 
 function openMemberContextMenu({ event, member }) {
@@ -1055,11 +1074,12 @@ function handleMemberMenuSelect(item) {
 }
 
 function insertMention(member) {
-  if (!activeConversation.value || activeConversation.value.type !== 'group') return;
+  const conv = activeConversation.value;
+  if (!conv || conv.type !== 'group') return;
   const name = member.nickname || member.name;
-  const current = activeConversation.value.draft || '';
+  const current = conv.draft || '';
   const prefix = current && !current.endsWith(' ') ? ' ' : '';
-  convStore.updateConversationDraft(activeConversation.value.id, `${current}${prefix}@${name} `);
+  convStore.updateConversationDraft(conversationChannelId(conv), `${current}${prefix}@${name} `, conversationChannelType(conv));
   uni.showToast({ title: `已 @${name}`, icon: 'none' });
 }
 
@@ -1080,10 +1100,9 @@ function saveMemberRemark() {
 function startDirectChat(member) {
   const conv = convStore.upsertDirectConversation(member);
   if (!conv) return;
-  convStore.setActiveId(conv.id);
-  storage.set('active_conversation_id', conv.id);
+  convStore.setActiveId(conv.id, conv.channelType || 1);
   if (!isDesktop.value) {
-    uni.redirectTo({ url: `/pages/chat/detail?id=${conv.id}` });
+    uni.redirectTo({ url: `/pages/chat/detail?id=${conv.id}&channelType=${conv.channelType || 1}` });
   }
   uni.showToast({ title: `已切换到 ${conv.name}`, icon: 'none' });
 }

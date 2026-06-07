@@ -168,7 +168,8 @@ const groupData = computed(() => {
 });
 
 const sharedFiles = computed(() => {
-  const msgs = messageStore.messages[props.conversation.id] || [];
+  const channelType = props.conversation?.channelType || props.conversation?.type || 1;
+  const msgs = messageStore.getMessages(props.conversation.id, channelType);
   return msgs.filter((m) => m.type === 'file');
 });
 

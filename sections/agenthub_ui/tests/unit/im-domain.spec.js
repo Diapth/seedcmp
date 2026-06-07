@@ -6,7 +6,7 @@ import { useContactStore } from '../../stores/contact.js';
 import { useConversationStore } from '../../stores/conversation.js';
 import { useGroupStore } from '../../stores/group.js';
 import { useMessageStore } from '../../stores/message.js';
-import { resetStorageForTests } from '../../utils/storage.js';
+import { resetStorageForTests, storage } from '../../utils/storage.js';
 import { resetRequestRuntimeForTests, setRequestAdapter } from '../../utils/request.js';
 import { createInboundMessage, toConversationItem } from '../../utils/im-mappers.js';
 import { isClowderConversation, shouldShowProjectWorkspaceLoading } from '../../utils/clowder-conversation.js';
@@ -859,6 +859,59 @@ describe('IM domain mapping and stores', () => {
 
     expect(conversationStore.conversations[0].draft).toBe('跨端草稿');
     expect(conversationStore.getDraft('friend-a', 1)).toBe('跨端草稿');
+  });
+
+  it('keeps active conversation scoped by channel type when direct and group share channel id', async () => {
+    const adapter = vi.fn(async () => ({ status: 200, data: { code: 0, data: {} } }));
+    setRequestAdapter(adapter);
+    const conversationStore = useConversationStore();
+    conversationStore.addOrUpdateConversation('same-channel', 2, {
+      name: '未命名会话',
+      type: 'group',
+      lastTime: 1780741000000
+    });
+    conversationStore.addOrUpdateConversation('same-channel', 1, {
+      name: '测试员B',
+      type: 'single',
+      lastTime: 1780742000000
+    });
+
+    await conversationStore.setActiveId('same-channel', 2);
+    expect(conversationStore.activeConversation).toMatchObject({
+      id: 'same-channel',
+      channelType: 2,
+      type: 'group'
+    });
+
+    await conversationStore.setActiveId('same-channel', 1);
+    expect(conversationStore.activeConversation).toMatchObject({
+      id: 'same-channel',
+      channelType: 1,
+      type: 'single',
+      name: '测试员B'
+    });
+    expect(storage.get('active_conversation_key')).toBe('same-channel-1');
+  });
+
+  it('keeps direct and group message buckets separate when channel id is reused', () => {
+    const messageStore = useMessageStore();
+    messageStore.addMessage('same-channel', {
+      id: 'direct-1',
+      clientMsgNo: 'direct-1',
+      content: '测试员B 历史单聊',
+      type: 'text',
+      channelType: 1
+    }, 1);
+    messageStore.addMessage('same-channel', {
+      id: 'group-1',
+      clientMsgNo: 'group-1',
+      content: '群聊消息',
+      type: 'text',
+      channelType: 2
+    }, 2);
+
+    expect(messageStore.getMessages('same-channel', 1).map((msg) => msg.content)).toEqual(['测试员B 历史单聊']);
+    expect(messageStore.getMessages('same-channel', 2).map((msg) => msg.content)).toEqual(['群聊消息']);
   });
 
   it('clears unread locally and posts the backend read cursor', async () => {

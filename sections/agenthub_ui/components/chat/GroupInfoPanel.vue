@@ -119,7 +119,7 @@ const announcementText = computed(() => {
 });
 
 const sharedFiles = computed(() => {
-  const msgs = messageStore.messages[props.group.id] || [];
+  const msgs = messageStore.getMessages(props.group.id, 2);
   return msgs.filter((m) => m.type === 'file').slice(0, 4);
 });
 

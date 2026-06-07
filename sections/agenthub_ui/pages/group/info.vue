@@ -54,7 +54,7 @@ const memberTapGuard = ref({ memberId: '', until: 0 });
 const groupId = computed(() => readOption('id') || convStore.activeId || '2');
 
 const conversation = computed(() => {
-  return convStore.conversations.find((item) => item.id === groupId.value) || null;
+  return convStore.getConversation(groupId.value, 2) || null;
 });
 
 const groupData = computed(() => {
@@ -82,7 +82,7 @@ onMounted(() => {
   const currentPage = pages[pages.length - 1];
   routeOptions.value = currentPage?.$page?.options || {};
   if (groupId.value) {
-    convStore.setActiveId(groupId.value);
+    convStore.setActiveId(groupId.value, 2);
     groupStore.setActiveGroupId(groupId.value);
   }
   navStore.setActiveModule('chat');

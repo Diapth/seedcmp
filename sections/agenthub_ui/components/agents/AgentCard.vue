@@ -82,10 +82,9 @@ const statusText = computed(() => {
 function startChat() {
   const agent = props.agent;
   
-  let conv = convStore.conversations.find(c => c.id === agent.id);
+  let conv = convStore.getConversation(agent.id, 1);
   if (!conv) {
-    conv = {
-      id: agent.id,
+    conv = convStore.addOrUpdateConversation(agent.id, 1, {
       name: agent.name,
       avatar: agent.avatar,
       type: 'robot',
@@ -95,25 +94,23 @@ function startChat() {
       isPinned: false,
       isMuted: false,
       draft: ''
-    };
-    convStore.conversations.push(conv);
+    });
+  }
+
+  if (!msgStore.getMessages(agent.id, 1).length) {
+    msgStore.addMessage(agent.id, {
+      id: Date.now().toString(),
+      senderId: agent.id,
+      senderName: agent.name,
+      content: `你好！我是 "${agent.name}"，很高兴为您服务。${agent.desc}`,
+      type: 'text',
+      time: Date.now(),
+      status: 'success',
+      channelType: 1
+    }, 1);
   }
   
-  if (!msgStore.messages[agent.id]) {
-    msgStore.messages[agent.id] = [
-      {
-        id: Date.now().toString(),
-        senderId: agent.id,
-        senderName: agent.name,
-        content: `你好！我是 "${agent.name}"，很高兴为您服务。${agent.desc}`,
-        type: 'text',
-        time: Date.now(),
-        status: 'success'
-      }
-    ];
-  }
-  
-  convStore.setActiveId(agent.id);
+  convStore.setActiveId(agent.id, 1);
   uni.setStorageSync('active_conversation_id', agent.id);
   uni.redirectTo({
     url: '/pages/chat/index'
