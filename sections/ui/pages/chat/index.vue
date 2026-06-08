@@ -595,7 +595,7 @@ async function handleSendMessage({ type, content, fileName, fileSize, fileSizeBy
   }
   if (replyRef) extra.replyRef = replyRef;
 
-  await messageStore.sendNativeMessage(conversation || convStore.activeId, {
+  const sendPromise = messageStore.sendNativeMessage(conversation || convStore.activeId, {
     type,
     content,
     fileName,
@@ -613,6 +613,7 @@ async function handleSendMessage({ type, content, fileName, fileSize, fileSizeBy
   if (type === 'text' && isClowderConversation(conversation)) {
     messageStore.startClowderMarkdownStream(conversation.id, content);
   }
+  await sendPromise;
   replyTarget.value = null;
 }
 
