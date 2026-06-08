@@ -22,10 +22,17 @@ type OutboundPayload struct {
 	Format            string                   `json:"format"`
 	RichBlocks        []map[string]interface{} `json:"richBlocks,omitempty"`
 	Media             *OutboundMediaPayload    `json:"media,omitempty"`
+	Reaction          *OutboundReactionPayload `json:"reaction,omitempty"`
 	Origin            map[string]interface{}   `json:"origin,omitempty"`
 	Stream            *OutboundStreamState     `json:"stream,omitempty"`
 	Metadata          map[string]interface{}   `json:"metadata,omitempty"`
 	PlatformMessageID string                   `json:"platformMessageId,omitempty"`
+}
+
+type OutboundReactionPayload struct {
+	PlatformMessageID string `json:"platformMessageId"`
+	Emoji             string `json:"emoji"`
+	EmojiType         string `json:"emojiType,omitempty"`
 }
 
 type OutboundMediaPayload struct {
@@ -70,6 +77,9 @@ func BuildOutboundMessageWithDefaultRecipient(payload OutboundPayload, defaultRe
 			}
 			directRecipientUID = outboundDirectRecipientUID(payload, defaultRecipientUID)
 		}
+	}
+	if payload.Reaction != nil {
+		return buildOutboundReactionEvent(payload, channelType, channelID, directRecipientUID, directVirtualSenderUID)
 	}
 	content := strings.TrimSpace(payload.Content)
 	if content == "" && payload.Stream != nil && payload.Stream.State == "cleanup" {
@@ -136,6 +146,57 @@ func BuildOutboundMessageWithDefaultRecipient(payload OutboundPayload, defaultRe
 	return &config.MsgSendReq{
 		Header: config.MsgHeader{
 			RedDot: 1,
+		},
+		ChannelID:   channelID,
+		ChannelType: channelType,
+		FromUID:     fromUID,
+		Payload:     bodyBytes,
+	}, nil
+}
+
+func buildOutboundReactionEvent(payload OutboundPayload, channelType uint8, channelID string, directRecipientUID string, directVirtualSenderUID string) (*config.MsgSendReq, error) {
+	reaction := payload.Reaction
+	if reaction == nil {
+		return nil, errors.New("empty clowder outbound reaction")
+	}
+	targetMessageID := strings.TrimSpace(reaction.PlatformMessageID)
+	if targetMessageID == "" {
+		return nil, errors.New("empty clowder outbound reaction message id")
+	}
+	if directRecipientUID != "" {
+		channelID = directRecipientUID
+	}
+	fromUID := clowderAIDirectChannelID
+	if directVirtualSenderUID != "" {
+		fromUID = directVirtualSenderUID
+	}
+	emoji := strings.TrimSpace(reaction.Emoji)
+	if emoji == "" {
+		emoji = strings.TrimSpace(reaction.EmojiType)
+	}
+	if emoji == "" {
+		emoji = "❤️"
+	}
+	body := map[string]interface{}{
+		"type":              1000,
+		"event":             "clowder_reaction",
+		"target_message_id": targetMessageID,
+		"message_id":        targetMessageID,
+		"emoji":             emoji,
+		"emoji_type":        strings.TrimSpace(reaction.EmojiType),
+		"user_id":           "clowder",
+		"user_name":         "Clowder AI",
+		"connector_id":      ConnectorID,
+		"silent":            true,
+	}
+	bodyBytes, err := json.Marshal(body)
+	if err != nil {
+		return nil, err
+	}
+	return &config.MsgSendReq{
+		Header: config.MsgHeader{
+			NoPersist: 1,
+			RedDot:   0,
 		},
 		ChannelID:   channelID,
 		ChannelType: channelType,

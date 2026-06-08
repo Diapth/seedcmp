@@ -227,6 +227,34 @@ func TestOutboundPayloadUsesDefaultRecipientForDirectMessageWithoutSenderMetadat
 	assert.Equal(t, "clowder_ai", req.FromUID)
 }
 
+func TestOutboundPayloadBuildsSilentReactionEvent(t *testing.T) {
+	payload := OutboundPayload{
+		ConnectorID:    ConnectorID,
+		ExternalChatID: "2:group-cat-cafe",
+		Reaction: &OutboundReactionPayload{
+			PlatformMessageID: "user-message-1",
+			Emoji:             "❤️",
+			EmojiType:         "HEART",
+		},
+	}
+
+	req, err := BuildOutboundMessage(payload)
+
+	require.NoError(t, err)
+	assert.Equal(t, "group-cat-cafe", req.ChannelID)
+	assert.Equal(t, common.ChannelTypeGroup.Uint8(), req.ChannelType)
+	assert.Equal(t, clowderAIDirectChannelID, req.FromUID)
+	assert.Equal(t, 1, req.Header.NoPersist)
+
+	var body map[string]interface{}
+	require.NoError(t, json.Unmarshal(req.Payload, &body))
+	assert.Equal(t, float64(1000), body["type"])
+	assert.Equal(t, "clowder_reaction", body["event"])
+	assert.Equal(t, "user-message-1", body["target_message_id"])
+	assert.Equal(t, "❤️", body["emoji"])
+	assert.Equal(t, true, body["silent"])
+}
+
 func TestVirtualClowderExternalChatIDIncludesUserFakeChannel(t *testing.T) {
 	userID := "u_1"
 

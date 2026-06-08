@@ -101,6 +101,49 @@ function memberListText(...values) {
   return members.map(memberDisplayName).filter(Boolean).join('、');
 }
 
+function normalizeStreamState(content = {}) {
+  const stream = content.stream && typeof content.stream === 'object' ? content.stream : null;
+  if (!stream) return {};
+  const state = clean(firstText(stream.state, stream.phase, stream.status)).toLowerCase();
+  const streamKey = firstText(
+    stream.platformMessageId,
+    stream.platform_message_id,
+    content.platformMessageId,
+    content.platform_message_id,
+    content.clientMsgNo,
+    content.client_msg_no
+  );
+  if (!streamKey) return {};
+  const phase = ['placeholder', 'chunk', 'final', 'cleanup'].includes(state) ? state : 'chunk';
+  return {
+    streamKey,
+    streamPhase: phase,
+    streaming: phase === 'placeholder' || phase === 'chunk',
+    renderMode: 'markdown',
+    isMarkdown: true
+  };
+}
+
+function normalizeClowderReactionEvent(content = {}) {
+  const event = normalizeEventName(firstText(content.event, content.type_name, content.typeName, content.action, content.cmd));
+  if (event !== 'clowder_reaction') return null;
+  const targetMessageId = firstText(
+    content.target_message_id,
+    content.targetMessageId,
+    content.message_id,
+    content.messageId,
+    content.platformMessageId,
+    content.platform_message_id
+  );
+  const emoji = firstText(content.emoji, content.reaction, content.emoji_type, content.emojiType) || '❤️';
+  return {
+    targetMessageId,
+    emoji,
+    userId: firstText(content.user_id, content.userId, content.uid, 'clowder'),
+    userName: firstText(content.user_name, content.userName, content.name, 'Clowder AI')
+  };
+}
+
 function hasNoticeChange(content = {}) {
   const fields = firstArray(content.fields, content.changedFields, content.changed_fields);
   return Boolean(
@@ -111,6 +154,10 @@ function hasNoticeChange(content = {}) {
 
 export function resolveSystemMessageContent(content = {}) {
   const event = normalizeEventName(firstText(content.event, content.type_name, content.typeName, content.action, content.cmd));
+  const reactionEvent = normalizeClowderReactionEvent(content);
+  if (reactionEvent) {
+    return { text: '', event, isSilentSystem: true, reactionEvent };
+  }
   const explicitText = firstText(content.text, content.title, content.message);
   if (explicitText) {
     return { text: explicitText, event, isSilentSystem: false };
@@ -238,6 +285,10 @@ export function normalizeContent(payload) {
     envelope.title
   );
   const name = firstNonEmpty(content.name, content.fileName, payload?.name, payload?.file_name);
+  const streamState = normalizeStreamState(content);
+  const markdownState = (content.markdown === true || content.format === 'markdown')
+    ? { renderMode: 'markdown', isMarkdown: true }
+    : {};
 
   if (type === 2) {
     return { type: 'image', content: '[图片]', url: content.url || content.remoteUrl || '' };
@@ -261,11 +312,17 @@ export function normalizeContent(payload) {
       type: 'system',
       content: system.text,
       systemEvent: system.event,
-      isSilentSystem: system.isSilentSystem
+      isSilentSystem: system.isSilentSystem,
+      ...(system.reactionEvent ? { reactionEvent: system.reactionEvent } : {})
     };
   }
 
-  return { type: 'text', content: text || '' };
+  return {
+    type: 'text',
+    content: text || '',
+    ...markdownState,
+    ...streamState
+  };
 }
 
 export function normalizeMessage(input = {}, options = {}) {

@@ -38,7 +38,7 @@ export interface IOutboundAdapter {
   /** F151: Delivery batch complete. `chainDone=true` = no more output for this task; send close frame. */
   onDeliveryBatchDone?(externalChatId: string, chainDone: boolean): Promise<void>;
   /** F157: Add an emoji reaction to a message (e.g. ❤️ on user's message as instant ack). */
-  addReaction?(platformMessageId: string, emojiType: string): Promise<void>;
+  addReaction?(platformMessageId: string, emojiType: string, externalChatId?: string): Promise<void>;
 }
 
 /** Adapter that supports edit-in-place streaming (placeholder → progressive edits). */

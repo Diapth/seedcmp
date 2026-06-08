@@ -512,6 +512,85 @@ test('clowder helper creates markdown placeholder chunks and final event', () =>
   assert.equal(merged[0].content, events.at(-1).content);
 });
 
+test('native clowder stream messages normalize and merge as one markdown message', () => {
+  const chunk = normalizeMessage({
+    message_id: 'wk-1',
+    client_msg_no: 'clowder-stream-invoke-1',
+    from_uid: 'clowder:opus',
+    payload: JSON.stringify({
+      type: 1,
+      content: '## 标题\n\n| 项 | 值 |\n| --- | --- |\n| A | B | ▌',
+      format: 'markdown',
+      markdown: true,
+      stream: {
+        state: 'chunk',
+        platform_message_id: 'im-web-stream-1'
+      },
+      platform_message_id: 'im-web-stream-1'
+    })
+  });
+  const final = normalizeMessage({
+    message_id: 'wk-2',
+    client_msg_no: 'clowder-stream-invoke-1',
+    from_uid: 'clowder:opus',
+    payload: JSON.stringify({
+      type: 1,
+      content: '## 标题\n\n| 项 | 值 |\n| --- | --- |\n| A | B |',
+      format: 'markdown',
+      markdown: true,
+      stream: {
+        state: 'final',
+        platform_message_id: 'im-web-stream-1'
+      },
+      platform_message_id: 'im-web-stream-1'
+    })
+  });
+
+  assert.equal(chunk.streamKey, 'im-web-stream-1');
+  assert.equal(chunk.streamPhase, 'chunk');
+  assert.equal(chunk.renderMode, 'markdown');
+  assert.equal(chunk.streaming, true);
+
+  const merged = messageState.mergeNativeMessageIntoList(
+    messageState.mergeNativeMessageIntoList([], chunk),
+    final
+  );
+  assert.equal(merged.length, 1);
+  assert.equal(merged[0].id, 'im-web-stream-1');
+  assert.equal(merged[0].streaming, false);
+  assert.equal(merged[0].status, 'success');
+  assert.doesNotMatch(merged[0].content, /▌$/);
+});
+
+test('native clowder reaction event adds an idempotent emoji to the target user message', () => {
+  assert.equal(typeof messageState.applyReactionEventIntoList, 'function');
+  const messages = [{
+    id: 'user-message-1',
+    messageId: 'user-message-1',
+    senderId: 'u1',
+    senderName: '我',
+    content: '请处理这个任务',
+    type: 'text',
+    reactions: []
+  }];
+  const event = normalizeMessage({
+    message_id: 'reaction-event-1',
+    payload: JSON.stringify({
+      type: 1000,
+      event: 'clowder_reaction',
+      target_message_id: 'user-message-1',
+      emoji: '❤️',
+      user_id: 'clowder'
+    })
+  });
+
+  const once = messageState.applyReactionEventIntoList(messages, event.reactionEvent);
+  const twice = messageState.applyReactionEventIntoList(once, event.reactionEvent);
+
+  assert.equal(event.isSilentSystem, true);
+  assert.deepEqual(twice[0].reactions, [{ emoji: '❤️', userIds: ['clowder'], count: 1 }]);
+});
+
 test('conversation summary turns long clowder markdown into one line preview', () => {
   const summary = messageState.conversationSummaryForMessage({
     senderId: 'clowder',
