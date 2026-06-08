@@ -307,6 +307,7 @@ export function messageDigestFromInput(input = {}) {
     ?? input.content
     ?? input.lastMessage;
   const content = normalizeContent(payload || input.last_message || recent || {});
+  if (content.isSilentSystem) return '';
   return content.content || '收到一条新消息';
 }
 
