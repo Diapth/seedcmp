@@ -64,6 +64,8 @@ sections/im_web/packages/datasource-vue/src/stores/messageStore.ts:1471-1532
 
 2026-06-08 复验补充：H5/mock 会话在 WuKongIM SDK 不可用或原生 send 只返回 `sending` 且没有 ACK 的情况下，会把本地 optimistic 消息落为 `success`，避免用户发送后一直显示失败或转圈；真实服务端拒绝类错误仍保留 `failed`。
 
+2026-06-08 再次复验修复：补齐后端用户身份字段 `userId/user_id/raw.id` 的 self id 解析，避免页面 fallback 的 `me/我` 覆盖真实 uid；发送链路统一归一化 outbound sender，并让 uid-only 登录态也可初始化 native SDK。H5/mock 单聊和群聊的图片、文件在无真实上传后端时保留本地成功状态，不再卡在 `sending`。
+
 ---
 
 ## 测试结果
@@ -77,6 +79,17 @@ npm run test:smoke
 ```
 
 浏览器验收：`http://localhost:5173/`，375x844、768x1024、1024x768、1440x900 均通过。补充 Playwright 发送验收：文本发送后 `failedCount=0`、`sendingCount=0`。
+
+再次复验：`npm run test:native-im`、`npm run build:h5`、`npm run test:smoke` 通过；Playwright 在 `http://localhost:5174/` 验收单聊/群聊文本、图片、文件发送，并覆盖 375x844、768x1024、1024x768、1440x900 截图。截图：
+
+```text
+/tmp/issue-001-native-message-single-desktop.png
+/tmp/issue-001-native-message-group-desktop.png
+/tmp/issue-001-native-message-desktop.png
+/tmp/issue-001-native-message-tablet.png
+/tmp/issue-001-native-message-landscape.png
+/tmp/issue-001-native-message-mobile.png
+```
 
 ---
 

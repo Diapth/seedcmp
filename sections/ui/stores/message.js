@@ -12,11 +12,10 @@ import {
   mergeNativeMessageIntoList,
   mergeNativeMessageLists,
   mergeAgentReplyEventIntoList,
-  resolveSelfAvatar,
-  resolveSelfId,
-  resolveSelfName,
+  resolveOutboundSender,
   resolveLocalSendStatus,
-  shouldKeepLocalSendSuccess
+  shouldKeepLocalSendSuccess,
+  shouldUseLocalMockMediaSuccess
 } from '@/services/native-im/message-state';
 
 function defaultMsg(overrides = {}) {
@@ -145,11 +144,7 @@ export const useMessageStore = defineStore('message', {
       const identity = convStore.getConversationIdentity(conversationOrId);
       const conversationId = identity.conversationId;
       const currentUser = readCurrentUser();
-      const selfSender = {
-        id: sender.id || resolveSelfId(currentUser),
-        name: sender.name || resolveSelfName(currentUser),
-        avatar: sender.avatar || resolveSelfAvatar(currentUser)
-      };
+      const selfSender = resolveOutboundSender(currentUser, sender);
       const local = this.appendLocalMessage(conversationId, payload.content, selfSender, payload.type, {
         replyRef: payload.replyRef || null,
         mentions: payload.mentions || [],
@@ -170,6 +165,12 @@ export const useMessageStore = defineStore('message', {
       }
 
       if (payload.type !== 'text') {
+        if (shouldUseLocalMockMediaSuccess(conversation, payload)) {
+          local.status = 'success';
+          local.nativeError = '';
+          this.syncError = '';
+          return local;
+        }
         try {
           let remoteUrl = payload.url || payload.content || '';
           const needsUpload = payload.file || payload.path || isLocalMediaUrl(remoteUrl);

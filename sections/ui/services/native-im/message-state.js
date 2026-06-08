@@ -310,7 +310,16 @@ export function isSelfSender(senderId, currentUser = {}) {
 
 export function resolveSelfId(currentUser = {}) {
   currentUser = currentUser || {};
-  return firstNonEmpty(currentUser.id, currentUser.uid, currentUser.raw?.uid, 'me');
+  return firstNonEmpty(
+    currentUser.id,
+    currentUser.uid,
+    currentUser.userId,
+    currentUser.user_id,
+    currentUser.raw?.uid,
+    currentUser.raw?.id,
+    currentUser.raw?.user_id,
+    'me'
+  );
 }
 
 export function resolveSelfName(currentUser = {}, fallback = '我') {
@@ -321,6 +330,20 @@ export function resolveSelfName(currentUser = {}, fallback = '我') {
 export function resolveSelfAvatar(currentUser = {}) {
   currentUser = currentUser || {};
   return firstNonEmpty(currentUser.avatar, currentUser.logo, currentUser.raw?.avatar, currentUser.raw?.logo);
+}
+
+export function resolveOutboundSender(currentUser = {}, sender = {}) {
+  currentUser = currentUser || {};
+  sender = sender || {};
+  const explicitId = firstNonEmpty(sender.id, sender.uid, sender.userId, sender.user_id);
+  const explicitName = firstNonEmpty(sender.name === '我' ? '' : sender.name, sender.nickname);
+  const explicitAvatar = firstNonEmpty(sender.avatar, sender.logo);
+
+  return {
+    id: explicitId && explicitId !== 'me' ? explicitId : resolveSelfId(currentUser),
+    name: explicitName || resolveSelfName(currentUser),
+    avatar: explicitAvatar || resolveSelfAvatar(currentUser)
+  };
 }
 
 export function conversationSummaryForMessage(message = {}, currentUser = {}, conversation = {}) {
@@ -340,7 +363,8 @@ export function shouldKeepLocalSendSuccess(error = {}, conversation = {}) {
   const text = firstNonEmpty(error.msg, error.message, error.error?.msg, error.error?.message);
   if (error.sdkUnavailable) return true;
   if (/wukongimjssdk|WKSDK\.shared|chatManager|send unavailable|不可用|未安装/i.test(text)) return true;
-  return conversation?.source === 'mock' && /network|runtime|request|fetch|uni\./i.test(text);
+  return conversation?.source === 'mock'
+    && /network|runtime|request|fetch|uni\.|未获取到上传地址|文件上传失败|upload url is empty|no supported upload runtime/i.test(text);
 }
 
 export function resolveLocalSendStatus(sent = {}, conversation = {}) {
@@ -348,6 +372,12 @@ export function resolveLocalSendStatus(sent = {}, conversation = {}) {
   if (status === 'failed' || status === 'revoked') return status;
   if (conversation?.source === 'mock' && status === 'sending') return 'success';
   return status;
+}
+
+export function shouldUseLocalMockMediaSuccess(conversation = {}, payload = {}) {
+  return conversation?.source === 'mock'
+    && payload?.type
+    && payload.type !== 'text';
 }
 
 export function createClientMsgNo(prefix = 'ui') {

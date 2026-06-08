@@ -32,7 +32,7 @@
 </template>
 
 <script setup>
-import { ref, watch, nextTick } from 'vue';
+import { ref, watch, nextTick, onBeforeUnmount } from 'vue';
 import MessageBubble from './MessageBubble.vue';
 import { formatChatTime, shouldShowMessageTime } from '@/utils/formatMessage';
 
@@ -65,6 +65,8 @@ defineEmits([
 ]);
 
 const scrollToId = ref('');
+let scrollTimer = null;
+let disposed = false;
 
 watch(() => props.list, () => {
   scrollToBottom();
@@ -75,13 +77,28 @@ watch(() => props.bottomAnchorKey, () => {
 }, { flush: 'post' });
 
 function scrollToBottom() {
+  if (scrollTimer) {
+    clearTimeout(scrollTimer);
+    scrollTimer = null;
+  }
   nextTick(() => {
+    if (disposed) return;
     scrollToId.value = '';
-    setTimeout(() => {
+    scrollTimer = setTimeout(() => {
+      if (disposed) return;
       scrollToId.value = 'bottom-anchor';
+      scrollTimer = null;
     }, 150);
   });
 }
+
+onBeforeUnmount(() => {
+  disposed = true;
+  if (scrollTimer) {
+    clearTimeout(scrollTimer);
+    scrollTimer = null;
+  }
+});
 
 function shouldShowTime(index) {
   return shouldShowMessageTime(props.list[index], props.list[index - 1]);
