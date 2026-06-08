@@ -612,10 +612,12 @@ async function handleSendMessage({ type, content, fileName, fileSize, fileSizeBy
     url,
     mentions: extra.mentions || []
   }, sender);
+  const localMessage = await sendPromise;
   if (type === 'text' && shouldStartLocalClowderStream(conversation)) {
-    messageStore.startClowderMarkdownStream(conversation.id, content);
+    messageStore.startClowderMarkdownStream(conversation.id, content, {
+      targetMessageId: localMessage?.id || localMessage?.messageId || localMessage?.clientMsgNo
+    });
   }
-  await sendPromise;
   replyTarget.value = null;
 }
 

@@ -11,7 +11,7 @@ import {
   isVisibleChatMessage,
   isSelfSender,
   mergeNativeMessageIntoList,
-  mergeNativeMessageLists,
+  mergeSyncedMessagesPreservingLocalContext,
   mergeAgentReplyEventIntoList,
   resolveClowderDirectCatId,
   resolveOutboundSender,
@@ -296,11 +296,8 @@ export const useMessageStore = defineStore('message', {
           endSeq: options.endSeq || 0,
           pullMode: options.pullMode
         })).map((message) => defaultMsg(enrichNativeMessageSender(message, conversation, currentUser)));
-        const localPending = (this.messages[identity.conversationId] || []).filter((message) => (
-          message.status === 'sending' || message.status === 'failed'
-        ));
         this.messages[identity.conversationId] = synced.length
-          ? mergeNativeMessageLists(localPending, synced, { currentUser, conversation })
+          ? mergeSyncedMessagesPreservingLocalContext(this.messages[identity.conversationId] || [], synced, { currentUser, conversation })
           : this.messages[identity.conversationId] || [];
         const latest = (this.messages[identity.conversationId] || []).filter(isVisibleChatMessage).at(-1);
         updateConversationSummary(conversation, latest, currentUser);
