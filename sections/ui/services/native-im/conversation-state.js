@@ -1,3 +1,5 @@
+import { messageDigestFromInput } from './normalizers.js';
+
 export function dropMockConversations(conversations = []) {
   return conversations.filter((item) => item?.source !== 'mock');
 }
@@ -10,6 +12,42 @@ function clean(value) {
 function safeNumber(value, fallback = 0) {
   const next = Number(value);
   return Number.isFinite(next) ? next : fallback;
+}
+
+function firstNonEmpty(...values) {
+  for (const value of values) {
+    const text = clean(value);
+    if (text) return value;
+  }
+  return '';
+}
+
+function toTimestampMs(value, fallback = 0) {
+  if (value === undefined || value === null || value === '') return fallback;
+  const next = safeNumber(value, 0);
+  if (!next) return fallback;
+  return next > 100000000000 ? next : next * 1000;
+}
+
+function groupLastMessageTime(input = {}) {
+  const recent = Array.isArray(input.recents) ? input.recents[0] : null;
+  const lastMessage = input.last_message || input.lastMessageObj || {};
+  return firstNonEmpty(
+    input.last_msg_time,
+    input.lastMsgTime,
+    input.last_message_time,
+    input.lastMessageTime,
+    input.timestamp,
+    input.lastTime,
+    lastMessage.timestamp,
+    lastMessage.time,
+    lastMessage.created_at,
+    lastMessage.createdAt,
+    recent?.timestamp,
+    recent?.time,
+    recent?.created_at,
+    recent?.createdAt
+  );
 }
 
 export function conversationDraftKey(channelId, channelType = 1) {
@@ -55,6 +93,8 @@ export function mergeRemoteDrafts(conversations = [], remoteDrafts = [], options
 export function normalizeNativeGroup(input = {}) {
   const id = clean(input.group_no || input.groupNo || input.id || input.channel_id || input.channelId);
   const name = clean(input.name || input.group_name || input.groupName || id || '群聊');
+  const lastTime = toTimestampMs(groupLastMessageTime(input), 0);
+  const digest = messageDigestFromInput(input);
   return {
     id,
     groupNo: id,
@@ -65,7 +105,9 @@ export function normalizeNativeGroup(input = {}) {
     memberCount: safeNumber(input.member_count ?? input.memberCount ?? input.members_count, 0),
     announcement: clean(input.notice || input.announcement),
     creatorId: clean(input.creator || input.owner || input.creator_id || input.creatorId),
-    createTime: safeNumber(input.created_at ?? input.createdAt ?? input.createTime, Date.now()),
+    createTime: toTimestampMs(input.created_at ?? input.createdAt ?? input.createTime, 0),
+    lastMessage: digest && digest !== '收到一条新消息' ? digest : '',
+    lastTime,
     raw: input
   };
 }
@@ -102,8 +144,8 @@ export function upsertGroupConversation(conversations = [], group = {}) {
     name: normalized.name,
     avatar: normalized.avatar,
     unread: 0,
-    lastMessage: `你已加入群聊 ${normalized.name}`,
-    lastTime: normalized.createTime || Date.now(),
+    lastMessage: normalized.lastMessage || `你已加入群聊 ${normalized.name}`,
+    lastTime: normalized.lastTime || normalized.createTime || 0,
     memberCount: normalized.memberCount,
     isPinned: false,
     isMuted: false,
@@ -116,14 +158,19 @@ export function upsertGroupConversation(conversations = [], group = {}) {
   });
   if (index < 0) return [nextConversation, ...conversations];
   const next = [...conversations];
+  const existing = next[index];
+  const shouldUseGroupLastMessage = nextConversation.lastTime
+    && (!existing.lastTime || nextConversation.lastTime >= existing.lastTime);
   next[index] = {
     ...nextConversation,
-    ...next[index],
-    name: normalized.name || next[index].name,
-    avatar: normalized.avatar || next[index].avatar,
-    memberCount: normalized.memberCount || next[index].memberCount || 0,
+    ...existing,
+    name: normalized.name || existing.name,
+    avatar: normalized.avatar || existing.avatar,
+    memberCount: normalized.memberCount || existing.memberCount || 0,
     channelType: 2,
-    type: 'group'
+    type: 'group',
+    lastMessage: shouldUseGroupLastMessage ? nextConversation.lastMessage : existing.lastMessage,
+    lastTime: shouldUseGroupLastMessage ? nextConversation.lastTime : (existing.lastTime || nextConversation.lastTime || 0)
   };
   return next;
 }

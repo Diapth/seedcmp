@@ -26,8 +26,10 @@ function normalizeStatus(input = {}) {
   return 'success';
 }
 
-function toTimestampMs(value, fallbackSeconds = Math.floor(Date.now() / 1000)) {
-  const next = toNumber(value, fallbackSeconds);
+function toTimestampMs(value, fallbackMs = 0) {
+  if (value === undefined || value === null || value === '') return fallbackMs;
+  const next = toNumber(value, 0);
+  if (!next) return fallbackMs;
   return next > 100000000000 ? next : next * 1000;
 }
 
@@ -102,7 +104,7 @@ export function normalizeMessage(input = {}, options = {}) {
     senderId: String(senderId || ''),
     senderName: String(senderName || ''),
     senderAvatar: input.senderAvatar || input.from_avatar || '',
-    time: toTimestampMs(input.timestamp ?? input.time ?? input.created_at),
+    time: toTimestampMs(input.timestamp ?? input.time ?? input.created_at, Date.now()),
     status: normalizeStatus(input),
     reactions: input.reactions || [],
     replyRef: input.replyRef || raw.reply || null,
@@ -125,6 +127,31 @@ export function messageDigestFromInput(input = {}) {
   return content.content || '收到一条新消息';
 }
 
+function recentMessageFromInput(input = {}) {
+  return Array.isArray(input.recents) ? input.recents[0] : null;
+}
+
+function lastMessageTimeFromInput(input = {}) {
+  const recent = recentMessageFromInput(input);
+  const lastMessage = input.last_message || input.lastMessageObj || {};
+  return firstNonEmpty(
+    input.last_msg_time,
+    input.lastMsgTime,
+    input.last_message_time,
+    input.lastMessageTime,
+    input.timestamp,
+    input.lastTime,
+    lastMessage.timestamp,
+    lastMessage.time,
+    lastMessage.created_at,
+    lastMessage.createdAt,
+    recent?.timestamp,
+    recent?.time,
+    recent?.created_at,
+    recent?.createdAt
+  );
+}
+
 export function normalizeConversation(input = {}, channelInfo = {}) {
   const channelId = String(firstNonEmpty(input.channel_id, input.channelId, input.id, channelInfo.channel_id, channelInfo.channelID));
   const channelType = toNumber(input.channel_type ?? input.channelType ?? channelInfo.channel_type ?? channelInfo.channelType, 1);
@@ -133,8 +160,7 @@ export function normalizeConversation(input = {}, channelInfo = {}) {
   const isRobot = Number(channelInfo.robot || channelInfo.orgData?.robot || 0) === 1 || category === 'robot';
   const name = firstNonEmpty(channelInfo.remark, channelInfo.orgData?.remark, input.remark, channelInfo.name, channelInfo.title, input.name, channelId);
   const logo = firstNonEmpty(channelInfo.logo, channelInfo.avatar, input.avatar);
-  const lastTimeRaw = input.last_msg_time ?? input.lastMsgTime ?? input.timestamp ?? input.lastTime ?? Date.now();
-  const lastTime = toNumber(lastTimeRaw, Date.now());
+  const lastTime = toTimestampMs(lastMessageTimeFromInput(input), 0);
 
   return {
     id: channelId,
@@ -147,7 +173,7 @@ export function normalizeConversation(input = {}, channelInfo = {}) {
     unread: toNumber(input.unread, 0),
     lastSeq: toNumber(input.last_msg_seq ?? input.lastMsgSeq, 0),
     lastMessage: messageDigestFromInput(input),
-    lastTime: lastTime > 100000000000 ? lastTime : lastTime * 1000,
+    lastTime,
     isPinned: Number(input.top ?? input.stick ?? channelInfo.top ?? channelInfo.stick ?? 0) === 1,
     isMuted: Number(input.mute ?? channelInfo.mute ?? 0) === 1,
     draft: String(firstNonEmpty(input.draft, input.extra?.draft, input.remoteExtra?.draft)),
