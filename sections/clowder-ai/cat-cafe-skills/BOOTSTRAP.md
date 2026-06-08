@@ -3,7 +3,7 @@
 <EXTREMELY_IMPORTANT>
 你已加载 Cat Café Skills。路由规则定义在 `cat-cafe-skills/manifest.yaml`。
 
-## Skills 列表（40 个）
+## Skills 列表（30 个）
 
 ### 开发流程链
 ```
@@ -29,27 +29,19 @@ feat-lifecycle → Design Gate(设计确认) → writing-plans → worktree → 
 | `merge-gate` | 门禁→PR→云端 review→merge→清理 | ④⑤⑥ |
 | `open-source-teardown` | 热门开源项目/竞品 agent/runtime 的源码拆解、算法剥皮、营销水分和 tradeoff 判断 | — |
 | `cross-cat-handoff` | 跨猫交接/传话（五件套） | — |
+| `thread-orchestration` | 大任务拆解与多 thread 并行编排 | — |
 | `deep-research` | 多源深度调研 | — |
-| `ttfund-skills` | 天天基金官方 Skills 网关：基金搜索/净值/持仓/经理/指数/黄金/债市/活期宝事实数据 | — |
-| `knowledge-engineering` | 外部项目文档重构/冷启动知识注入 | — |
 | `memory-navigation` | 项目记忆三入口路由（graph / recent / search） | — |
 | `memory-search-best-practices` | 记忆系统多刀检索 + recall coverage 策略（8 类题型 recipe） | — |
 | `writing-skills` | 写新 skill | — |
 | `pencil-design` | 设计 UI / .pen 文件 | — |
 | `rich-messaging` | 发语音/发图/发卡片/富媒体 | — |
-| `enterprise-workflow` | 企微/飞书文档、表格、待办、会议、日程一键创建 | — |
-| `schedule-tasks` | 定时任务/周期提醒/延迟执行 | — |
-| `hyperfocus-brake` | 铲屎官健康提醒/三猫撒娇打断 | — |
-| `incident-response` | 闯祸了/不可挽回/人很难过 | — |
 | `image-generation` | 生成图片/画头像/AI 画图 | — |
 | `self-evolution` | scope 守护/流程改进/知识沉淀 | — |
-| `vision-rescue` | 任务绝境/反复摆动/投降修辞/放弃愿景 | — |
-| `bootcamp-guide` | CVO 新手训练营引导 | — |
 | `cross-thread-sync` | 跨 thread 协同/通知/争用协调 | — |
 | `browser-preview` | 写前端/跑 dev server/看页面效果 | — |
 | `console-dev` | Console 前端开发的入口、设计体系、实现和验证门禁 | — |
 | `browser-automation` | 外部网站浏览/登录态流程/浏览器工具路由 | — |
-| `organize-threads` | 整理未分类 thread，建议合适标签 | — |
 | `workspace-navigator` | 铲屎官说"打开日志/看代码/打开设计图"等模糊指令 → 猫猫自己找路径 → API 导航 | — |
 | `video-forge` | 做视频/showcase/教程视频/视频审查 | — |
 

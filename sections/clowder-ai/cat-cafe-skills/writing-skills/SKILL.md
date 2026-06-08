@@ -129,7 +129,7 @@ Claude 会按需读取这些文件。重材料移到子文件，SKILL.md 正文�
 | Business Process & Team Automation | feat-lifecycle, merge-gate | Pattern |
 | Code Quality & Review | tdd, request-review, receive-review | Pattern |
 | Code Scaffolding & Templates | worktree | Technique |
-| Runbooks | debugging, incident-response | Technique |
+| Runbooks | debugging | Technique |
 | CI/CD & Deployment | merge-gate, opensource-ops | Technique |
 
 ## SKILL.md 结构模板

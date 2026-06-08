@@ -83,7 +83,7 @@ node scripts/audit-claude-code-system-prompt.mjs --cli codex \
 
 Phase E 注册了 weekly scheduled task：`--check` claude + codex 版本 vs 最新
 归档。drift → 发消息提醒猫跑本 SOP。**cron 不自动改 L0**（功能性判断 +
-carry-over 是猫/CVO 决策，不自动化）。task 管理见 `schedule-tasks` skill。
+carry-over 是猫/CVO 决策，不自动化）。task 管理走项目的 scheduler/runtime 文档，不再作为独立 skill 路由。
 
 ## 一句话
 

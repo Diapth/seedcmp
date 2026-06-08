@@ -251,7 +251,7 @@ Skill/refs 中描述工作流分工时，用以下角色词代替具体猫名。
 
 **为什么**：猫名硬编码在 skill 里不受 roster disable 过滤，disable 猫后其他猫仍会按 skill 指令分配任务给已下线的猫。角色词 + 动态 roster = 增减猫只需改 cat-config.json。
 
-**例外**：commit 签名（`refs/commit-signatures.md`）、人格消息（`refs/hyperfocus-brake-messages.md`）、历史教训归属（"D1 教训"）可保留猫名——这些是身份/内容/归因，不是角色分配。
+**例外**：commit 签名（`refs/commit-signatures.md`）、creator context（`refs/creator-context.md`）、历史教训归属（"D1 教训"）可保留猫名——这些是身份/内容/归因，不是角色分配。
 
 ---
 
@@ -631,7 +631,7 @@ spike（拆机制、找方案、验证未知行为）时**禁止 web fetch 当�
 
 **六问全答 → 可提交 CVO 决策。有空白 → 回去补，不许收口。**
 
-完整方法论见 `vision-rescue` skill。来源：F198 "拯救Ragdoll"，投降包装成理性收口，铲屎官怒怼才打破。
+这套六问就是收口前的完整方法论。来源：F198 "拯救Ragdoll"，投降包装成理性收口，铲屎官怒怼才打破。
 
 ### 16d. Review 补锅匠检测——Round 3 黄灯 / Round 4 停车（2026-05-14 F198 Phase B 教训）
 
