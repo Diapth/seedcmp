@@ -346,6 +346,19 @@ test('native normalizer hides empty time-only system messages from chat and dige
     messageState.conversationSummaryForMessage(normalized, {}, { type: 'single' }),
     ''
   );
+
+  const conversation = normalizeConversation({
+    channel_id: 'filehelper',
+    channel_type: 1,
+    last_message: {
+      timestamp: 1780490400,
+      payload: JSON.stringify({ type: 1000, time: 1780490400 })
+    }
+  }, {
+    name: 'filehelper'
+  });
+  assert.equal(conversation.lastMessage, '');
+  assert.equal(conversation.lastTime, 1780490400000);
 });
 
 test('native normalizer renders group system event messages with concrete text', () => {
