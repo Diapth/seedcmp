@@ -99,11 +99,9 @@ function normalizeAgentFile(file = {}, streamKey = '', index = 0) {
 export function isClowderConversation(conversation = {}) {
   const id = clean(conversation.id || conversation.channelId || conversation.agentId).toLowerCase();
   const name = clean(conversation.name || conversation.title || conversation.displayName).toLowerCase();
-  return conversation.type === 'robot' && (
-    id.includes('clowder')
+  return id.includes('clowder')
     || name.includes('clowder')
-    || name.includes('协同猫')
-  );
+    || name.includes('协同猫');
 }
 
 function splitStreamContent(content = '', chunkSize = 36) {
