@@ -5,6 +5,7 @@
 **标签**：bug, clowder, agent, message-history
 **AI修复模式**：Plan First
 **计划路径**：sections/ui/.ai/plans/ISSUE-012_agent_chat_history_loses_user_messages.md
+**阶段提交**：若开始修复，则每完成一个可验证阶段必须中文 commit。
 
 ---
 

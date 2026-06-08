@@ -5,6 +5,7 @@
 **标签**：feature, clowder, agent, membership
 **AI修复模式**：Plan First
 **计划路径**：sections/ui/.ai/plans/ISSUE-005_add_agent_to_agent_or_group.md
+**阶段提交**：若开始修复，则每完成一个可验证阶段必须中文 commit。
 
 ---
 

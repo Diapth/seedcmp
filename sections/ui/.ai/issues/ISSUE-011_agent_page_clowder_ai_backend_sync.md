@@ -5,6 +5,7 @@
 **标签**：feature, clowder, agent, streaming, multi-account, kanban
 **AI修复模式**：Plan First
 **计划路径**：sections/ui/.ai/plans/ISSUE-011_agent_page_clowder_ai_backend_sync.md
+**阶段提交**：若开始修复，则每完成一个可验证阶段必须中文 commit。
 
 ---
 

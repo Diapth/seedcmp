@@ -5,6 +5,7 @@
 **标签**：<!-- bug / feature / refactor / investigation -->
 **AI修复模式**：<!-- Direct Fix / Plan First -->
 **计划路径**：<!-- Direct Fix 写 N/A；Plan First 写 sections/ui/.ai/plans/ISSUE-XXX_xxx.md -->
+**阶段提交**：若开始修复，则每完成一个可验证阶段必须中文 commit。
 
 ---
 

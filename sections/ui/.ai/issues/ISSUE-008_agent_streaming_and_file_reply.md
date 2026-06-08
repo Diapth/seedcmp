@@ -5,6 +5,7 @@
 **标签**：feature, clowder, streaming, file
 **AI修复模式**：Plan First
 **计划路径**：sections/ui/.ai/plans/ISSUE-008_agent_streaming_and_file_reply.md
+**阶段提交**：若开始修复，则每完成一个可验证阶段必须中文 commit。
 
 ---
 
