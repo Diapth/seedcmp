@@ -38,7 +38,7 @@ describe('im-web streaming adapter', () => {
     if (server) await server.close();
   });
 
-  it('sends placeholder, chunk, and cleanup callbacks with one stable platform message id', async () => {
+  it('reserves a stream id without sending a thinking placeholder, then sends chunk and cleanup callbacks', async () => {
     server = await captureServer();
     const adapter = new ImWebAdapter(noopLog(), {
       outboundCallbackUrl: server.url,
@@ -50,12 +50,50 @@ describe('im-web streaming adapter', () => {
     await adapter.editMessage('2:group-clowder', platformMessageId, 'partial');
     await adapter.finalizeStreamCard('2:group-clowder', platformMessageId, 'Codex');
 
-    assert.equal(server.requests.length, 3);
+    assert.equal(server.requests.length, 2);
     assert.deepEqual(server.requests.map((req) => req.body.stream), [
-      { state: 'placeholder', platformMessageId },
       { state: 'chunk', platformMessageId },
       { state: 'cleanup', platformMessageId },
     ]);
     assert.ok(server.requests.every((req) => req.headers['x-clowder-signature']));
+  });
+
+  it('edits the pending stream message for inline final markdown delivery', async () => {
+    server = await captureServer();
+    const adapter = new ImWebAdapter(noopLog(), {
+      outboundCallbackUrl: server.url,
+      connectorSecret: 'shared-secret',
+      now: () => 1780000000000,
+    });
+
+    adapter.registerInlinePlaceholder('2:group-clowder', 'im-web-stream-1');
+    await adapter.sendFormattedReply('2:group-clowder', { body: '## 完成\n\n- 已流式输出', actions: [] });
+
+    assert.equal(server.requests.length, 1);
+    assert.deepEqual(server.requests[0].body.stream, {
+      state: 'final',
+      platformMessageId: 'im-web-stream-1',
+    });
+    assert.equal(server.requests[0].body.format, 'markdown');
+    assert.equal(server.requests[0].body.content, '## 完成\n\n- 已流式输出');
+  });
+
+  it('delivers reaction callbacks for source message acknowledgements', async () => {
+    server = await captureServer();
+    const adapter = new ImWebAdapter(noopLog(), {
+      outboundCallbackUrl: server.url,
+      connectorSecret: 'shared-secret',
+      now: () => 1780000000000,
+    });
+
+    await adapter.addReaction('user-message-1', 'HEART', '2:group-clowder');
+
+    assert.equal(server.requests.length, 1);
+    assert.equal(server.requests[0].body.externalChatId, '2:group-clowder');
+    assert.deepEqual(server.requests[0].body.reaction, {
+      platformMessageId: 'user-message-1',
+      emoji: '❤️',
+      emojiType: 'HEART',
+    });
   });
 });

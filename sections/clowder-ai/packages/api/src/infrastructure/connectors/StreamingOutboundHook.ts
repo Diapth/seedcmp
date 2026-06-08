@@ -96,7 +96,6 @@ export class StreamingOutboundHook {
     const now = Date.now();
 
     for (const session of sessions) {
-      if (session.connectorId === 'im-web') continue;
       const elapsed = now - session.lastUpdateAt;
       const delta = accumulatedText.length - session.lastContentLength;
       if (!force && elapsed < this.updateIntervalMs) continue;

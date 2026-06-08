@@ -425,6 +425,7 @@ export function createClientMsgNo(prefix = 'ui') {
 
 export function messageIdentityKey(message = {}) {
   return firstNonEmpty(
+    message.streamKey,
     message.messageId,
     message.messageID,
     message.message_id,
@@ -432,6 +433,53 @@ export function messageIdentityKey(message = {}) {
     message.client_msg_no,
     message.id
   );
+}
+
+function normalizeReactionEvent(event = {}) {
+  const targetMessageId = firstNonEmpty(
+    event.targetMessageId,
+    event.target_message_id,
+    event.messageId,
+    event.message_id,
+    event.platformMessageId,
+    event.platform_message_id
+  );
+  const emoji = firstNonEmpty(event.emoji, event.reaction, event.emojiType, event.emoji_type, '❤️');
+  const userId = firstNonEmpty(event.userId, event.user_id, event.uid, 'clowder');
+  return { targetMessageId, emoji, userId };
+}
+
+export function applyReactionEventIntoList(messages = [], event = {}) {
+  const normalized = normalizeReactionEvent(event);
+  if (!normalized.targetMessageId || !normalized.emoji || !normalized.userId) return [...messages];
+  return messages.map((message) => {
+    const keys = new Set([
+      message.id,
+      message.messageId,
+      message.messageID,
+      message.message_id,
+      message.clientMsgNo,
+      message.client_msg_no
+    ].map(clean).filter(Boolean));
+    if (!keys.has(normalized.targetMessageId)) return message;
+
+    const reactions = Array.isArray(message.reactions)
+      ? message.reactions.map((reaction) => ({
+          ...reaction,
+          userIds: Array.isArray(reaction.userIds) ? [...reaction.userIds] : []
+        }))
+      : [];
+    const existing = reactions.find((reaction) => reaction.emoji === normalized.emoji);
+    if (existing) {
+      if (!existing.userIds.some((uid) => clean(uid) === normalized.userId)) {
+        existing.userIds.push(normalized.userId);
+      }
+      existing.count = existing.userIds.length;
+    } else {
+      reactions.push({ emoji: normalized.emoji, userIds: [normalized.userId], count: 1 });
+    }
+    return { ...message, reactions };
+  });
 }
 
 export function enrichNativeMessageSender(message = {}, conversation = {}, currentUser = {}) {
@@ -478,6 +526,43 @@ export function mergeNativeMessageIntoList(messages = [], incoming = {}, options
   const currentUser = options.currentUser || {};
   const conversation = options.conversation || {};
   const enrichedIncoming = enrichNativeMessageSender(incoming, conversation, currentUser);
+  if (enrichedIncoming.reactionEvent) {
+    return applyReactionEventIntoList(messages, enrichedIncoming.reactionEvent);
+  }
+  if (enrichedIncoming.streamKey) {
+    const phase = clean(enrichedIncoming.streamPhase).toLowerCase();
+    if (phase === 'cleanup') {
+      return [...messages];
+    }
+    const isFinal = phase === 'final';
+    const streamMessage = {
+      ...enrichedIncoming,
+      id: enrichedIncoming.streamKey,
+      clientMsgNo: enrichedIncoming.streamKey,
+      messageId: enrichedIncoming.streamKey,
+      type: 'text',
+      status: isFinal ? 'success' : 'sending',
+      streaming: !isFinal,
+      renderMode: 'markdown',
+      isMarkdown: true,
+      source: enrichedIncoming.source || 'clowder'
+    };
+    const key = messageIdentityKey(streamMessage);
+    const next = [...messages];
+    const streamIndex = next.findIndex((message) => messageIdentityKey(message) === key);
+    if (streamIndex >= 0) {
+      next[streamIndex] = {
+        ...next[streamIndex],
+        ...streamMessage,
+        reactions: next[streamIndex].reactions || streamMessage.reactions || [],
+        replyRef: next[streamIndex].replyRef || streamMessage.replyRef || null,
+        mentions: next[streamIndex].mentions || streamMessage.mentions || []
+      };
+      return sortMessages(next);
+    }
+    next.push(streamMessage);
+    return sortMessages(next);
+  }
   const key = messageIdentityKey(enrichedIncoming);
   const next = [...messages];
 

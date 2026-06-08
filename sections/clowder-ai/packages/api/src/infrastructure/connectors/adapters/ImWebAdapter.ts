@@ -35,12 +35,18 @@ export interface ImWebOutboundPayload {
     readonly state: 'placeholder' | 'chunk' | 'final' | 'cleanup';
     readonly platformMessageId?: string;
   };
+  readonly reaction?: {
+    readonly platformMessageId: string;
+    readonly emoji: string;
+    readonly emojiType?: string;
+  };
   readonly metadata?: Record<string, unknown>;
 }
 
 export class ImWebAdapter implements IStreamableOutboundAdapter {
   readonly connectorId = 'im-web';
   private readonly now: () => number;
+  private readonly inlinePlaceholders = new Map<string, string[]>();
 
   constructor(
     private readonly log: FastifyBaseLogger,
@@ -54,11 +60,15 @@ export class ImWebAdapter implements IStreamableOutboundAdapter {
   }
 
   async sendReply(externalChatId: string, content: string, metadata?: Record<string, unknown>): Promise<void> {
+    const inlinePlatformMessageId = this.consumeInlinePlaceholder(externalChatId);
     await this.deliver({
       connectorId: this.connectorId,
       externalChatId,
       content,
       format: 'markdown',
+      ...(inlinePlatformMessageId
+        ? { stream: { state: 'final' as const, platformMessageId: inlinePlatformMessageId } }
+        : {}),
       metadata,
     });
   }
@@ -70,6 +80,7 @@ export class ImWebAdapter implements IStreamableOutboundAdapter {
     catDisplayName: string,
     metadata?: Record<string, unknown>,
   ): Promise<void> {
+    const inlinePlatformMessageId = this.consumeInlinePlaceholder(externalChatId);
     await this.deliver({
       connectorId: this.connectorId,
       externalChatId,
@@ -77,6 +88,9 @@ export class ImWebAdapter implements IStreamableOutboundAdapter {
       format: 'markdown',
       richBlocks: blocks,
       catDisplayName,
+      ...(inlinePlatformMessageId
+        ? { stream: { state: 'final' as const, platformMessageId: inlinePlatformMessageId } }
+        : {}),
       metadata,
     });
   }
@@ -86,24 +100,25 @@ export class ImWebAdapter implements IStreamableOutboundAdapter {
     envelope: MessageEnvelope,
     metadata?: Record<string, unknown>,
   ): Promise<void> {
+    const inlinePlatformMessageId = this.consumeInlinePlaceholder(externalChatId);
     await this.deliver({
       connectorId: this.connectorId,
       externalChatId,
       content: envelope.body,
       format: 'markdown',
+      ...(inlinePlatformMessageId
+        ? { stream: { state: 'final' as const, platformMessageId: inlinePlatformMessageId } }
+        : {}),
       metadata,
     });
   }
 
   async sendPlaceholder(externalChatId: string, text: string): Promise<string> {
-    const platformMessageId = `im-web-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
-    await this.deliver({
-      connectorId: this.connectorId,
-      externalChatId,
-      content: text,
-      format: 'markdown',
-      stream: { state: 'placeholder', platformMessageId },
-    });
+    const platformMessageId = `im-web-${this.now()}-${Math.random().toString(36).slice(2, 8)}`;
+    this.log.info(
+      { externalChatId, textLen: text.length, platformMessageId },
+      '[ImWebAdapter] stream placeholder reserved without visible message',
+    );
     return platformMessageId;
   }
 
@@ -125,6 +140,43 @@ export class ImWebAdapter implements IStreamableOutboundAdapter {
       format: 'markdown',
       catDisplayName,
       stream: { state: 'cleanup', platformMessageId },
+    });
+  }
+
+  registerInlinePlaceholder(externalChatId: string, platformMessageId: string): void {
+    if (!platformMessageId) return;
+    const queue = this.inlinePlaceholders.get(externalChatId) ?? [];
+    queue.push(platformMessageId);
+    this.inlinePlaceholders.set(externalChatId, queue);
+  }
+
+  async clearInlinePlaceholder(chatId: string, platformMessageId?: string): Promise<void> {
+    const queue = this.inlinePlaceholders.get(chatId);
+    if (!queue) return;
+    const next = platformMessageId ? queue.filter((id) => id !== platformMessageId) : [];
+    if (next.length) {
+      this.inlinePlaceholders.set(chatId, next);
+    } else {
+      this.inlinePlaceholders.delete(chatId);
+    }
+  }
+
+  async addReaction(platformMessageId: string, emojiType: string, externalChatId?: string): Promise<void> {
+    if (!platformMessageId) return;
+    if (!externalChatId) {
+      this.log.warn({ platformMessageId }, '[ImWebAdapter] addReaction skipped without externalChatId');
+      return;
+    }
+    await this.deliver({
+      connectorId: this.connectorId,
+      externalChatId,
+      content: '',
+      format: 'markdown',
+      reaction: {
+        platformMessageId,
+        emoji: emojiFromType(emojiType),
+        emojiType,
+      },
     });
   }
 
@@ -203,4 +255,29 @@ export class ImWebAdapter implements IStreamableOutboundAdapter {
       clearTimeout(timeout);
     }
   }
+
+  private consumeInlinePlaceholder(externalChatId: string): string | undefined {
+    const queue = this.inlinePlaceholders.get(externalChatId);
+    if (!queue || queue.length === 0) return undefined;
+    const platformMessageId = queue.shift();
+    if (queue.length === 0) {
+      this.inlinePlaceholders.delete(externalChatId);
+    } else {
+      this.inlinePlaceholders.set(externalChatId, queue);
+    }
+    return platformMessageId;
+  }
+}
+
+function emojiFromType(emojiType: string): string {
+  const normalized = String(emojiType || '').trim().toUpperCase();
+  const map: Record<string, string> = {
+    HEART: '❤️',
+    THUMBSUP: '👍',
+    THUMBS_UP: '👍',
+    EYES: '👀',
+    CHECK: '✅',
+    THINKING: '🤔',
+  };
+  return map[normalized] ?? emojiType;
 }
