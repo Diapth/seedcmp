@@ -264,6 +264,22 @@ test('sdk unavailable send errors keep local h5 demo messages successful', () =>
   );
 });
 
+test('mock h5 native send results do not leave local messages sending forever', () => {
+  assert.equal(typeof messageState.resolveLocalSendStatus, 'function');
+  assert.equal(
+    messageState.resolveLocalSendStatus({ status: 'sending' }, { id: '3', type: 'robot', source: 'mock' }),
+    'success'
+  );
+  assert.equal(
+    messageState.resolveLocalSendStatus({ status: 'failed' }, { id: '3', type: 'robot', source: 'mock' }),
+    'failed'
+  );
+  assert.equal(
+    messageState.resolveLocalSendStatus({ status: 'sending' }, { id: 'g1', type: 'group' }),
+    'sending'
+  );
+});
+
 test('message sender helpers tolerate empty current user during anonymous visual smoke', () => {
   assert.equal(messageState.isSelfSender('me', null), true);
   assert.equal(messageState.resolveSelfId(null), 'me');

@@ -13,6 +13,7 @@ import {
   resolveSelfAvatar,
   resolveSelfId,
   resolveSelfName,
+  resolveLocalSendStatus,
   shouldKeepLocalSendSuccess
 } from '@/services/native-im/message-state';
 
@@ -198,7 +199,7 @@ export const useMessageStore = defineStore('message', {
             senderId: selfSender.id,
             senderName: selfSender.name,
             senderAvatar: selfSender.avatar,
-            status: sent.status || 'sending',
+            status: resolveLocalSendStatus(sent, conversation),
             time: sent.time || local.time,
             content: payload.type === 'image' ? (sent.url || remoteUrl) : (payload.content || sent.content || payload.fileName),
             url: sent.url || remoteUrl,
@@ -238,7 +239,7 @@ export const useMessageStore = defineStore('message', {
           senderId: selfSender.id,
           senderName: selfSender.name,
           senderAvatar: selfSender.avatar,
-          status: sent.status || 'sending',
+          status: resolveLocalSendStatus(sent, conversation),
           time: sent.time || local.time
         });
         this.messages[conversationId] = mergeNativeMessageIntoList(

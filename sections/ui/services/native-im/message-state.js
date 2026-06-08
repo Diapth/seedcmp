@@ -270,6 +270,13 @@ export function shouldKeepLocalSendSuccess(error = {}, conversation = {}) {
   return conversation?.source === 'mock' && /network|runtime|request|fetch|uni\./i.test(text);
 }
 
+export function resolveLocalSendStatus(sent = {}, conversation = {}) {
+  const status = clean(sent.status) || 'success';
+  if (status === 'failed' || status === 'revoked') return status;
+  if (conversation?.source === 'mock' && status === 'sending') return 'success';
+  return status;
+}
+
 export function createClientMsgNo(prefix = 'ui') {
   const random = globalThis.crypto?.randomUUID
     ? globalThis.crypto.randomUUID().replace(/-/g, '')
