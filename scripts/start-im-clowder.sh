@@ -13,6 +13,7 @@ set -Eeuo pipefail
 # 旧版 sections/im_web 前端默认不启动；需要时设置 LEGACY_IM_WEB=1。
 
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+ROOT_PARENT_DIR="$(dirname "$ROOT_DIR")"
 RUN_DIR="$ROOT_DIR/.seedcmp-run"
 LOG_DIR="$RUN_DIR/logs"
 PID_DIR="$RUN_DIR/pids"
@@ -47,6 +48,9 @@ CLOWDER_PNPM_CMD="${CLOWDER_PNPM_CMD:-pnpm}"
 TANGSENG_WAIT_TIMEOUT="${TANGSENG_WAIT_TIMEOUT:-180}"
 IM_WEB_CHOKIDAR_USEPOLLING="${IM_WEB_CHOKIDAR_USEPOLLING:-true}"
 IM_WEB_CHOKIDAR_INTERVAL="${IM_WEB_CHOKIDAR_INTERVAL:-250}"
+SEEDCMP_CLEAN_OLD_PORTS="${SEEDCMP_CLEAN_OLD_PORTS:-1}"
+SEEDCMP_CLEAN_ALL_PORTS="${SEEDCMP_CLEAN_ALL_PORTS:-0}"
+OLD_SEEDCMP_PORTS="${OLD_SEEDCMP_PORTS:-5173 5174 5175 3000 3003 3004 4100 8090 6979 5001 5100 5200 5301 7000}"
 
 MYSQL_CONTAINER="${MYSQL_CONTAINER:-seedcmp-mysql}"
 REDIS_CONTAINER="${REDIS_CONTAINER:-seedcmp-redis}"
@@ -102,6 +106,9 @@ Environment overrides:
   TANGSENG_WAIT_TIMEOUT=180
   IM_WEB_CHOKIDAR_USEPOLLING=true             (avoid inotify watcher ENOSPC)
   IM_WEB_CHOKIDAR_INTERVAL=250
+  SEEDCMP_CLEAN_OLD_PORTS=1               (cleanup old seedcmp worktree listeners before start/restart)
+  SEEDCMP_CLEAN_ALL_PORTS=0               (danger: set 1 to kill any listener on known seedcmp ports)
+  OLD_SEEDCMP_PORTS="5173 5174 ..."       (ports checked by startup cleanup)
   REDIS_MODE=auto|docker|external
   INFRA_IMAGE_PREFIX=docker.example.com/
 EOF
@@ -324,6 +331,29 @@ path_in_root() {
   esac
 }
 
+normalize_proc_cwd() {
+  local path="$1"
+  printf '%s\n' "${path% (deleted)}"
+}
+
+path_in_old_seedcmp_tree() {
+  local path normalized
+  path="${1:-}"
+  normalized="$(normalize_proc_cwd "$path")"
+  [ -n "$normalized" ] || return 1
+
+  if [ "${SEEDCMP_CLEAN_ALL_PORTS:-0}" = "1" ]; then
+    return 0
+  fi
+
+  path_in_root "$normalized" && return 1
+
+  case "$normalized" in
+    "$ROOT_PARENT_DIR"/seedcmp*|"$ROOT_PARENT_DIR"/*/seedcmp*) return 0 ;;
+    *) return 1 ;;
+  esac
+}
+
 stop_project_port() {
   local port="$1"
   local label="$2"
@@ -348,6 +378,41 @@ stop_project_port() {
       kill -9 "$pid" >/dev/null 2>&1 || true
     fi
   done < <(port_pids "$port")
+}
+
+stop_old_seedcmp_port() {
+  local port="$1"
+  local label="$2"
+  local pid cwd
+
+  while IFS= read -r pid; do
+    [ -n "$pid" ] || continue
+    cwd="$(pid_cwd "$pid" || true)"
+    if [ -n "$cwd" ] && path_in_old_seedcmp_tree "$cwd"; then
+      log "stopping old $label listener on port $port (PID $pid, cwd: $(normalize_proc_cwd "$cwd"))"
+      kill "$pid" >/dev/null 2>&1 || true
+    fi
+  done < <(port_pids "$port")
+
+  sleep 0.5
+
+  while IFS= read -r pid; do
+    [ -n "$pid" ] || continue
+    cwd="$(pid_cwd "$pid" || true)"
+    if [ -n "$cwd" ] && path_in_old_seedcmp_tree "$cwd"; then
+      log "force stopping old $label listener on port $port (PID $pid, cwd: $(normalize_proc_cwd "$cwd"))"
+      kill -9 "$pid" >/dev/null 2>&1 || true
+    fi
+  done < <(port_pids "$port")
+}
+
+cleanup_old_seedcmp_ports() {
+  local port
+  [ "$SEEDCMP_CLEAN_OLD_PORTS" = "1" ] || return
+  log "cleaning old seedcmp/worktree listeners on known ports..."
+  for port in $OLD_SEEDCMP_PORTS; do
+    stop_old_seedcmp_port "$port" "seedcmp"
+  done
 }
 
 start_bg() {
@@ -490,6 +555,7 @@ start_infra() {
 }
 
 start_all() {
+  cleanup_old_seedcmp_ports
   start_infra
   ensure_wukongim
   ensure_tangseng
@@ -727,6 +793,10 @@ show_logs() {
   ls -1 "$LOG_DIR" 2>/dev/null || true
   log "use: scripts/start-im-clowder.sh logs agenthub-ui"
 }
+
+if [ "${SEEDCMP_SOURCE_ONLY:-0}" = "1" ]; then
+  return 0 2>/dev/null || exit 0
+fi
 
 case "${1:-start}" in
   start)
