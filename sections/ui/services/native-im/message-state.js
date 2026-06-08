@@ -96,6 +96,70 @@ function normalizeAgentFile(file = {}, streamKey = '', index = 0) {
   };
 }
 
+export function isClowderConversation(conversation = {}) {
+  const id = clean(conversation.id || conversation.channelId || conversation.agentId).toLowerCase();
+  const name = clean(conversation.name || conversation.title || conversation.displayName).toLowerCase();
+  return conversation.type === 'robot' && (
+    id.includes('clowder')
+    || name.includes('clowder')
+    || name.includes('协同猫')
+  );
+}
+
+function splitStreamContent(content = '', chunkSize = 36) {
+  const size = Math.max(8, Number(chunkSize) || 36);
+  const chunks = [];
+  for (let index = 0; index < content.length; index += size) {
+    chunks.push(content.slice(index, index + size));
+  }
+  return chunks;
+}
+
+function clowderMarkdownReplyContent(prompt = '') {
+  const topic = toConversationPreview(prompt, 48) || '当前请求';
+  return [
+    `## Clowder AI 流式回复`,
+    '',
+    `我已收到：**${topic}**`,
+    '',
+    '| 项目 | 说明 |',
+    '| --- | --- |',
+    '| 状态 | 已进入多智能体协作整理流程 |',
+    '| 输出 | 以 Markdown 表格、代码块和链接样式流式返回 |',
+    '| 下一步 | 可继续补充约束，我会把结论同步到会话摘要 |',
+    '',
+    '```markdown',
+    '- placeholder: 正在思考',
+    '- chunk: 分段追加 Markdown 内容',
+    '- final: 合并为一条最终回复',
+    '```',
+    '',
+    '[查看协作说明](https://agenthub.local/clowder)'
+  ].join('\n');
+}
+
+export function createClowderMarkdownStreamEvents(prompt = '', options = {}) {
+  const streamKey = firstNonEmpty(options.streamKey, createClientMsgNo('clowder_stream'));
+  const content = firstNonEmpty(options.content, clowderMarkdownReplyContent(prompt));
+  const chunks = splitStreamContent(content, options.chunkSize);
+  const base = {
+    streamKey,
+    senderId: 'clowder',
+    senderName: 'Clowder AI',
+    time: options.time || Date.now()
+  };
+  return [
+    { ...base, phase: 'placeholder', content: '' },
+    ...chunks.map((delta, index) => ({
+      ...base,
+      phase: 'chunk',
+      delta,
+      time: base.time + index + 1
+    })),
+    { ...base, phase: 'final', content, time: base.time + chunks.length + 1 }
+  ];
+}
+
 export function normalizeAgentReplyEvent(event = {}) {
   const streamKey = firstNonEmpty(
     event.streamKey,
@@ -146,10 +210,11 @@ export function mergeAgentReplyEventIntoList(messages = [], event = {}) {
   });
   const existing = index >= 0 ? next[index] : null;
   const isFinal = normalized.phase === 'final';
+  const existingContent = existing?.content === '正在思考...' ? '' : (existing?.content || '');
   const content = isFinal
     ? (normalized.content || existing?.content || normalized.delta)
     : normalized.phase === 'chunk'
-      ? `${existing?.content || ''}${normalized.delta || normalized.content}`
+      ? `${existingContent}${normalized.delta || normalized.content}`
       : (normalized.content || existing?.content || '正在思考...');
 
   const merged = {

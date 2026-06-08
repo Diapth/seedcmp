@@ -264,6 +264,40 @@ test('clowder stream events merge placeholder chunks final markdown and generate
   assert.equal(list[1].generatedByAgent, true);
 });
 
+test('clowder helper creates markdown placeholder chunks and final event', () => {
+  assert.equal(typeof messageState.isClowderConversation, 'function');
+  assert.equal(typeof messageState.createClowderMarkdownStreamEvents, 'function');
+  assert.equal(messageState.isClowderConversation({ id: 'clowder_ai', name: 'Clowder AI', type: 'robot' }), true);
+
+  const events = messageState.createClowderMarkdownStreamEvents('请用 markdown 表格总结当前任务', {
+    streamKey: 'clowder-test-stream',
+    chunkSize: 24
+  });
+  assert.equal(events[0].phase, 'placeholder');
+  assert.ok(events.some((event) => event.phase === 'chunk'));
+  assert.equal(events.at(-1).phase, 'final');
+  assert.equal(new Set(events.map((event) => event.streamKey)).size, 1);
+  assert.match(events.at(-1).content, /\| 项目 \| 说明 \|/);
+  assert.match(events.at(-1).content, /```markdown/);
+
+  const firstChunk = events.find((event) => event.phase === 'chunk');
+  const streaming = [events[0], firstChunk].reduce(
+    (list, event) => messageState.mergeAgentReplyEventIntoList(list, event),
+    []
+  );
+  assert.doesNotMatch(streaming[0].content, /正在思考/);
+  assert.equal(streaming[0].streaming, true);
+
+  const merged = events.reduce(
+    (list, event) => messageState.mergeAgentReplyEventIntoList(list, event),
+    []
+  );
+  assert.equal(merged.length, 1);
+  assert.equal(merged[0].streaming, false);
+  assert.equal(merged[0].renderMode, 'markdown');
+  assert.equal(merged[0].content, events.at(-1).content);
+});
+
 test('conversation summary turns long clowder markdown into one line preview', () => {
   const summary = messageState.conversationSummaryForMessage({
     senderId: 'clowder',
