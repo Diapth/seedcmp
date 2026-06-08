@@ -52,6 +52,7 @@ export { createAuthorizationRuleStore } from './stores/factories/AuthorizationRu
 export { createDraftStore } from './stores/factories/DraftStoreFactory.js';
 export type { AnyInvocationRecordStore } from './stores/factories/InvocationRecordStoreFactory.js';
 export { createInvocationRecordStore } from './stores/factories/InvocationRecordStoreFactory.js';
+export { createManualContextPinStore } from './stores/factories/ManualContextPinStoreFactory.js';
 export type { AnyMessageStore } from './stores/factories/MessageStoreFactory.js';
 export { createMessageStore } from './stores/factories/MessageStoreFactory.js';
 export { createPendingRequestStore } from './stores/factories/PendingRequestStoreFactory.js';
@@ -90,6 +91,14 @@ export {
   MemoryGovernanceStore,
   resolveTransition,
 } from './stores/ports/MemoryGovernanceStore.js';
+export type {
+  IManualContextPinStore,
+  ManualContextPin,
+  ManualContextPinInput,
+  ManualContextPinStatus,
+  ManualContextPinSummary,
+} from './stores/ports/ManualContextPinStore.js';
+export { ManualContextPinStore } from './stores/ports/ManualContextPinStore.js';
 export type { AppendMessageInput, IMessageStore, StoredMessage } from './stores/ports/MessageStore.js';
 export { MessageStore } from './stores/ports/MessageStore.js';
 export type { CreateSessionInput, ISessionChainStore, SessionRecordPatch } from './stores/ports/SessionChainStore.js';
@@ -105,6 +114,7 @@ export { RedisAuthorizationRuleStore } from './stores/redis/RedisAuthorizationRu
 export { RedisDraftStore } from './stores/redis/RedisDraftStore.js';
 export { RedisGameStore } from './stores/redis/RedisGameStore.js';
 export { RedisInvocationRecordStore } from './stores/redis/RedisInvocationRecordStore.js';
+export { RedisManualContextPinStore } from './stores/redis/RedisManualContextPinStore.js';
 export { RedisMessageStore } from './stores/redis/RedisMessageStore.js';
 export { RedisPendingRequestStore } from './stores/redis/RedisPendingRequestStore.js';
 export { RedisSessionChainStore } from './stores/redis/RedisSessionChainStore.js';

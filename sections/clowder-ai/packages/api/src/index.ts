@@ -87,6 +87,7 @@ import { createAuthorizationRuleStore } from './domains/cats/services/stores/fac
 import { createBacklogStore } from './domains/cats/services/stores/factories/BacklogStoreFactory.js';
 import { createCommunityIssueStore } from './domains/cats/services/stores/factories/CommunityIssueStoreFactory.js';
 import { createLabelStore } from './domains/cats/services/stores/factories/LabelStoreFactory.js';
+import { createManualContextPinStore } from './domains/cats/services/stores/factories/ManualContextPinStoreFactory.js';
 import { createMemoryStore } from './domains/cats/services/stores/factories/MemoryStoreFactory.js';
 import { createMessageStore } from './domains/cats/services/stores/factories/MessageStoreFactory.js';
 import { createPendingRequestStore } from './domains/cats/services/stores/factories/PendingRequestStoreFactory.js';
@@ -537,6 +538,7 @@ async function main(): Promise<void> {
   const { InMemoryGuideDismissTracker } = await import('./domains/guides/GuideDismissTracker.js');
   const dismissTracker = new InMemoryGuideDismissTracker();
   const taskStore = createTaskStore(redis);
+  const manualContextPinStore = createManualContextPinStore(redis);
   const { RuntimeWorkspaceStore } = await import('./domains/runtime-workspaces/RuntimeWorkspaceStore.js');
   const runtimeWorkspaceStore = new RuntimeWorkspaceStore();
   const { findLaunchedProjectRoot, resolveMaomiWorkspaceRoot } = await import(
@@ -2326,6 +2328,14 @@ async function main(): Promise<void> {
       ? { defaultUserId: (process.env.CLOWDER_DEFAULT_OWNER_USER_ID || process.env.DEFAULT_OWNER_USER_ID) as string }
       : {}),
     log: app.log,
+  });
+
+  const { manualContextPinsRoutes } = await import('./routes/manual-context-pins.js');
+  await app.register(manualContextPinsRoutes, {
+    manualContextPinStore,
+    ...(process.env.CLOWDER_DEFAULT_OWNER_USER_ID || process.env.DEFAULT_OWNER_USER_ID
+      ? { defaultUserId: (process.env.CLOWDER_DEFAULT_OWNER_USER_ID || process.env.DEFAULT_OWNER_USER_ID) as string }
+      : {}),
   });
 
   const { maomiWorkspaceRoutes } = await import('./routes/maomi-workspaces.js');

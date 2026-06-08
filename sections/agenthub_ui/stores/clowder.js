@@ -88,6 +88,7 @@ export const useClowderStore = defineStore('clowder', {
     artifacts: {},
     threadArtifacts: {},
     threadArtifactDiagnostics: {},
+    manualContextPins: {},
     deployments: {},
     projectGroups: {},
     groupCats: {},
@@ -196,6 +197,40 @@ export const useClowderStore = defineStore('clowder', {
       this.threadArtifactDiagnostics[threadId] = data.diagnostics || {};
       return this.threadArtifacts[threadId];
     },
+    async listManualContextPins(threadId) {
+      if (!threadId) return [];
+      const response = await clowderApi.listManualContextPins(threadId);
+      const data = unwrapData(response);
+      const pins = data.pins || data.items || [];
+      this.manualContextPins[threadId] = pins;
+      return pins;
+    },
+    async upsertManualContextPin(threadId, payload) {
+      if (!threadId) return null;
+      const response = await clowderApi.upsertManualContextPin(threadId, payload);
+      const data = unwrapData(response);
+      const pin = data.pin || data;
+      if (!pin?.id) return pin;
+      const existing = this.manualContextPins[threadId] || [];
+      const index = existing.findIndex((item) => item.id === pin.id || item.messageId === pin.messageId || item.message_id === pin.messageId);
+      const next = index >= 0
+        ? existing.map((item, itemIndex) => (itemIndex === index ? pin : item))
+        : [pin, ...existing];
+      this.manualContextPins[threadId] = next;
+      return pin;
+    },
+    async removeManualContextPin(threadId, pinIdOrMessageId) {
+      if (!threadId || !pinIdOrMessageId) return;
+      const existing = this.manualContextPins[threadId] || [];
+      const matched = existing.find((pin) => (
+        pin.id === pinIdOrMessageId ||
+        pin.messageId === pinIdOrMessageId ||
+        pin.message_id === pinIdOrMessageId
+      ));
+      const pinId = matched?.id || pinIdOrMessageId;
+      await clowderApi.removeManualContextPin(threadId, pinId);
+      this.manualContextPins[threadId] = existing.filter((pin) => pin.id !== pinId && pin.messageId !== pinIdOrMessageId && pin.message_id !== pinIdOrMessageId);
+    },
     async fetchArtifacts(coordinationId) {
       const response = await clowderApi.getCoordination(coordinationId);
       const data = unwrapData(response);
@@ -262,6 +297,7 @@ export const useClowderStore = defineStore('clowder', {
       this.artifacts = {};
       this.threadArtifacts = {};
       this.threadArtifactDiagnostics = {};
+      this.manualContextPins = {};
       this.deployments = {};
       this.projectGroups = {};
       this.groupCats = {};

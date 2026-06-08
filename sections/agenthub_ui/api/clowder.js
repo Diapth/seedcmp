@@ -55,6 +55,17 @@ export const clowderApi = {
   getThreadArtifacts(threadId) {
     return request(`clowder/thread/${encodeURIComponent(threadId)}/artifacts`);
   },
+  listManualContextPins(threadId) {
+    return request(`clowder/thread/${encodeURIComponent(threadId)}/manual-context-pins`);
+  },
+  upsertManualContextPin(threadId, data) {
+    return request(`clowder/thread/${encodeURIComponent(threadId)}/manual-context-pins`, { method: 'POST', data });
+  },
+  removeManualContextPin(threadId, pinId) {
+    return request(`clowder/thread/${encodeURIComponent(threadId)}/manual-context-pins/${encodeURIComponent(pinId)}`, {
+      method: 'DELETE'
+    });
+  },
   createDeploymentRequest(data) {
     return request('clowder/conversation/deployment-request', { method: 'POST', data });
   },

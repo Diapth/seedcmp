@@ -408,6 +408,77 @@ describe('Clowder and agent stores', () => {
     ]);
   });
 
+  it('mirrors manual context pins through Clowder thread endpoints', async () => {
+    const calls = [];
+    setRequestAdapter(async ({ url, method, data }) => {
+      calls.push({ url, method, data });
+      if (method === 'GET') {
+        expect(url).toContain('/clowder/thread/thread-1/manual-context-pins');
+        return {
+          status: 200,
+          data: {
+            code: 0,
+            data: {
+              pins: [
+                {
+                  id: 'pin-1',
+                  threadId: 'thread-1',
+                  messageId: 'm-1',
+                  contentExcerpt: '关键约束',
+                  status: 'active'
+                }
+              ]
+            }
+          }
+        };
+      }
+      if (method === 'POST') {
+        expect(url).toContain('/clowder/thread/thread-1/manual-context-pins');
+        expect(data).toMatchObject({
+          channelId: 'group-1',
+          channelType: 2,
+          messageId: 'm-1',
+          contentExcerpt: '关键约束'
+        });
+        return {
+          status: 200,
+          data: {
+            code: 0,
+            data: {
+              pin: {
+                id: 'pin-1',
+                threadId: 'thread-1',
+                messageId: 'm-1',
+                contentExcerpt: '关键约束',
+                status: 'active'
+              }
+            }
+          }
+        };
+      }
+      if (method === 'DELETE') {
+        expect(url).toContain('/clowder/thread/thread-1/manual-context-pins/pin-1');
+        return { status: 204, data: {} };
+      }
+      throw new Error(`unexpected ${method} ${url}`);
+    });
+
+    const clowderStore = useClowderStore();
+    const listed = await clowderStore.listManualContextPins('thread-1');
+    const upserted = await clowderStore.upsertManualContextPin('thread-1', {
+      channelId: 'group-1',
+      channelType: 2,
+      messageId: 'm-1',
+      contentExcerpt: '关键约束'
+    });
+    await clowderStore.removeManualContextPin('thread-1', 'pin-1');
+
+    expect(listed[0]).toMatchObject({ id: 'pin-1', messageId: 'm-1' });
+    expect(upserted).toMatchObject({ id: 'pin-1', contentExcerpt: '关键约束' });
+    expect(clowderStore.manualContextPins['thread-1']).toEqual([]);
+    expect(calls.map((call) => call.method)).toEqual(['GET', 'POST', 'DELETE']);
+  });
+
   it('loads active project-group bindings by project group number for refreshed group chats', async () => {
     setRequestAdapter(async ({ url, method }) => {
       expect(method).toBe('GET');
