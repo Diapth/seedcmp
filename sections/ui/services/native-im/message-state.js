@@ -54,10 +54,19 @@ function contentKey(message = {}) {
 }
 
 function messageDigest(message = {}) {
+  if (!isVisibleChatMessage(message)) return '';
+  if (message.type === 'system') return clean(message.content);
   if (message.type === 'image') return '[图片]';
   if (message.type === 'voice') return '[语音]';
   if (message.type === 'file') return toConversationPreview(`[文件] ${message.fileName || message.name || message.content || ''}`);
   return toConversationPreview(message.content) || '收到一条新消息';
+}
+
+export function isVisibleChatMessage(message = {}) {
+  if (!message) return false;
+  if (message.hidden || message.isSilentSystem) return false;
+  if (message.type === 'system' && !clean(message.content)) return false;
+  return true;
 }
 
 function normalizeTimestampMs(value, fallback = Date.now()) {
@@ -316,6 +325,7 @@ export function resolveSelfAvatar(currentUser = {}) {
 
 export function conversationSummaryForMessage(message = {}, currentUser = {}, conversation = {}) {
   const digest = messageDigest(message);
+  if (!digest) return '';
   if (isSelfSender(message.senderId || message.from_uid || message.fromUID, currentUser)) {
     return conversation?.type === 'group' ? `我: ${digest}` : digest;
   }

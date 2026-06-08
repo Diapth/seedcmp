@@ -305,6 +305,7 @@ import ContactCard from '@/components/contacts/ContactCard.vue';
 import AgentProfilePanel from '@/components/agents/AgentProfilePanel.vue';
 import {
   isClowderConversation,
+  isVisibleChatMessage,
   isSelfSender,
   resolveSelfAvatar,
   resolveSelfId,
@@ -390,7 +391,7 @@ const activeConversation = computed(() => {
 
 const messagesList = computed(() => {
   if (!convStore.activeId) return [];
-  return messageStore.messages[convStore.activeId] || [];
+  return (messageStore.messages[convStore.activeId] || []).filter(isVisibleChatMessage);
 });
 
 const mentionCandidates = computed(() => {
