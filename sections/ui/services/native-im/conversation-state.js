@@ -56,7 +56,9 @@ export function conversationDraftKey(channelId, channelType = 1) {
 
 export function shouldPersistConversationDraft(conversation = {}, identity = {}) {
   const channelId = clean(identity.channelId || conversation.channelId || conversation.channel_id || conversation.id);
+  const name = clean(conversation.name || conversation.title || conversation.displayName).toLowerCase();
   if (!channelId) return false;
+  if (channelId.toLowerCase().includes('clowder') || name.includes('clowder') || name.includes('协同猫')) return false;
   if (conversation.source === 'mock' || conversation.type === 'robot' || conversation.isAgent) return false;
   return true;
 }
