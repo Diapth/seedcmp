@@ -2,6 +2,7 @@
 
 import type { HierarchicalContextConfig } from '../../../../../config/hierarchical-context-config.js';
 import { getSenderName } from '../../context/ContextAssembler.js';
+import type { ManualContextPinSummary } from '../../stores/ports/ManualContextPinStore.js';
 import type { StoredMessage } from '../../stores/ports/MessageStore.js';
 
 // --- Phase D: Coverage Map (AC-D2) ---
@@ -50,6 +51,58 @@ export function buildCoverageMap(input: CoverageMapInput): CoverageMap {
     retrievalHints: input.retrievalHints,
     ...(input.searchSuggestions?.length ? { searchSuggestions: input.searchSuggestions } : {}),
   };
+}
+
+export function stripInjectedHistoryEnvelopes(content: string): string {
+  const lines = content.split('\n');
+  const kept: string[] = [];
+  let skippingHistoryEnvelope = false;
+
+  for (const line of lines) {
+    const trimmed = line.trim();
+    const isHistoryHeader =
+      line.startsWith('[对话历史 - 最近 ') ||
+      line.startsWith('[对话历史增量 - 未发送过 ') ||
+      line.startsWith('[对话历史增量 - 智能窗口');
+
+    if (!skippingHistoryEnvelope && isHistoryHeader) {
+      skippingHistoryEnvelope = true;
+      continue;
+    }
+
+    if (skippingHistoryEnvelope) {
+      if (trimmed === '[/对话历史]' || trimmed === '---') {
+        skippingHistoryEnvelope = false;
+      }
+      continue;
+    }
+
+    kept.push(line);
+  }
+
+  return kept.join('\n').trim();
+}
+
+export function formatManualContextPins(
+  pins: readonly ManualContextPinSummary[],
+  truncateLimit: number,
+  sanitize: (content: string) => string = stripInjectedHistoryEnvelopes,
+): string[] {
+  const active = pins.filter((pin) => pin.status === 'active').slice(0, 5);
+  if (active.length === 0) return [];
+
+  const maxLength = Math.max(200, truncateLimit);
+  const lines = active
+    .map((pin) => {
+      const excerpt = sanitize(pin.contentExcerpt).replace(/\s+/g, ' ').trim();
+      if (!excerpt) return '';
+      const clipped = excerpt.length > maxLength ? `${excerpt.slice(0, maxLength)}…` : excerpt;
+      return `[pin:${pin.messageId} @${pin.senderName || 'unknown'}] ${clipped}`;
+    })
+    .filter((line) => line.length > 0);
+  if (lines.length === 0) return [];
+
+  return ['[Manual context pins - user selected, max 5]', ...lines, '[/Manual context pins]'];
 }
 
 /**

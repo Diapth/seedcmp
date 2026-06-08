@@ -30,6 +30,29 @@ describe('F148 Phase E: formatContextBriefing (AC-E3 + AC-E4)', () => {
     assert.deepEqual(result.richBlock.coverageMap, coverageMap);
   });
 
+  test('summary includes manual pin count when provided', () => {
+    const coverageMap = {
+      omitted: { count: 0, timeRange: { from: 0, to: 0 }, participants: [] },
+      burst: { count: 5, timeRange: { from: 1712003600000, to: 1712004000000 } },
+      anchorIds: [],
+      threadMemory: null,
+      retrievalHints: [],
+    };
+    const result = formatContextBriefing(coverageMap, undefined, undefined, [
+      {
+        id: 'pin-1',
+        messageId: 'm-1',
+        contentExcerpt: '关键约束',
+        senderName: 'PM',
+        pinnedBy: 'user-1',
+        pinnedAt: '2026-06-08T00:00:00.000Z',
+        status: 'active',
+      },
+    ]);
+    assert.ok(result.summary.includes('手动 pin 1 条'), `summary should include manual pin count: ${result.summary}`);
+    assert.equal(result.richBlock.manualContextPins?.length, 1);
+  });
+
   test('handles zero omitted gracefully', () => {
     const coverageMap = {
       omitted: { count: 0, timeRange: { from: 0, to: 0 }, participants: [] },
@@ -122,6 +145,25 @@ describe('F148 Phase E: buildBriefingMessage (AC-E1)', () => {
     assert.ok(card.bodyMarkdown, 'should have bodyMarkdown');
     assert.ok(card.bodyMarkdown.includes('opus'), 'participants in body');
     assert.ok(card.bodyMarkdown.includes('Session #1'), 'threadMemory in body');
+  });
+
+  test('card bodyMarkdown lists manual context pins for audit', () => {
+    const msg = buildBriefingMessage(baseCoverageMap, 'thread-1', {
+      manualContextPins: [
+        {
+          id: 'pin-1',
+          messageId: 'm-1',
+          contentExcerpt: '关键约束',
+          senderName: 'PM',
+          pinnedBy: 'user-1',
+          pinnedAt: '2026-06-08T00:00:00.000Z',
+          status: 'active',
+        },
+      ],
+    });
+    const card = msg.extra.rich.blocks[0];
+    assert.ok(card.bodyMarkdown?.includes('手动长期上下文'), 'manual pin section should be present');
+    assert.ok(card.bodyMarkdown?.includes('PM: 关键约束'), 'manual pin summary should be listed');
   });
 
   test('card fields include coverage data', () => {

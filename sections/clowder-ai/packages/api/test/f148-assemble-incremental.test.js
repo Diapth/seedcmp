@@ -85,6 +85,13 @@ function buildDeps(messageStore, deliveryCursorStore, options = {}) {
     messageStore,
     deliveryCursorStore,
     evidenceStore: options.evidenceStore ?? undefined,
+    manualContextPinStore: options.manualContextPinStore ?? undefined,
+  };
+}
+
+function mockManualContextPinStore(pins = []) {
+  return {
+    listActive: async () => pins,
   };
 }
 
@@ -881,6 +888,93 @@ describe('F148 Phase E: coverageMap on IncrementalContextResult', () => {
     const result = await assembleIncrementalContext(deps, 'user-1', 'thread-1', 'opus');
     assert.ok(!result_is_smart_window(result), 'should NOT use smart window');
     assert.strictEqual(result.coverageMap, undefined, 'warm path should not have coverageMap');
+  });
+});
+
+describe('009 manual context pins in F148 context', () => {
+  test('warm path injects manual pins before regular history', async () => {
+    const messageStore = new MessageStore();
+    const deliveryCursorStore = new DeliveryCursorStore();
+    seedMessages(messageStore, 5);
+    const deps = buildDeps(messageStore, deliveryCursorStore, {
+      manualContextPinStore: mockManualContextPinStore([
+        {
+          id: 'pin-1',
+          messageId: 'm-pin',
+          contentExcerpt: '必须保留 compact toolbar',
+          senderName: 'PM',
+          pinnedBy: 'user-1',
+          pinnedAt: '2026-06-08T00:00:00.000Z',
+          status: 'active',
+        },
+      ]),
+    });
+
+    const result = await assembleIncrementalContext(deps, 'user-1', 'thread-1', 'opus');
+    const pinIdx = result.contextText.indexOf('[Manual context pins');
+    const historyIdx = result.contextText.indexOf('[对话历史增量 - 未发送过');
+    assert.ok(pinIdx >= 0, 'manual pin section should be present on warm path');
+    assert.ok(pinIdx < historyIdx, 'manual pins must precede regular history');
+  });
+
+  test('cold path injects manual pins before automatic anchors and exposes briefing summaries', async () => {
+    const messageStore = new MessageStore();
+    const deliveryCursorStore = new DeliveryCursorStore();
+    const now = Date.now();
+    for (let i = 0; i < 22; i++) {
+      messageStore.append(
+        mockMsg({
+          content: i === 0 ? 'Thread opener: Redis design\n```ts\nconst mode = "cluster"\n```' : `old ${i}`,
+          timestamp: now - 40 * 60_000 + i * 60_000,
+        }),
+      );
+    }
+    for (let i = 0; i < 8; i++) {
+      messageStore.append(mockMsg({ content: `recent ${i}`, timestamp: now - 8 * 60_000 + i * 60_000 }));
+    }
+    const deps = buildDeps(messageStore, deliveryCursorStore, {
+      threadStore: mockThreadStore('Manual pins'),
+      manualContextPinStore: mockManualContextPinStore([
+        {
+          id: 'pin-1',
+          messageId: 'm-pin',
+          contentExcerpt: '优先使用用户手动 pin 的约束',
+          senderName: 'PM',
+          pinnedBy: 'user-1',
+          pinnedAt: '2026-06-08T00:00:00.000Z',
+          status: 'active',
+        },
+      ]),
+    });
+
+    const result = await assembleIncrementalContext(deps, 'user-1', 'thread-1', 'opus');
+    assert.ok(result_is_smart_window(result), 'should use smart window path');
+    const pinIdx = result.contextText.indexOf('[Manual context pins');
+    const anchorIdx = result.contextText.indexOf('[Thread opener @');
+    assert.ok(pinIdx >= 0, 'manual pin section should be present on cold path');
+    assert.ok(anchorIdx >= 0, 'automatic anchor should be present');
+    assert.ok(pinIdx < anchorIdx, 'manual pins must precede automatic anchors');
+    assert.ok(!result.coverageMap.anchorIds.includes('m-pin'), 'manual pins must not mutate anchor coverage');
+    assert.ok(result.briefingContext?.manualContextPins?.[0]?.contentExcerpt.includes('用户手动 pin'));
+  });
+
+  test('manual pin store failure is fail-open and leaves output unchanged', async () => {
+    const messageStore = new MessageStore();
+    const deliveryCursorStore = new DeliveryCursorStore();
+    seedMessages(messageStore, 5);
+    const deps = buildDeps(messageStore, deliveryCursorStore);
+    const baseline = await assembleIncrementalContext(deps, 'user-1', 'thread-1', 'opus');
+
+    const failingDeps = buildDeps(messageStore, deliveryCursorStore, {
+      manualContextPinStore: {
+        listActive: async () => {
+          throw new Error('manual pin store down');
+        },
+      },
+    });
+    const failed = await assembleIncrementalContext(failingDeps, 'user-1', 'thread-1', 'opus');
+    assert.equal(failed.contextText, baseline.contextText);
+    assert.equal(failed.briefingContext?.manualContextPins, undefined);
   });
 });
 

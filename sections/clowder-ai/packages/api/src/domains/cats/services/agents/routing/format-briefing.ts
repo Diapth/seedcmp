@@ -1,6 +1,7 @@
 // F148 Phase E: Pure function to format context briefing content.
 
 import type { RichCardBlock, RichMessageExtra } from '@cat-cafe/shared';
+import type { ManualContextPinSummary } from '../../stores/ports/ManualContextPinStore.js';
 import type { AppendMessageInput } from '../../stores/ports/MessageStore.js';
 import type { RecentArtifact } from './artifact-tracking.js';
 import type { CoverageMap } from './context-transport.js';
@@ -15,6 +16,7 @@ export interface ContextBriefingBlock {
   anchorSummaries?: string[];
   baton?: BatonContext;
   activeTasks?: TaskSummary[];
+  manualContextPins?: ManualContextPinSummary[];
 }
 
 /** Result from formatContextBriefing */
@@ -37,6 +39,7 @@ export function formatContextBriefing(
   coverageMap: CoverageMap,
   threadMemorySummary?: string,
   anchorSummaries?: string[],
+  manualContextPins?: ManualContextPinSummary[],
 ): ContextBriefingResult {
   const parts: string[] = [];
   parts.push(`看到 ${coverageMap.burst.count} 条`);
@@ -48,6 +51,9 @@ export function formatContextBriefing(
   }
 
   parts.push(`证据 ${coverageMap.retrievalHints.length} 条`);
+  if (manualContextPins?.length) {
+    parts.push(`手动 pin ${manualContextPins.length} 条`);
+  }
 
   const summary = parts.join(' · ');
 
@@ -56,6 +62,7 @@ export function formatContextBriefing(
     coverageMap,
     ...(threadMemorySummary ? { threadMemorySummary } : {}),
     ...(anchorSummaries?.length ? { anchorSummaries } : {}),
+    ...(manualContextPins?.length ? { manualContextPins } : {}),
   };
 
   return { summary, richBlock };
@@ -96,6 +103,14 @@ interface BriefingMessageOptions {
   activeTasks?: TaskSummary[];
   recentArtifacts?: RecentArtifact[];
   rankedSources?: RankedSource[];
+  manualContextPins?: ManualContextPinSummary[];
+}
+
+function formatManualContextPinLine(pin: ManualContextPinSummary): string {
+  const sender = (pin.senderName || 'unknown').replace(/[\n\r]/g, ' ').trim() || 'unknown';
+  const excerpt = pin.contentExcerpt.replace(/[`\\\n\r]/g, ' ').replace(/\s+/g, ' ').trim();
+  const clipped = excerpt.length > 200 ? `${excerpt.slice(0, 200)}…` : excerpt;
+  return `- ${sender}: ${clipped}`;
 }
 
 /**
@@ -112,6 +127,7 @@ export function buildBriefingMessage(
     coverageMap,
     options?.threadMemorySummary,
     options?.anchorSummaries,
+    options?.manualContextPins,
   );
 
   // Build expanded bodyMarkdown for AC-E4
@@ -135,6 +151,9 @@ export function buildBriefingMessage(
   }
   if (options?.threadMemorySummary) {
     bodyParts.push(`**线程记忆**:\n${options.threadMemorySummary}`);
+  }
+  if (options?.manualContextPins?.length) {
+    bodyParts.push(`**手动长期上下文**:\n${options.manualContextPins.map(formatManualContextPinLine).join('\n')}`);
   }
   // VG-3: Key decisions from threadMemory
   if (coverageMap.threadMemory?.decisions?.length) {

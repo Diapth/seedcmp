@@ -1430,6 +1430,7 @@ async function main(): Promise<void> {
     signalArticleLookup: createSignalArticleLookup({ transcriptReader }),
     packStore,
     evidenceStore: memoryServices.evidenceStore,
+    manualContextPinStore,
     ...(toolUsageCounter ? { toolUsageCounter } : {}),
     ...(toolEventLog ? { toolEventLog } : {}),
     ...(skillLoadEventLog ? { skillLoadEventLog } : {}),
