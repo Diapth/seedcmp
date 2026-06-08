@@ -187,6 +187,8 @@ export function createClowderMarkdownStreamEvents(prompt = '', options = {}) {
   const chunks = splitStreamContent(content, options.chunkSize);
   const base = {
     streamKey,
+    targetMessageId: firstNonEmpty(options.targetMessageId, options.target_message_id),
+    emoji: firstNonEmpty(options.emoji, options.reaction, '👀'),
     senderId: 'clowder',
     senderName: 'Clowder AI',
     time: options.time || Date.now()
@@ -227,6 +229,15 @@ export function normalizeAgentReplyEvent(event = {}) {
     content,
     delta,
     files,
+    targetMessageId: firstNonEmpty(
+      event.targetMessageId,
+      event.target_message_id,
+      event.promptMessageId,
+      event.prompt_message_id,
+      event.inReplyTo,
+      event.in_reply_to
+    ),
+    emoji: firstNonEmpty(event.emoji, event.reaction, event.ackEmoji, event.ack_emoji, '👀'),
     senderId: firstNonEmpty(event.senderId, event.sender_id, event.agentId, event.agent_id, 'clowder'),
     senderName: firstNonEmpty(event.senderName, event.sender_name, event.agentName, event.agent_name, 'Clowder AI'),
     senderAvatar: firstNonEmpty(event.senderAvatar, event.sender_avatar),
@@ -247,6 +258,17 @@ export function mergeAgentReplyEventIntoList(messages = [], event = {}) {
   if (!normalized.streamKey) return [...messages];
 
   const next = [...messages];
+  if (normalized.phase === 'placeholder') {
+    if (normalized.targetMessageId) {
+      return applyReactionEventIntoList(next, {
+        targetMessageId: normalized.targetMessageId,
+        emoji: normalized.emoji,
+        userId: normalized.senderId
+      });
+    }
+    return next;
+  }
+
   const index = next.findIndex((message) => {
     const key = firstNonEmpty(message.streamKey, message.clientMsgNo, message.messageId, message.id);
     return key === normalized.streamKey;
@@ -530,7 +552,10 @@ export function mergeNativeMessageIntoList(messages = [], incoming = {}, options
     return applyReactionEventIntoList(messages, enrichedIncoming.reactionEvent);
   }
   if (enrichedIncoming.streamKey) {
-    const phase = clean(enrichedIncoming.streamPhase).toLowerCase();
+    const phase = clean(
+      enrichedIncoming.streamPhase
+      || (enrichedIncoming.streaming === false || clean(enrichedIncoming.status) === 'success' ? 'final' : 'chunk')
+    ).toLowerCase();
     if (phase === 'cleanup') {
       return [...messages];
     }
@@ -551,9 +576,14 @@ export function mergeNativeMessageIntoList(messages = [], incoming = {}, options
     const next = [...messages];
     const streamIndex = next.findIndex((message) => messageIdentityKey(message) === key);
     if (streamIndex >= 0) {
+      const incomingContent = streamMessage.content || '';
+      const mergedContent = phase === 'chunk' && streamMessage.streamDelta
+        ? `${next[streamIndex].content || ''}${incomingContent}`
+        : streamMessage.content;
       next[streamIndex] = {
         ...next[streamIndex],
         ...streamMessage,
+        content: mergedContent,
         reactions: next[streamIndex].reactions || streamMessage.reactions || [],
         replyRef: next[streamIndex].replyRef || streamMessage.replyRef || null,
         mentions: next[streamIndex].mentions || streamMessage.mentions || []
@@ -595,6 +625,29 @@ export function mergeNativeMessageIntoList(messages = [], incoming = {}, options
 
 export function mergeNativeMessageLists(current = [], incoming = [], options = {}) {
   return incoming.reduce((list, message) => mergeNativeMessageIntoList(list, message, options), [...current]);
+}
+
+function hasEquivalentIncomingMessage(message = {}, incoming = [], currentUser = {}, options = {}) {
+  const key = messageIdentityKey(message);
+  if (key && incoming.some((candidate) => messageIdentityKey(candidate) === key)) return true;
+  return findSelfEchoIndex(incoming, message, currentUser, options) >= 0;
+}
+
+function shouldPreserveLocalContextMessage(message = {}, incoming = [], options = {}) {
+  const currentUser = options.currentUser || {};
+  const conversation = options.conversation || {};
+  const status = clean(message.status);
+  if (status === 'sending' || status === 'failed') return true;
+  if (status !== 'success') return false;
+  if (!isClowderConversation(conversation)) return false;
+  if (!isSelfSender(message.senderId || message.from_uid || message.fromUID, currentUser)) return false;
+  if (hasEquivalentIncomingMessage(message, incoming, currentUser, options)) return false;
+  return isVisibleChatMessage(message);
+}
+
+export function mergeSyncedMessagesPreservingLocalContext(current = [], incoming = [], options = {}) {
+  const preserved = current.filter((message) => shouldPreserveLocalContextMessage(message, incoming, options));
+  return mergeNativeMessageLists(preserved, incoming, options);
 }
 
 export function sortMessages(messages = []) {

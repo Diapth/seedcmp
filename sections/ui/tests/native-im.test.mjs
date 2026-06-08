@@ -485,9 +485,11 @@ test('clowder helper creates markdown placeholder chunks and final event', () =>
 
   const events = messageState.createClowderMarkdownStreamEvents('请用 markdown 表格总结当前任务', {
     streamKey: 'clowder-test-stream',
+    targetMessageId: 'prompt-for-stream',
     chunkSize: 24
   });
   assert.equal(events[0].phase, 'placeholder');
+  assert.equal(events[0].targetMessageId, 'prompt-for-stream');
   assert.ok(events.some((event) => event.phase === 'chunk'));
   assert.equal(events.at(-1).phase, 'final');
   assert.equal(new Set(events.map((event) => event.streamKey)).size, 1);
@@ -589,6 +591,189 @@ test('native clowder reaction event adds an idempotent emoji to the target user 
 
   assert.equal(event.isSilentSystem, true);
   assert.deepEqual(twice[0].reactions, [{ emoji: '❤️', userIds: ['clowder'], count: 1 }]);
+});
+
+test('synced clowder history preserves local successful user prompt until backend echo arrives', () => {
+  assert.equal(typeof messageState.mergeSyncedMessagesPreservingLocalContext, 'function');
+  const localPrompt = {
+    id: 'local-prompt-1',
+    clientMsgNo: 'local-prompt-1',
+    senderId: 'u1',
+    senderName: '我',
+    content: '请总结任务',
+    type: 'text',
+    status: 'success',
+    source: 'clowder',
+    time: 1000,
+    reactions: []
+  };
+  const localPending = {
+    id: 'local-pending-1',
+    clientMsgNo: 'local-pending-1',
+    senderId: 'u1',
+    content: '还在发送',
+    type: 'text',
+    status: 'sending',
+    time: 1100
+  };
+  const remoteFinal = {
+    id: 'stream-1',
+    streamKey: 'stream-1',
+    senderId: 'clowder',
+    senderName: 'Clowder AI',
+    content: '任务总结完成',
+    type: 'text',
+    status: 'success',
+    time: 1200
+  };
+
+  const merged = messageState.mergeSyncedMessagesPreservingLocalContext(
+    [localPrompt, localPending],
+    [remoteFinal],
+    { currentUser: { id: 'u1' }, conversation: { id: 'clowder_cat:opus', type: 'robot', source: 'clowder' } }
+  );
+
+  assert.deepEqual(merged.map((message) => message.id), ['local-prompt-1', 'local-pending-1', 'stream-1']);
+  assert.equal(merged[0].content, '请总结任务');
+});
+
+test('agent placeholder ack adds reaction to user prompt instead of visible thinking message', () => {
+  const userPrompt = {
+    id: 'prompt-ack-1',
+    clientMsgNo: 'prompt-ack-1',
+    senderId: 'u1',
+    senderName: '我',
+    content: '请开始分析',
+    type: 'text',
+    status: 'success',
+    time: 1000,
+    reactions: []
+  };
+
+  const acknowledged = messageState.mergeAgentReplyEventIntoList([userPrompt], {
+    streamKey: 'stream-ack-1',
+    phase: 'placeholder',
+    targetMessageId: 'prompt-ack-1',
+    emoji: '👀',
+    senderId: 'clowder:opus',
+    senderName: 'Opus'
+  });
+
+  assert.equal(acknowledged.length, 1);
+  assert.equal(acknowledged[0].content, '请开始分析');
+  assert.deepEqual(acknowledged[0].reactions, [{ emoji: '👀', userIds: ['clowder:opus'], count: 1 }]);
+});
+
+test('native clowder stream system events normalize as mergeable markdown deltas', () => {
+  const chunk = normalizeMessage({
+    message_id: 'evt-chunk-1',
+    from_uid: 'clowder:opus',
+    payload: JSON.stringify({
+      type: 1000,
+      event: 'clowder_stream',
+      stream_key: 'real-stream-1',
+      phase: 'chunk',
+      delta: '## 任务',
+      markdown: true
+    })
+  });
+  const final = normalizeMessage({
+    message_id: 'evt-final-1',
+    from_uid: 'clowder:opus',
+    payload: JSON.stringify({
+      type: 1000,
+      event: 'clowder_stream',
+      stream_key: 'real-stream-1',
+      phase: 'final',
+      content: '## 任务\n\n已完成',
+      markdown: true
+    })
+  });
+
+  assert.equal(chunk.type, 'text');
+  assert.equal(chunk.streamKey, 'real-stream-1');
+  assert.equal(chunk.streamPhase, 'chunk');
+  assert.equal(chunk.content, '## 任务');
+  assert.equal(chunk.streaming, true);
+
+  const merged = messageState.mergeNativeMessageIntoList(
+    messageState.mergeNativeMessageIntoList([], chunk),
+    final
+  );
+  assert.equal(merged.length, 1);
+  assert.equal(merged[0].id, 'real-stream-1');
+  assert.equal(merged[0].content, '## 任务\n\n已完成');
+  assert.equal(merged[0].streaming, false);
+});
+
+test('native clowder stream chunk deltas append until final replaces content', () => {
+  const firstChunk = normalizeMessage({
+    message_id: 'evt-chunk-a',
+    from_uid: 'clowder:opus',
+    payload: JSON.stringify({
+      type: 1000,
+      event: 'clowder_stream',
+      stream_key: 'delta-stream-1',
+      phase: 'chunk',
+      delta: '## '
+    })
+  });
+  const secondChunk = normalizeMessage({
+    message_id: 'evt-chunk-b',
+    from_uid: 'clowder:opus',
+    payload: JSON.stringify({
+      type: 1000,
+      event: 'clowder_stream',
+      stream_key: 'delta-stream-1',
+      phase: 'chunk',
+      delta: '任务'
+    })
+  });
+  const final = normalizeMessage({
+    message_id: 'evt-final-b',
+    from_uid: 'clowder:opus',
+    payload: JSON.stringify({
+      type: 1000,
+      event: 'clowder_stream',
+      stream_key: 'delta-stream-1',
+      phase: 'final',
+      content: '## 任务\n\n完成'
+    })
+  });
+
+  const streaming = messageState.mergeNativeMessageIntoList(
+    messageState.mergeNativeMessageIntoList([], firstChunk),
+    secondChunk
+  );
+  assert.equal(streaming[0].content, '## 任务');
+  assert.equal(streaming[0].streaming, true);
+
+  const completed = messageState.mergeNativeMessageIntoList(streaming, final);
+  assert.equal(completed[0].content, '## 任务\n\n完成');
+  assert.equal(completed[0].streaming, false);
+});
+
+test('durable clowder stream messages without phase stay completed during history merge', () => {
+  const durableFinal = {
+    id: 'durable-stream-1',
+    streamKey: 'durable-stream-1',
+    messageId: 'durable-stream-1',
+    senderId: 'clowder',
+    senderName: 'Clowder AI',
+    type: 'text',
+    content: '最终回复',
+    status: 'success',
+    streaming: false,
+    renderMode: 'markdown',
+    time: 1000
+  };
+
+  const merged = messageState.mergeNativeMessageIntoList([], durableFinal);
+
+  assert.equal(merged[0].id, 'durable-stream-1');
+  assert.equal(merged[0].content, '最终回复');
+  assert.equal(merged[0].status, 'success');
+  assert.equal(merged[0].streaming, false);
 });
 
 test('conversation summary turns long clowder markdown into one line preview', () => {

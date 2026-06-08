@@ -26,6 +26,16 @@ function firstText(...values) {
   return '';
 }
 
+function firstRawText(...values) {
+  for (const value of values) {
+    if (value === undefined || value === null) continue;
+    if (typeof value === 'object') continue;
+    const text = String(value);
+    if (text) return text;
+  }
+  return '';
+}
+
 function firstArray(...values) {
   for (const value of values) {
     if (Array.isArray(value)) return value;
@@ -101,15 +111,44 @@ function memberListText(...values) {
   return members.map(memberDisplayName).filter(Boolean).join('、');
 }
 
+function normalizeStreamPhase(value) {
+  const state = clean(value).toLowerCase();
+  if (['placeholder', 'thinking', 'start', 'created'].includes(state)) return 'placeholder';
+  if (['chunk', 'delta', 'streaming'].includes(state)) return 'chunk';
+  if (['final', 'done', 'complete', 'completed'].includes(state)) return 'final';
+  if (state === 'cleanup') return 'cleanup';
+  return state;
+}
+
 function normalizeStreamState(content = {}) {
+  const event = normalizeEventName(firstText(content.event, content.type_name, content.typeName, content.action, content.cmd));
   const stream = content.stream && typeof content.stream === 'object' ? content.stream : null;
-  if (!stream) return {};
-  const state = clean(firstText(stream.state, stream.phase, stream.status)).toLowerCase();
+  const isTopLevelStream = /^clowder_(stream|reply|delta)/.test(event)
+    || firstText(content.streamKey, content.stream_key, content.streamId, content.stream_id);
+  const source = stream || (isTopLevelStream ? content : null);
+  if (!source) return {};
+  const state = normalizeStreamPhase(firstText(
+    source.state,
+    source.phase,
+    source.status,
+    source.stage,
+    content.phase,
+    content.status,
+    content.stage
+  ));
   const streamKey = firstText(
-    stream.platformMessageId,
-    stream.platform_message_id,
+    source.platformMessageId,
+    source.platform_message_id,
+    source.streamKey,
+    source.stream_key,
+    source.streamId,
+    source.stream_id,
     content.platformMessageId,
     content.platform_message_id,
+    content.streamKey,
+    content.stream_key,
+    content.streamId,
+    content.stream_id,
     content.clientMsgNo,
     content.client_msg_no
   );
@@ -274,7 +313,7 @@ export function normalizeContent(payload) {
       ?? 1,
     1
   );
-  const text = firstText(
+  const contentText = firstText(
     parsed.content,
     parsed.text,
     parsed.title,
@@ -284,6 +323,18 @@ export function normalizeContent(payload) {
     envelope.text,
     envelope.title
   );
+  const deltaText = firstRawText(
+    parsed.delta,
+    parsed.contentDelta,
+    parsed.content_delta,
+    nested.delta,
+    nested.contentDelta,
+    nested.content_delta,
+    envelope.delta,
+    envelope.contentDelta,
+    envelope.content_delta
+  );
+  const text = contentText || deltaText;
   const name = firstNonEmpty(content.name, content.fileName, payload?.name, payload?.file_name);
   const streamState = normalizeStreamState(content);
   const markdownState = (content.markdown === true || content.format === 'markdown')
@@ -304,6 +355,15 @@ export function normalizeContent(payload) {
       fileName: name || text || '文件',
       size: content.size || payload?.size || 0,
       url: content.url || payload?.url || ''
+    };
+  }
+  if (streamState.streamKey) {
+    return {
+      type: 'text',
+      content: text || '',
+      streamDelta: Boolean(deltaText && !contentText && streamState.streamPhase === 'chunk'),
+      ...markdownState,
+      ...streamState
     };
   }
   if (type === 99 || type === 1000) {
