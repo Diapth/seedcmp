@@ -11,7 +11,8 @@ import {
 } from '@/services/native-im/conversation-state';
 import {
   createAgentConversation,
-  createAgentMember
+  createAgentMember,
+  shouldPreserveClowderAgentDisplayName
 } from '@/services/native-im/agent-state';
 
 function channelTypeFromConversation(conversation = {}) {
@@ -374,6 +375,17 @@ export const useConversationStore = defineStore('conversation', {
           return item.id === nativeConversation.id && channelTypeFromConversation(item) === nativeConversation.channelType;
         });
         if (existing) {
+          const preservedAgentDisplay = shouldPreserveClowderAgentDisplayName(existing, nativeConversation)
+            ? {
+              name: existing.name,
+              avatar: existing.avatar,
+              type: existing.type,
+              source: existing.source,
+              isAgent: existing.isAgent,
+              agentId: existing.agentId,
+              directCatId: existing.directCatId
+            }
+            : {};
           const key = conversationDraftKey(
             nativeConversation.channelId || nativeConversation.id,
             nativeConversation.channelType || channelTypeFromConversation(nativeConversation)
@@ -388,7 +400,8 @@ export const useConversationStore = defineStore('conversation', {
           Object.assign(existing, nativeConversation, {
             draft,
             isPinned: existing.isPinned || nativeConversation.isPinned,
-            isMuted: existing.isMuted || nativeConversation.isMuted
+            isMuted: existing.isMuted || nativeConversation.isMuted,
+            ...preservedAgentDisplay
           });
           if (localHidden && !this.isHidden.includes(existing.id)) this.isHidden.push(existing.id);
         } else {

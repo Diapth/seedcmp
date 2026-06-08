@@ -41,6 +41,13 @@ function resolveDefaultBaseUrl() {
     || '/v1/';
 }
 
+function resolveDefaultClowderBaseUrl() {
+  const env = import.meta.env || {};
+  return readStorage('clowder_api_base_url')
+    || env.VITE_CLOWDER_API_BASE_URL
+    || '/clowder-api/api/';
+}
+
 function randomHexId() {
   if (globalThis.crypto?.randomUUID) {
     return globalThis.crypto.randomUUID();
@@ -215,6 +222,90 @@ function firstNonEmpty(...values) {
   return '';
 }
 
+function firstList(...values) {
+  for (const value of values) {
+    if (Array.isArray(value)) return value;
+  }
+  return [];
+}
+
+function normalizeMention(value = '', fallback = '') {
+  const raw = firstNonEmpty(value, fallback);
+  if (!raw) return '';
+  return raw.startsWith('@') ? raw : `@${raw}`;
+}
+
+function splitCapabilityTags(value = '') {
+  return String(value || '')
+    .split(/[、,，/|]/)
+    .map((item) => item.trim())
+    .filter(Boolean)
+    .slice(0, 6);
+}
+
+function normalizeClowderAgent(agent = {}) {
+  const id = firstNonEmpty(agent.catId, agent.cat_id, agent.roleTemplateId, agent.role_template_id, agent.id, agent.agentId, agent.uid);
+  const name = firstNonEmpty(agent.displayName, agent.display_name, agent.name, agent.nickname, id, '智能体');
+  const aliases = firstList(agent.aliases, agent.mentionPatterns, agent.mention_patterns);
+  const alias = normalizeMention(aliases[0] || agent.alias, id || name);
+  const capabilitySummary = firstNonEmpty(
+    agent.capabilitySummary,
+    agent.capability_summary,
+    agent.teamStrengths,
+    agent.team_strengths,
+    agent.roleDescription,
+    agent.role_description,
+    agent.desc,
+    agent.description
+  );
+  const personalitySummary = firstNonEmpty(agent.personalitySummary, agent.personality_summary, agent.personality, agent.systemPrompt);
+  const capabilityTags = firstList(agent.capabilityTags, agent.capabilities)
+    .map((item) => String(item || '').trim())
+    .filter(Boolean);
+  const available = agent.available !== false && agent.availabilityState !== 'unavailable';
+
+  return {
+    id,
+    uid: id,
+    name,
+    nickname: name,
+    alias,
+    desc: capabilitySummary || personalitySummary || '后端智能体已连接，可以开始协作',
+    avatar: firstNonEmpty(agent.avatar, agent.logo),
+    status: available ? 'active' : 'inactive',
+    creator: agent.source === 'runtime-created' ? 'User' : 'System',
+    platform: firstNonEmpty(agent.platform, 'clowder'),
+    accessMode: firstNonEmpty(agent.accessMode, 'backend'),
+    model: firstNonEmpty(agent.model, agent.defaultModel),
+    accountRef: firstNonEmpty(agent.accountRef),
+    apiKey: '',
+    apiUrl: '',
+    customModel: '',
+    systemPrompt: personalitySummary,
+    roleTemplate: firstNonEmpty(agent.roleTemplate, 'general'),
+    templateId: firstNonEmpty(agent.templateId, agent.roleTemplateId, 'general'),
+    capabilityTags: capabilityTags.length ? capabilityTags : splitCapabilityTags(capabilitySummary),
+    isAgent: true,
+    connected: agent.connected !== false && available,
+    source: 'clowder',
+    preferred: Boolean(agent.preferred),
+    raw: agent
+  };
+}
+
+function mergeClowderDirectoryAgents(agents = [], templates = []) {
+  const seen = new Set();
+  const result = [];
+  [...agents, ...templates].forEach((item) => {
+    const normalized = normalizeClowderAgent(item);
+    const key = String(normalized.id || normalized.name || '').toLowerCase();
+    if (!key || seen.has(key)) return;
+    seen.add(key);
+    result.push(normalized);
+  });
+  return result;
+}
+
 function safeFileName(name = 'file') {
   return String(name || 'file').replace(/[\\/:*?"<>|\u0000-\u001f]/g, '_').slice(0, 160) || 'file';
 }
@@ -270,6 +361,11 @@ export function createNativeImService(options = {}) {
   const client = options.client || createNativeApiClient({
     baseUrl: options.baseUrl || resolveDefaultBaseUrl(),
     getToken: options.getToken || (() => readStorage('app_token')),
+    request: options.request
+  });
+  const clowderClient = options.clowderClient || createNativeApiClient({
+    baseUrl: options.clowderBaseUrl || resolveDefaultClowderBaseUrl(),
+    getToken: () => '',
     request: options.request
   });
   const deviceFactory = options.deviceFactory || defaultDeviceFactory;
@@ -444,6 +540,43 @@ export function createNativeImService(options = {}) {
     };
   }
 
+  async function sendClowderConversationMessage({
+    channelId,
+    channelType = CHANNEL_TYPE_PERSON,
+    text = '',
+    directCatId = '',
+    targetCatIds,
+    promptContext = ''
+  } = {}) {
+    if (!channelId) throw { msg: 'channelId不能为空' };
+    const trimmedText = String(text || '').trim();
+    if (!trimmedText) throw { msg: '消息内容不能为空' };
+    const payload = {
+      channelId: String(channelId),
+      channelType: Number(channelType),
+      text: trimmedText
+    };
+    if (directCatId) payload.directCatId = String(directCatId);
+    if (Array.isArray(targetCatIds) && targetCatIds.length) {
+      payload.targetCatIds = targetCatIds.map(String).filter(Boolean);
+    }
+    if (promptContext) payload.promptContext = String(promptContext);
+
+    const resp = await client.post('clowder/conversation/message', payload);
+    const source = resp.message || resp.data?.message || resp.data || resp;
+    return {
+      ...normalizeMessage({
+        ...source,
+        message_id: source.message_id || source.messageId || source.id || resp.message_id || resp.messageId || resp.id,
+        payload: source.payload || { type: 1, content: trimmedText },
+        status: source.status || resp.status || 'success'
+      }),
+      channelId: String(channelId),
+      channelType: Number(channelType),
+      content: trimmedText
+    };
+  }
+
   async function updateConversationSettings({ channelId, channelType = CHANNEL_TYPE_PERSON, isPinned, isMuted } = {}) {
     if (!channelId) throw { msg: 'channelId不能为空' };
     const payload = {};
@@ -608,6 +741,59 @@ export function createNativeImService(options = {}) {
     return firstArray(resp, resp.members, resp.list, resp.data, resp.data?.members).map(normalizeNativeGroupMember);
   }
 
+  async function fetchClowderCatDirectory(params = {}) {
+    let resp = null;
+    if (params.preferDirect) {
+      resp = await fetchDirectClowderCatDirectory(params);
+    } else try {
+      resp = await client.get('clowder/cats', {
+        query: params.query || undefined,
+        includeUnavailable: params.includeUnavailable === undefined ? true : params.includeUnavailable
+      });
+    } catch (error) {
+      resp = await fetchDirectClowderCatDirectory(params, error);
+    }
+    const rawAgents = firstArray(resp.agents, resp.data?.agents, resp.cats, resp.data?.cats);
+    const rawTemplates = firstArray(resp.templates, resp.data?.templates);
+    return {
+      ...resp,
+      agents: mergeClowderDirectoryAgents(rawAgents, rawTemplates)
+    };
+  }
+
+  async function fetchDirectClowderCatDirectory(params = {}, nativeError) {
+    const [templatesResp, agentsResp] = await Promise.all([
+      clowderClient.get('cat-templates').catch(() => ({})),
+      clowderClient.get('connectors/im-web/agents', {
+        externalChatId: params.externalChatId || '1:clowder_ai'
+      }).catch(() => ({}))
+    ]);
+    const templates = firstArray(templatesResp.templates, templatesResp.data?.templates);
+    const agents = firstArray(agentsResp.agents, agentsResp.data?.agents);
+    if (!templates.length && !agents.length) throw nativeError;
+    return {
+      agents,
+      templates,
+      clientDefaults: templatesResp.clientDefaults || templatesResp.data?.clientDefaults,
+      skillCatalog: templatesResp.skillCatalog || templatesResp.data?.skillCatalog,
+      directClowderFallback: true,
+      nativeError
+    };
+  }
+
+  async function fetchClowderConversationAgents({ channelId, channelType = CHANNEL_TYPE_PERSON } = {}) {
+    if (!channelId) throw { msg: 'channelId不能为空' };
+    const resp = await client.get('clowder/conversation/agents', {
+      channelId: String(channelId),
+      channelType: Number(channelType)
+    });
+    const rawAgents = firstArray(resp.agents, resp.data?.agents);
+    return {
+      ...resp,
+      agents: rawAgents.map(normalizeClowderAgent)
+    };
+  }
+
   function disconnect() {
     try {
       getShared()?.disconnect?.();
@@ -625,6 +811,7 @@ export function createNativeImService(options = {}) {
     syncConversations,
     syncMessages,
     sendTextMessage,
+    sendClowderConversationMessage,
     sendMediaMessage,
     uploadChatFile,
     updateConversationSettings,
@@ -637,6 +824,8 @@ export function createNativeImService(options = {}) {
     createGroup,
     syncMyGroups,
     syncGroupMembers,
+    fetchClowderCatDirectory,
+    fetchClowderConversationAgents,
     disconnect,
     get sdkReady() {
       return Boolean(sdkShared);

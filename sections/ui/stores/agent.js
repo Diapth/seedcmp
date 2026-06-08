@@ -1,7 +1,46 @@
 import { defineStore } from 'pinia';
+import { nativeImService } from '@/services/native-im/service';
+
+const STATIC_AGENT_IDS = new Set([
+  'pm-agent',
+  'codex',
+  'claude-code',
+  'ds',
+  'logic-weaver',
+  'creative-spark',
+  'clowder'
+]);
+
+const SKILL_TONES = ['primary', 'cyan', 'orange', 'green', 'purple'];
+
+function agentErrorText(error) {
+  return error?.msg || error?.message || '智能体目录同步失败';
+}
+
+function normalizeSkillCatalog(skillCatalog = {}, agents = []) {
+  return Object.entries(skillCatalog || {}).flatMap(([provider, entries], providerIndex) => {
+    if (!Array.isArray(entries)) return [];
+    return entries.map((entry, index) => {
+      const name = String(entry.name || entry.id || `${provider}-${index + 1}`).trim();
+      const id = `${provider}-${name}`.toLowerCase().replace(/[^a-z0-9\u4e00-\u9fa5_-]+/g, '-');
+      return {
+        id,
+        name,
+        category: entry.category || provider,
+        level: entry.mounted === false ? '未启用' : '可用',
+        desc: entry.description || entry.trigger || '后端技能已同步',
+        icon: 'bookmark',
+        tone: SKILL_TONES[(providerIndex + index) % SKILL_TONES.length],
+        agentIds: agents.map((agent) => agent.id).filter(Boolean)
+      };
+    });
+  });
+}
 
 export const useAgentStore = defineStore('agent', {
   state: () => ({
+    syncState: 'idle',
+    nativeError: '',
     agents: [
       { id: 'pm-agent', name: 'PM 智能体', alias: '@pm', desc: '项目管理专家，辅助拆解计划与里程碑', avatar: '', status: 'active', creator: 'System', platform: 'claude-code', accessMode: 'oauth', model: 'Claude 3.5 Sonnet', accountRef: 'agenthub-default', apiKey: '', apiUrl: '', customModel: '', systemPrompt: '', roleTemplate: 'general', templateId: 'reviewer', capabilityTags: ['计划', '里程碑'] },
       { id: 'codex', name: 'Codex', alias: '@codex', desc: '代码生成专家，适合快速实现与重构', avatar: '', status: 'active', creator: 'System', platform: 'codex', accessMode: 'api-key', model: 'DeepSeek V3', accountRef: 'openai-prod', apiKey: '', apiUrl: 'https://api.deepseek.com/v1', customModel: '', systemPrompt: '', roleTemplate: 'engineer', templateId: 'engineer', capabilityTags: ['代码生成', '重构'] },
@@ -400,6 +439,66 @@ export const useAgentStore = defineStore('agent', {
     drafts: []
   }),
   actions: {
+    clearStaticCatalog() {
+      this.agents = this.agents.filter((agent) => {
+        if (agent.source === 'clowder') return false;
+        if (STATIC_AGENT_IDS.has(agent.id)) return false;
+        return agent.source === 'user';
+      });
+      this.userSkills = [];
+      this.localSkills = [];
+    },
+    applyNativeAgents(agents = []) {
+      if (!Array.isArray(agents) || agents.length === 0) return [];
+      const backendIds = new Set(agents.map((agent) => agent.id).filter(Boolean));
+      const retainedLocalAgents = this.agents.filter((agent) => {
+        if (agent.source === 'clowder') return false;
+        if (STATIC_AGENT_IDS.has(agent.id)) return false;
+        return agent.source === 'user' && !backendIds.has(agent.id);
+      });
+      this.agents = [...agents, ...retainedLocalAgents];
+      return this.agents;
+    },
+    applyNativeSkills(skillCatalog = {}) {
+      const skills = normalizeSkillCatalog(skillCatalog, this.agents);
+      this.userSkills = skills;
+      this.localSkills = skills.map((skill) => ({
+        ...skill,
+        version: '',
+        packageName: '',
+        size: '',
+        updatedAt: '',
+        location: 'backend',
+        author: 'Clowder',
+        status: skill.level,
+        source: '后端',
+        triggers: [],
+        files: [],
+        documents: []
+      }));
+      return skills;
+    },
+    async fetchNativeAgents(options = {}) {
+      if (!options.silent) this.syncState = 'syncing';
+      if (options.clearStatic !== false) this.clearStaticCatalog();
+      this.nativeError = '';
+      try {
+        const directory = await nativeImService.fetchClowderCatDirectory({
+          query: options.query,
+          includeUnavailable: true,
+          preferDirect: options.preferDirect !== false
+        });
+        this.applyNativeAgents(directory.agents || []);
+        this.applyNativeSkills(directory.skillCatalog || {});
+        this.syncState = 'success';
+        return directory;
+      } catch (error) {
+        this.syncState = 'failed';
+        this.nativeError = agentErrorText(error);
+        if (!options.silent) throw error;
+        return { agents: [] };
+      }
+    },
     createAgent(agent) {
       const id = 'agent-' + Date.now().toString();
       this.agents.push({

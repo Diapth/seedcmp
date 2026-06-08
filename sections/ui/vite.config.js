@@ -107,6 +107,11 @@ export default defineConfig({
       '/v1': {
         target: process.env.VITE_TANGSENG_PROXY_TARGET || 'http://127.0.0.1:8090',
         changeOrigin: true
+      },
+      '/clowder-api': {
+        target: process.env.VITE_CLOWDER_PROXY_TARGET || 'http://127.0.0.1:3004',
+        changeOrigin: true,
+        rewrite: (path) => path.replace(/^\/clowder-api/, '')
       }
     }
   },

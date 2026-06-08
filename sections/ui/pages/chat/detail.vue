@@ -288,7 +288,8 @@ import {
   isSelfSender,
   resolveSelfAvatar,
   resolveSelfId,
-  resolveSelfName
+  resolveSelfName,
+  shouldStartLocalClowderStream
 } from '@/services/native-im/message-state';
 
 const { isDesktop } = useResponsiveLayout();
@@ -638,7 +639,7 @@ async function handleSendMessage({ type, content, fileName, fileSize, fileSizeBy
     url,
     mentions: extra.mentions || []
   }, sender);
-  if (type === 'text' && isClowderConversation(conversation)) {
+  if (type === 'text' && shouldStartLocalClowderStream(conversation)) {
     messageStore.startClowderMarkdownStream(conversation.id, content);
   }
   await sendPromise;

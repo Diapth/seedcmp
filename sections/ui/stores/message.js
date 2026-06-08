@@ -7,11 +7,13 @@ import {
   createClowderMarkdownStreamEvents,
   createClientMsgNo,
   enrichNativeMessageSender,
+  isClowderDirectCatConversation,
   isVisibleChatMessage,
   isSelfSender,
   mergeNativeMessageIntoList,
   mergeNativeMessageLists,
   mergeAgentReplyEventIntoList,
+  resolveClowderDirectCatId,
   resolveOutboundSender,
   resolveLocalSendStatus,
   shouldKeepLocalSendSuccess,
@@ -238,11 +240,20 @@ export const useMessageStore = defineStore('message', {
       }
 
       try {
-        const sent = await nativeImService.sendTextMessage({
-          channelId: identity.channelId,
-          channelType: identity.channelType,
-          content: payload.content
-        });
+        const routeContext = conversation || identity;
+        const sent = isClowderDirectCatConversation(routeContext)
+          ? await nativeImService.sendClowderConversationMessage({
+            channelId: identity.channelId,
+            channelType: identity.channelType,
+            text: payload.content,
+            directCatId: resolveClowderDirectCatId(routeContext),
+            promptContext: payload.promptContext
+          })
+          : await nativeImService.sendTextMessage({
+            channelId: identity.channelId,
+            channelType: identity.channelType,
+            content: payload.content
+          });
         const sentMessage = defaultMsg({
           ...sent,
           id: sent.id || local.id,

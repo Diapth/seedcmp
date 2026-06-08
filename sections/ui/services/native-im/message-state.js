@@ -1,3 +1,8 @@
+import {
+  CLOWDER_CAT_CONTACT_PREFIX,
+  getClowderCatIdFromContactId
+} from './agent-state.js';
+
 function clean(value) {
   if (value === undefined || value === null) return '';
   return String(value).trim();
@@ -108,9 +113,40 @@ function normalizeAgentFile(file = {}, streamKey = '', index = 0) {
 export function isClowderConversation(conversation = {}) {
   const id = clean(conversation.id || conversation.channelId || conversation.agentId).toLowerCase();
   const name = clean(conversation.name || conversation.title || conversation.displayName).toLowerCase();
-  return id.includes('clowder')
+  return isClowderDirectCatConversation(conversation)
+    || id.includes('clowder')
     || name.includes('clowder')
     || name.includes('协同猫');
+}
+
+export function resolveClowderDirectCatId(conversation = {}) {
+  const explicit = firstNonEmpty(
+    conversation.directCatId,
+    conversation.direct_cat_id,
+    conversation.catId,
+    conversation.cat_id,
+    conversation.agentId,
+    conversation.agent_id
+  );
+  if (explicit && !explicit.startsWith(CLOWDER_CAT_CONTACT_PREFIX)) return explicit;
+  return getClowderCatIdFromContactId(explicit)
+    || getClowderCatIdFromContactId(conversation.channelId)
+    || getClowderCatIdFromContactId(conversation.id);
+}
+
+export function isClowderDirectCatConversation(conversation = {}) {
+  const id = firstNonEmpty(conversation.channelId, conversation.id);
+  return Boolean(
+    getClowderCatIdFromContactId(id)
+    || conversation.directCatId
+    || conversation.direct_cat_id
+    || (conversation.source === 'clowder' && conversation.type === 'robot')
+  );
+}
+
+export function shouldStartLocalClowderStream(conversation = {}) {
+  return isClowderConversation(conversation)
+    && !isClowderDirectCatConversation(conversation);
 }
 
 function splitStreamContent(content = '', chunkSize = 36) {
