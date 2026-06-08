@@ -1,6 +1,6 @@
 # IM Web Clowder Visual Smoke
 
-- Target: http://100.79.157.76:3000/
+- Target: http://localhost:3000/
 - Replied: true
 - /extra 400 count: 0
 - Screenshots: 01-opened.png, 02-clowder-contact.png, 03-before-send.png, 04-after-send.png, 05-after-reply-wait.png

@@ -26,7 +26,7 @@
 ## 复现步骤
 
 1. 登录 `13733632709`。
-2. 打开 `http://100.79.157.76:5173/#/pages/settings/devices`。
+2. 打开 `http://localhost:5173/#/pages/settings/devices`。
 3. 找到非当前设备，例如 `MacBook Pro 16"` 或 `Chrome Browser (Windows)`。
 4. 点击 `下线`。
 5. 在确认弹窗中确认。
@@ -98,8 +98,8 @@ function handleLogoutDevice(device) {
 
 ```bash
 cd /home/leng/.codex/skills/playwright-skill \
-  && TARGET_URL='http://100.79.157.76:5173' \
-     API_BASE='http://100.79.157.76:3000/v1' \
+  && TARGET_URL='http://localhost:5173' \
+     API_BASE='http://localhost:3000/v1' \
      REPO_ROOT='/media/leng/DiskB1/exp/seedcmp' \
      node run.js /tmp/playwright-test-sections-ui-user-settings.js
 

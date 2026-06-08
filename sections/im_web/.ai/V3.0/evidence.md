@@ -115,7 +115,7 @@ Baseline command inventory captured during Phase 1 setup, with final V3 implemen
 
 - Date/time: 2026-05-31 16:19 CST
 - IM Web URL: `http://localhost:3000`
-- TangSeng API preflight: `GET http://100.79.157.76:8090/v1/health` returned 200 with `db/redis/status: up`
+- TangSeng API preflight: `GET http://localhost:8090/v1/health` returned 200 with `db/redis/status: up`
 - Clowder URL: `http://localhost:3003`
 - Clowder preflight: `GET /api/connectors/im-web/status` returned 200 with `connectorId: im-web`, `enabled/configured/reachable: true`
 - Accounts: `18337488675`, `13733632709`
@@ -169,13 +169,13 @@ Baseline command inventory captured during Phase 1 setup, with final V3 implemen
   - Pass - `GET http://localhost:3003/api/cats` returned 200 with one cat.
   - Fail - `GET http://localhost:3003/api/connectors/im-web/status` returned 404.
   - Fail - `GET http://localhost:3003/api/connectors/im-web/agents?externalChatId=2:test` returned 404.
-  - Fail - `curl --noproxy '*' http://100.79.157.76:8090/v1/user/login` could not connect; browser login remained on `/login`.
+  - Fail - `curl --noproxy '*' http://localhost:8090/v1/user/login` could not connect; browser login remained on `/login`.
 
 ### V3 Recovery Visual Audit - conversation-loss-audit-20260528-2316
 
 - Date/time: 2026-05-28 23:16 CST
 - IM Web URL: `http://localhost:3000`
-- TangSeng API: `http://100.79.157.76:8090/v1`
+- TangSeng API: `http://localhost:8090/v1`
 - Clowder API: `http://127.0.0.1:3004`
 - User: `leng_test_updated` / `008618337488675`
 - Root cause found: TangSengDaoDaoServer HTTP API was not listening on `:8090`; IM recovery helpers masked sync failures.
@@ -184,7 +184,7 @@ Baseline command inventory captured during Phase 1 setup, with final V3 implemen
   - Regression: `cd sections/im_web/apps/chat && pnpm exec vitest run tests/recoveryFailureState.test.ts tests/offlineQueue.test.ts tests/sdkRecovery.test.ts tests/groupOfflineUnreadRetention.test.ts --config vitest.config.ts` passed 8 tests.
   - Type check: `cd sections/im_web && pnpm type-check` passed.
 - Service evidence:
-  - `GET http://100.79.157.76:8090/v1/health` returned `{"db":"up","redis":"up","status":"up"}`.
+  - `GET http://localhost:8090/v1/health` returned `{"db":"up","redis":"up","status":"up"}`.
   - `GET http://127.0.0.1:3004/api/commands?surface=connector` returned 200 and includes `/cats | /cats new <猫名> [@别名]`.
 - Browser evidence directory: `sections/im_web/.ai/V3.0/tests-e2e/conversation-loss-audit-20260528-2316/`
   - `01-login.png`

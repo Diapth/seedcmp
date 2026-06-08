@@ -1,7 +1,7 @@
 # V3 Clowder Direct Complex Browser Smoke
 
 - Time: 2026-05-29 10:32 Asia/Shanghai
-- Target: http://100.79.157.76:3000/
+- Target: http://localhost:3000/
 - Clowder API: http://127.0.0.1:3004
 - Account: 008618337488675
 - MySQL check: README business account `tsdd_user` / `tsdd_password` against database `im`

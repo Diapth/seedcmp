@@ -142,7 +142,7 @@ export interface InvocationContext {
   bootcampState?: BootcampStateV1;
   /**
    * F155: Matched guide candidate from routing-layer keyword match.
-   * When present, cats load guide-interaction skill and offer the guide.
+   * When present, cats offer the matched guide flow.
    */
   guideCandidate?: {
     id: string;
@@ -352,7 +352,7 @@ const WORKFLOW_TRIGGERS: Record<string, string> = {
     '### 执行纪律',
     '- 加载 Skill 后直接执行第一步（产出 > 复述）',
     '- 接球后静默执行：收到"放行"后沉默做到下一状态迁移点（BLOCKED / REVIEW READY / DONE）',
-    '- 声明 = 执行：说"我进 merge gate"必须同 turn 加载 skill 并执行',
+    '- 声明 = 执行：说"我进 review-and-release"必须同 turn 加载 skill 并执行',
     '- 只发状态迁移消息，中间产物留在代码里',
     '- 完成任务后必须 @ 下一棒',
     '- 若识别到角色不匹配或方向有问题，先通知对方再执行（Rule 0）',

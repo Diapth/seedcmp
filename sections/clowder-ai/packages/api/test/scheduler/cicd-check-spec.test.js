@@ -93,7 +93,7 @@ describe('CiCdCheckTaskSpec', () => {
     const policy = triggered[0][6];
     assert.equal(policy.priority, 'normal');
     assert.equal(policy.reason, 'github_ci_pass');
-    assert.equal(policy.suggestedSkill, 'merge-gate');
+    assert.equal(policy.suggestedSkill, 'review-and-release');
   });
 
   it('execute triggers invokeTrigger for CI fail with urgent priority (unchanged)', async () => {

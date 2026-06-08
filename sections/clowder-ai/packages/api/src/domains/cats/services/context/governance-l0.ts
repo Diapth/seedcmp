@@ -174,7 +174,7 @@ export function compileGovernanceL0FromMarkdown(markdown: string): string {
     '### 质量覆盖',
     '- Bug 先定位根因再修；不确定方向：停 → 搜 → 问 → 确认 → 再动手。',
     '- “完成”附证据；Bug 先红后绿；scope 失控要记录并沉淀。',
-    '- 被铲屎官纠正理解偏差时，先完成实际任务，再按 self-evolution 归档偏差根因。',
+    '- 被铲屎官纠正理解偏差时，先完成实际任务，再沉淀偏差根因和后续改进。',
     '',
     '### Magic Words（铲屎官专用拉闸词 — 仅铲屎官当前指令触发）',
     ...magicWords,

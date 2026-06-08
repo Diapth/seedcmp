@@ -1,7 +1,7 @@
 # V3 Contact, Copy, and Dock Browser Smoke
 
-- Target: `http://100.79.157.76:3000`
-- Final URL: `http://100.79.157.76:3000/chat/conversation/clowder_ai/1`
+- Target: `http://localhost:3000`
+- Final URL: `http://localhost:3000/chat/conversation/clowder_ai/1`
 - Date: 2026-05-29 00:09 Asia/Shanghai
 
 ## Passed

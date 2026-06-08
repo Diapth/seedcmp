@@ -1,5 +1,5 @@
 /**
- * Phase 4 (AC-H2): Content fetch with browser-automation routing detection.
+ * Phase 4 (AC-H2): Content fetch with deep-research routing detection.
  * Server-side fetch for simple HTML; flags JS-heavy sites as needs-browser.
  */
 import type { FetchResult } from './types.js';

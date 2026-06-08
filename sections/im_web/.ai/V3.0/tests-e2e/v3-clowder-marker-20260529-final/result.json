@@ -1,6 +1,6 @@
 {
-  "targetUrl": "http://100.79.157.76:3000/",
-  "clowderUrl": "http://100.79.157.76:3000/chat/conversation/clowder_ai/1",
+  "targetUrl": "http://localhost:3000/",
+  "clowderUrl": "http://localhost:3000/chat/conversation/clowder_ai/1",
   "marker": "Clowder UI marker 1779988384984",
   "markerVisible": false,
   "catsCommandVisible": true,
@@ -9,643 +9,643 @@
   "relevantNetwork": [
     {
       "status": 200,
-      "url": "http://100.79.157.76:3000/@fs/media/leng/DiskB1/exp/seedcmp/sections/im_web/packages/base-vue/src/components/messages/CardCell.vue"
+      "url": "http://localhost:3000/@fs/media/leng/DiskB1/exp/seedcmp/sections/im_web/packages/base-vue/src/components/messages/CardCell.vue"
     },
     {
       "status": 200,
-      "url": "http://100.79.157.76:3000/@fs/media/leng/DiskB1/exp/seedcmp/sections/im_web/packages/base-vue/src/components/messages/MergeCell.vue"
+      "url": "http://localhost:3000/@fs/media/leng/DiskB1/exp/seedcmp/sections/im_web/packages/base-vue/src/components/messages/MergeCell.vue"
     },
     {
       "status": 200,
-      "url": "http://100.79.157.76:3000/@fs/media/leng/DiskB1/exp/seedcmp/sections/im_web/packages/datasource-vue/src/stores/clowderTypes.ts"
+      "url": "http://localhost:3000/@fs/media/leng/DiskB1/exp/seedcmp/sections/im_web/packages/datasource-vue/src/stores/clowderTypes.ts"
     },
     {
       "status": 200,
-      "url": "http://100.79.157.76:3000/@fs/media/leng/DiskB1/exp/seedcmp/sections/im_web/packages/datasource-vue/src/stores/clowderStore.ts?t=1779986788954"
+      "url": "http://localhost:3000/@fs/media/leng/DiskB1/exp/seedcmp/sections/im_web/packages/datasource-vue/src/stores/clowderStore.ts?t=1779986788954"
     },
     {
       "status": 200,
-      "url": "http://100.79.157.76:3000/@fs/media/leng/DiskB1/exp/seedcmp/sections/im_web/packages/datasource-vue/src/stores/messageStore.ts?t=1779986788954"
+      "url": "http://localhost:3000/@fs/media/leng/DiskB1/exp/seedcmp/sections/im_web/packages/datasource-vue/src/stores/messageStore.ts?t=1779986788954"
     },
     {
       "status": 200,
-      "url": "http://100.79.157.76:3000/@fs/media/leng/DiskB1/exp/seedcmp/sections/im_web/packages/base-vue/src/components/messages/TextCell.vue?vue&type=style&index=0&scoped=c0035fb9&lang.css"
+      "url": "http://localhost:3000/@fs/media/leng/DiskB1/exp/seedcmp/sections/im_web/packages/base-vue/src/components/messages/TextCell.vue?vue&type=style&index=0&scoped=c0035fb9&lang.css"
     },
     {
       "status": 200,
-      "url": "http://100.79.157.76:3000/@fs/media/leng/DiskB1/exp/seedcmp/sections/im_web/packages/base-vue/src/components/messages/ImageCell.vue?vue&type=style&index=0&scoped=3915ada8&lang.css"
+      "url": "http://localhost:3000/@fs/media/leng/DiskB1/exp/seedcmp/sections/im_web/packages/base-vue/src/components/messages/ImageCell.vue?vue&type=style&index=0&scoped=3915ada8&lang.css"
     },
     {
       "status": 200,
-      "url": "http://100.79.157.76:3000/@fs/media/leng/DiskB1/exp/seedcmp/sections/im_web/packages/base-vue/src/components/messages/SystemCell.vue?vue&type=style&index=0&scoped=538333ce&lang.css"
+      "url": "http://localhost:3000/@fs/media/leng/DiskB1/exp/seedcmp/sections/im_web/packages/base-vue/src/components/messages/SystemCell.vue?vue&type=style&index=0&scoped=538333ce&lang.css"
     },
     {
       "status": 200,
-      "url": "http://100.79.157.76:3000/@fs/media/leng/DiskB1/exp/seedcmp/sections/im_web/packages/base-vue/src/components/messages/VoiceCell.vue?vue&type=style&index=0&scoped=1e2cce37&lang.css"
+      "url": "http://localhost:3000/@fs/media/leng/DiskB1/exp/seedcmp/sections/im_web/packages/base-vue/src/components/messages/VoiceCell.vue?vue&type=style&index=0&scoped=1e2cce37&lang.css"
     },
     {
       "status": 200,
-      "url": "http://100.79.157.76:3000/@fs/media/leng/DiskB1/exp/seedcmp/sections/im_web/packages/base-vue/src/components/messages/TimeCell.vue?vue&type=style&index=0&scoped=e4ca3361&lang.css"
+      "url": "http://localhost:3000/@fs/media/leng/DiskB1/exp/seedcmp/sections/im_web/packages/base-vue/src/components/messages/TimeCell.vue?vue&type=style&index=0&scoped=e4ca3361&lang.css"
     },
     {
       "status": 200,
-      "url": "http://100.79.157.76:3000/@fs/media/leng/DiskB1/exp/seedcmp/sections/im_web/packages/base-vue/src/components/messages/VideoCell.vue?vue&type=style&index=0&scoped=f1b4e35d&lang.css"
+      "url": "http://localhost:3000/@fs/media/leng/DiskB1/exp/seedcmp/sections/im_web/packages/base-vue/src/components/messages/VideoCell.vue?vue&type=style&index=0&scoped=f1b4e35d&lang.css"
     },
     {
       "status": 200,
-      "url": "http://100.79.157.76:3000/@fs/media/leng/DiskB1/exp/seedcmp/sections/im_web/packages/base-vue/src/components/messages/FileCell.vue?vue&type=style&index=0&scoped=94bf8c19&lang.css"
+      "url": "http://localhost:3000/@fs/media/leng/DiskB1/exp/seedcmp/sections/im_web/packages/base-vue/src/components/messages/FileCell.vue?vue&type=style&index=0&scoped=94bf8c19&lang.css"
     },
     {
       "status": 200,
-      "url": "http://100.79.157.76:3000/@fs/media/leng/DiskB1/exp/seedcmp/sections/im_web/packages/base-vue/src/components/messages/GifCell.vue?vue&type=style&index=0&scoped=f4914e1b&lang.css"
+      "url": "http://localhost:3000/@fs/media/leng/DiskB1/exp/seedcmp/sections/im_web/packages/base-vue/src/components/messages/GifCell.vue?vue&type=style&index=0&scoped=f4914e1b&lang.css"
     },
     {
       "status": 200,
-      "url": "http://100.79.157.76:3000/@fs/media/leng/DiskB1/exp/seedcmp/sections/im_web/packages/base-vue/src/components/messages/StickerCell.vue?vue&type=style&index=0&scoped=c6467feb&lang.css"
+      "url": "http://localhost:3000/@fs/media/leng/DiskB1/exp/seedcmp/sections/im_web/packages/base-vue/src/components/messages/StickerCell.vue?vue&type=style&index=0&scoped=c6467feb&lang.css"
     },
     {
       "status": 200,
-      "url": "http://100.79.157.76:3000/@fs/media/leng/DiskB1/exp/seedcmp/sections/im_web/packages/base-vue/src/components/messages/LocationCell.vue?vue&type=style&index=0&scoped=8c7ba2ba&lang.css"
+      "url": "http://localhost:3000/@fs/media/leng/DiskB1/exp/seedcmp/sections/im_web/packages/base-vue/src/components/messages/LocationCell.vue?vue&type=style&index=0&scoped=8c7ba2ba&lang.css"
     },
     {
       "status": 200,
-      "url": "http://100.79.157.76:3000/@fs/media/leng/DiskB1/exp/seedcmp/sections/im_web/packages/base-vue/src/components/messages/CardCell.vue?vue&type=style&index=0&scoped=a69ad7c0&lang.css"
+      "url": "http://localhost:3000/@fs/media/leng/DiskB1/exp/seedcmp/sections/im_web/packages/base-vue/src/components/messages/CardCell.vue?vue&type=style&index=0&scoped=a69ad7c0&lang.css"
     },
     {
       "status": 200,
-      "url": "http://100.79.157.76:3000/@fs/media/leng/DiskB1/exp/seedcmp/sections/im_web/packages/base-vue/src/components/messages/MergeCell.vue?vue&type=style&index=0&scoped=c504c6ba&lang.css"
+      "url": "http://localhost:3000/@fs/media/leng/DiskB1/exp/seedcmp/sections/im_web/packages/base-vue/src/components/messages/MergeCell.vue?vue&type=style&index=0&scoped=c504c6ba&lang.css"
     },
     {
       "status": 200,
-      "url": "http://100.79.157.76:3000/@fs/media/leng/DiskB1/exp/seedcmp/sections/im_web/packages/datasource-vue/src/api/clowder.ts?t=1779986788954"
+      "url": "http://localhost:3000/@fs/media/leng/DiskB1/exp/seedcmp/sections/im_web/packages/datasource-vue/src/api/clowder.ts?t=1779986788954"
     },
     {
       "status": 200,
-      "url": "http://100.79.157.76:8090/v1/conversation/sync"
+      "url": "http://localhost:8090/v1/conversation/sync"
     },
     {
       "status": 200,
-      "url": "http://100.79.157.76:8090/v1/conversation/extra/sync"
+      "url": "http://localhost:8090/v1/conversation/extra/sync"
     },
     {
       "status": 200,
-      "url": "http://100.79.157.76:8090/v1/message/channel/sync"
+      "url": "http://localhost:8090/v1/message/channel/sync"
     },
     {
       "status": 200,
-      "url": "http://100.79.157.76:8090/v1/message/channel/sync"
+      "url": "http://localhost:8090/v1/message/channel/sync"
     },
     {
       "status": 200,
-      "url": "http://100.79.157.76:8090/v1/message/channel/sync"
+      "url": "http://localhost:8090/v1/message/channel/sync"
     },
     {
       "status": 200,
-      "url": "http://100.79.157.76:8090/v1/message/channel/sync"
+      "url": "http://localhost:8090/v1/message/channel/sync"
     },
     {
       "status": 200,
-      "url": "http://100.79.157.76:8090/v1/message/channel/sync"
+      "url": "http://localhost:8090/v1/message/channel/sync"
     },
     {
       "status": 200,
-      "url": "http://100.79.157.76:8090/v1/message/channel/sync"
+      "url": "http://localhost:8090/v1/message/channel/sync"
     },
     {
       "status": 200,
-      "url": "http://100.79.157.76:8090/v1/message/channel/sync"
+      "url": "http://localhost:8090/v1/message/channel/sync"
     },
     {
       "status": 200,
-      "url": "http://100.79.157.76:8090/v1/message/channel/sync"
+      "url": "http://localhost:8090/v1/message/channel/sync"
     },
     {
       "status": 200,
-      "url": "http://100.79.157.76:8090/v1/message/channel/sync"
+      "url": "http://localhost:8090/v1/message/channel/sync"
     },
     {
       "status": 200,
-      "url": "http://100.79.157.76:8090/v1/conversation/sync"
+      "url": "http://localhost:8090/v1/conversation/sync"
     },
     {
       "status": 200,
-      "url": "http://100.79.157.76:8090/v1/conversation/sync"
+      "url": "http://localhost:8090/v1/conversation/sync"
     },
     {
       "status": 200,
-      "url": "http://100.79.157.76:8090/v1/message/channel/sync"
+      "url": "http://localhost:8090/v1/message/channel/sync"
     },
     {
       "status": 200,
-      "url": "http://100.79.157.76:8090/v1/message/channel/sync"
+      "url": "http://localhost:8090/v1/message/channel/sync"
     },
     {
       "status": 200,
-      "url": "http://100.79.157.76:8090/v1/message/channel/sync"
+      "url": "http://localhost:8090/v1/message/channel/sync"
     },
     {
       "status": 200,
-      "url": "http://100.79.157.76:8090/v1/message/channel/sync"
+      "url": "http://localhost:8090/v1/message/channel/sync"
     },
     {
       "status": 200,
-      "url": "http://100.79.157.76:8090/v1/message/channel/sync"
+      "url": "http://localhost:8090/v1/message/channel/sync"
     },
     {
       "status": 200,
-      "url": "http://100.79.157.76:8090/v1/conversation/extra/sync"
+      "url": "http://localhost:8090/v1/conversation/extra/sync"
     },
     {
       "status": 200,
-      "url": "http://100.79.157.76:8090/v1/conversation/extra/sync"
+      "url": "http://localhost:8090/v1/conversation/extra/sync"
     },
     {
       "status": 200,
-      "url": "http://100.79.157.76:8090/v1/message/channel/sync"
+      "url": "http://localhost:8090/v1/message/channel/sync"
     },
     {
       "status": 200,
-      "url": "http://100.79.157.76:8090/v1/message/channel/sync"
+      "url": "http://localhost:8090/v1/message/channel/sync"
     },
     {
       "status": 200,
-      "url": "http://100.79.157.76:8090/v1/message/channel/sync"
+      "url": "http://localhost:8090/v1/message/channel/sync"
     },
     {
       "status": 200,
-      "url": "http://100.79.157.76:8090/v1/message/channel/sync"
+      "url": "http://localhost:8090/v1/message/channel/sync"
     },
     {
       "status": 200,
-      "url": "http://100.79.157.76:8090/v1/message/channel/sync"
+      "url": "http://localhost:8090/v1/message/channel/sync"
     },
     {
       "status": 200,
-      "url": "http://100.79.157.76:8090/v1/message/channel/sync"
+      "url": "http://localhost:8090/v1/message/channel/sync"
     },
     {
       "status": 200,
-      "url": "http://100.79.157.76:8090/v1/message/channel/sync"
+      "url": "http://localhost:8090/v1/message/channel/sync"
     },
     {
       "status": 200,
-      "url": "http://100.79.157.76:8090/v1/message/channel/sync"
+      "url": "http://localhost:8090/v1/message/channel/sync"
     },
     {
       "status": 200,
-      "url": "http://100.79.157.76:8090/v1/message/channel/sync"
+      "url": "http://localhost:8090/v1/message/channel/sync"
     },
     {
       "status": 200,
-      "url": "http://100.79.157.76:8090/v1/message/channel/sync"
+      "url": "http://localhost:8090/v1/message/channel/sync"
     },
     {
       "status": 200,
-      "url": "http://100.79.157.76:8090/v1/message/channel/sync"
+      "url": "http://localhost:8090/v1/message/channel/sync"
     },
     {
       "status": 200,
-      "url": "http://100.79.157.76:8090/v1/message/channel/sync"
+      "url": "http://localhost:8090/v1/message/channel/sync"
     },
     {
       "status": 200,
-      "url": "http://100.79.157.76:8090/v1/message/channel/sync"
+      "url": "http://localhost:8090/v1/message/channel/sync"
     },
     {
       "status": 200,
-      "url": "http://100.79.157.76:8090/v1/message/channel/sync"
+      "url": "http://localhost:8090/v1/message/channel/sync"
     },
     {
       "status": 200,
-      "url": "http://100.79.157.76:8090/v1/message/channel/sync"
+      "url": "http://localhost:8090/v1/message/channel/sync"
     },
     {
       "status": 200,
-      "url": "http://100.79.157.76:8090/v1/message/channel/sync"
+      "url": "http://localhost:8090/v1/message/channel/sync"
     },
     {
       "status": 200,
-      "url": "http://100.79.157.76:8090/v1/message/channel/sync"
+      "url": "http://localhost:8090/v1/message/channel/sync"
     },
     {
       "status": 200,
-      "url": "http://100.79.157.76:8090/v1/message/pinned/sync"
+      "url": "http://localhost:8090/v1/message/pinned/sync"
     },
     {
       "status": 200,
-      "url": "http://100.79.157.76:8090/v1/message/pinned/sync"
+      "url": "http://localhost:8090/v1/message/pinned/sync"
     },
     {
       "status": 200,
-      "url": "http://100.79.157.76:8090/v1/message/pinned/sync"
+      "url": "http://localhost:8090/v1/message/pinned/sync"
     },
     {
       "status": 200,
-      "url": "http://100.79.157.76:8090/v1/message/pinned/sync"
+      "url": "http://localhost:8090/v1/message/pinned/sync"
     },
     {
       "status": 200,
-      "url": "http://100.79.157.76:8090/v1/message/pinned/sync"
+      "url": "http://localhost:8090/v1/message/pinned/sync"
     },
     {
       "status": 200,
-      "url": "http://100.79.157.76:8090/v1/message/pinned/sync"
+      "url": "http://localhost:8090/v1/message/pinned/sync"
     },
     {
       "status": 200,
-      "url": "http://100.79.157.76:8090/v1/message/pinned/sync"
+      "url": "http://localhost:8090/v1/message/pinned/sync"
     },
     {
       "status": 200,
-      "url": "http://100.79.157.76:8090/v1/message/pinned/sync"
+      "url": "http://localhost:8090/v1/message/pinned/sync"
     },
     {
       "status": 200,
-      "url": "http://100.79.157.76:8090/v1/message/pinned/sync"
+      "url": "http://localhost:8090/v1/message/pinned/sync"
     },
     {
       "status": 200,
-      "url": "http://100.79.157.76:8090/v1/message/pinned/sync"
+      "url": "http://localhost:8090/v1/message/pinned/sync"
     },
     {
       "status": 200,
-      "url": "http://100.79.157.76:8090/v1/message/pinned/sync"
+      "url": "http://localhost:8090/v1/message/pinned/sync"
     },
     {
       "status": 200,
-      "url": "http://100.79.157.76:8090/v1/message/pinned/sync"
+      "url": "http://localhost:8090/v1/message/pinned/sync"
     },
     {
       "status": 200,
-      "url": "http://100.79.157.76:8090/v1/message/pinned/sync"
+      "url": "http://localhost:8090/v1/message/pinned/sync"
     },
     {
       "status": 200,
-      "url": "http://100.79.157.76:8090/v1/message/pinned/sync"
+      "url": "http://localhost:8090/v1/message/pinned/sync"
     },
     {
       "status": 200,
-      "url": "http://100.79.157.76:8090/v1/message/pinned/sync"
+      "url": "http://localhost:8090/v1/message/pinned/sync"
     },
     {
       "status": 200,
-      "url": "http://100.79.157.76:8090/v1/message/pinned/sync"
+      "url": "http://localhost:8090/v1/message/pinned/sync"
     },
     {
       "status": 200,
-      "url": "http://100.79.157.76:8090/v1/message/pinned/sync"
+      "url": "http://localhost:8090/v1/message/pinned/sync"
     },
     {
       "status": 200,
-      "url": "http://100.79.157.76:8090/v1/message/reminder/sync"
+      "url": "http://localhost:8090/v1/message/reminder/sync"
     },
     {
       "status": 200,
-      "url": "http://100.79.157.76:3000/chat/conversation/clowder_ai/1"
+      "url": "http://localhost:3000/chat/conversation/clowder_ai/1"
     },
     {
       "status": 200,
-      "url": "http://100.79.157.76:3000/@fs/media/leng/DiskB1/exp/seedcmp/sections/im_web/packages/base-vue/src/components/messages/TextCell.vue?t=1779984078374"
+      "url": "http://localhost:3000/@fs/media/leng/DiskB1/exp/seedcmp/sections/im_web/packages/base-vue/src/components/messages/TextCell.vue?t=1779984078374"
     },
     {
       "status": 200,
-      "url": "http://100.79.157.76:3000/@fs/media/leng/DiskB1/exp/seedcmp/sections/im_web/packages/base-vue/src/components/messages/ImageCell.vue"
+      "url": "http://localhost:3000/@fs/media/leng/DiskB1/exp/seedcmp/sections/im_web/packages/base-vue/src/components/messages/ImageCell.vue"
     },
     {
       "status": 200,
-      "url": "http://100.79.157.76:3000/@fs/media/leng/DiskB1/exp/seedcmp/sections/im_web/packages/base-vue/src/components/messages/SystemCell.vue"
+      "url": "http://localhost:3000/@fs/media/leng/DiskB1/exp/seedcmp/sections/im_web/packages/base-vue/src/components/messages/SystemCell.vue"
     },
     {
       "status": 200,
-      "url": "http://100.79.157.76:3000/@fs/media/leng/DiskB1/exp/seedcmp/sections/im_web/packages/base-vue/src/components/messages/TimeCell.vue"
+      "url": "http://localhost:3000/@fs/media/leng/DiskB1/exp/seedcmp/sections/im_web/packages/base-vue/src/components/messages/TimeCell.vue"
     },
     {
       "status": 200,
-      "url": "http://100.79.157.76:3000/@fs/media/leng/DiskB1/exp/seedcmp/sections/im_web/packages/base-vue/src/components/messages/VoiceCell.vue"
+      "url": "http://localhost:3000/@fs/media/leng/DiskB1/exp/seedcmp/sections/im_web/packages/base-vue/src/components/messages/VoiceCell.vue"
     },
     {
       "status": 200,
-      "url": "http://100.79.157.76:3000/@fs/media/leng/DiskB1/exp/seedcmp/sections/im_web/packages/base-vue/src/components/messages/FileCell.vue"
+      "url": "http://localhost:3000/@fs/media/leng/DiskB1/exp/seedcmp/sections/im_web/packages/base-vue/src/components/messages/FileCell.vue"
     },
     {
       "status": 200,
-      "url": "http://100.79.157.76:3000/@fs/media/leng/DiskB1/exp/seedcmp/sections/im_web/packages/base-vue/src/components/messages/VideoCell.vue"
+      "url": "http://localhost:3000/@fs/media/leng/DiskB1/exp/seedcmp/sections/im_web/packages/base-vue/src/components/messages/VideoCell.vue"
     },
     {
       "status": 200,
-      "url": "http://100.79.157.76:3000/@fs/media/leng/DiskB1/exp/seedcmp/sections/im_web/packages/base-vue/src/components/messages/GifCell.vue"
+      "url": "http://localhost:3000/@fs/media/leng/DiskB1/exp/seedcmp/sections/im_web/packages/base-vue/src/components/messages/GifCell.vue"
     },
     {
       "status": 200,
-      "url": "http://100.79.157.76:3000/@fs/media/leng/DiskB1/exp/seedcmp/sections/im_web/packages/base-vue/src/components/messages/StickerCell.vue"
+      "url": "http://localhost:3000/@fs/media/leng/DiskB1/exp/seedcmp/sections/im_web/packages/base-vue/src/components/messages/StickerCell.vue"
     },
     {
       "status": 200,
-      "url": "http://100.79.157.76:3000/@fs/media/leng/DiskB1/exp/seedcmp/sections/im_web/packages/base-vue/src/components/messages/LocationCell.vue"
+      "url": "http://localhost:3000/@fs/media/leng/DiskB1/exp/seedcmp/sections/im_web/packages/base-vue/src/components/messages/LocationCell.vue"
     },
     {
       "status": 200,
-      "url": "http://100.79.157.76:3000/@fs/media/leng/DiskB1/exp/seedcmp/sections/im_web/packages/base-vue/src/components/messages/CardCell.vue"
+      "url": "http://localhost:3000/@fs/media/leng/DiskB1/exp/seedcmp/sections/im_web/packages/base-vue/src/components/messages/CardCell.vue"
     },
     {
       "status": 200,
-      "url": "http://100.79.157.76:3000/@fs/media/leng/DiskB1/exp/seedcmp/sections/im_web/packages/base-vue/src/components/messages/MergeCell.vue"
+      "url": "http://localhost:3000/@fs/media/leng/DiskB1/exp/seedcmp/sections/im_web/packages/base-vue/src/components/messages/MergeCell.vue"
     },
     {
       "status": 200,
-      "url": "http://100.79.157.76:3000/@fs/media/leng/DiskB1/exp/seedcmp/sections/im_web/packages/base-vue/src/components/messages/TextCell.vue?vue&type=style&index=0&scoped=c0035fb9&lang.css"
+      "url": "http://localhost:3000/@fs/media/leng/DiskB1/exp/seedcmp/sections/im_web/packages/base-vue/src/components/messages/TextCell.vue?vue&type=style&index=0&scoped=c0035fb9&lang.css"
     },
     {
       "status": 200,
-      "url": "http://100.79.157.76:3000/@fs/media/leng/DiskB1/exp/seedcmp/sections/im_web/packages/base-vue/src/components/messages/ImageCell.vue?vue&type=style&index=0&scoped=3915ada8&lang.css"
+      "url": "http://localhost:3000/@fs/media/leng/DiskB1/exp/seedcmp/sections/im_web/packages/base-vue/src/components/messages/ImageCell.vue?vue&type=style&index=0&scoped=3915ada8&lang.css"
     },
     {
       "status": 200,
-      "url": "http://100.79.157.76:3000/@fs/media/leng/DiskB1/exp/seedcmp/sections/im_web/packages/base-vue/src/components/messages/SystemCell.vue?vue&type=style&index=0&scoped=538333ce&lang.css"
+      "url": "http://localhost:3000/@fs/media/leng/DiskB1/exp/seedcmp/sections/im_web/packages/base-vue/src/components/messages/SystemCell.vue?vue&type=style&index=0&scoped=538333ce&lang.css"
     },
     {
       "status": 200,
-      "url": "http://100.79.157.76:3000/@fs/media/leng/DiskB1/exp/seedcmp/sections/im_web/packages/base-vue/src/components/messages/TimeCell.vue?vue&type=style&index=0&scoped=e4ca3361&lang.css"
+      "url": "http://localhost:3000/@fs/media/leng/DiskB1/exp/seedcmp/sections/im_web/packages/base-vue/src/components/messages/TimeCell.vue?vue&type=style&index=0&scoped=e4ca3361&lang.css"
     },
     {
       "status": 200,
-      "url": "http://100.79.157.76:3000/@fs/media/leng/DiskB1/exp/seedcmp/sections/im_web/packages/base-vue/src/components/messages/VoiceCell.vue?vue&type=style&index=0&scoped=1e2cce37&lang.css"
+      "url": "http://localhost:3000/@fs/media/leng/DiskB1/exp/seedcmp/sections/im_web/packages/base-vue/src/components/messages/VoiceCell.vue?vue&type=style&index=0&scoped=1e2cce37&lang.css"
     },
     {
       "status": 200,
-      "url": "http://100.79.157.76:3000/@fs/media/leng/DiskB1/exp/seedcmp/sections/im_web/packages/base-vue/src/components/messages/FileCell.vue?vue&type=style&index=0&scoped=94bf8c19&lang.css"
+      "url": "http://localhost:3000/@fs/media/leng/DiskB1/exp/seedcmp/sections/im_web/packages/base-vue/src/components/messages/FileCell.vue?vue&type=style&index=0&scoped=94bf8c19&lang.css"
     },
     {
       "status": 200,
-      "url": "http://100.79.157.76:3000/@fs/media/leng/DiskB1/exp/seedcmp/sections/im_web/packages/base-vue/src/components/messages/VideoCell.vue?vue&type=style&index=0&scoped=f1b4e35d&lang.css"
+      "url": "http://localhost:3000/@fs/media/leng/DiskB1/exp/seedcmp/sections/im_web/packages/base-vue/src/components/messages/VideoCell.vue?vue&type=style&index=0&scoped=f1b4e35d&lang.css"
     },
     {
       "status": 200,
-      "url": "http://100.79.157.76:3000/@fs/media/leng/DiskB1/exp/seedcmp/sections/im_web/packages/base-vue/src/components/messages/GifCell.vue?vue&type=style&index=0&scoped=f4914e1b&lang.css"
+      "url": "http://localhost:3000/@fs/media/leng/DiskB1/exp/seedcmp/sections/im_web/packages/base-vue/src/components/messages/GifCell.vue?vue&type=style&index=0&scoped=f4914e1b&lang.css"
     },
     {
       "status": 200,
-      "url": "http://100.79.157.76:3000/@fs/media/leng/DiskB1/exp/seedcmp/sections/im_web/packages/base-vue/src/components/messages/StickerCell.vue?vue&type=style&index=0&scoped=c6467feb&lang.css"
+      "url": "http://localhost:3000/@fs/media/leng/DiskB1/exp/seedcmp/sections/im_web/packages/base-vue/src/components/messages/StickerCell.vue?vue&type=style&index=0&scoped=c6467feb&lang.css"
     },
     {
       "status": 200,
-      "url": "http://100.79.157.76:3000/@fs/media/leng/DiskB1/exp/seedcmp/sections/im_web/packages/base-vue/src/components/messages/LocationCell.vue?vue&type=style&index=0&scoped=8c7ba2ba&lang.css"
+      "url": "http://localhost:3000/@fs/media/leng/DiskB1/exp/seedcmp/sections/im_web/packages/base-vue/src/components/messages/LocationCell.vue?vue&type=style&index=0&scoped=8c7ba2ba&lang.css"
     },
     {
       "status": 200,
-      "url": "http://100.79.157.76:3000/@fs/media/leng/DiskB1/exp/seedcmp/sections/im_web/packages/base-vue/src/components/messages/CardCell.vue?vue&type=style&index=0&scoped=a69ad7c0&lang.css"
+      "url": "http://localhost:3000/@fs/media/leng/DiskB1/exp/seedcmp/sections/im_web/packages/base-vue/src/components/messages/CardCell.vue?vue&type=style&index=0&scoped=a69ad7c0&lang.css"
     },
     {
       "status": 200,
-      "url": "http://100.79.157.76:3000/@fs/media/leng/DiskB1/exp/seedcmp/sections/im_web/packages/base-vue/src/components/messages/MergeCell.vue?vue&type=style&index=0&scoped=c504c6ba&lang.css"
+      "url": "http://localhost:3000/@fs/media/leng/DiskB1/exp/seedcmp/sections/im_web/packages/base-vue/src/components/messages/MergeCell.vue?vue&type=style&index=0&scoped=c504c6ba&lang.css"
     },
     {
       "status": 200,
-      "url": "http://100.79.157.76:3000/@fs/media/leng/DiskB1/exp/seedcmp/sections/im_web/packages/datasource-vue/src/stores/clowderTypes.ts"
+      "url": "http://localhost:3000/@fs/media/leng/DiskB1/exp/seedcmp/sections/im_web/packages/datasource-vue/src/stores/clowderTypes.ts"
     },
     {
       "status": 200,
-      "url": "http://100.79.157.76:3000/@fs/media/leng/DiskB1/exp/seedcmp/sections/im_web/packages/datasource-vue/src/stores/clowderStore.ts?t=1779986788954"
+      "url": "http://localhost:3000/@fs/media/leng/DiskB1/exp/seedcmp/sections/im_web/packages/datasource-vue/src/stores/clowderStore.ts?t=1779986788954"
     },
     {
       "status": 200,
-      "url": "http://100.79.157.76:3000/@fs/media/leng/DiskB1/exp/seedcmp/sections/im_web/packages/datasource-vue/src/stores/messageStore.ts?t=1779986788954"
+      "url": "http://localhost:3000/@fs/media/leng/DiskB1/exp/seedcmp/sections/im_web/packages/datasource-vue/src/stores/messageStore.ts?t=1779986788954"
     },
     {
       "status": 200,
-      "url": "http://100.79.157.76:3000/@fs/media/leng/DiskB1/exp/seedcmp/sections/im_web/packages/datasource-vue/src/api/clowder.ts?t=1779986788954"
+      "url": "http://localhost:3000/@fs/media/leng/DiskB1/exp/seedcmp/sections/im_web/packages/datasource-vue/src/api/clowder.ts?t=1779986788954"
     },
     {
       "status": 200,
-      "url": "http://100.79.157.76:3000/src/components/ClowderConversationPanel.vue?t=1779986788954"
+      "url": "http://localhost:3000/src/components/ClowderConversationPanel.vue?t=1779986788954"
     },
     {
       "status": 200,
-      "url": "http://100.79.157.76:3000/src/components/ClowderConversationPanel.vue?t=1779984275286&vue&type=style&index=0&scoped=371fd023&lang.css"
+      "url": "http://localhost:3000/src/components/ClowderConversationPanel.vue?t=1779984275286&vue&type=style&index=0&scoped=371fd023&lang.css"
     },
     {
       "status": 200,
-      "url": "http://100.79.157.76:8090/v1/message/channel/sync"
+      "url": "http://localhost:8090/v1/message/channel/sync"
     },
     {
       "status": 200,
-      "url": "http://100.79.157.76:8090/v1/message/channel/sync"
+      "url": "http://localhost:8090/v1/message/channel/sync"
     },
     {
       "status": 200,
-      "url": "http://100.79.157.76:8090/v1/message/channel/sync"
+      "url": "http://localhost:8090/v1/message/channel/sync"
     },
     {
       "status": 200,
-      "url": "http://100.79.157.76:8090/v1/message/channel/sync"
+      "url": "http://localhost:8090/v1/message/channel/sync"
     },
     {
       "status": 200,
-      "url": "http://100.79.157.76:8090/v1/message/channel/sync"
+      "url": "http://localhost:8090/v1/message/channel/sync"
     },
     {
       "status": 200,
-      "url": "http://100.79.157.76:8090/v1/message/channel/sync"
+      "url": "http://localhost:8090/v1/message/channel/sync"
     },
     {
       "status": 200,
-      "url": "http://100.79.157.76:8090/v1/message/channel/sync"
+      "url": "http://localhost:8090/v1/message/channel/sync"
     },
     {
       "status": 200,
-      "url": "http://100.79.157.76:8090/v1/message/channel/sync"
+      "url": "http://localhost:8090/v1/message/channel/sync"
     },
     {
       "status": 200,
-      "url": "http://100.79.157.76:8090/v1/message/channel/sync"
+      "url": "http://localhost:8090/v1/message/channel/sync"
     },
     {
       "status": 200,
-      "url": "http://100.79.157.76:8090/v1/message/channel/sync"
+      "url": "http://localhost:8090/v1/message/channel/sync"
     },
     {
       "status": 200,
-      "url": "http://100.79.157.76:8090/v1/conversation/sync"
+      "url": "http://localhost:8090/v1/conversation/sync"
     },
     {
       "status": 200,
-      "url": "http://100.79.157.76:8090/v1/conversation/sync"
+      "url": "http://localhost:8090/v1/conversation/sync"
     },
     {
       "status": 200,
-      "url": "http://100.79.157.76:8090/v1/conversation/sync"
+      "url": "http://localhost:8090/v1/conversation/sync"
     },
     {
       "status": 200,
-      "url": "http://100.79.157.76:8090/v1/conversation/extra/sync"
+      "url": "http://localhost:8090/v1/conversation/extra/sync"
     },
     {
       "status": 200,
-      "url": "http://100.79.157.76:8090/v1/conversation/extra/sync"
+      "url": "http://localhost:8090/v1/conversation/extra/sync"
     },
     {
       "status": 200,
-      "url": "http://100.79.157.76:8090/v1/conversation/extra/sync"
+      "url": "http://localhost:8090/v1/conversation/extra/sync"
     },
     {
       "status": 200,
-      "url": "http://100.79.157.76:8090/v1/message/channel/sync"
+      "url": "http://localhost:8090/v1/message/channel/sync"
     },
     {
       "status": 200,
-      "url": "http://100.79.157.76:8090/v1/message/channel/sync"
+      "url": "http://localhost:8090/v1/message/channel/sync"
     },
     {
       "status": 200,
-      "url": "http://100.79.157.76:8090/v1/message/channel/sync"
+      "url": "http://localhost:8090/v1/message/channel/sync"
     },
     {
       "status": 200,
-      "url": "http://100.79.157.76:8090/v1/message/channel/sync"
+      "url": "http://localhost:8090/v1/message/channel/sync"
     },
     {
       "status": 200,
-      "url": "http://100.79.157.76:8090/v1/message/channel/sync"
+      "url": "http://localhost:8090/v1/message/channel/sync"
     },
     {
       "status": 200,
-      "url": "http://100.79.157.76:8090/v1/message/channel/sync"
+      "url": "http://localhost:8090/v1/message/channel/sync"
     },
     {
       "status": 200,
-      "url": "http://100.79.157.76:8090/v1/message/channel/sync"
+      "url": "http://localhost:8090/v1/message/channel/sync"
     },
     {
       "status": 200,
-      "url": "http://100.79.157.76:8090/v1/message/channel/sync"
+      "url": "http://localhost:8090/v1/message/channel/sync"
     },
     {
       "status": 200,
-      "url": "http://100.79.157.76:8090/v1/message/channel/sync"
+      "url": "http://localhost:8090/v1/message/channel/sync"
     },
     {
       "status": 200,
-      "url": "http://100.79.157.76:8090/v1/message/channel/sync"
+      "url": "http://localhost:8090/v1/message/channel/sync"
     },
     {
       "status": 200,
-      "url": "http://100.79.157.76:8090/v1/message/channel/sync"
+      "url": "http://localhost:8090/v1/message/channel/sync"
     },
     {
       "status": 200,
-      "url": "http://100.79.157.76:8090/v1/message/channel/sync"
+      "url": "http://localhost:8090/v1/message/channel/sync"
     },
     {
       "status": 200,
-      "url": "http://100.79.157.76:8090/v1/message/channel/sync"
+      "url": "http://localhost:8090/v1/message/channel/sync"
     },
     {
       "status": 200,
-      "url": "http://100.79.157.76:8090/v1/message/channel/sync"
+      "url": "http://localhost:8090/v1/message/channel/sync"
     },
     {
       "status": 200,
-      "url": "http://100.79.157.76:8090/v1/message/channel/sync"
+      "url": "http://localhost:8090/v1/message/channel/sync"
     },
     {
       "status": 200,
-      "url": "http://100.79.157.76:8090/v1/message/channel/sync"
+      "url": "http://localhost:8090/v1/message/channel/sync"
     },
     {
       "status": 200,
-      "url": "http://100.79.157.76:8090/v1/message/channel/sync"
+      "url": "http://localhost:8090/v1/message/channel/sync"
     },
     {
       "status": 200,
-      "url": "http://100.79.157.76:8090/v1/message/channel/sync"
+      "url": "http://localhost:8090/v1/message/channel/sync"
     },
     {
       "status": 200,
-      "url": "http://100.79.157.76:8090/v1/message/channel/sync"
+      "url": "http://localhost:8090/v1/message/channel/sync"
     },
     {
       "status": 200,
-      "url": "http://100.79.157.76:8090/v1/message/channel/sync"
+      "url": "http://localhost:8090/v1/message/channel/sync"
     },
     {
       "status": 200,
-      "url": "http://100.79.157.76:8090/v1/message/pinned/sync"
+      "url": "http://localhost:8090/v1/message/pinned/sync"
     },
     {
       "status": 200,
-      "url": "http://100.79.157.76:8090/v1/message/pinned/sync"
+      "url": "http://localhost:8090/v1/message/pinned/sync"
     },
     {
       "status": 200,
-      "url": "http://100.79.157.76:8090/v1/message/pinned/sync"
+      "url": "http://localhost:8090/v1/message/pinned/sync"
     },
     {
       "status": 200,
-      "url": "http://100.79.157.76:8090/v1/message/channel/sync"
+      "url": "http://localhost:8090/v1/message/channel/sync"
     },
     {
       "status": 200,
-      "url": "http://100.79.157.76:8090/v1/message/channel/sync"
+      "url": "http://localhost:8090/v1/message/channel/sync"
     },
     {
       "status": 200,
-      "url": "http://100.79.157.76:8090/v1/message/pinned/sync"
+      "url": "http://localhost:8090/v1/message/pinned/sync"
     },
     {
       "status": 200,
-      "url": "http://100.79.157.76:8090/v1/message/pinned/sync"
+      "url": "http://localhost:8090/v1/message/pinned/sync"
     },
     {
       "status": 200,
-      "url": "http://100.79.157.76:8090/v1/message/pinned/sync"
+      "url": "http://localhost:8090/v1/message/pinned/sync"
     },
     {
       "status": 200,
-      "url": "http://100.79.157.76:8090/v1/message/pinned/sync"
+      "url": "http://localhost:8090/v1/message/pinned/sync"
     },
     {
       "status": 200,
-      "url": "http://100.79.157.76:8090/v1/message/pinned/sync"
+      "url": "http://localhost:8090/v1/message/pinned/sync"
     },
     {
       "status": 200,
-      "url": "http://100.79.157.76:8090/v1/message/pinned/sync"
+      "url": "http://localhost:8090/v1/message/pinned/sync"
     },
     {
       "status": 200,
-      "url": "http://100.79.157.76:8090/v1/message/pinned/sync"
+      "url": "http://localhost:8090/v1/message/pinned/sync"
     },
     {
       "status": 200,
-      "url": "http://100.79.157.76:8090/v1/message/pinned/sync"
+      "url": "http://localhost:8090/v1/message/pinned/sync"
     },
     {
       "status": 200,
-      "url": "http://100.79.157.76:8090/v1/message/pinned/sync"
+      "url": "http://localhost:8090/v1/message/pinned/sync"
     },
     {
       "status": 200,
-      "url": "http://100.79.157.76:8090/v1/message/pinned/sync"
+      "url": "http://localhost:8090/v1/message/pinned/sync"
     },
     {
       "status": 200,
-      "url": "http://100.79.157.76:8090/v1/message/pinned/sync"
+      "url": "http://localhost:8090/v1/message/pinned/sync"
     },
     {
       "status": 200,
-      "url": "http://100.79.157.76:8090/v1/message/pinned/sync"
+      "url": "http://localhost:8090/v1/message/pinned/sync"
     },
     {
       "status": 200,
-      "url": "http://100.79.157.76:8090/v1/message/pinned/sync"
+      "url": "http://localhost:8090/v1/message/pinned/sync"
     },
     {
       "status": 200,
-      "url": "http://100.79.157.76:8090/v1/message/pinned/sync"
+      "url": "http://localhost:8090/v1/message/pinned/sync"
     },
     {
       "status": 200,
-      "url": "http://100.79.157.76:8090/v1/message/reminder/sync"
+      "url": "http://localhost:8090/v1/message/reminder/sync"
     }
   ],
   "consoleMessages": [],

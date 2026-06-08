@@ -10,9 +10,9 @@ tokenAuthOn: true # 是否开启token验证 默认为false，如果不开启任�
 #wsAddr: "ws://0.0.0.0:5200"  # websocket ws 监听地址 
 #wssAddr: "wss://0.0.0.0:5210"  # websocket wss 监听地址 
 external: # 公网配置
-  ip: "100.79.157.76" # 如果节点部署在内网，需要配置外网ip，否则外网的客户端无法连接到此节点
-  wsAddr: "ws://100.79.157.76:5200" # 对外的wsAddr地址，客户端WebSocket连接地址
-  wssAddr: "wss://100.79.157.76:5210" # 对外的wssAddr地址，也就是客户端真正连接的地址 格式：wss://ip:port （支持域名配置）
+  ip: "localhost" # 如果节点部署在内网，需要配置外网ip，否则外网的客户端无法连接到此节点
+  wsAddr: "ws://localhost:5200" # 对外的wsAddr地址，客户端WebSocket连接地址
+  wssAddr: "wss://localhost:5210" # 对外的wssAddr地址，也就是客户端真正连接的地址 格式：wss://ip:port （支持域名配置）
 #  tcpAddr: "" #  默认自动获取， 节点的TCP地址 对外公开，APP端长连接通讯  格式： ip:port  （支持域名配置）
 #  wsAddr: "" # 默认自动获取， 节点的wsAdd地址 对外公开 WEB端长连接通讯 格式： ws://ip:port  （支持域名配置）
 #   wssAddr: "" # 对外的wssAddr地址，也就是客户端真正连接的地址 格式：wss://ip:port （支持域名配置）

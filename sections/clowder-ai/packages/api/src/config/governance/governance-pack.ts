@@ -26,7 +26,7 @@ const HARD_CONSTRAINTS = `## Cat Cafe Governance Rules (Auto-managed)
 ### Collaboration Standards
 - A2A handoff uses five-tuple: What / Why / Tradeoff / Open Questions / Next Action
 - Vision Guardian: Read original requirements before starting. AC completion ≠ feature complete.
-- Review flow: quality-gate → request-review → receive-review → merge-gate
+- Review flow: quality-gate → review-and-release
 - Skills are available via symlinked cat-cafe-skills/ — load the relevant skill before each workflow step
 - Shared rules: See cat-cafe-skills/refs/shared-rules.md for full collaboration contract
 

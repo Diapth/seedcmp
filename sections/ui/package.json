@@ -4,7 +4,7 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "dev:h5": "node scripts/run-uni.mjs -p h5",
+    "dev:h5": "node scripts/run-uni.mjs -p h5 --host 0.0.0.0 --port 5173 --strictPort",
     "build:h5": "node scripts/run-uni.mjs build -p h5",
     "test:native-im": "node --test tests/native-im.test.mjs",
     "test:smoke": "node scripts/smoke-test.js"

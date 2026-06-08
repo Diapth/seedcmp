@@ -219,7 +219,7 @@ describe('buildReviewFeedbackContent', () => {
       newComments: [],
     });
     assert.ok(content.includes('自动处理'), 'should include action hint section');
-    assert.ok(content.includes('receive-review'), 'CHANGES_REQUESTED should reference receive-review mode');
+    assert.ok(content.includes('review-and-release'), 'CHANGES_REQUESTED should reference review-and-release mode');
     assert.ok(content.includes('owner/repo#42'), 'should include PR reference');
   });
 

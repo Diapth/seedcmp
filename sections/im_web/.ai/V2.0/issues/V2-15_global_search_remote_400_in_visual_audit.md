@@ -12,7 +12,7 @@
 按照 `manual-testing-guide.md` 执行浏览器自动可视化审计时，在全局搜索框输入 `test` 会触发后端请求：
 
 ```
-POST http://100.79.157.76:8090/v1/search/global
+POST http://localhost:8090/v1/search/global
 ```
 
 登录态下该请求返回 400，导致控制台出现 resource error，并让网络错误检查失败。手册要求全局搜索在无结果时显示友好状态，不能因为后端远程搜索不可用而污染 UI 验收。
@@ -29,7 +29,7 @@ sections/im_web/.ai/V2.0/issues/tests-e2e/manual-visual-audit-2026-05-24T12-54-3
 
 ```
 控制台严重错误检查: Failed to load resource: the server responded with a status of 400
-网络错误检查: http://100.79.157.76:8090/v1/search/global 400
+网络错误检查: http://localhost:8090/v1/search/global 400
 ```
 
 ---

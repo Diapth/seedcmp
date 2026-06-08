@@ -6,7 +6,7 @@ Resolved on 2026-06-01
 
 ## Problem
 
-During manual testing on `http://100.79.157.76:3000`, account `18337488675` showed an empty conversation list (`暂无聊天会话`) even though the account still had group and direct conversation history.
+During manual testing on `http://localhost:3000`, account `18337488675` showed an empty conversation list (`暂无聊天会话`) even though the account still had group and direct conversation history.
 
 The same session also showed a connection banner like `在线 [object Object]`.
 
@@ -26,7 +26,7 @@ The same session also showed a connection banner like `在线 [object Object]`.
 
 ## Verification
 
-- `curl http://100.79.157.76:3000/v1/common/appconfig` -> `200`
+- `curl http://localhost:3000/v1/common/appconfig` -> `200`
 - `curl http://127.0.0.1:8090/v1/common/appconfig` -> `200`
 - `pnpm --filter chat exec vitest run tests/notificationUnread.test.ts tests/sdkRecovery.test.ts --pool=threads --poolOptions.threads.singleThread=true` -> 2 files / 3 tests passed
 - `pnpm type-check` -> passed

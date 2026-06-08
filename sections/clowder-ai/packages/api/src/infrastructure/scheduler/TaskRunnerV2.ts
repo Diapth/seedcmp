@@ -29,7 +29,7 @@ export interface TaskRunnerV2Options {
   emissionStore?: import('./EmissionStore.js').EmissionStore;
   /** Phase 4 (AC-H1): deliver message to a thread */
   deliver?: (opts: DeliverOpts) => Promise<string>;
-  /** Phase 4 (AC-H2): fetch web content with browser-automation routing */
+  /** Phase 4 (AC-H2): fetch web content with deep-research routing */
   fetchContent?: (url: string) => Promise<FetchResult>;
   /** Phase 4b: invoke a cat to handle a scheduled task (fire-and-forget) */
   invokeTrigger?: ScheduleInvokeTrigger;

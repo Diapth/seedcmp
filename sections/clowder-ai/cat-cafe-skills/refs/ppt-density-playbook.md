@@ -215,7 +215,7 @@ Layer Header
 ```
 
 要点：
-- 图片路径用相对路径，方便 worktree/example 目录引用
+- 图片路径用相对路径，方便 workspace/example 目录引用
 - 红底半透明 caption 叠在图片底部，不额外占版面
 - `width: 100%` 让图片自适应容器宽度
 - 如需 callout 箭头标注，用 `position: absolute` + CSS 箭头

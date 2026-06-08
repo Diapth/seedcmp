@@ -31,7 +31,7 @@
 
 ## 复现步骤
 
-1. 打开 `http://100.79.157.76:5173/#/pages/login/register`。
+1. 打开 `http://localhost:5173/#/pages/login/register`。
 2. 不填表单点击 `注册账号`，确认出现 `请填写完整的注册信息`。
 3. 填写手机号、点击 `获取验证码`，确认倒计时启动。
 4. 填写短密码，确认出现 `密码长度不能少于6位`。
@@ -101,8 +101,8 @@ function handleRegister() {
 
 ```bash
 cd /home/leng/.codex/skills/playwright-skill \
-  && TARGET_URL='http://100.79.157.76:5173' \
-     API_BASE='http://100.79.157.76:3000/v1' \
+  && TARGET_URL='http://localhost:5173' \
+     API_BASE='http://localhost:3000/v1' \
      REPO_ROOT='/media/leng/DiskB1/exp/seedcmp' \
      node run.js /tmp/playwright-test-sections-ui-user-settings.js
 

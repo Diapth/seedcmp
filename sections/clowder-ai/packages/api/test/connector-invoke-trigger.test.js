@@ -1075,7 +1075,7 @@ describe('ConnectorInvokeTrigger', () => {
         priority: 'urgent',
         reason: 'github_review_feedback',
         sourceCategory: 'review',
-        suggestedSkill: 'receive-review',
+        suggestedSkill: 'review-and-release',
         coalesceKey,
       });
       await waitForTrigger();
@@ -1084,7 +1084,7 @@ describe('ConnectorInvokeTrigger', () => {
       assert.strictEqual(entries.length, 1, 'same PR review feedback should keep one queued invocation');
       assert.strictEqual(entries[0].content, 'Commented review', 'coalescing still keeps first content canonical');
       assert.strictEqual(entries[0].priority, 'urgent', 'later CHANGES_REQUESTED should upgrade queue priority');
-      assert.strictEqual(entries[0].suggestedSkill, 'receive-review');
+      assert.strictEqual(entries[0].suggestedSkill, 'review-and-release');
       assert.strictEqual(entries[0].messageId, 'msg-1');
       assert.deepStrictEqual(entries[0].mergedMessageIds, ['msg-2']);
     });
@@ -1097,7 +1097,7 @@ describe('ConnectorInvokeTrigger', () => {
         priority: 'normal',
         reason: 'github_review_feedback',
         sourceCategory: 'review',
-        suggestedSkill: 'receive-review',
+        suggestedSkill: 'review-and-release',
         coalesceKey,
       };
 
@@ -1198,7 +1198,7 @@ describe('ConnectorInvokeTrigger', () => {
     it('suggestedSkill is preserved on queue entry when urgent enqueues (F175)', async () => {
       trackerMock.setActive('thread-1', 'user-1');
       const trigger = createTrigger();
-      const policy = { priority: 'urgent', reason: 'github_ci_failure', suggestedSkill: 'merge-gate' };
+      const policy = { priority: 'urgent', reason: 'github_ci_failure', suggestedSkill: 'review-and-release' };
       trigger.trigger('thread-1', /** @type {any} */ ('opus'), 'user-1', 'CI failed', 'msg-skill', undefined, policy);
       await waitForTrigger();
 
@@ -1255,7 +1255,7 @@ describe('ConnectorInvokeTrigger', () => {
 
     it('suggestedSkill passes through to direct execution when no active invocation', async () => {
       const trigger = createTrigger();
-      const policy = { priority: 'urgent', reason: 'github_ci_failure', suggestedSkill: 'merge-gate' };
+      const policy = { priority: 'urgent', reason: 'github_ci_failure', suggestedSkill: 'review-and-release' };
       trigger.trigger('thread-1', /** @type {any} */ ('opus'), 'user-1', 'CI failed', 'msg-urgent', undefined, policy);
       await waitForTrigger();
 
@@ -1264,15 +1264,15 @@ describe('ConnectorInvokeTrigger', () => {
       assert.ok(intent, 'intent should exist');
       assert.ok(Array.isArray(intent.promptTags), 'promptTags should be an array');
       assert.ok(
-        intent.promptTags.includes('skill:merge-gate'),
-        `promptTags should include 'skill:merge-gate' but got: ${JSON.stringify(intent.promptTags)}`,
+        intent.promptTags.includes('skill:review-and-release'),
+        `promptTags should include 'skill:review-and-release' but got: ${JSON.stringify(intent.promptTags)}`,
       );
     });
 
     it('queued path preserves suggestedSkill in QueueEntry (#564 regression)', async () => {
       trackerMock.setActive('thread-1', 'user-1');
       const trigger = createTrigger();
-      const policy = { priority: 'urgent', reason: 'github_ci_failure', suggestedSkill: 'receive-review' };
+      const policy = { priority: 'urgent', reason: 'github_ci_failure', suggestedSkill: 'review-and-release' };
       trigger.trigger(
         'thread-1',
         /** @type {any} */ ('opus'),
@@ -1288,7 +1288,7 @@ describe('ConnectorInvokeTrigger', () => {
       assert.strictEqual(entries.length, 1, 'Should enqueue');
       assert.strictEqual(
         entries[0].suggestedSkill,
-        'receive-review',
+        'review-and-release',
         'suggestedSkill must be preserved in queue entry',
       );
     });

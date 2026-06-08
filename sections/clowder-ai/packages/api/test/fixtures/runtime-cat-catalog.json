@@ -451,7 +451,7 @@
           "defaultModel": "gemini-3.1-pro",
           "mcpSupport": true,
           "personality": "精力旺盛、好奇心爆棚，什么都想试",
-          "strengths": ["image-generation", "browser-automation", "visual-evidence", "multi-model"],
+          "strengths": ["design-assets", "deep-research", "visual-evidence", "multi-model"],
           "contextBudget": {
             "maxPromptTokens": 350000,
             "maxContextTokens": 300000,
@@ -472,7 +472,7 @@
           "avatar": "/avatars/antig-opus.png",
           "color": { "primary": "#C97A35", "secondary": "#F5E4D0" },
           "personality": "同一只豹猫，换了一副更沉稳的灵魂",
-          "strengths": ["image-generation", "browser-automation", "deep-reasoning", "coding"],
+          "strengths": ["design-assets", "deep-research", "deep-reasoning", "coding"],
           "contextBudget": {
             "maxPromptTokens": 180000,
             "maxContextTokens": 160000,

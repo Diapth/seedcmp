@@ -37,13 +37,13 @@ test('internal upload URLs default to the API entrypoint for remote IM browsers'
 
 test('internal upload URLs prefer the explicit API URL over frontend port settings', async () => {
   const restore = [
-    setEnv('CAT_CAFE_PUBLIC_URL', 'http://100.79.157.76:3003/'),
-    setEnv('CAT_CAFE_API_URL', 'http://100.79.157.76:3004/'),
+    setEnv('CAT_CAFE_PUBLIC_URL', 'http://localhost:3003/'),
+    setEnv('CAT_CAFE_API_URL', 'http://localhost:3004/'),
     setEnv('FRONTEND_PORT', '3003'),
   ];
   try {
     const { resolveInternalRouteUrl } = await import('../dist/utils/upload-paths.js');
-    assert.equal(resolveInternalRouteUrl('/uploads/sinx.png'), 'http://100.79.157.76:3004/uploads/sinx.png');
+    assert.equal(resolveInternalRouteUrl('/uploads/sinx.png'), 'http://localhost:3004/uploads/sinx.png');
   } finally {
     restore.reverse().forEach((fn) => fn());
   }

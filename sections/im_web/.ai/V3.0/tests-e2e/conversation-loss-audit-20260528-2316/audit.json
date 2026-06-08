@@ -108,7 +108,7 @@
     ],
     "apiProbe": {
       "status": 200,
-      "text": "{\"uid\":\"6db8b65b3ae94092badfeb82e47c06f7\",\"conversations\":[{\"channel_id\":\"deepseek_ai_robot\",\"channel_type\":1,\"timestamp\":1779782902,\"last_msg_seq\":126,\"last_client_msg_no\":\"57e8d4f19fb66e6e53abbcfcfeb2fdc6_0_3\",\"offset_msg_seq\":0,\"version\":1779782902000000000,\"recents\":[{\"header\":{\"no_persist\":0,\"red_dot\":1,\"sync_once\":0},\"setting\":0,\"message_id\":2059184942063030272,\"message_idstr\":\"2059184942063030272\",\"message_seq\":126,\"client_msg_no\":\"57e8d4f19fb66e6e53abbcfcfeb2fdc6_0_3\",\"from_uid\":\"6db8b65b3ae94092badfeb82e47c06f7\",\"channel_id\":\"deepseek_ai_robot\",\"channel_type\":1,\"timestamp\":1779782902,\"payload\":{\"type\":99},\"signal_payload\":\"\",\"is_deleted\":0,\"readed\":0,\"extra_version\":0}],\"extra\":{\"channel_id\":\"deepseek_ai_robot\",\"channel_type\":1,\"browse_to\":0,\"keep_message_seq\":0,\"keep_offset_y\":0,\"draft\":\"\",\"version\":1004033}},{\"channel_id\":\"u_10000\",\"channel_type\":1,\"timestamp\":1779763205,\"last_msg_seq\":30,\"last_client_msg_no\":\"450805859745a8fa376654426f926046_0_3\",\"offset_msg_seq\":0,\"version\":1779782897345496040,\"recents\":[{\"header\":{\"no_persist\":0,\"red_dot\":1,\"sync_once\":0},\"setting\":0,\"message_id\":2059102311099142144,\"message_idstr\":\"2059102311099142144\",\"message_seq\":30,\"client_msg_no\":\"450805859745a8fa376654426f926046_0_3\",\"from_uid\":\"6db8b65b3ae94092badfeb82e47c06f7\",\"channel_id\":\"u_10000\",\"channel_type\":1,\"timestamp\":1779763205,\"payload\":{\"type\":99},\"signal_payload\":\"\",\"is_deleted\":0,\"readed\":0,\"extra_version\":0}],\"extra\":{\"channel_id\":\"u_10000\",\"channel_type\":1,\"browse_to\":0,\"keep_message_seq\":0,\"keep_offset_y\":0,\"draft\":\"\",\"version\":1004006}},{\"channel_id\":\"989ec1fc79664ede9ff9008831d76337\",\"channel_type\":1,\"timestamp\":1779713743,\"last_msg_seq\":82,\"last_client_msg_no\":\"ec7b5eb21085d106e2ef4e7537c123b4_0_3\",\"offset_msg_seq\":0,\"version\":1779715268771743611,\"recents\":[{\"header\":{\"no_persist\":0,\"red_dot\":1,\"sync_once\":0},\"setting\":0,\"message_id\":2058894844377436160,\"message_idstr\":\"2058894844377436160\",\"message_seq\":82,\"client_msg_no\":\"ec7b5eb21085d106e2ef4e7537c123b4_0_3\",\"from_uid\":\"6db8b65b3ae94092badfeb82e47c06f7\",\"channel_id\":\"989ec1fc79664ede9ff9008831d76337\",\"channel_type\":1,\"timestamp\":1779713743,\"payload\":{\"height\":0,\"type\":2,\"url\":\"http://100.79.157.76:9000/chat/1/989ec1fc79664ede9ff9008831d76337/1779713741799-56f2fb87ae11d-oIBECbBGEPfyNaQClBbDfAGxxmAFAAWgAJMoIttplv-0wx4r9yasq-awebp-resize_0_0.gif\",\"width\":0},\"signal_payload\":\"\",\"is_deleted\":0,\"readed\":0,\"extra_version\":0}],\"extra\":{\"channel_id\":\"989ec1fc79664ede9ff9008831d76337\",\"channel_type\":1,\"browse_to\":0,\"keep_message_seq\":0,\"keep_offset_y\":0,\"draft\":\"\",\"version\":1002019}},{\"channel_id\":\"31af7b0cdb1042be9b29b8660a862fb0\",\"channel_type\":1,\"timestamp\":1779689274,\"last_msg_seq\":17,\"last_client_msg_no\":\"d48f6bfd3460968934e4a2893ba1c847_0_3\",\"offset_msg_seq\":0,\"version\":1779689274866773212,\"recents\":[{\"header\":{\"no_persist\":0,\"red_dot\":1,\"sync_once\":0},\"setting\":0,\"message_id\":2058792195988656128,\"message_idstr\":\"2058792195988656128\",\"message_seq\":17,\"client_msg_no\":\"d48f6bfd3460968934e4a2893ba1c847_0_3\",\"from_uid\":\"6db8b65b3ae94092badfeb82e47c06f7\",\"channel_id\":\"31af7b0cdb1042be9b29b8660a862fb0\",\"channel_type\":1,\"timestamp\":1779689274,\"payload\":{\"content\":\"3333333333333333\",\"type\":1},\"signal_payload\":\"\",\"is_deleted\":0,\"readed\":0,\"extra_version\":0}],\"extra\":{\"channel_id\":\"31af7b0cdb1042be9b29b8660a862fb0\",\"channel_type\":1,\"browse_to\":0,\"keep_message_seq\":0,\"keep_offset_y\":0,\"draft\":\"\",\"version\":1003080}},{\"channel_id\":\"00cc4f31ecfb4d8298b82065a513c552\",\"channel_type\":1,\"timestamp\":1779628029,\"last_msg_seq\":27,\"last_client_msg_no\":\"22c4dea94a9b0b9cb2bd93d6c2331bd6_0_3\",\"offset_msg_seq\":0,\"version\":1779628279253438444,\"recents\":[{\"header\":{\"no_persist\":0,\"red_dot\":1,\"sync_once\":0},\"setting\":0,\"message_id\":2058535293513895936,\"message_idstr\":\"2058535293513895936\",\"message_seq\":27,\"client_msg_no\":\"22c4dea94a9b0b9cb2bd93d6c2331bd6_0_3\",\"from_uid\":\"6db8b65b3ae94092badfeb82e47c06f7\",\"channel_id\":\"00cc4f31ecfb4d8298b82065a513c552\",\"channel_type\":1,\"timestamp\":1779628029,\"payload\":{\"name\":\"manual-audit-file-1779628029439.txt\",\"size\":25,\"type\":8,\"url\":\"http://127.0.0.1:8090/v1/file/preview/chat/1/00cc4f31ecfb4d8298b82065a513c552/1779628029468-dbd030e06617c-manual-audit-file-1779628029439.txt\"},\"signal_payload\":\"\",\"is_deleted\":0,\"readed\":0,\"extra_version\":0}],\"extra\":{\"channel_id\":\"00cc4f31ecfb4d8298b82065a513c552\",\"channel_type\":1,\"browse_to\":0,\"keep_message_seq\":0,\"keep_offset_y\":0,\"draft\":\"\",\"version\":1003061}},{\"channel_id\":\"fileHelper\",\"channel_type\":1,\"timestamp\":1779507285,\"last_msg_seq\":23,\"last_client_msg_no\":\"0e05c4b10f57681cd543cb68ef11d39b_0_3\",\"offset_msg_seq\":0,\"version\":1779507289005499532,\"recents\":[{\"header\":{\"no_persist\":0,\"red_dot\":1,\"sync_once\":0},\"setting\":0,\"message_id\":2058028835168849920,\"message_idstr\":\"2058028835168849920\",\"message_seq\":23,\"client_msg_no\":\"0e05c4b10f57681cd543cb68ef11d39b_0_3\",\"from_uid\":\"6db8b65b3ae94092badfeb82e47c06f7\",\"channel_id\":\"fileHelper\",\"channel_type\":1,\"timestamp\":1779507285,\"payload\":{\"content\":\"回归测试：后端与IM联动已成功解决！系统功能稳定。\",\"type\":1},\"signal_payload\":\"\",\"is_deleted\":0,\"readed\":0,\"extra_version\":0}],\"extra\":{\"channel_id\":\"fileHelper\",\"channel_type\":1,\"browse_to\":0,\"keep_message_seq\":0,\"keep_offset_y\":0,\"draft\":\"\",\"version\":1002010}},{\"channel_id\":\"9d97387230a544dcba955a6266ee6285\",\"channel_type\":1,\"timestamp\":1779507280,\"last_msg_seq\":17,\"last_client_msg_no\":\"f2f596fe1150ab94a99a269662eae5b7_0_3\",\"offset_msg_seq\":0,\"version\":1779507283267014746,\"recents\":[{\"header\":{\"no_persist\":0,\"red_dot\":1,\"sync_once\":0},\"setting\":0,\"message_id\":2058028816822964224,\"message_idstr\":\"2058028816822964224\",\"message_seq\":17,\"client_msg_no\":\"f2f596fe1150ab94a99a269662eae5b7_0_3\",\"from_uid\":\"6db8b65b3ae94092badfeb82e47c06f7\",\"channel_id\":\"9d97387230a544dcba955a6266ee6285\",\"channel_type\":1,\"timestamp\":1779507280,\"payload\":{\"content\":\"This is a draft message\",\"type\":1},\"signal_payload\":\"\",\"is_deleted\":0,\"readed\":0,\"extra_version\":0}],\"extra\":{\"channel_id\":\"9d97387230a544dcba955a6266ee6285\",\"channel_type\":1,\"browse_to\":0,\"keep_message_seq\":0,\"keep_offset_y\":0,\"draft\":\"\",\"version\":1002009}}],\"users\":[{\"uid\":\"u_10000\",\"name\":\"系统账号\",\"username\":\"\",\"mute\":0,\"top\":0,\"sex\":0,\"category\":\"system\",\"short_no\":\"10000\",\"chat_pwd_on\":0,\"screenshot\":0,\"revoke_remind\":1,\"receipt\":0,\"online\":0,\"last_offline\":0,\"device_flag\":0,\"follow\":1,\"be_deleted\":1,\"be_blacklist\":0,\"code\":\"\",\"vercode\":\"\",\"source_desc\":\"\",\"remark\":\"\",\"is_upload_avatar\":1,\"status\":1,\"robot\":1,\"is_destroy\":0,\"flame\":0,\"flame_second\":0,\"join_group_invite_uid\":\"\",\"join_group_invite_name\":\"\",\"join_group_time\":\"\"},{\"uid\":\"fileHelper\",\"name\":\"文件传输助手\",\"username\":\"\",\"mute\":0,\"top\":0,\"sex\":0,\"category\":\"system\",\"short_no\":\"20000\",\"chat_pwd_on\":0,\"screenshot\":0,\"revoke_remind\":1,\"receipt\":0,\"online\":0,\"last_offline\":0,\"device_flag\":0,\"follow\":1,\"be_deleted\":1,\"be_blacklist\":0,\"code\":\"\",\"vercode\":\"\",\"source_desc\":\"\",\"remark\":\"\",\"is_upload_avatar\":1,\"status\":1,\"robot\":0,\"is_destroy\":0,\"flame\":0,\"flame_second\":0,\"join_group_invite_uid\":\"\",\"join_group_invite_name\":\"\",\"join_group_time\":\"\"},{\"uid\":\"31af7b0cdb1042be9b29b8660a862fb0\",\"name\":\"逐味魔\",\"username\":\"\",\"mute\":0,\"top\":0,\"sex\":1,\"category\":\"\",\"short_no\":\"rmcVaiNZ\",\"chat_pwd_on\":0,\"screenshot\":0,\"revoke_remind\":1,\"receipt\":0,\"online\":0,\"last_offline\":0,\"device_flag\":0,\"follow\":1,\"be_deleted\":0,\"be_blacklist\":0,\"code\":\"\",\"vercode\":\"99bf4c6cc64546ee917fa6f7e1f808a7@4\",\"source_desc\":\"通过搜索添加\",\"remark\":\"\",\"is_upload_avatar\":0,\"status\":1,\"robot\":0,\"is_destroy\":0,\"flame\":0,\"flame_second\":0,\"join_group_invite_uid\":\"\",\"join_group_invite_name\":\"\",\"join_group_time\":\"\"},{\"uid\":\"989ec1fc79664ede9ff9008831d76337\",\"name\":\"123\",\"username\":\"\",\"mute\":0,\"top\":0,\"sex\":1,\"category\":\"\",\"short_no\":\"rpLdUnCSQ\",\"chat_pwd_on\":0,\"screenshot\":0,\"revoke_remind\":1,\"receipt\":0,\"online\":0,\"last_offline\":0,\"device_flag\":0,\"follow\":1,\"be_deleted\":0,\"be_blacklist\":0,\"code\":\"\",\"vercode\":\"ff98025bc6654572a8582530bd806ca7@4\",\"source_desc\":\"通过搜索添加\",\"remark\":\"\",\"is_upload_avatar\":0,\"status\":1,\"robot\":0,\"is_destroy\":0,\"flame\":0,\"flame_second\":0,\"join_group_invite_uid\":\"\",\"join_group_invite_name\":\"\",\"join_group_time\":\"\"},{\"uid\":\"9d97387230a544dcba955a6266ee6285\",\"name\":\"TestFriend2\",\"username\":\"\",\"mute\":0,\"top\":0,\"sex\":1,\"category\":\"\",\"short_no\":\"rVrpnsWfd\",\"chat_pwd_on\":0,\"screenshot\":0,\"revoke_remind\":1,\"receipt\":0,\"online\":0,\"last_offline\":0,\"device_flag\":0,\"follow\":1,\"be_deleted\":0,\"be_blacklist\":0,\"code\":\"\",\"vercode\":\"f4c55f43eea34e1b97383926c5cccc55@4\",\"source_desc\":\"通过搜索添加\",\"remark\":\"\",\"is_upload_avatar\":0,\"status\":1,\"robot\":0,\"is_destroy\":0,\"flame\":0,\"flame_second\":0,\"join_group_invite_uid\":\"\",\"join_group_invite_name\":\"\",\"join_group_time\":\"\"},{\"uid\":\"00cc4f31ecfb4d8298b82065a513c552\",\"name\":\"yunyi\",\"username\":\"\",\"mute\":0,\"top\":0,\"sex\":1,\"category\":\"\",\"short_no\":\"sfAoSwP\",\"chat_pwd_on\":0,\"screenshot\":0,\"revoke_remind\":1,\"receipt\":0,\"online\":0,\"last_offline\":0,\"device_flag\":0,\"follow\":1,\"be_deleted\":0,\"be_blacklist\":0,\"code\":\"\",\"vercode\":\"aef40c2bc1d54e73a184accf1cdc7d4f@4\",\"source_desc\":\"通过搜索添加\",\"remark\":\"\",\"is_upload_avatar\":0,\"status\":1,\"robot\":0,\"is_destroy\":0,\"flame\":0,\"flame_second\":0,\"join_group_invite_uid\":\"\",\"join_group_invite_name\":\"\",\"join_group_time\":\"\"},{\"uid\":\"deepseek_ai_robot\",\"name\":\"DeepSeek AI\",\"username\":\"deepseek_ai_robot\",\"mute\":0,\"top\":0,\"sex\":0,\"category\":\"system\",\"short_no\":\"21000\",\"chat_pwd_on\":0,\"screenshot\":0,\"revoke_remind\":1,\"receipt\":0,\"online\":0,\"last_offline\":0,\"device_flag\":0,\"follow\":0,\"be_deleted\":1,\"be_blacklist\":0,\"code\":\"\",\"vercode\":\"\",\"source_desc\":\"\",\"remark\":\"\",\"is_upload_avatar\":1,\"status\":1,\"robot\":1,\"is_destroy\":0,\"flame\":0,\"flame_second\":0,\"join_group_invite_uid\":\"\",\"join_group_invite_name\":\"\",\"join_group_time\":\"\"}],\"groups\":[],\"channel_status\":[]}"
+      "text": "{\"uid\":\"6db8b65b3ae94092badfeb82e47c06f7\",\"conversations\":[{\"channel_id\":\"deepseek_ai_robot\",\"channel_type\":1,\"timestamp\":1779782902,\"last_msg_seq\":126,\"last_client_msg_no\":\"57e8d4f19fb66e6e53abbcfcfeb2fdc6_0_3\",\"offset_msg_seq\":0,\"version\":1779782902000000000,\"recents\":[{\"header\":{\"no_persist\":0,\"red_dot\":1,\"sync_once\":0},\"setting\":0,\"message_id\":2059184942063030272,\"message_idstr\":\"2059184942063030272\",\"message_seq\":126,\"client_msg_no\":\"57e8d4f19fb66e6e53abbcfcfeb2fdc6_0_3\",\"from_uid\":\"6db8b65b3ae94092badfeb82e47c06f7\",\"channel_id\":\"deepseek_ai_robot\",\"channel_type\":1,\"timestamp\":1779782902,\"payload\":{\"type\":99},\"signal_payload\":\"\",\"is_deleted\":0,\"readed\":0,\"extra_version\":0}],\"extra\":{\"channel_id\":\"deepseek_ai_robot\",\"channel_type\":1,\"browse_to\":0,\"keep_message_seq\":0,\"keep_offset_y\":0,\"draft\":\"\",\"version\":1004033}},{\"channel_id\":\"u_10000\",\"channel_type\":1,\"timestamp\":1779763205,\"last_msg_seq\":30,\"last_client_msg_no\":\"450805859745a8fa376654426f926046_0_3\",\"offset_msg_seq\":0,\"version\":1779782897345496040,\"recents\":[{\"header\":{\"no_persist\":0,\"red_dot\":1,\"sync_once\":0},\"setting\":0,\"message_id\":2059102311099142144,\"message_idstr\":\"2059102311099142144\",\"message_seq\":30,\"client_msg_no\":\"450805859745a8fa376654426f926046_0_3\",\"from_uid\":\"6db8b65b3ae94092badfeb82e47c06f7\",\"channel_id\":\"u_10000\",\"channel_type\":1,\"timestamp\":1779763205,\"payload\":{\"type\":99},\"signal_payload\":\"\",\"is_deleted\":0,\"readed\":0,\"extra_version\":0}],\"extra\":{\"channel_id\":\"u_10000\",\"channel_type\":1,\"browse_to\":0,\"keep_message_seq\":0,\"keep_offset_y\":0,\"draft\":\"\",\"version\":1004006}},{\"channel_id\":\"989ec1fc79664ede9ff9008831d76337\",\"channel_type\":1,\"timestamp\":1779713743,\"last_msg_seq\":82,\"last_client_msg_no\":\"ec7b5eb21085d106e2ef4e7537c123b4_0_3\",\"offset_msg_seq\":0,\"version\":1779715268771743611,\"recents\":[{\"header\":{\"no_persist\":0,\"red_dot\":1,\"sync_once\":0},\"setting\":0,\"message_id\":2058894844377436160,\"message_idstr\":\"2058894844377436160\",\"message_seq\":82,\"client_msg_no\":\"ec7b5eb21085d106e2ef4e7537c123b4_0_3\",\"from_uid\":\"6db8b65b3ae94092badfeb82e47c06f7\",\"channel_id\":\"989ec1fc79664ede9ff9008831d76337\",\"channel_type\":1,\"timestamp\":1779713743,\"payload\":{\"height\":0,\"type\":2,\"url\":\"http://localhost:9000/chat/1/989ec1fc79664ede9ff9008831d76337/1779713741799-56f2fb87ae11d-oIBECbBGEPfyNaQClBbDfAGxxmAFAAWgAJMoIttplv-0wx4r9yasq-awebp-resize_0_0.gif\",\"width\":0},\"signal_payload\":\"\",\"is_deleted\":0,\"readed\":0,\"extra_version\":0}],\"extra\":{\"channel_id\":\"989ec1fc79664ede9ff9008831d76337\",\"channel_type\":1,\"browse_to\":0,\"keep_message_seq\":0,\"keep_offset_y\":0,\"draft\":\"\",\"version\":1002019}},{\"channel_id\":\"31af7b0cdb1042be9b29b8660a862fb0\",\"channel_type\":1,\"timestamp\":1779689274,\"last_msg_seq\":17,\"last_client_msg_no\":\"d48f6bfd3460968934e4a2893ba1c847_0_3\",\"offset_msg_seq\":0,\"version\":1779689274866773212,\"recents\":[{\"header\":{\"no_persist\":0,\"red_dot\":1,\"sync_once\":0},\"setting\":0,\"message_id\":2058792195988656128,\"message_idstr\":\"2058792195988656128\",\"message_seq\":17,\"client_msg_no\":\"d48f6bfd3460968934e4a2893ba1c847_0_3\",\"from_uid\":\"6db8b65b3ae94092badfeb82e47c06f7\",\"channel_id\":\"31af7b0cdb1042be9b29b8660a862fb0\",\"channel_type\":1,\"timestamp\":1779689274,\"payload\":{\"content\":\"3333333333333333\",\"type\":1},\"signal_payload\":\"\",\"is_deleted\":0,\"readed\":0,\"extra_version\":0}],\"extra\":{\"channel_id\":\"31af7b0cdb1042be9b29b8660a862fb0\",\"channel_type\":1,\"browse_to\":0,\"keep_message_seq\":0,\"keep_offset_y\":0,\"draft\":\"\",\"version\":1003080}},{\"channel_id\":\"00cc4f31ecfb4d8298b82065a513c552\",\"channel_type\":1,\"timestamp\":1779628029,\"last_msg_seq\":27,\"last_client_msg_no\":\"22c4dea94a9b0b9cb2bd93d6c2331bd6_0_3\",\"offset_msg_seq\":0,\"version\":1779628279253438444,\"recents\":[{\"header\":{\"no_persist\":0,\"red_dot\":1,\"sync_once\":0},\"setting\":0,\"message_id\":2058535293513895936,\"message_idstr\":\"2058535293513895936\",\"message_seq\":27,\"client_msg_no\":\"22c4dea94a9b0b9cb2bd93d6c2331bd6_0_3\",\"from_uid\":\"6db8b65b3ae94092badfeb82e47c06f7\",\"channel_id\":\"00cc4f31ecfb4d8298b82065a513c552\",\"channel_type\":1,\"timestamp\":1779628029,\"payload\":{\"name\":\"manual-audit-file-1779628029439.txt\",\"size\":25,\"type\":8,\"url\":\"http://127.0.0.1:8090/v1/file/preview/chat/1/00cc4f31ecfb4d8298b82065a513c552/1779628029468-dbd030e06617c-manual-audit-file-1779628029439.txt\"},\"signal_payload\":\"\",\"is_deleted\":0,\"readed\":0,\"extra_version\":0}],\"extra\":{\"channel_id\":\"00cc4f31ecfb4d8298b82065a513c552\",\"channel_type\":1,\"browse_to\":0,\"keep_message_seq\":0,\"keep_offset_y\":0,\"draft\":\"\",\"version\":1003061}},{\"channel_id\":\"fileHelper\",\"channel_type\":1,\"timestamp\":1779507285,\"last_msg_seq\":23,\"last_client_msg_no\":\"0e05c4b10f57681cd543cb68ef11d39b_0_3\",\"offset_msg_seq\":0,\"version\":1779507289005499532,\"recents\":[{\"header\":{\"no_persist\":0,\"red_dot\":1,\"sync_once\":0},\"setting\":0,\"message_id\":2058028835168849920,\"message_idstr\":\"2058028835168849920\",\"message_seq\":23,\"client_msg_no\":\"0e05c4b10f57681cd543cb68ef11d39b_0_3\",\"from_uid\":\"6db8b65b3ae94092badfeb82e47c06f7\",\"channel_id\":\"fileHelper\",\"channel_type\":1,\"timestamp\":1779507285,\"payload\":{\"content\":\"回归测试：后端与IM联动已成功解决！系统功能稳定。\",\"type\":1},\"signal_payload\":\"\",\"is_deleted\":0,\"readed\":0,\"extra_version\":0}],\"extra\":{\"channel_id\":\"fileHelper\",\"channel_type\":1,\"browse_to\":0,\"keep_message_seq\":0,\"keep_offset_y\":0,\"draft\":\"\",\"version\":1002010}},{\"channel_id\":\"9d97387230a544dcba955a6266ee6285\",\"channel_type\":1,\"timestamp\":1779507280,\"last_msg_seq\":17,\"last_client_msg_no\":\"f2f596fe1150ab94a99a269662eae5b7_0_3\",\"offset_msg_seq\":0,\"version\":1779507283267014746,\"recents\":[{\"header\":{\"no_persist\":0,\"red_dot\":1,\"sync_once\":0},\"setting\":0,\"message_id\":2058028816822964224,\"message_idstr\":\"2058028816822964224\",\"message_seq\":17,\"client_msg_no\":\"f2f596fe1150ab94a99a269662eae5b7_0_3\",\"from_uid\":\"6db8b65b3ae94092badfeb82e47c06f7\",\"channel_id\":\"9d97387230a544dcba955a6266ee6285\",\"channel_type\":1,\"timestamp\":1779507280,\"payload\":{\"content\":\"This is a draft message\",\"type\":1},\"signal_payload\":\"\",\"is_deleted\":0,\"readed\":0,\"extra_version\":0}],\"extra\":{\"channel_id\":\"9d97387230a544dcba955a6266ee6285\",\"channel_type\":1,\"browse_to\":0,\"keep_message_seq\":0,\"keep_offset_y\":0,\"draft\":\"\",\"version\":1002009}}],\"users\":[{\"uid\":\"u_10000\",\"name\":\"系统账号\",\"username\":\"\",\"mute\":0,\"top\":0,\"sex\":0,\"category\":\"system\",\"short_no\":\"10000\",\"chat_pwd_on\":0,\"screenshot\":0,\"revoke_remind\":1,\"receipt\":0,\"online\":0,\"last_offline\":0,\"device_flag\":0,\"follow\":1,\"be_deleted\":1,\"be_blacklist\":0,\"code\":\"\",\"vercode\":\"\",\"source_desc\":\"\",\"remark\":\"\",\"is_upload_avatar\":1,\"status\":1,\"robot\":1,\"is_destroy\":0,\"flame\":0,\"flame_second\":0,\"join_group_invite_uid\":\"\",\"join_group_invite_name\":\"\",\"join_group_time\":\"\"},{\"uid\":\"fileHelper\",\"name\":\"文件传输助手\",\"username\":\"\",\"mute\":0,\"top\":0,\"sex\":0,\"category\":\"system\",\"short_no\":\"20000\",\"chat_pwd_on\":0,\"screenshot\":0,\"revoke_remind\":1,\"receipt\":0,\"online\":0,\"last_offline\":0,\"device_flag\":0,\"follow\":1,\"be_deleted\":1,\"be_blacklist\":0,\"code\":\"\",\"vercode\":\"\",\"source_desc\":\"\",\"remark\":\"\",\"is_upload_avatar\":1,\"status\":1,\"robot\":0,\"is_destroy\":0,\"flame\":0,\"flame_second\":0,\"join_group_invite_uid\":\"\",\"join_group_invite_name\":\"\",\"join_group_time\":\"\"},{\"uid\":\"31af7b0cdb1042be9b29b8660a862fb0\",\"name\":\"逐味魔\",\"username\":\"\",\"mute\":0,\"top\":0,\"sex\":1,\"category\":\"\",\"short_no\":\"rmcVaiNZ\",\"chat_pwd_on\":0,\"screenshot\":0,\"revoke_remind\":1,\"receipt\":0,\"online\":0,\"last_offline\":0,\"device_flag\":0,\"follow\":1,\"be_deleted\":0,\"be_blacklist\":0,\"code\":\"\",\"vercode\":\"99bf4c6cc64546ee917fa6f7e1f808a7@4\",\"source_desc\":\"通过搜索添加\",\"remark\":\"\",\"is_upload_avatar\":0,\"status\":1,\"robot\":0,\"is_destroy\":0,\"flame\":0,\"flame_second\":0,\"join_group_invite_uid\":\"\",\"join_group_invite_name\":\"\",\"join_group_time\":\"\"},{\"uid\":\"989ec1fc79664ede9ff9008831d76337\",\"name\":\"123\",\"username\":\"\",\"mute\":0,\"top\":0,\"sex\":1,\"category\":\"\",\"short_no\":\"rpLdUnCSQ\",\"chat_pwd_on\":0,\"screenshot\":0,\"revoke_remind\":1,\"receipt\":0,\"online\":0,\"last_offline\":0,\"device_flag\":0,\"follow\":1,\"be_deleted\":0,\"be_blacklist\":0,\"code\":\"\",\"vercode\":\"ff98025bc6654572a8582530bd806ca7@4\",\"source_desc\":\"通过搜索添加\",\"remark\":\"\",\"is_upload_avatar\":0,\"status\":1,\"robot\":0,\"is_destroy\":0,\"flame\":0,\"flame_second\":0,\"join_group_invite_uid\":\"\",\"join_group_invite_name\":\"\",\"join_group_time\":\"\"},{\"uid\":\"9d97387230a544dcba955a6266ee6285\",\"name\":\"TestFriend2\",\"username\":\"\",\"mute\":0,\"top\":0,\"sex\":1,\"category\":\"\",\"short_no\":\"rVrpnsWfd\",\"chat_pwd_on\":0,\"screenshot\":0,\"revoke_remind\":1,\"receipt\":0,\"online\":0,\"last_offline\":0,\"device_flag\":0,\"follow\":1,\"be_deleted\":0,\"be_blacklist\":0,\"code\":\"\",\"vercode\":\"f4c55f43eea34e1b97383926c5cccc55@4\",\"source_desc\":\"通过搜索添加\",\"remark\":\"\",\"is_upload_avatar\":0,\"status\":1,\"robot\":0,\"is_destroy\":0,\"flame\":0,\"flame_second\":0,\"join_group_invite_uid\":\"\",\"join_group_invite_name\":\"\",\"join_group_time\":\"\"},{\"uid\":\"00cc4f31ecfb4d8298b82065a513c552\",\"name\":\"yunyi\",\"username\":\"\",\"mute\":0,\"top\":0,\"sex\":1,\"category\":\"\",\"short_no\":\"sfAoSwP\",\"chat_pwd_on\":0,\"screenshot\":0,\"revoke_remind\":1,\"receipt\":0,\"online\":0,\"last_offline\":0,\"device_flag\":0,\"follow\":1,\"be_deleted\":0,\"be_blacklist\":0,\"code\":\"\",\"vercode\":\"aef40c2bc1d54e73a184accf1cdc7d4f@4\",\"source_desc\":\"通过搜索添加\",\"remark\":\"\",\"is_upload_avatar\":0,\"status\":1,\"robot\":0,\"is_destroy\":0,\"flame\":0,\"flame_second\":0,\"join_group_invite_uid\":\"\",\"join_group_invite_name\":\"\",\"join_group_time\":\"\"},{\"uid\":\"deepseek_ai_robot\",\"name\":\"DeepSeek AI\",\"username\":\"deepseek_ai_robot\",\"mute\":0,\"top\":0,\"sex\":0,\"category\":\"system\",\"short_no\":\"21000\",\"chat_pwd_on\":0,\"screenshot\":0,\"revoke_remind\":1,\"receipt\":0,\"online\":0,\"last_offline\":0,\"device_flag\":0,\"follow\":0,\"be_deleted\":1,\"be_blacklist\":0,\"code\":\"\",\"vercode\":\"\",\"source_desc\":\"\",\"remark\":\"\",\"is_upload_avatar\":1,\"status\":1,\"robot\":1,\"is_destroy\":0,\"flame\":0,\"flame_second\":0,\"join_group_invite_uid\":\"\",\"join_group_invite_name\":\"\",\"join_group_time\":\"\"}],\"groups\":[],\"channel_status\":[]}"
     }
   },
   "events": {
@@ -204,337 +204,337 @@
         "method": "GET"
       },
       {
-        "url": "http://100.79.157.76:8090/v1/user/login",
+        "url": "http://localhost:8090/v1/user/login",
         "status": 200,
         "method": "POST"
       },
       {
-        "url": "http://100.79.157.76:8090/v1/users/6db8b65b3ae94092badfeb82e47c06f7/im",
+        "url": "http://localhost:8090/v1/users/6db8b65b3ae94092badfeb82e47c06f7/im",
         "status": 200,
         "method": "GET"
       },
       {
-        "url": "http://100.79.157.76:8090/v1/conversation/sync",
+        "url": "http://localhost:8090/v1/conversation/sync",
         "status": 200,
         "method": "POST"
       },
       {
-        "url": "http://100.79.157.76:8090/v1/common/appconfig",
+        "url": "http://localhost:8090/v1/common/appconfig",
         "status": 200,
         "method": "GET"
       },
       {
-        "url": "http://100.79.157.76:8090/v1/group/my",
+        "url": "http://localhost:8090/v1/group/my",
         "status": 200,
         "method": "GET"
       },
       {
-        "url": "http://100.79.157.76:8090/v1/group/my",
+        "url": "http://localhost:8090/v1/group/my",
         "status": 200,
         "method": "GET"
       },
       {
-        "url": "http://100.79.157.76:8090/v1/conversation/extra/sync",
+        "url": "http://localhost:8090/v1/conversation/extra/sync",
         "status": 200,
         "method": "POST"
       },
       {
-        "url": "http://100.79.157.76:8090/v1/message/channel/sync",
+        "url": "http://localhost:8090/v1/message/channel/sync",
         "status": 200,
         "method": "POST"
       },
       {
-        "url": "http://100.79.157.76:8090/v1/message/channel/sync",
+        "url": "http://localhost:8090/v1/message/channel/sync",
         "status": 200,
         "method": "POST"
       },
       {
-        "url": "http://100.79.157.76:8090/v1/message/channel/sync",
+        "url": "http://localhost:8090/v1/message/channel/sync",
         "status": 200,
         "method": "POST"
       },
       {
-        "url": "http://100.79.157.76:8090/v1/message/channel/sync",
+        "url": "http://localhost:8090/v1/message/channel/sync",
         "status": 200,
         "method": "POST"
       },
       {
-        "url": "http://100.79.157.76:8090/v1/message/channel/sync",
+        "url": "http://localhost:8090/v1/message/channel/sync",
         "status": 200,
         "method": "POST"
       },
       {
-        "url": "http://100.79.157.76:8090/v1/message/channel/sync",
+        "url": "http://localhost:8090/v1/message/channel/sync",
         "status": 200,
         "method": "POST"
       },
       {
-        "url": "http://100.79.157.76:8090/v1/message/channel/sync",
+        "url": "http://localhost:8090/v1/message/channel/sync",
         "status": 200,
         "method": "POST"
       },
       {
-        "url": "http://100.79.157.76:8090/v1/group/my",
+        "url": "http://localhost:8090/v1/group/my",
         "status": 200,
         "method": "GET"
       },
       {
-        "url": "http://100.79.157.76:8090/v1/message/channel/sync",
+        "url": "http://localhost:8090/v1/message/channel/sync",
         "status": 200,
         "method": "POST"
       },
       {
-        "url": "http://100.79.157.76:8090/v1/message/channel/sync",
+        "url": "http://localhost:8090/v1/message/channel/sync",
         "status": 200,
         "method": "POST"
       },
       {
-        "url": "http://100.79.157.76:8090/v1/users/6db8b65b3ae94092badfeb82e47c06f7",
+        "url": "http://localhost:8090/v1/users/6db8b65b3ae94092badfeb82e47c06f7",
         "status": 200,
         "method": "GET"
       },
       {
-        "url": "http://100.79.157.76:8090/v1/conversation/sync",
+        "url": "http://localhost:8090/v1/conversation/sync",
         "status": 200,
         "method": "POST"
       },
       {
-        "url": "http://100.79.157.76:8090/v1/users/6db8b65b3ae94092badfeb82e47c06f7",
+        "url": "http://localhost:8090/v1/users/6db8b65b3ae94092badfeb82e47c06f7",
         "status": 200,
         "method": "GET"
       },
       {
-        "url": "http://100.79.157.76:8090/v1/message/channel/sync",
+        "url": "http://localhost:8090/v1/message/channel/sync",
         "status": 200,
         "method": "POST"
       },
       {
-        "url": "http://100.79.157.76:8090/v1/users/6db8b65b3ae94092badfeb82e47c06f7",
+        "url": "http://localhost:8090/v1/users/6db8b65b3ae94092badfeb82e47c06f7",
         "status": 200,
         "method": "GET"
       },
       {
-        "url": "http://100.79.157.76:8090/v1/message/channel/sync",
+        "url": "http://localhost:8090/v1/message/channel/sync",
         "status": 200,
         "method": "POST"
       },
       {
-        "url": "http://100.79.157.76:8090/v1/message/channel/sync",
+        "url": "http://localhost:8090/v1/message/channel/sync",
         "status": 200,
         "method": "POST"
       },
       {
-        "url": "http://100.79.157.76:8090/v1/message/channel/sync",
+        "url": "http://localhost:8090/v1/message/channel/sync",
         "status": 200,
         "method": "POST"
       },
       {
-        "url": "http://100.79.157.76:8090/v1/message/channel/sync",
+        "url": "http://localhost:8090/v1/message/channel/sync",
         "status": 200,
         "method": "POST"
       },
       {
-        "url": "http://100.79.157.76:8090/v1/message/channel/sync",
+        "url": "http://localhost:8090/v1/message/channel/sync",
         "status": 200,
         "method": "POST"
       },
       {
-        "url": "http://100.79.157.76:8090/v1/message/channel/sync",
+        "url": "http://localhost:8090/v1/message/channel/sync",
         "status": 200,
         "method": "POST"
       },
       {
-        "url": "http://100.79.157.76:8090/v1/users/6db8b65b3ae94092badfeb82e47c06f7",
+        "url": "http://localhost:8090/v1/users/6db8b65b3ae94092badfeb82e47c06f7",
         "status": 200,
         "method": "GET"
       },
       {
-        "url": "http://100.79.157.76:8090/v1/conversation/sync",
+        "url": "http://localhost:8090/v1/conversation/sync",
         "status": 200,
         "method": "POST"
       },
       {
-        "url": "http://100.79.157.76:8090/v1/conversation/extra/sync",
+        "url": "http://localhost:8090/v1/conversation/extra/sync",
         "status": 200,
         "method": "POST"
       },
       {
-        "url": "http://100.79.157.76:8090/v1/message/channel/sync",
+        "url": "http://localhost:8090/v1/message/channel/sync",
         "status": 200,
         "method": "POST"
       },
       {
-        "url": "http://100.79.157.76:8090/v1/message/channel/sync",
+        "url": "http://localhost:8090/v1/message/channel/sync",
         "status": 200,
         "method": "POST"
       },
       {
-        "url": "http://100.79.157.76:8090/v1/message/channel/sync",
+        "url": "http://localhost:8090/v1/message/channel/sync",
         "status": 200,
         "method": "POST"
       },
       {
-        "url": "http://100.79.157.76:8090/v1/message/channel/sync",
+        "url": "http://localhost:8090/v1/message/channel/sync",
         "status": 200,
         "method": "POST"
       },
       {
-        "url": "http://100.79.157.76:8090/v1/message/channel/sync",
+        "url": "http://localhost:8090/v1/message/channel/sync",
         "status": 200,
         "method": "POST"
       },
       {
-        "url": "http://100.79.157.76:8090/v1/message/channel/sync",
+        "url": "http://localhost:8090/v1/message/channel/sync",
         "status": 200,
         "method": "POST"
       },
       {
-        "url": "http://100.79.157.76:8090/v1/message/channel/sync",
+        "url": "http://localhost:8090/v1/message/channel/sync",
         "status": 200,
         "method": "POST"
       },
       {
-        "url": "http://100.79.157.76:8090/v1/message/channel/sync",
+        "url": "http://localhost:8090/v1/message/channel/sync",
         "status": 200,
         "method": "POST"
       },
       {
-        "url": "http://100.79.157.76:8090/v1/message/channel/sync",
+        "url": "http://localhost:8090/v1/message/channel/sync",
         "status": 200,
         "method": "POST"
       },
       {
-        "url": "http://100.79.157.76:8090/v1/message/channel/sync",
+        "url": "http://localhost:8090/v1/message/channel/sync",
         "status": 200,
         "method": "POST"
       },
       {
-        "url": "http://100.79.157.76:8090/v1/message/channel/sync",
+        "url": "http://localhost:8090/v1/message/channel/sync",
         "status": 200,
         "method": "POST"
       },
       {
-        "url": "http://100.79.157.76:8090/v1/message/channel/sync",
+        "url": "http://localhost:8090/v1/message/channel/sync",
         "status": 200,
         "method": "POST"
       },
       {
-        "url": "http://100.79.157.76:8090/v1/message/channel/sync",
+        "url": "http://localhost:8090/v1/message/channel/sync",
         "status": 200,
         "method": "POST"
       },
       {
-        "url": "http://100.79.157.76:8090/v1/message/channel/sync",
+        "url": "http://localhost:8090/v1/message/channel/sync",
         "status": 200,
         "method": "POST"
       },
       {
-        "url": "http://100.79.157.76:8090/v1/message/channel/sync",
+        "url": "http://localhost:8090/v1/message/channel/sync",
         "status": 200,
         "method": "POST"
       },
       {
-        "url": "http://100.79.157.76:8090/v1/message/channel/sync",
+        "url": "http://localhost:8090/v1/message/channel/sync",
         "status": 200,
         "method": "POST"
       },
       {
-        "url": "http://100.79.157.76:8090/v1/conversation/extra/sync",
+        "url": "http://localhost:8090/v1/conversation/extra/sync",
         "status": 200,
         "method": "POST"
       },
       {
-        "url": "http://100.79.157.76:8090/v1/message/pinned/sync",
+        "url": "http://localhost:8090/v1/message/pinned/sync",
         "status": 200,
         "method": "POST"
       },
       {
-        "url": "http://100.79.157.76:8090/v1/message/pinned/sync",
+        "url": "http://localhost:8090/v1/message/pinned/sync",
         "status": 200,
         "method": "POST"
       },
       {
-        "url": "http://100.79.157.76:8090/v1/message/pinned/sync",
+        "url": "http://localhost:8090/v1/message/pinned/sync",
         "status": 200,
         "method": "POST"
       },
       {
-        "url": "http://100.79.157.76:8090/v1/message/pinned/sync",
+        "url": "http://localhost:8090/v1/message/pinned/sync",
         "status": 200,
         "method": "POST"
       },
       {
-        "url": "http://100.79.157.76:8090/v1/message/pinned/sync",
+        "url": "http://localhost:8090/v1/message/pinned/sync",
         "status": 200,
         "method": "POST"
       },
       {
-        "url": "http://100.79.157.76:8090/v1/message/pinned/sync",
+        "url": "http://localhost:8090/v1/message/pinned/sync",
         "status": 200,
         "method": "POST"
       },
       {
-        "url": "http://100.79.157.76:8090/v1/message/pinned/sync",
+        "url": "http://localhost:8090/v1/message/pinned/sync",
         "status": 200,
         "method": "POST"
       },
       {
-        "url": "http://100.79.157.76:8090/v1/message/pinned/sync",
+        "url": "http://localhost:8090/v1/message/pinned/sync",
         "status": 200,
         "method": "POST"
       },
       {
-        "url": "http://100.79.157.76:8090/v1/message/pinned/sync",
+        "url": "http://localhost:8090/v1/message/pinned/sync",
         "status": 200,
         "method": "POST"
       },
       {
-        "url": "http://100.79.157.76:8090/v1/message/pinned/sync",
+        "url": "http://localhost:8090/v1/message/pinned/sync",
         "status": 200,
         "method": "POST"
       },
       {
-        "url": "http://100.79.157.76:8090/v1/message/pinned/sync",
+        "url": "http://localhost:8090/v1/message/pinned/sync",
         "status": 200,
         "method": "POST"
       },
       {
-        "url": "http://100.79.157.76:8090/v1/message/pinned/sync",
+        "url": "http://localhost:8090/v1/message/pinned/sync",
         "status": 200,
         "method": "POST"
       },
       {
-        "url": "http://100.79.157.76:8090/v1/message/pinned/sync",
+        "url": "http://localhost:8090/v1/message/pinned/sync",
         "status": 200,
         "method": "POST"
       },
       {
-        "url": "http://100.79.157.76:8090/v1/message/pinned/sync",
+        "url": "http://localhost:8090/v1/message/pinned/sync",
         "status": 200,
         "method": "POST"
       },
       {
-        "url": "http://100.79.157.76:8090/v1/message/pinned/sync",
+        "url": "http://localhost:8090/v1/message/pinned/sync",
         "status": 200,
         "method": "POST"
       },
       {
-        "url": "http://100.79.157.76:8090/v1/message/pinned/sync",
+        "url": "http://localhost:8090/v1/message/pinned/sync",
         "status": 200,
         "method": "POST"
       },
       {
-        "url": "http://100.79.157.76:8090/v1/message/reminder/sync",
+        "url": "http://localhost:8090/v1/message/reminder/sync",
         "status": 200,
         "method": "POST"
       },
       {
-        "url": "http://100.79.157.76:8090/v1/group/my",
+        "url": "http://localhost:8090/v1/group/my",
         "status": 200,
         "method": "GET"
       },
       {
-        "url": "http://100.79.157.76:8090/v1/conversation/sync",
+        "url": "http://localhost:8090/v1/conversation/sync",
         "status": 200,
         "method": "POST"
       },
@@ -549,317 +549,317 @@
         "method": "GET"
       },
       {
-        "url": "http://100.79.157.76:8090/v1/users/6db8b65b3ae94092badfeb82e47c06f7/im",
+        "url": "http://localhost:8090/v1/users/6db8b65b3ae94092badfeb82e47c06f7/im",
         "status": 200,
         "method": "GET"
       },
       {
-        "url": "http://100.79.157.76:8090/v1/common/appconfig",
+        "url": "http://localhost:8090/v1/common/appconfig",
         "status": 200,
         "method": "GET"
       },
       {
-        "url": "http://100.79.157.76:8090/v1/group/my",
+        "url": "http://localhost:8090/v1/group/my",
         "status": 200,
         "method": "GET"
       },
       {
-        "url": "http://100.79.157.76:8090/v1/group/my",
+        "url": "http://localhost:8090/v1/group/my",
         "status": 200,
         "method": "GET"
       },
       {
-        "url": "http://100.79.157.76:8090/v1/message/channel/sync",
+        "url": "http://localhost:8090/v1/message/channel/sync",
         "status": 200,
         "method": "POST"
       },
       {
-        "url": "http://100.79.157.76:8090/v1/message/channel/sync",
+        "url": "http://localhost:8090/v1/message/channel/sync",
         "status": 200,
         "method": "POST"
       },
       {
-        "url": "http://100.79.157.76:8090/v1/message/channel/sync",
+        "url": "http://localhost:8090/v1/message/channel/sync",
         "status": 200,
         "method": "POST"
       },
       {
-        "url": "http://100.79.157.76:8090/v1/message/channel/sync",
+        "url": "http://localhost:8090/v1/message/channel/sync",
         "status": 200,
         "method": "POST"
       },
       {
-        "url": "http://100.79.157.76:8090/v1/message/channel/sync",
+        "url": "http://localhost:8090/v1/message/channel/sync",
         "status": 200,
         "method": "POST"
       },
       {
-        "url": "http://100.79.157.76:8090/v1/message/channel/sync",
+        "url": "http://localhost:8090/v1/message/channel/sync",
         "status": 200,
         "method": "POST"
       },
       {
-        "url": "http://100.79.157.76:8090/v1/message/channel/sync",
+        "url": "http://localhost:8090/v1/message/channel/sync",
         "status": 200,
         "method": "POST"
       },
       {
-        "url": "http://100.79.157.76:8090/v1/message/channel/sync",
+        "url": "http://localhost:8090/v1/message/channel/sync",
         "status": 200,
         "method": "POST"
       },
       {
-        "url": "http://100.79.157.76:8090/v1/message/channel/sync",
+        "url": "http://localhost:8090/v1/message/channel/sync",
         "status": 200,
         "method": "POST"
       },
       {
-        "url": "http://100.79.157.76:8090/v1/users/6db8b65b3ae94092badfeb82e47c06f7",
+        "url": "http://localhost:8090/v1/users/6db8b65b3ae94092badfeb82e47c06f7",
         "status": 200,
         "method": "GET"
       },
       {
-        "url": "http://100.79.157.76:8090/v1/conversation/sync",
+        "url": "http://localhost:8090/v1/conversation/sync",
         "status": 200,
         "method": "POST"
       },
       {
-        "url": "http://100.79.157.76:8090/v1/users/6db8b65b3ae94092badfeb82e47c06f7",
+        "url": "http://localhost:8090/v1/users/6db8b65b3ae94092badfeb82e47c06f7",
         "status": 200,
         "method": "GET"
       },
       {
-        "url": "http://100.79.157.76:8090/v1/users/6db8b65b3ae94092badfeb82e47c06f7",
+        "url": "http://localhost:8090/v1/users/6db8b65b3ae94092badfeb82e47c06f7",
         "status": 200,
         "method": "GET"
       },
       {
-        "url": "http://100.79.157.76:8090/v1/users/6db8b65b3ae94092badfeb82e47c06f7",
+        "url": "http://localhost:8090/v1/users/6db8b65b3ae94092badfeb82e47c06f7",
         "status": 200,
         "method": "GET"
       },
       {
-        "url": "http://100.79.157.76:8090/v1/conversation/sync",
+        "url": "http://localhost:8090/v1/conversation/sync",
         "status": 200,
         "method": "POST"
       },
       {
-        "url": "http://100.79.157.76:8090/v1/conversation/sync",
+        "url": "http://localhost:8090/v1/conversation/sync",
         "status": 200,
         "method": "POST"
       },
       {
-        "url": "http://100.79.157.76:8090/v1/conversation/extra/sync",
+        "url": "http://localhost:8090/v1/conversation/extra/sync",
         "status": 200,
         "method": "POST"
       },
       {
-        "url": "http://100.79.157.76:8090/v1/conversation/extra/sync",
+        "url": "http://localhost:8090/v1/conversation/extra/sync",
         "status": 200,
         "method": "POST"
       },
       {
-        "url": "http://100.79.157.76:8090/v1/conversation/extra/sync",
+        "url": "http://localhost:8090/v1/conversation/extra/sync",
         "status": 200,
         "method": "POST"
       },
       {
-        "url": "http://100.79.157.76:8090/v1/group/my",
+        "url": "http://localhost:8090/v1/group/my",
         "status": 200,
         "method": "GET"
       },
       {
-        "url": "http://100.79.157.76:8090/v1/message/channel/sync",
+        "url": "http://localhost:8090/v1/message/channel/sync",
         "status": 200,
         "method": "POST"
       },
       {
-        "url": "http://100.79.157.76:8090/v1/message/channel/sync",
+        "url": "http://localhost:8090/v1/message/channel/sync",
         "status": 200,
         "method": "POST"
       },
       {
-        "url": "http://100.79.157.76:8090/v1/message/channel/sync",
+        "url": "http://localhost:8090/v1/message/channel/sync",
         "status": 200,
         "method": "POST"
       },
       {
-        "url": "http://100.79.157.76:8090/v1/message/channel/sync",
+        "url": "http://localhost:8090/v1/message/channel/sync",
         "status": 200,
         "method": "POST"
       },
       {
-        "url": "http://100.79.157.76:8090/v1/message/channel/sync",
+        "url": "http://localhost:8090/v1/message/channel/sync",
         "status": 200,
         "method": "POST"
       },
       {
-        "url": "http://100.79.157.76:8090/v1/message/channel/sync",
+        "url": "http://localhost:8090/v1/message/channel/sync",
         "status": 200,
         "method": "POST"
       },
       {
-        "url": "http://100.79.157.76:8090/v1/message/channel/sync",
+        "url": "http://localhost:8090/v1/message/channel/sync",
         "status": 200,
         "method": "POST"
       },
       {
-        "url": "http://100.79.157.76:8090/v1/message/channel/sync",
+        "url": "http://localhost:8090/v1/message/channel/sync",
         "status": 200,
         "method": "POST"
       },
       {
-        "url": "http://100.79.157.76:8090/v1/message/channel/sync",
+        "url": "http://localhost:8090/v1/message/channel/sync",
         "status": 200,
         "method": "POST"
       },
       {
-        "url": "http://100.79.157.76:8090/v1/message/channel/sync",
+        "url": "http://localhost:8090/v1/message/channel/sync",
         "status": 200,
         "method": "POST"
       },
       {
-        "url": "http://100.79.157.76:8090/v1/message/channel/sync",
+        "url": "http://localhost:8090/v1/message/channel/sync",
         "status": 200,
         "method": "POST"
       },
       {
-        "url": "http://100.79.157.76:8090/v1/message/channel/sync",
+        "url": "http://localhost:8090/v1/message/channel/sync",
         "status": 200,
         "method": "POST"
       },
       {
-        "url": "http://100.79.157.76:8090/v1/message/channel/sync",
+        "url": "http://localhost:8090/v1/message/channel/sync",
         "status": 200,
         "method": "POST"
       },
       {
-        "url": "http://100.79.157.76:8090/v1/message/channel/sync",
+        "url": "http://localhost:8090/v1/message/channel/sync",
         "status": 200,
         "method": "POST"
       },
       {
-        "url": "http://100.79.157.76:8090/v1/message/channel/sync",
+        "url": "http://localhost:8090/v1/message/channel/sync",
         "status": 200,
         "method": "POST"
       },
       {
-        "url": "http://100.79.157.76:8090/v1/message/channel/sync",
+        "url": "http://localhost:8090/v1/message/channel/sync",
         "status": 200,
         "method": "POST"
       },
       {
-        "url": "http://100.79.157.76:8090/v1/message/channel/sync",
+        "url": "http://localhost:8090/v1/message/channel/sync",
         "status": 200,
         "method": "POST"
       },
       {
-        "url": "http://100.79.157.76:8090/v1/message/channel/sync",
+        "url": "http://localhost:8090/v1/message/channel/sync",
         "status": 200,
         "method": "POST"
       },
       {
-        "url": "http://100.79.157.76:8090/v1/message/channel/sync",
+        "url": "http://localhost:8090/v1/message/channel/sync",
         "status": 200,
         "method": "POST"
       },
       {
-        "url": "http://100.79.157.76:8090/v1/message/channel/sync",
+        "url": "http://localhost:8090/v1/message/channel/sync",
         "status": 200,
         "method": "POST"
       },
       {
-        "url": "http://100.79.157.76:8090/v1/message/channel/sync",
+        "url": "http://localhost:8090/v1/message/channel/sync",
         "status": 200,
         "method": "POST"
       },
       {
-        "url": "http://100.79.157.76:8090/v1/message/pinned/sync",
+        "url": "http://localhost:8090/v1/message/pinned/sync",
         "status": 200,
         "method": "POST"
       },
       {
-        "url": "http://100.79.157.76:8090/v1/message/pinned/sync",
+        "url": "http://localhost:8090/v1/message/pinned/sync",
         "status": 200,
         "method": "POST"
       },
       {
-        "url": "http://100.79.157.76:8090/v1/message/pinned/sync",
+        "url": "http://localhost:8090/v1/message/pinned/sync",
         "status": 200,
         "method": "POST"
       },
       {
-        "url": "http://100.79.157.76:8090/v1/message/pinned/sync",
+        "url": "http://localhost:8090/v1/message/pinned/sync",
         "status": 200,
         "method": "POST"
       },
       {
-        "url": "http://100.79.157.76:8090/v1/message/pinned/sync",
+        "url": "http://localhost:8090/v1/message/pinned/sync",
         "status": 200,
         "method": "POST"
       },
       {
-        "url": "http://100.79.157.76:8090/v1/message/pinned/sync",
+        "url": "http://localhost:8090/v1/message/pinned/sync",
         "status": 200,
         "method": "POST"
       },
       {
-        "url": "http://100.79.157.76:8090/v1/message/pinned/sync",
+        "url": "http://localhost:8090/v1/message/pinned/sync",
         "status": 200,
         "method": "POST"
       },
       {
-        "url": "http://100.79.157.76:8090/v1/message/pinned/sync",
+        "url": "http://localhost:8090/v1/message/pinned/sync",
         "status": 200,
         "method": "POST"
       },
       {
-        "url": "http://100.79.157.76:8090/v1/message/pinned/sync",
+        "url": "http://localhost:8090/v1/message/pinned/sync",
         "status": 200,
         "method": "POST"
       },
       {
-        "url": "http://100.79.157.76:8090/v1/message/pinned/sync",
+        "url": "http://localhost:8090/v1/message/pinned/sync",
         "status": 200,
         "method": "POST"
       },
       {
-        "url": "http://100.79.157.76:8090/v1/message/pinned/sync",
+        "url": "http://localhost:8090/v1/message/pinned/sync",
         "status": 200,
         "method": "POST"
       },
       {
-        "url": "http://100.79.157.76:8090/v1/message/pinned/sync",
+        "url": "http://localhost:8090/v1/message/pinned/sync",
         "status": 200,
         "method": "POST"
       },
       {
-        "url": "http://100.79.157.76:8090/v1/message/pinned/sync",
+        "url": "http://localhost:8090/v1/message/pinned/sync",
         "status": 200,
         "method": "POST"
       },
       {
-        "url": "http://100.79.157.76:8090/v1/message/pinned/sync",
+        "url": "http://localhost:8090/v1/message/pinned/sync",
         "status": 200,
         "method": "POST"
       },
       {
-        "url": "http://100.79.157.76:8090/v1/message/pinned/sync",
+        "url": "http://localhost:8090/v1/message/pinned/sync",
         "status": 200,
         "method": "POST"
       },
       {
-        "url": "http://100.79.157.76:8090/v1/message/pinned/sync",
+        "url": "http://localhost:8090/v1/message/pinned/sync",
         "status": 200,
         "method": "POST"
       },
       {
-        "url": "http://100.79.157.76:8090/v1/message/reminder/sync",
+        "url": "http://localhost:8090/v1/message/reminder/sync",
         "status": 200,
         "method": "POST"
       },
       {
-        "url": "http://100.79.157.76:8090/v1/group/my",
+        "url": "http://localhost:8090/v1/group/my",
         "status": 200,
         "method": "GET"
       }

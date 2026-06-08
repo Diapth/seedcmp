@@ -3,7 +3,7 @@
 ## Run
 
 - Date: 2026-05-26 CST
-- Target: `http://100.79.157.76:3000`
+- Target: `http://localhost:3000`
 - Backend: TangSengDaoDaoServer rebuilt and restarted on `:8090`
 - Script: `audit.cjs`
 - Browser: Chromium headless via Playwright skill
@@ -25,7 +25,7 @@
 
 ```json
 {
-  "currentUrl": "http://100.79.157.76:3000/chat/conversation/deepseek_ai_robot/1",
+  "currentUrl": "http://localhost:3000/chat/conversation/deepseek_ai_robot/1",
   "deepSeekVisible": true,
   "robotTagVisible": true,
   "aiPanelVisible": true,

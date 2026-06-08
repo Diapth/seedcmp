@@ -1,7 +1,7 @@
 # IM Web Clowder Marker Visual Verification
 
-- Target: http://100.79.157.76:3000/
-- Clowder route: http://100.79.157.76:3000/chat/conversation/clowder_ai/1
+- Target: http://localhost:3000/
+- Clowder route: http://localhost:3000/chat/conversation/clowder_ai/1
 - Marker: Clowder UI marker 1779988384984
 - Marker visible: false
 - /cats visible after send: true

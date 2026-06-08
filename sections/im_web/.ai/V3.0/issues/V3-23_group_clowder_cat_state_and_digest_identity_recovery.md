@@ -6,7 +6,7 @@ Resolved on 2026-06-01
 
 ## Problem
 
-During manual testing on `http://100.79.157.76:3000` with account `18337488675`, the `集群` group showed only two human members in the group settings drawer and `猫猫 0`, even though recent group history contained messages sent by `布偶猫`.
+During manual testing on `http://localhost:3000` with account `18337488675`, the `集群` group showed only two human members in the group settings drawer and `猫猫 0`, even though recent group history contained messages sent by `布偶猫`.
 
 The same group also showed `yunyi： 图片` in the outer conversation list for a Clowder-generated image, because the durable image rows used the human transport `from_uid` and did not carry `cat_display_name`.
 
@@ -49,7 +49,7 @@ The same group also showed `yunyi： 图片` in the outer conversation list for 
 - `pnpm build` -> passed; existing Vite CJS deprecation and large chunk warnings only
 - `/media/leng/DiskB1/exp/clowder-ai/packages/api`: `pnpm build` -> passed
 - Playwright real-account smoke:
-  - command: `TARGET_URL=http://100.79.157.76:3000 TEST_USERNAME=18337488675 TEST_PASSWORD=123456 node /home/leng/.codex/skills/playwright-skill/run.js /tmp/playwright-v3-23-group-cat-recovery.js`
+  - command: `TARGET_URL=http://localhost:3000 TEST_USERNAME=18337488675 TEST_PASSWORD=123456 node /home/leng/.codex/skills/playwright-skill/run.js /tmp/playwright-v3-23-group-cat-recovery.js`
   - result: passed
   - evidence: `sections/im_web/.ai/V3.0/tests-e2e/v3-23-group-cat-recovery-20260530171118/`
   - observed digest: `布偶猫： 图片`

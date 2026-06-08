@@ -45,15 +45,15 @@ Commit: `abc1234`
 
 ### 收到冲突通知
 
-1. 在 worktree 中 `git fetch origin main && git rebase origin/main`
+1. 在 workspace 中 `git fetch origin main && git rebase origin/main`
 2. 自动解决简单冲突 → push → 等下一轮 CI 通知
 3. 复杂冲突（无法自动 resolve）→ 通知铲屎官
 
 ### 收到 Review Feedback
 
 1. 区分 review decision：
-   - `CHANGES_REQUESTED` → 加载 `receive-review` skill，按 Red→Green 修复
-   - `APPROVED` → 准备进入 merge-gate
+   - `CHANGES_REQUESTED` → 加载 `review-and-release` skill，按 Red→Green 修复
+   - `APPROVED` → 准备进入 review-and-release
    - `COMMENTED` → 阅读 comments，判断是否需要改动
    - `DISMISSED` → 记录，继续
 2. Inline comments → 逐个定位代码位置，理解反馈后处理
@@ -67,13 +67,13 @@ Commit: `abc1234`
 
 收到 `github-conflict` 通知时：
 
-1. **定位 worktree**：根据 PR 号查分支 → 找到对应 worktree
+1. **定位 workspace**：根据 PR 号查分支 → 找到对应 workspace
    ```bash
    gh pr view {N} --json headRefName --jq '.headRefName'
    ```
 2. **执行 rebase**：
    ```bash
-   cd <worktree-path>
+   cd <workspace-path>
    git fetch origin main
    git rebase origin/main
    ```
@@ -88,9 +88,9 @@ Commit: `abc1234`
 
 | Decision | 行动 |
 |----------|------|
-| `CHANGES_REQUESTED` | 加载 `receive-review` 模式，逐项处理（Red→Green） |
-| `APPROVED` | 检查 CI + 冲突状态 → 全绿则准备 merge-gate |
-| `COMMENTED` | 阅读评论，需回复则回复，需修改则按 receive-review 处理 |
+| `CHANGES_REQUESTED` | 加载 `review-and-release` 模式，逐项处理（Red→Green） |
+| `APPROVED` | 检查 CI + 冲突状态 → 全绿则准备 review-and-release |
+| `COMMENTED` | 阅读评论，需回复则回复，需修改则按 review-and-release 处理 |
 | `DISMISSED` | 记录，不自动行动 |
 
 ### 事后通知
@@ -98,7 +98,7 @@ Commit: `abc1234`
 所有自动行动完成后，通知铲屎官结果：
 - 成功: "已自动 rebase 并 push PR #42"
 - 失败: "PR #42 冲突无法自动解决，需要人工介入" + 冲突文件列表
-- Review 处理完: "已按 receive-review 模式处理 PR #42 的 review 意见，@ reviewer 确认"
+- Review 处理完: "已按 review-and-release 模式处理 PR #42 的 review 意见，@ reviewer 确认"
 
 ## 去重机制
 

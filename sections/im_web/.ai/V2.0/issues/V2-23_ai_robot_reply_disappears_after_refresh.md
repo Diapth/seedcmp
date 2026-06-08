@@ -63,7 +63,7 @@ Resolved
 ## Root Cause
 
 - V2-22 中 `apps/chat/vite.config.ts` 增加了开发期 `/v1/robot/ai_reply` 代理。
-- 在 `http://100.79.157.76:3000` 下，前端 `requestAiReplyStream()` 会请求相对路径 `/v1/robot/ai_reply`。
+- 在 `http://localhost:3000` 下，前端 `requestAiReplyStream()` 会请求相对路径 `/v1/robot/ai_reply`。
 - 该请求被 Vite dev server 拦截后直接调用 DeepSeek，并返回 `persisted:false`，没有经过 TangSengDaoDaoServer 的 `/v1/robot/ai_reply`。
 - 因此当页能看到本地流式 AI 消息，但后端历史中没有这条机器人回复；刷新后只依赖远端同步，回复就消失。
 
@@ -106,7 +106,7 @@ Resolved
 
 Final browser audit result:
 
-- AI SSE request URL: `http://100.79.157.76:8090/v1/robot/ai_reply`
+- AI SSE request URL: `http://localhost:8090/v1/robot/ai_reply`
 - SSE content type: `text/event-stream; charset=utf-8`
 - AI reply visible before refresh: yes
 - AI reply visible after refresh: yes

@@ -464,7 +464,7 @@ describe('TranscriptWriter', () => {
       });
       writer.appendEvent(SESSION_INFO, {
         type: 'assistant',
-        content: [{ type: 'text', text: '@opus\n请继续 merge-gate。' }],
+        content: [{ type: 'text', text: '@opus\n请继续 review-and-release。' }],
       });
 
       const digest = writer.generateExtractiveDigest(SESSION_INFO, {
@@ -475,7 +475,7 @@ describe('TranscriptWriter', () => {
       assert.ok(Array.isArray(digest.recentMessages), 'digest should expose recent visible messages');
       assert.deepEqual(
         digest.recentMessages.map((msg) => msg.content),
-        ['我接球继续 review，球在我手上。', '@opus\n请继续 merge-gate。'],
+        ['我接球继续 review，球在我手上。', '@opus\n请继续 review-and-release。'],
         'digest should include visible text and exclude system_info noise',
       );
     });

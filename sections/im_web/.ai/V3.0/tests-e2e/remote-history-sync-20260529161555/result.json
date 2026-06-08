@@ -5,6 +5,6 @@
   "conversationCount": 10,
   "visibleConversationCount": 19,
   "failures": [],
-  "url": "http://100.79.157.76:3000/chat",
+  "url": "http://localhost:3000/chat",
   "recordedAt": "2026-05-29T16:15:55.428Z"
 }

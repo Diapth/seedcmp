@@ -1,6 +1,6 @@
 const { chromium } = require('/media/leng/DiskB1/exp/seedcmp/sections/im_web/apps/chat/node_modules/@playwright/test');
 
-const TARGET_URL = process.env.TARGET_URL || 'http://100.79.157.76:3000';
+const TARGET_URL = process.env.TARGET_URL || 'http://localhost:3000';
 const OUT_DIR = '/media/leng/DiskB1/exp/seedcmp/sections/im_web/.ai/V2.0/issues/imgs/v2-22-robot-ai-visual-20260526';
 
 (async () => {

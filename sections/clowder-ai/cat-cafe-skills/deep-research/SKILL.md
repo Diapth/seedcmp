@@ -119,9 +119,9 @@ project-research/YYYY-MM-DD-{topic}/prompt.md
 执行猫可用 `mcp__claude-in-chrome__*` 工具自动发送 prompt + 附件 + 提取回复。
 
 **详细 DOM 选择器和代码片段见各平台 ref**：
-- **ChatGPT** → `refs/chatgpt-browser-automation.md`（2026-03-10 实测验证 ✅）
-- **Claude.ai** → `refs/claude-ai-browser-automation.md`（2026-03-10 实测验证 ✅）
-- **Gemini** → `refs/gemini-browser-automation.md`（2026-03-10 实测验证 ✅）
+- **ChatGPT** → `refs/chatgpt-browser-automation.md`（2026-03-10 实测验证）
+- **Claude.ai** → `refs/claude-ai-browser-automation.md`（2026-03-10 实测验证）
+- **Gemini** → `refs/gemini-browser-automation.md`（2026-03-10 实测验证）
 
 ### ChatGPT 自动化摘要（已验证）
 

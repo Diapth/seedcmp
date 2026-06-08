@@ -3,7 +3,7 @@
 ## Run
 
 - Date: 2026-05-26 CST
-- Target: `http://100.79.157.76:3000`
+- Target: `http://localhost:3000`
 - Backend: TangSengDaoDaoServer on `:8090`
 - Script: `audit.cjs`
 - Browser: Chromium headless via Playwright
@@ -12,7 +12,7 @@
 
 - Login succeeds and opens `DeepSeek AI` at `/chat/conversation/deepseek_ai_robot/1`.
 - Prompt with unique marker is sent and the input is cleared.
-- AI reply request uses backend SSE: `http://100.79.157.76:8090/v1/robot/ai_reply`.
+- AI reply request uses backend SSE: `http://localhost:8090/v1/robot/ai_reply`.
 - During generation the user marker remains visible.
 - After completion there is exactly one user marker row and one AI marker row.
 - The AI marker row is rendered through `.markdown-body`.
@@ -24,7 +24,7 @@
 
 ```json
 {
-  "currentUrl": "http://100.79.157.76:3000/chat/conversation/deepseek_ai_robot/1",
+  "currentUrl": "http://localhost:3000/chat/conversation/deepseek_ai_robot/1",
   "inputCleared": true,
   "duringStream": {
     "userMarkerRows": 1,
@@ -44,7 +44,7 @@
     "totalRows": 11
   },
   "aiResponses": [
-    "200 http://100.79.157.76:8090/v1/robot/ai_reply text/event-stream; charset=utf-8"
+    "200 http://localhost:8090/v1/robot/ai_reply text/event-stream; charset=utf-8"
   ],
   "consoleMessages": [],
   "failedRequests": [],
@@ -76,7 +76,7 @@ Final multi-turn audit excerpt:
 
 ```json
 {
-  "currentUrl": "http://100.79.157.76:3000/chat/conversation/deepseek_ai_robot/1",
+  "currentUrl": "http://localhost:3000/chat/conversation/deepseek_ai_robot/1",
   "before": {
     "totalRows": 20,
     "aiRows": 10,

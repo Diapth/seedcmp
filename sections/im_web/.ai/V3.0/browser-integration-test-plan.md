@@ -37,7 +37,7 @@ The runner should confirm or discover these values before executing assertion-he
 |------|----------------|--------------|
 | Clowder PWA URL | `http://localhost:3003` | All Clowder browser tests |
 | IM Web URL | `TARGET_URL` or `http://localhost:3000` | IM Web browser tests |
-| TangSeng API URL | Existing IM Web config, often `/v1/` or `http://100.79.157.76:8090/v1/` | Bridge status and message delivery checks |
+| TangSeng API URL | Existing IM Web config, often `/v1/` or `http://localhost:8090/v1/` | Bridge status and message delivery checks |
 | Test owner user | Existing Clowder session or `x-cat-cafe-user` API header | Agent directory and thread checks |
 | Direct chat target | Existing IM Web contact or seeded conversation | SC-001 direct binding |
 | Group chat target | Existing IM Web group with at least two users | SC-001, SC-003, SC-004 |

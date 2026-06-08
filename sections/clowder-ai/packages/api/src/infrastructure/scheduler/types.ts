@@ -130,7 +130,7 @@ export interface ExecuteContext {
   context?: ContextSpec;
   /** Phase 4: deliver message to a thread */
   deliver?: (opts: DeliverOpts) => Promise<string>;
-  /** Phase 4: fetch web content with browser-automation routing */
+  /** Phase 4: fetch web content with deep-research routing */
   fetchContent?: (url: string) => Promise<FetchResult>;
   /** Phase 4b: invoke a cat to handle a scheduled task (fire-and-forget) */
   invokeTrigger?: ScheduleInvokeTrigger;

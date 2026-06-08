@@ -29,7 +29,7 @@
 
 ## 复现步骤
 
-1. 打开 `http://100.79.157.76:5173/`。
+1. 打开 `http://localhost:5173/`。
 2. 使用 `13733632709` 登录并进入真实群 `UI深验群-160100`。
 3. 打开右侧群信息。
 4. 点击 `查看全部` 或 `成员管理`。
@@ -100,8 +100,8 @@ convStore.addMember('2', { /* contact */ });
 
 ```bash
 cd /home/leng/.codex/skills/playwright-skill \
-  && TARGET_URL='http://100.79.157.76:5173' \
-     API_BASE='http://100.79.157.76:3000/v1' \
+  && TARGET_URL='http://localhost:5173' \
+     API_BASE='http://localhost:3000/v1' \
      REPO_ROOT='/media/leng/DiskB1/exp/seedcmp' \
      node run.js /tmp/playwright-test-sections-ui-group-deep.js
 

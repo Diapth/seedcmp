@@ -1,6 +1,6 @@
 {
   "runId": "manual-visual-audit-2026-05-24T12-54-37-825Z",
-  "targetUrl": "http://100.79.157.76:3000",
+  "targetUrl": "http://localhost:3000",
   "startedAt": "2026-05-24T12:54:44.433Z",
   "accounts": [
     "18337488675"
@@ -9,7 +9,7 @@
     {
       "name": "US4 基础登录成功",
       "status": "pass",
-      "url": "http://100.79.157.76:3000/chat"
+      "url": "http://localhost:3000/chat"
     },
     {
       "name": "US1 打开首个会话",
@@ -183,7 +183,7 @@
       "count": 1,
       "samples": [
         {
-          "url": "http://100.79.157.76:8090/v1/search/global",
+          "url": "http://localhost:8090/v1/search/global",
           "status": 400
         }
       ]
@@ -315,7 +315,7 @@
   ],
   "networkErrors": [
     {
-      "url": "http://100.79.157.76:8090/v1/search/global",
+      "url": "http://localhost:8090/v1/search/global",
       "status": 400
     }
   ]

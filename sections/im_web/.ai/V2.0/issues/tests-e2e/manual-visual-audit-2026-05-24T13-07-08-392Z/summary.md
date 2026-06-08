@@ -1,6 +1,6 @@
 # Manual Visual Audit manual-visual-audit-2026-05-24T13-07-08-392Z
 
-- Target: http://100.79.157.76:3000
+- Target: http://localhost:3000
 - Account: 18337488675
 - Checks: 12
 - Failed: 0

@@ -27,7 +27,7 @@ wukongimjssdk.js:12972 开始重连
 
 ## 复现步骤
 
-1. 部署 TangSengDaoDaoServer + WuKongIM 到远程服务器（IP: `100.79.157.76`）。
+1. 部署 TangSengDaoDaoServer + WuKongIM 到远程服务器（IP: `localhost`）。
 2. 启动 `im_web` 前端（可本地启动，访问远程后端）。
 3. 登录 IM Web 客户端。
 4. 打开浏览器控制台，观察 WebSocket 连接尝试连接到 `ws://0.0.0.0:5200/`（而非远程可访问的地址）。
@@ -115,8 +115,8 @@ WKSDK.shared().config.provider.connectAddrCallback = async (cb) => {
 已完成以下修复：
 
 1. `sections/im/WuKongIM/wukongim.conf`
-   - 添加 `WK_EXTERNAL_WSADDR=ws://100.79.157.76:5200`
-   - 添加 `WK_EXTERNAL_WSSADDR=wss://100.79.157.76:5210`
+   - 添加 `WK_EXTERNAL_WSADDR=ws://localhost:5200`
+   - 添加 `WK_EXTERNAL_WSSADDR=wss://localhost:5210`
 
 2. `sections/im_web/packages/datasource-vue/src/stores/sdkAddress.ts`
    - 新增 WebSocket 地址净化函数，避免把 `0.0.0.0`、`localhost` 之类地址直接交给浏览器
@@ -134,11 +134,11 @@ WKSDK.shared().config.provider.connectAddrCallback = async (cb) => {
 ```bash
 # 修复后验证：WuKongIM /route 接口应返回正确的外网地址
 curl http://127.0.0.1:5001/route?uid=<uid>
-# 预期：ws_addr 应为 "ws://100.79.157.76:5200" 而非 "ws://0.0.0.0:5200"
+# 预期：ws_addr 应为 "ws://localhost:5200" 而非 "ws://0.0.0.0:5200"
 
 # 远程浏览器测试
 # 1. 登录 IM Web 客户端
-# 2. 打开控制台，WebSocket 应连接到 ws://100.79.157.76:5200/
+# 2. 打开控制台，WebSocket 应连接到 ws://localhost:5200/
 # 3. 不应再出现 "ws://0.0.0.0:5200/" 连接失败
 # 4. 会话扩展更新和清除未读请求不再返回 400
 ```
@@ -158,7 +158,7 @@ docker compose up -d wukongim
 
 ## 关闭备注
 
-通过配置 `WK_EXTERNAL_WSADDR` / `WK_EXTERNAL_WSSADDR` 到当前运行的 `wukongim.conf`，WuKongIM 的 `/route` API 现在应返回远程可访问的 WebSocket 地址 `ws://100.79.157.76:5200`。前端现在也会把退化地址净化成可访问地址，避免再次把 `0.0.0.0` 直接喂给浏览器。
+通过配置 `WK_EXTERNAL_WSADDR` / `WK_EXTERNAL_WSSADDR` 到当前运行的 `wukongim.conf`，WuKongIM 的 `/route` API 现在应返回远程可访问的 WebSocket 地址 `ws://localhost:5200`。前端现在也会把退化地址净化成可访问地址，避免再次把 `0.0.0.0` 直接喂给浏览器。
 
 
 
@@ -191,7 +191,7 @@ install @ vue-router.js?v=ff8f33c4:2558
 use @ chunk-5NXKDPXE.js?v=ff8f33c4:6416
 (anonymous) @ main.ts:13
 conversationStore.js:152 [ConversationStore] Remote clear unread command failed; local state was kept {error: AxiosError: Request failed with status code 400
-    at settle (http://100.79.157.76:3000/node_modul…, msg: '命令发送失败！', status: 400}
+    at settle (http://localhost:3000/node_modul…, msg: '命令发送失败！', status: 400}
 (anonymous) @ conversationStore.js:152
 (anonymous) @ conversationStore.js:295
 await in (anonymous)
@@ -244,7 +244,7 @@ push @ vue-router.js?v=ff8f33c4:2299
 install @ vue-router.js?v=ff8f33c4:2558
 use @ chunk-5NXKDPXE.js?v=ff8f33c4:6416
 (anonymous) @ main.ts:13
-index.js:240  PUT http://100.79.157.76:8090/v1/coversation/clearUnread 400 (Bad Request)
+index.js:240  PUT http://localhost:8090/v1/coversation/clearUnread 400 (Bad Request)
 dispatchXhrRequest @ axios.js?v=ff8f33c4:1976
 xhr @ axios.js?v=ff8f33c4:1837
 dispatchRequest @ axios.js?v=ff8f33c4:2573
@@ -286,7 +286,7 @@ install @ vue-router.js?v=ff8f33c4:2558
 use @ chunk-5NXKDPXE.js?v=ff8f33c4:6416
 (anonymous) @ main.ts:13
 conversationStore.js:152 [ConversationStore] Remote clear unread command failed; local state was kept {error: AxiosError: Request failed with status code 400
-    at settle (http://100.79.157.76:3000/node_modul…, msg: '命令发送失败！', status: 400}
+    at settle (http://localhost:3000/node_modul…, msg: '命令发送失败！', status: 400}
 (anonymous) @ conversationStore.js:152
 (anonymous) @ conversationStore.js:295
 await in (anonymous)
@@ -332,7 +332,7 @@ wukongimjssdk.js?v=ff8f33c4:12922 连接关闭！ CloseEvent {isTrusted: true, 
 sdk.js:54 web运行环境
 sdk.js:54 使用原生websocket
 sdk.js:54 websocket WebSocket {url: 'ws://0.0.0.0:5200/', readyState: 0, bufferedAmount: 0, onopen: null, onerror: null, …}
-index.js:240  PUT http://100.79.157.76:8090/v1/coversation/clearUnread 400 (Bad Request)
+index.js:240  PUT http://localhost:8090/v1/coversation/clearUnread 400 (Bad Request)
 dispatchXhrRequest @ axios.js?v=ff8f33c4:1976
 xhr @ axios.js?v=ff8f33c4:1837
 dispatchRequest @ axios.js?v=ff8f33c4:2573
@@ -366,7 +366,7 @@ set @ chunk-5NXKDPXE.js?v=ff8f33c4:1815
 (anonymous) @ MessageInput.vue:300
 (anonymous) @ chunk-5NXKDPXE.js?v=ff8f33c4:12479
 conversationStore.js:152 [ConversationStore] Remote clear unread command failed; local state was kept {error: AxiosError: Request failed with status code 400
-    at settle (http://100.79.157.76:3000/node_modul…, msg: '命令发送失败！', status: 400}
+    at settle (http://localhost:3000/node_modul…, msg: '命令发送失败！', status: 400}
 (anonymous) @ conversationStore.js:152
 (anonymous) @ conversationStore.js:295
 await in (anonymous)
@@ -401,7 +401,7 @@ ConnectManager2.reConnect @ wukongimjssdk.js?v=ff8f33c4:12978
 (anonymous) @ wukongimjssdk.js?v=ff8f33c4:12938
 ws.onerror @ wukongimjssdk.js?v=ff8f33c4:12766
 wukongimjssdk.js?v=ff8f33c4:12874 已在连接中，不再进行连接.
-index.js:220  POST http://100.79.157.76:8090/v1/conversations/989ec1fc79664ede9ff9008831d76337/1/extra 400 (Bad Request)
+index.js:220  POST http://localhost:8090/v1/conversations/989ec1fc79664ede9ff9008831d76337/1/extra 400 (Bad Request)
 dispatchXhrRequest @ axios.js?v=ff8f33c4:1976
 xhr @ axios.js?v=ff8f33c4:1837
 dispatchRequest @ axios.js?v=ff8f33c4:2573
@@ -437,7 +437,7 @@ set @ chunk-5NXKDPXE.js?v=ff8f33c4:1815
 (anonymous) @ MessageInput.vue:300
 (anonymous) @ chunk-5NXKDPXE.js?v=ff8f33c4:12479
 conversationStore.js:152 [ConversationStore] Remote update conversation extra command failed; local state was kept {error: AxiosError: Request failed with status code 400
-    at settle (http://100.79.157.76:3000/node_modul…, msg: '发送同步扩展会话cmd失败！', status: 400}
+    at settle (http://localhost:3000/node_modul…, msg: '发送同步扩展会话cmd失败！', status: 400}
 (anonymous) @ conversationStore.js:152
 (anonymous) @ conversationStore.js:263
 setTimeout
@@ -464,7 +464,7 @@ set value @ chunk-5NXKDPXE.js?v=ff8f33c4:1777
 set @ chunk-5NXKDPXE.js?v=ff8f33c4:1815
 (anonymous) @ MessageInput.vue:300
 (anonymous) @ chunk-5NXKDPXE.js?v=ff8f33c4:12479
-index.js:240  PUT http://100.79.157.76:8090/v1/coversation/clearUnread 400 (Bad Request)
+index.js:240  PUT http://localhost:8090/v1/coversation/clearUnread 400 (Bad Request)
 dispatchXhrRequest @ axios.js?v=ff8f33c4:1976
 xhr @ axios.js?v=ff8f33c4:1837
 dispatchRequest @ axios.js?v=ff8f33c4:2573
@@ -499,7 +499,7 @@ callWithErrorHandling @ chunk-5NXKDPXE.js?v=ff8f33c4:2391
 callWithAsyncErrorHandling @ chunk-5NXKDPXE.js?v=ff8f33c4:2398
 invoker @ chunk-5NXKDPXE.js?v=ff8f33c4:11649
 conversationStore.js:152 [ConversationStore] Remote clear unread command failed; local state was kept {error: AxiosError: Request failed with status code 400
-    at settle (http://100.79.157.76:3000/node_modul…, msg: '命令发送失败！', status: 400}
+    at settle (http://localhost:3000/node_modul…, msg: '命令发送失败！', status: 400}
 (anonymous) @ conversationStore.js:152
 (anonymous) @ conversationStore.js:295
 await in (anonymous)
@@ -526,7 +526,7 @@ handleSend @ MessageInput.vue:181
 callWithErrorHandling @ chunk-5NXKDPXE.js?v=ff8f33c4:2391
 callWithAsyncErrorHandling @ chunk-5NXKDPXE.js?v=ff8f33c4:2398
 invoker @ chunk-5NXKDPXE.js?v=ff8f33c4:11649
-index.js:240  PUT http://100.79.157.76:8090/v1/coversation/clearUnread 400 (Bad Request)
+index.js:240  PUT http://localhost:8090/v1/coversation/clearUnread 400 (Bad Request)
 dispatchXhrRequest @ axios.js?v=ff8f33c4:1976
 xhr @ axios.js?v=ff8f33c4:1837
 dispatchRequest @ axios.js?v=ff8f33c4:2573
@@ -561,7 +561,7 @@ callWithErrorHandling @ chunk-5NXKDPXE.js?v=ff8f33c4:2391
 callWithAsyncErrorHandling @ chunk-5NXKDPXE.js?v=ff8f33c4:2398
 invoker @ chunk-5NXKDPXE.js?v=ff8f33c4:11649
 conversationStore.js:152 [ConversationStore] Remote clear unread command failed; local state was kept {error: AxiosError: Request failed with status code 400
-    at settle (http://100.79.157.76:3000/node_modul…, msg: '命令发送失败！', status: 400}
+    at settle (http://localhost:3000/node_modul…, msg: '命令发送失败！', status: 400}
 (anonymous) @ conversationStore.js:152
 (anonymous) @ conversationStore.js:295
 await in (anonymous)
@@ -588,7 +588,7 @@ handleSend @ MessageInput.vue:181
 callWithErrorHandling @ chunk-5NXKDPXE.js?v=ff8f33c4:2391
 callWithAsyncErrorHandling @ chunk-5NXKDPXE.js?v=ff8f33c4:2398
 invoker @ chunk-5NXKDPXE.js?v=ff8f33c4:11649
-index.js:220  POST http://100.79.157.76:8090/v1/conversations/989ec1fc79664ede9ff9008831d76337/1/extra 400 (Bad Request)
+index.js:220  POST http://localhost:8090/v1/conversations/989ec1fc79664ede9ff9008831d76337/1/extra 400 (Bad Request)
 dispatchXhrRequest @ axios.js?v=ff8f33c4:1976
 xhr @ axios.js?v=ff8f33c4:1837
 dispatchRequest @ axios.js?v=ff8f33c4:2573
@@ -608,7 +608,7 @@ callWithErrorHandling @ chunk-5NXKDPXE.js?v=ff8f33c4:2391
 callWithAsyncErrorHandling @ chunk-5NXKDPXE.js?v=ff8f33c4:2398
 invoker @ chunk-5NXKDPXE.js?v=ff8f33c4:11649
 conversationStore.js:152 [ConversationStore] Remote update conversation extra command failed; local state was kept {error: AxiosError: Request failed with status code 400
-    at settle (http://100.79.157.76:3000/node_modul…, msg: '发送同步扩展会话cmd失败！', status: 400}
+    at settle (http://localhost:3000/node_modul…, msg: '发送同步扩展会话cmd失败！', status: 400}
 
 
 

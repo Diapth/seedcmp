@@ -42,6 +42,8 @@ AI 每完成一个可验证的阶段性工作，必须提交一次中文 commit�
 
 目标地址：`http://localhost:5173/`
 
+Web 测试端口固定为 `5173`。如果 `5173` 被占用，先停止旧的 `sections/ui`/Vite 进程或重启 `scripts/start-im-clowder.sh` 做端口清理；不要把 Playwright、人工验收或 `H5_BASE_URL` 临时改到 `5174`、`5175` 等自动递增端口。
+
 截图输出目录：`seedcmp/sections/ui/.ai/tests/`
 
 AI/Playwright 验收必须把截图、trace 截图和人工复核截图写入上述目录；建议按 issue 或验收批次建立子目录，例如 `seedcmp/sections/ui/.ai/tests/ISSUE-019-group-file-upload-YYYYMMDDHHmmss/`。不要写入 `/tmp` 或 `seedcmp/sections/ui/.ai/tests-e2e`。

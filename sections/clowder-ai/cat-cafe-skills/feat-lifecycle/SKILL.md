@@ -110,7 +110,7 @@ search_evidence("{topic}", scope="all")  # 找历史讨论 + thread
 
 ## Design Gate (设计确认) 🔴
 
-**Discussion → writing-plans 之间的必经关卡。UX 没确认，不准开 worktree。**
+**Discussion → writing-plans 之间的必经关卡。UX 没确认，不准开 worktree 写代码。**
 
 按功能类型分流确认：
 
@@ -206,7 +206,7 @@ harness / skill / MCP / shared-rules 类 feature 的 spec **必须含 `## Eval /
 
 **触发**：AC 全部打勾 + PR 合入 + 云端 review 通过。**不触发**：只是 Phase 完成 / 只是 review 过了。
 
-**⚠️ Phase 级进度由 `merge-gate` Step 7.5 实时同步**：每次 PR merge 后，merge-gate 负责更新 Phase ✅、AC 打勾、Timeline 记录。Completion 阶段不需要补这些——它们应该已经是最新的。如果发现 Phase 状态落后于实际 commit，说明之前 merge 时漏了 Step 7.5。
+**⚠️ Phase 级进度由 `review-and-release` 在合入阶段同步**：每次 PR merge 后，review-and-release 负责更新 Phase、AC、Timeline 记录。Completion 阶段不需要补这些——它们应该已经是最新的。
 
 **🔴 交付物核实铁律（LL-029）**：spec checkbox 是记录工具，不是真相源。声称"完成"或"未完成"前，**必须**核实实际 commit/PR 状态（`git log --grep` + `gh pr list`）。只读 .md 就下结论 = 睁眼说瞎话。
 
@@ -377,13 +377,13 @@ AC-A5 ❌ unmet → delete(why: 经评估不属于 MVP scope)
 | 只看 spec checkbox 就声称完成/未完成 | 核实 git log + PR 状态 + 实际 commit（LL-029）|
 | UX 没确认就开 worktree 写代码 | 先过 Design Gate 再动手 |
 | 后端 API 自己拍板不跟其他猫讨论 | 纯后端走 `collaborative-thinking` 拉猫讨论 |
-| 等 feat close 才补 Phase 进度 | merge-gate Step 7.5 每次 merge 实时同步（Phase ✅ + AC + Timeline） |
+| 等 feat close 才补 Phase 进度 | review-and-release 在合入阶段同步 Phase、AC、Timeline |
 | 社区 issue 批量打 feature 标签不逐个审核 | 每个 issue 必须过 Step 0 关联检测（F114/F115/F116 教训） |
 | 社区 feature 只在开源仓打标签，BACKLOG 不同步 | ROADMAP.md 必须同步加 Source=community 条目 |
 
 ## 下一步
 
 - Kickoff 后 → **Design Gate**（按类型分流确认）→ `writing-plans`
-- 开发完成后 → `quality-gate` → `request-review`
-- Review 通过后 → `merge-gate`（合入）→ 回来用 completion 闭环
+- 开发完成后 → `quality-gate` → `review-and-release`
+- Review 通过后 → `review-and-release`（合入）→ 回来用 completion 闭环
 - 讨论收敛后 → `collaborative-thinking` Mode C（沉淀 ADR/规则/教训）

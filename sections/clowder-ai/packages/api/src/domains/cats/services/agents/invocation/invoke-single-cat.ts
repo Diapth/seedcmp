@@ -893,7 +893,7 @@ export async function* invokeSingleCat(deps: InvocationDeps, params: InvocationP
       (!workingProjectRoot || isSameProject(workingProjectRoot, hostProjectRoot))
     ) {
       // L2 behavior is warn-only during interactive invocation. Hard safety still lives
-      // in L1/L3 (`pre-commit` + CI / merge gate); blocking regular chat invocations on
+      // in L1/L3 (`pre-commit` + CI / review-and-release); blocking regular chat invocations on
       // local git state made multi-cat routing unusable whenever shared-state lagged.
       try {
         const { checkSharedStatePreflight } = await import('../../../../../config/shared-state-preflight.js');

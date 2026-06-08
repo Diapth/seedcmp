@@ -188,7 +188,7 @@ describe('F128 approve dispatch — initialMessage routing', () => {
   });
 
   test('approve injects "## 主 Thread" header into sub-thread first message (fork-and-return loop)', async () => {
-    // thread-orchestration skill Step 5c: cats in the sub-thread must be able
+    // multi-agent-collaboration protocol: cats in the sub-thread must be able
     // to find the parent thread so they can report back when work is done.
     // Server defensively injects the header so cats who forget to write it in
     // initialMessage still preserve the fork-and-return loop.

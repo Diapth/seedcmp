@@ -117,7 +117,7 @@ Commit: `abc1234`
 | ReviewRouter | 共享 `deliverConnectorMessage()` helper，但独立去重逻辑 |
 | PrTrackingStore | 共享存储，CI 状态通过 `patchCiState()` 更新（不刷新 registeredAt） |
 | ConnectorInvokeTrigger | CI 失败时复用唤醒机制（priority: normal，reason: github_ci_failure） |
-| merge-gate | CI 绿灯可作为 merge 前参考（有 Actions 额度时） |
+| review-and-release | CI 绿灯可作为 merge 前参考（有 Actions 额度时） |
 | opensource-ops | Outbound PR / Hotfix 提 PR 后自动追踪 CI 结果 |
 
 ## 开源仓 CI 门禁

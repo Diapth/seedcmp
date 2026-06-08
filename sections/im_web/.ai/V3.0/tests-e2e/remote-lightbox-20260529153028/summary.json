@@ -1,5 +1,5 @@
 {
-  "target": "http://100.79.157.76:3011",
+  "target": "http://localhost:3011",
   "remoteApiSeen": true,
   "localApiSeen": false,
   "failed": [],

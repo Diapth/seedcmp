@@ -7,13 +7,13 @@
   "clowderReplies": 16,
   "transcriptParts": 5,
   "failures": [
-    "requestfailed: GET http://100.79.157.76:8090/v1/users/6db8b65b3ae94092badfeb82e47c06f7 net::ERR_ABORTED",
-    "requestfailed: GET http://100.79.157.76:8090/v1/users/6db8b65b3ae94092badfeb82e47c06f7 net::ERR_ABORTED",
-    "requestfailed: GET http://100.79.157.76:8090/v1/users/6db8b65b3ae94092badfeb82e47c06f7 net::ERR_ABORTED",
-    "requestfailed: POST http://100.79.157.76:8090/v1/conversation/sync net::ERR_ABORTED",
-    "requestfailed: GET http://100.79.157.76:8090/v1/channels/clowder:bot/1 net::ERR_ABORTED",
-    "requestfailed: GET http://100.79.157.76:8090/v1/group/my net::ERR_ABORTED",
-    "requestfailed: GET http://100.79.157.76:8090/v1/users/6db8b65b3ae94092badfeb82e47c06f7 net::ERR_ABORTED"
+    "requestfailed: GET http://localhost:8090/v1/users/6db8b65b3ae94092badfeb82e47c06f7 net::ERR_ABORTED",
+    "requestfailed: GET http://localhost:8090/v1/users/6db8b65b3ae94092badfeb82e47c06f7 net::ERR_ABORTED",
+    "requestfailed: GET http://localhost:8090/v1/users/6db8b65b3ae94092badfeb82e47c06f7 net::ERR_ABORTED",
+    "requestfailed: POST http://localhost:8090/v1/conversation/sync net::ERR_ABORTED",
+    "requestfailed: GET http://localhost:8090/v1/channels/clowder:bot/1 net::ERR_ABORTED",
+    "requestfailed: GET http://localhost:8090/v1/group/my net::ERR_ABORTED",
+    "requestfailed: GET http://localhost:8090/v1/users/6db8b65b3ae94092badfeb82e47c06f7 net::ERR_ABORTED"
   ],
   "url": "http://localhost:3000/chat/conversation/clowder_ai/1",
   "recordedAt": "2026-05-29T08:30:26.401Z"

@@ -305,7 +305,7 @@ describe('F139 Phase 4 E2E', () => {
     assert.equal(deliverCalls.length, 1);
     assert.equal(deliverCalls[0].threadId, 'thread-browser');
     assert.equal(deliverCalls[0].userId, 'scheduler');
-    assert.ok(deliverCalls[0].content.includes('browser-automation'));
+    assert.ok(deliverCalls[0].content.includes('deep-research'));
     assert.ok(deliverCalls[0].content.includes('https://x.com/anthropic'));
     assert.ok(deliverCalls[0].content.includes('今天 AI 新闻'));
 
@@ -313,9 +313,9 @@ describe('F139 Phase 4 E2E', () => {
     assert.equal(triggerCalls[0][0], 'thread-browser');
     assert.equal(triggerCalls[0][1], 'gpt52');
     assert.equal(triggerCalls[0][2], 'default-user'); // userId (from triggerUserId param)
-    assert.ok(triggerCalls[0][3].includes('browser-automation'));
+    assert.ok(triggerCalls[0][3].includes('deep-research'));
     assert.ok(triggerCalls[0][4].startsWith('msg-'));
-    assert.equal(triggerCalls[0][6]?.suggestedSkill, 'browser-automation');
+    assert.equal(triggerCalls[0][6]?.suggestedSkill, 'deep-research');
 
     const runs = ledger.query('digest-browser', 1);
     assert.equal(runs[0].outcome, 'RUN_DELIVERED');

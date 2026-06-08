@@ -98,7 +98,7 @@ export function checkSharedStatePreflight(projectRoot: string): SharedStatePrefl
 
     // Check unpushed commits touching shared state.
     // On feature branches / worktrees, skip: the branch inherits committed diffs
-    // from main that aren't actionable. Enforced at merge-gate (L3) instead.
+    // from main that aren't actionable. Enforced during review-and-release instead.
     let unpushedShared: string[] = [];
     const currentBranch = safeExec('git', ['branch', '--show-current'], projectRoot);
     const isMainBranch = !currentBranch || MAIN_BRANCHES.has(currentBranch);

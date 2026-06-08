@@ -25,5 +25,5 @@ The repo also has same-basename `.js` store files beside `.ts` files, so the run
 - GREEN: same command passed after the fix.
 - Regression: `cd sections/im_web/apps/chat && pnpm exec vitest run tests/recoveryFailureState.test.ts tests/offlineQueue.test.ts tests/sdkRecovery.test.ts tests/groupOfflineUnreadRetention.test.ts --config vitest.config.ts` passed 8 tests across 4 files.
 - Type check: `cd sections/im_web && pnpm type-check` passed.
-- Service recovery: TangSengDaoDaoServer started and `GET http://100.79.157.76:8090/v1/health` returned `{"db":"up","redis":"up","status":"up"}`.
+- Service recovery: TangSengDaoDaoServer started and `GET http://localhost:8090/v1/health` returned `{"db":"up","redis":"up","status":"up"}`.
 - Browser visual audit: `sections/im_web/.ai/V3.0/tests-e2e/conversation-loss-audit-20260528-2316/` shows `leng_test_updated` logged in, conversation list restored, no `暂无聊天会话`, `conversation/sync` 200, no page errors, no failed requests, and no 4xx/5xx responses in the captured 8090/3004 traffic.

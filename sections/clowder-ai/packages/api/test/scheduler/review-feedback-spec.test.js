@@ -670,7 +670,7 @@ describe('ReviewFeedbackTaskSpec', () => {
 
   // ── F140 Phase C: review intent routing ──
 
-  it('CHANGES_REQUESTED triggers with suggestedSkill=receive-review (Phase C)', async () => {
+  it('CHANGES_REQUESTED triggers with suggestedSkill=review-and-release (Phase C)', async () => {
     const { createReviewFeedbackTaskSpec } = await import('../../dist/infrastructure/email/ReviewFeedbackTaskSpec.js');
     const triggered = [];
     const spec = createReviewFeedbackTaskSpec({
@@ -693,10 +693,10 @@ describe('ReviewFeedbackTaskSpec', () => {
     assert.equal(triggered.length, 1);
     const policy = triggered[0][6];
     assert.equal(policy.priority, 'urgent');
-    assert.equal(policy.suggestedSkill, 'receive-review');
+    assert.equal(policy.suggestedSkill, 'review-and-release');
   });
 
-  it('APPROVED triggers with suggestedSkill=merge-gate (Phase C)', async () => {
+  it('APPROVED triggers with suggestedSkill=review-and-release (Phase C)', async () => {
     const { createReviewFeedbackTaskSpec } = await import('../../dist/infrastructure/email/ReviewFeedbackTaskSpec.js');
     const triggered = [];
     const spec = createReviewFeedbackTaskSpec({
@@ -719,7 +719,7 @@ describe('ReviewFeedbackTaskSpec', () => {
     assert.equal(triggered.length, 1);
     const policy = triggered[0][6];
     assert.equal(policy.priority, 'normal');
-    assert.equal(policy.suggestedSkill, 'merge-gate');
+    assert.equal(policy.suggestedSkill, 'review-and-release');
   });
 
   it('COMMENTED-only triggers with no suggestedSkill (Phase C)', async () => {

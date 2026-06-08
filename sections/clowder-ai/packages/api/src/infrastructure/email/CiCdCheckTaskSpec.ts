@@ -83,7 +83,7 @@ export function createCiCdCheckTaskSpec(opts: CiCdCheckTaskSpecOptions): TaskSpe
             priority: isFail ? 'urgent' : 'normal',
             reason: isFail ? 'github_ci_failure' : 'github_ci_pass',
             sourceCategory: 'ci',
-            suggestedSkill: isFail ? undefined : 'merge-gate',
+            suggestedSkill: isFail ? undefined : 'review-and-release',
           };
           opts.invokeTrigger.trigger(
             routeResult.threadId,

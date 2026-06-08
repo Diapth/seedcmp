@@ -62,7 +62,7 @@ If the backend is unavailable, the login page should show a clear user-facing er
 
    ```bash
    curl --noproxy '*' -i --max-time 8 \
-     -X POST http://100.79.157.76:8090/v1/user/login \
+     -X POST http://localhost:8090/v1/user/login \
      -H 'content-type: application/json' \
      --data '{"username":"18337488675","password":"123456","device":{"device_id":"playwright-smoke","device_name":"Playwright","platform":"web"}}'
    ```
@@ -70,7 +70,7 @@ If the backend is unavailable, the login page should show a clear user-facing er
 5. Result:
 
    ```text
-   curl: (7) Failed to connect to 100.79.157.76 port 8090
+   curl: (7) Failed to connect to localhost port 8090
    ```
 
 With proxy variables enabled, the same request returned `HTTP/1.1 502 Bad Gateway`.
@@ -78,7 +78,7 @@ With proxy variables enabled, the same request returned `HTTP/1.1 502 Bad Gatewa
 ## Related Code
 
 - `sections/im_web/packages/base-vue/src/service/APIClient.ts`
-  - `apiClient.baseURL` is currently hardcoded to `http://100.79.157.76:8090/v1/`.
+  - `apiClient.baseURL` is currently hardcoded to `http://localhost:8090/v1/`.
 - `sections/im_web/packages/login-vue/src/stores/loginStore.ts`
   - `loginWithPassword()` calls `userStore.login()`, which depends on the configured API.
 - `sections/im_web/apps/chat/tests-e2e/helpers/v3-clowder.ts`
@@ -89,7 +89,7 @@ With proxy variables enabled, the same request returned `HTTP/1.1 502 Bad Gatewa
 | Test Type | Command / Operation | Result |
 |---|---|---|
 | Layer 5 E2E | `RUN_V3_CLOWDER_SMOKE=1 CLOWDER_URL=http://localhost:3003 pnpm exec playwright test tests-e2e/smoke-v3-clowder-*.spec.ts --reporter=line` | Fail: login remains on `/login` |
-| API probe | `curl --noproxy '*' http://100.79.157.76:8090/v1/user/login` | Fail: connection refused |
+| API probe | `curl --noproxy '*' http://localhost:8090/v1/user/login` | Fail: connection refused |
 | Server probe | `ss -ltnp | rg ':(3000|3003|8090)\b'` | Only `3003` is listening; no TangSeng API on `8090` |
 
 ## Evidence

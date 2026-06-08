@@ -1,5 +1,5 @@
 {
-  "targetUrl": "http://100.79.157.76:3000",
+  "targetUrl": "http://localhost:3000",
   "account": "18337488675",
   "digestBefore": "布偶猫： 图片",
   "failedRequests": [],

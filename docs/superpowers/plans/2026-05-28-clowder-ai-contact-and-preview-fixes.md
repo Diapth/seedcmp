@@ -71,8 +71,8 @@
 
 **Files:**
 - Update evidence under `sections/im_web/.ai/V3.0/evidence.md`
-- Optional issue if external browser cannot reach `100.79.157.76:3000`
+- Optional issue if external browser cannot reach `localhost:3000`
 
-- [ ] Confirm `http://100.79.157.76:3000/` returns 200.
+- [ ] Confirm `http://localhost:3000/` returns 200.
 - [ ] Run Playwright visual checks for login, Clowder contact, right dock tabs, markdown copy fallback, and `/cats` in the Clowder contact.
 - [ ] Record screenshots and evidence.

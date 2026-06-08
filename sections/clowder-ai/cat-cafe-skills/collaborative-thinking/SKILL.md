@@ -125,7 +125,7 @@ Phase 6: 铲屎官反馈 + 最终确认 → 进入 Mode C
 
 ## 下一步
 
-- Mode A 结束 → `worktree` 拉 worktree，`writing-plans` 做实现计划
+- Mode A 结束 → `writing-plans` 做实现计划，必要时在隔离 worktree 里实现
 - Mode B 结束 → **必须进入 Mode C** 收敛
 - Mode C 完成后 → commit：`docs({scope}): {topic} 讨论收敛 + 追溯链 [{猫猫签名}]`
 - 产出了新 feat → `feat-lifecycle` skill 立项

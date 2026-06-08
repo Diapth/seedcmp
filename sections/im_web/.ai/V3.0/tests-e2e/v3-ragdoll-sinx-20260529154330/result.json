@@ -10,6 +10,6 @@
   "beforeImageEvidenceCount": 8,
   "beforeNativeImageEvidenceCount": 1,
   "failures": [],
-  "url": "http://100.79.157.76:3011/chat/conversation/clowder_ai/1",
+  "url": "http://localhost:3011/chat/conversation/clowder_ai/1",
   "recordedAt": "2026-05-29T15:44:02.202Z"
 }

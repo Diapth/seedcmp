@@ -6,6 +6,6 @@
     "/media/leng/DiskB1/exp/seedcmp/sections/im_web/.ai/V3.0/tests-e2e/local-ai-draft-unread-refresh-20260529163515/02-cleared-draft-after-reload.png",
     "/media/leng/DiskB1/exp/seedcmp/sections/im_web/.ai/V3.0/tests-e2e/local-ai-draft-unread-refresh-20260529163515/03-no-stale-unread-after-refresh.png"
   ],
-  "url": "http://100.79.157.76:3000/chat",
+  "url": "http://localhost:3000/chat",
   "recordedAt": "2026-05-29T16:35:16.466Z"
 }

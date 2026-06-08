@@ -11,7 +11,7 @@
 
 ## 问题描述
 
-使用 `sections/ui` 在 `http://100.79.157.76:5173/` 验收账号 `18337488675` 与 `13733632709` 的群聊 @ 功能时，@ 消息能送达接收方，但未满足两个展示要求：
+使用 `sections/ui` 在 `http://localhost:5173/` 验收账号 `18337488675` 与 `13733632709` 的群聊 @ 功能时，@ 消息能送达接收方，但未满足两个展示要求：
 
 1. 聊天气泡内的 `@leng_test_updated` 没有高亮。
 2. 被 @ 用户的会话列表未显示 `[有人@我]` 提示，只显示普通文本预览。
@@ -33,7 +33,7 @@
 
 ## 复现步骤
 
-1. 启动 `sections/ui` H5 并打开 `http://100.79.157.76:5173/`。
+1. 启动 `sections/ui` H5 并打开 `http://localhost:5173/`。
 2. 使用 `13733632709` 与 `18337488675` 分别登录。
 3. 创建或打开同时包含两个账号的群聊。
 4. 由 `13733632709` 在群里发送 `@leng_test_updated AT验收 20260608160100`。
@@ -105,8 +105,8 @@ mentions.push({ userId: m.id, name, offset: atIdx });
 
 ```bash
 cd /home/leng/.codex/skills/playwright-skill \
-  && TARGET_URL='http://100.79.157.76:5173' \
-     API_BASE='http://100.79.157.76:3000/v1' \
+  && TARGET_URL='http://localhost:5173' \
+     API_BASE='http://localhost:3000/v1' \
      REPO_ROOT='/media/leng/DiskB1/exp/seedcmp' \
      node run.js /tmp/playwright-test-sections-ui-group-deep.js
 

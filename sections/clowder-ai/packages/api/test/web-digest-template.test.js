@@ -87,7 +87,7 @@ describe('webDigestTemplate', () => {
     const delivered = deliverMock.mock.calls[0].arguments[0];
     assert.equal(delivered.threadId, 'th-2');
     assert.equal(delivered.userId, 'scheduler');
-    assert.ok(delivered.content.includes('browser-automation'));
+    assert.ok(delivered.content.includes('deep-research'));
     assert.ok(delivered.content.includes('https://x.com/user'));
     assert.ok(delivered.content.includes('AI'));
 
@@ -95,9 +95,9 @@ describe('webDigestTemplate', () => {
     assert.equal(triggerCalls[0][0], 'th-2');
     assert.equal(triggerCalls[0][1], 'gpt52');
     assert.equal(triggerCalls[0][2], 'default-user');
-    assert.ok(triggerCalls[0][3].includes('browser-automation'));
+    assert.ok(triggerCalls[0][3].includes('deep-research'));
     assert.equal(triggerCalls[0][4], 'msg-2');
-    assert.equal(triggerCalls[0][6]?.suggestedSkill, 'browser-automation');
+    assert.equal(triggerCalls[0][6]?.suggestedSkill, 'deep-research');
   });
 
   it('execute throws for needs-browser when invokeTrigger is not available', async () => {

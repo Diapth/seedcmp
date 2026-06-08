@@ -1,8 +1,8 @@
 /**
  * SkillLoadEventLog — F188 Phase F (AC-F10)
  *
- * Independent log for skill-load events. Supports AS-4 (memory-navigation
- * skill triggered) — carries loadTrigger context that Skill `tool_use`
+ * Independent log for skill-load events. Supports AS-4 skill trigger metrics
+ * and carries loadTrigger context that Skill `tool_use`
  * count doesn't (and avoids dedup).
  */
 

@@ -68,7 +68,7 @@ export type ToolEvent =
   | (BaseToolEvent & { toolName: 'list_recent'; summary: ListRecentSummary })
   | (BaseToolEvent & { summary: GenericSummary });
 
-/** Skill load event — supports AS-4 (memory-navigation skill triggered).
+/** Skill load event — supports AS-4 skill trigger metrics.
  *
  * Distinct from Skill tool_use count: not deduplicated, carries loadTrigger
  * context (why was this skill loaded?).

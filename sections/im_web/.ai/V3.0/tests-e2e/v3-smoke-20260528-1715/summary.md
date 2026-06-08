@@ -35,7 +35,7 @@ http://localhost:3003/api/commands?surface=connector -> 200
 http://localhost:3003/api/cats -> 200
 http://localhost:3003/api/connectors/im-web/status -> 404
 http://localhost:3003/api/connectors/im-web/agents?externalChatId=2:test -> 404
-http://100.79.157.76:8090/v1/user/login --noproxy '*' -> connection refused
+http://localhost:8090/v1/user/login --noproxy '*' -> connection refused
 ```
 
 `ss -ltnp` showed only `localhost:3003` among the expected ports; no TangSeng API listener was available on `8090`.

@@ -36,7 +36,7 @@
 
 ### 会话时间缺失
 
-1. 打开 `http://100.79.157.76:5173/#/pages/chat/index`。
+1. 打开 `http://localhost:5173/#/pages/chat/index`。
 2. 准备一个群聊会话：`lastMessage` 有值，但 `lastTime` 为 `0` 或后端未返回最后消息时间。
 3. 查看会话列表。
 4. 观察该会话右侧时间为空，排序也不会按最后消息时间进入正确位置。
@@ -164,7 +164,7 @@ function handleSelectConversation(id) {
 
 ```bash
 cd /home/leng/.codex/skills/playwright-skill \
-  && TARGET_URL='http://100.79.157.76:5173' \
+  && TARGET_URL='http://localhost:5173' \
      REPO_ROOT='/media/leng/DiskB1/exp/seedcmp' \
      node run.js /tmp/playwright-test-sections-ui-reply-time-bugs.js
 

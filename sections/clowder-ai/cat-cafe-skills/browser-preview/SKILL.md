@@ -83,7 +83,7 @@ Step 3: 等 1-2 秒，右侧 Browser panel 应自动打开
 
 | 场景 | 方式 | 怎么做 |
 |------|------|--------|
-| 简单可视化（图表、动画、计算器） | `html_widget` rich block 内联渲染 | 用 `rich-messaging` skill 发 `html_widget` block |
+| 简单可视化（图表、动画、计算器） | `html_widget` rich block 内联渲染 | 用 `design-assets` skill 发 `html_widget` block |
 | 复杂应用（完整页面、多组件交互） | 猫主动打开浏览器 | 调用 `auto-open` API |
 
 ## 技术要点（猫猫需要知道的）

@@ -97,37 +97,37 @@
       "samples": [
         {
           "account": "A",
-          "url": "http://100.79.157.76:8090/v1/users/6db8b65b3ae94092badfeb82e47c06f7",
+          "url": "http://localhost:8090/v1/users/6db8b65b3ae94092badfeb82e47c06f7",
           "method": "GET",
           "failure": "net::ERR_ABORTED"
         },
         {
           "account": "A",
-          "url": "http://100.79.157.76:8090/v1/users/6db8b65b3ae94092badfeb82e47c06f7",
+          "url": "http://localhost:8090/v1/users/6db8b65b3ae94092badfeb82e47c06f7",
           "method": "GET",
           "failure": "net::ERR_ABORTED"
         },
         {
           "account": "A",
-          "url": "http://100.79.157.76:8090/v1/users/6db8b65b3ae94092badfeb82e47c06f7",
+          "url": "http://localhost:8090/v1/users/6db8b65b3ae94092badfeb82e47c06f7",
           "method": "GET",
           "failure": "net::ERR_ABORTED"
         },
         {
           "account": "A",
-          "url": "http://100.79.157.76:8090/v1/users/6db8b65b3ae94092badfeb82e47c06f7",
+          "url": "http://localhost:8090/v1/users/6db8b65b3ae94092badfeb82e47c06f7",
           "method": "GET",
           "failure": "net::ERR_ABORTED"
         },
         {
           "account": "A",
-          "url": "http://100.79.157.76:8090/v1/conversation/sync",
+          "url": "http://localhost:8090/v1/conversation/sync",
           "method": "POST",
           "failure": "net::ERR_ABORTED"
         },
         {
           "account": "A",
-          "url": "http://100.79.157.76:8090/v1/conversation/sync",
+          "url": "http://localhost:8090/v1/conversation/sync",
           "method": "POST",
           "failure": "net::ERR_ABORTED"
         }
@@ -376,37 +376,37 @@
   "networkErrors": [
     {
       "account": "A",
-      "url": "http://100.79.157.76:8090/v1/users/6db8b65b3ae94092badfeb82e47c06f7",
+      "url": "http://localhost:8090/v1/users/6db8b65b3ae94092badfeb82e47c06f7",
       "method": "GET",
       "failure": "net::ERR_ABORTED"
     },
     {
       "account": "A",
-      "url": "http://100.79.157.76:8090/v1/users/6db8b65b3ae94092badfeb82e47c06f7",
+      "url": "http://localhost:8090/v1/users/6db8b65b3ae94092badfeb82e47c06f7",
       "method": "GET",
       "failure": "net::ERR_ABORTED"
     },
     {
       "account": "A",
-      "url": "http://100.79.157.76:8090/v1/users/6db8b65b3ae94092badfeb82e47c06f7",
+      "url": "http://localhost:8090/v1/users/6db8b65b3ae94092badfeb82e47c06f7",
       "method": "GET",
       "failure": "net::ERR_ABORTED"
     },
     {
       "account": "A",
-      "url": "http://100.79.157.76:8090/v1/users/6db8b65b3ae94092badfeb82e47c06f7",
+      "url": "http://localhost:8090/v1/users/6db8b65b3ae94092badfeb82e47c06f7",
       "method": "GET",
       "failure": "net::ERR_ABORTED"
     },
     {
       "account": "A",
-      "url": "http://100.79.157.76:8090/v1/conversation/sync",
+      "url": "http://localhost:8090/v1/conversation/sync",
       "method": "POST",
       "failure": "net::ERR_ABORTED"
     },
     {
       "account": "A",
-      "url": "http://100.79.157.76:8090/v1/conversation/sync",
+      "url": "http://localhost:8090/v1/conversation/sync",
       "method": "POST",
       "failure": "net::ERR_ABORTED"
     }

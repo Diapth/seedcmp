@@ -1,7 +1,7 @@
 #!/bin/bash
 # scripts/pre-merge-check.sh — Latest-main 全量门禁
 #
-# merge-gate 的硬门禁脚本。在 squash merge 前，基于最新 origin/main
+# review-and-release 的合入门禁脚本。在 squash merge 前，基于最新 origin/main
 # 跑全量 build + test + lint/check，确保合流后仍然全绿。
 #
 # Usage:
@@ -306,4 +306,4 @@ done
 printf "║    %-14s %3ds\n" "TOTAL" "$GATE_TOTAL"
 echo "╚══════════════════════════════════════════════════════╝"
 echo ""
-echo "可以安全执行 merge-gate 的后续步骤了。"
+echo "可以安全执行 review-and-release 的后续步骤了。"

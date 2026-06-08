@@ -25,7 +25,7 @@
 
 ## 复现步骤
 
-1. 打开 `http://100.79.157.76:5173/` 并登录。
+1. 打开 `http://localhost:5173/` 并登录。
 2. 创建自定义智能体 `测试名称161757`。
 3. 打开该智能体单聊。
 4. 让智能体返回 HTML 文件，例如 `agent-preview-20260608161757.html`。
@@ -108,8 +108,8 @@ watch(() => props.file, (newFile) => {
 
 ```bash
 cd /home/leng/.codex/skills/playwright-skill \
-  && TARGET_URL='http://100.79.157.76:5173' \
-     API_BASE='http://100.79.157.76:3000/v1' \
+  && TARGET_URL='http://localhost:5173' \
+     API_BASE='http://localhost:3000/v1' \
      REPO_ROOT='/media/leng/DiskB1/exp/seedcmp' \
      DEEPSEEK_API_KEY="$DEEPSEEK_API_KEY" \
      node run.js /tmp/playwright-test-sections-ui-agent-chain.js

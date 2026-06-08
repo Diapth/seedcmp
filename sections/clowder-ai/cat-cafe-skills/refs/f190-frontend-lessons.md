@@ -7,7 +7,7 @@ created: 2026-05-12
 
 # F190 Frontend Lessons
 
-本文件记录 F190 Console/Settings intake 的具体案例。主流程见 `cat-cafe-skills/console-dev/SKILL.md`；这里只沉淀这次社区 PR 回流中已经验证过的边界。
+本文件记录 F190 Console/Settings intake 的具体案例。主流程见 `cat-cafe-skills/browser-preview/SKILL.md`；这里只沉淀这次社区 PR 回流中已经验证过的边界。
 
 ## Gate 1: AppShell 可以成片，业务域不能混片
 

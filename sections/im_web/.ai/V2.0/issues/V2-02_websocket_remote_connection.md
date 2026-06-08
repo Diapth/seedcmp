@@ -15,7 +15,7 @@
 **v1.0 根因**：WuKongIM `/route` API 把监听地址 `0.0.0.0:5200` 直接返回给客户端；前端 `connectAddrCallback` 未对 `0.0.0.0`、`127.0.0.1`、`localhost` 做可拨号地址净化。
 
 **v1.0 修复**：
-- WuKongIM 配置 `WK_EXTERNAL_WSADDR=ws://100.79.157.76:5200`
+- WuKongIM 配置 `WK_EXTERNAL_WSADDR=ws://localhost:5200`
 - 前端 `sdkAddress.ts` 新增地址净化函数
 - 前端 `sdk.ts` 的 `connectAddrCallback` 调用净化函数
 

@@ -651,14 +651,14 @@ describe('SkillLoadEventLog (AC-F10 / AS-4)', () => {
     await skillLog.append({
       invocationId: 'inv-1',
       sessionId: 'sess-1',
-      skillId: 'memory-navigation',
+      skillId: 'deep-research',
       loadTrigger: 'keyword_match',
       timestamp: 100,
     });
     await skillLog.append({
       invocationId: 'inv-2',
       sessionId: 'sess-1',
-      skillId: 'memory-navigation',
+      skillId: 'deep-research',
       loadTrigger: 'mention_match',
       timestamp: 200,
     });
@@ -676,7 +676,7 @@ describe('SkillLoadEventLog (AC-F10 / AS-4)', () => {
     await skillLog.append({
       invocationId: 'inv-1',
       sessionId: 'sess-1',
-      skillId: 'memory-navigation',
+      skillId: 'deep-research',
       loadTrigger: 'keyword_match',
       timestamp: 100,
     });
@@ -688,7 +688,7 @@ describe('SkillLoadEventLog (AC-F10 / AS-4)', () => {
       timestamp: 200,
     });
 
-    assert.equal(await skillLog.countLoadsBySkill('sess-1', 'memory-navigation'), 1);
+    assert.equal(await skillLog.countLoadsBySkill('sess-1', 'deep-research'), 1);
     assert.equal(await skillLog.countLoadsBySkill('sess-1', 'tdd'), 1);
     assert.equal(await skillLog.countLoadsBySkill('sess-1', 'unknown'), 0);
   });

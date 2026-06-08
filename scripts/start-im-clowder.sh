@@ -643,18 +643,17 @@ start_all() {
   fi
 
   if [ "$AGENTHUB_UI" = "1" ]; then
-    # --host makes the Vite dev server bind to 0.0.0.0 so the H5 frontend is
-    # reachable from the LAN. Vite defaults to port 5173 and auto-increments
-    # if it is occupied; the flexible wait tolerates that.
+    # dev:h5 is strict on port 5173. If it is occupied, cleanup/restart should
+    # free the old listener instead of letting test traffic drift to 5174/5175.
     start_bg agenthub-ui "$AGENTHUB_UI_DIR" env \
       PNPM_CONFIG_VERIFY_DEPS_BEFORE_RUN=false \
-      corepack pnpm dev:h5 --host
-    wait_bg_port_flexible agenthub-ui 127.0.0.1 5173 "AgentHub UI"
+      corepack pnpm dev:h5
+    wait_bg_port agenthub-ui 127.0.0.1 5173 "AgentHub UI"
   fi
 
   log "ready:"
   if [ "$AGENTHUB_UI" = "1" ]; then
-    log "  AgentHub UI: http://localhost:5173 (vite may have auto-selected another port; see $LOG_DIR/agenthub-ui.log)"
+    log "  AgentHub UI: http://localhost:5173"
   fi
   if [ "$LEGACY_IM_WEB" = "1" ]; then
     log "  Legacy IM Web: http://localhost:3000"

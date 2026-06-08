@@ -3,7 +3,7 @@
 ## Run
 
 - Date: 2026-05-26 CST
-- Target: `http://100.79.157.76:3000`
+- Target: `http://localhost:3000`
 - Script: `audit.cjs`
 - Browser: Chromium headless via Playwright
 

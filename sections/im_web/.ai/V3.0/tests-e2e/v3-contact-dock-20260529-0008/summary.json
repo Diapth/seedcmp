@@ -1,11 +1,11 @@
 {
-  "targetUrl": "http://100.79.157.76:3000",
-  "finalUrl": "http://100.79.157.76:3000/chat/conversation/clowder_ai/1",
+  "targetUrl": "http://localhost:3000",
+  "finalUrl": "http://localhost:3000/chat/conversation/clowder_ai/1",
   "results": [
     {
       "name": "IM Web loads through external Tailscale URL",
       "passed": true,
-      "details": "http://100.79.157.76:3000/chat"
+      "details": "http://localhost:3000/chat"
     },
     {
       "name": "Application is past blank screen",

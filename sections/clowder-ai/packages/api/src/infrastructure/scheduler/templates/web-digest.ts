@@ -47,7 +47,7 @@ export const webDigestTemplate: TaskTemplate = {
             const catId = targetCatId ?? ctx.assignedCatId ?? 'opus';
             const topicLine = topic ? `\n重点关注：${topic}` : '';
             const triggerContent =
-              `${SCHEDULER_TRIGGER_PREFIX} 请使用 browser-automation 抓取并汇总网页内容\n` +
+              `${SCHEDULER_TRIGGER_PREFIX} 请使用 deep-research 抓取并汇总网页内容\n` +
               `URL: ${url}${topicLine}\n` +
               `要求：使用真实浏览器处理 JS 重站点，输出今天/当前值得关注的摘要，附标题、简述、来源链接与明确日期。`;
             const messageId = await ctx.deliver({
@@ -58,7 +58,7 @@ export const webDigestTemplate: TaskTemplate = {
             ctx.invokeTrigger.trigger(tid, catId, triggerUserId, triggerContent, messageId, undefined, {
               reason: 'scheduled_web_digest_browser_fetch',
               sourceCategory: 'scheduled',
-              suggestedSkill: 'browser-automation',
+              suggestedSkill: 'deep-research',
             });
             return;
           }

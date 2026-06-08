@@ -126,11 +126,11 @@ Claude 会按需读取这些文件。重材料移到子文件，SKILL.md 正文�
 |---------------|------------|-----------|
 | Library & API Reference | refs/rich-blocks, refs/mcp-tool-description-standard | Reference |
 | Product Verification | quality-gate, browser-preview | Technique |
-| Business Process & Team Automation | feat-lifecycle, merge-gate | Pattern |
-| Code Quality & Review | tdd, request-review, receive-review | Pattern |
-| Code Scaffolding & Templates | worktree | Technique |
+| Business Process & Team Automation | feat-lifecycle, review-and-release | Pattern |
+| Code Quality & Review | tdd, review-and-release | Pattern |
+| Code Scaffolding & Templates | writing-plans | Technique |
 | Runbooks | debugging | Technique |
-| CI/CD & Deployment | merge-gate, opensource-ops | Technique |
+| CI/CD & Deployment | review-and-release, opensource-ops | Technique |
 
 ## SKILL.md 结构模板
 
@@ -200,7 +200,7 @@ description: >
 
 - `tdd`：写**代码**的测试驱动纪律 — writing-skills 是写 **skill/MCP** 的质量纪律
 - `quality-gate`：**代码**完成后的自检 — writing-skills 是 **skill 文件**的质量检查
-- `self-evolution`：从经验中**提炼**知识对象 — writing-skills 是把知识对象**写成合格的 skill**
+- `collaborative-thinking`：讨论和经验收敛 — writing-skills 是把知识对象**写成合格的 skill**
 
 ## 下一步
 

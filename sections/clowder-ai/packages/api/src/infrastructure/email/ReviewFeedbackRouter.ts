@@ -151,11 +151,11 @@ export function buildReviewFeedbackContent(signal: ReviewFeedbackSignal): string
   const hasApproved = signal.newDecisions.some((d) => d.state === 'APPROVED');
 
   if (hasChangesRequested) {
-    lines.push('- 操作: 加载 `receive-review` 模式，逐项处理 review 意见（Red→Green）');
+    lines.push('- 操作: 加载 `review-and-release` 模式，逐项处理 review 意见（Red→Green）');
   } else if (hasApproved) {
     lines.push('- 操作: PR 已被批准，检查 CI 和冲突状态，准备 merge');
   } else {
-    lines.push('- 操作: 阅读评论内容，需要回复则回复，需要修改则按 `receive-review` 模式处理');
+    lines.push('- 操作: 阅读评论内容，需要回复则回复，需要修改则按 `review-and-release` 模式处理');
   }
 
   return lines.join('\n');

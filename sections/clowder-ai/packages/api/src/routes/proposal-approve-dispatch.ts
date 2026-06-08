@@ -37,7 +37,7 @@ export interface AppendApprovedInitialMessageResult {
 }
 
 /**
- * Build the "## 主 Thread" header that the thread-orchestration skill mandates
+ * Build the "## 主 Thread" header used by the multi-agent-collaboration protocol
  * for the first message of any sub-thread. This header lets cats inside the
  * sub-thread locate the parent thread and report back when work is done
  * (skill Step 5c "汇聚" — final report flow).
@@ -63,7 +63,7 @@ export function enrichWithParentThreadHeader(
     `ID: \`${sourceThreadId}\`${titleLine}`,
     '',
     '完成后请由最后一棒猫 `cat_cafe_cross_post_message` 把总结回报到这个主 Thread。',
-    '（这是 thread-orchestration skill 的 Step 5c 汇聚铁律，不要忘了汇报。）',
+    '（这是 multi-agent-collaboration 协作协议的汇聚约定，不要忘了汇报。）',
   ].join('\n');
   return `${content}\n\n${header}`;
 }

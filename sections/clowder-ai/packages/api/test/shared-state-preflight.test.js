@@ -12,7 +12,7 @@
  * E: git not available → { ok: true } (fail-open)
  * F: non-shared-state files ignored
  * G: no upstream + no origin + no merge-base → { ok: true } (fail-open)
- * H: non-main branch, unpushed → { ok: true } (skip unpushed, enforced at merge-gate)
+ * H: non-main branch, unpushed → { ok: true } (skip unpushed, enforced at review-and-release)
  * I: non-main branch, uncommitted → { ok: false } (uncommitted still detected)
  */
 import assert from 'node:assert/strict';

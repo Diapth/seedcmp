@@ -39,9 +39,9 @@ created: {{DATE}}
 |------|------|-------|
 | 1 | Create worktree | \`worktree\` |
 | 2 | Self-check (spec compliance) | \`quality-gate\` |
-| 3 | Peer review | \`request-review\` / \`receive-review\` |
-| 4 | Merge gate | \`merge-gate\` |
-| 5 | PR + cloud review | (merge-gate handles) |
+| 3 | Peer review | \`review-and-release\` |
+| 4 | Merge gate | \`review-and-release\` |
+| 5 | PR + cloud review | (review-and-release handles) |
 | 6 | Merge + cleanup | (SOP steps) |
 
 ## Code Quality

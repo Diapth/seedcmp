@@ -231,7 +231,7 @@ describe('Skills Route', () => {
     }
   });
 
-  it('resolves required MCP status from the selected project capabilities config', async () => {
+  it('uses the simplified target skill profile and omits removed skills', async () => {
     const projectDir = join('/tmp', `skills-route-test-project-mcp-${Date.now()}`);
     await mkdir(projectDir, { recursive: true });
     await writeCapabilitiesConfig(projectDir, {
@@ -260,21 +260,30 @@ describe('Skills Route', () => {
 
       assert.equal(res.statusCode, 200);
       const body = JSON.parse(res.body);
-      const pencilDesign = body.skills.find((skill) => skill.name === 'pencil-design');
-      assert.ok(pencilDesign, 'pencil-design should be present');
-      assert.deepEqual(pencilDesign.requiresMcp, [
-        {
-          id: 'pencil',
-          status: 'missing',
-        },
-      ]);
+      const names = body.skills.map((skill) => skill.name);
+
+      assert.ok(names.includes('design-assets'), 'design-assets should replace image/pencil/rich-messaging skills');
+      assert.ok(names.includes('review-and-release'), 'review-and-release should replace review/merge split skills');
+      assert.ok(names.includes('multi-agent-collaboration'), 'multi-agent-collaboration should replace cross-thread skills');
+      assert.ok(!names.includes('pencil-design'), 'pencil-design should be removed from target profile');
+      assert.ok(!names.includes('browser-automation'), 'browser-automation should be removed from target profile');
+      assert.ok(!names.includes('receive-review'), 'receive-review should be merged into review-and-release');
+      assert.ok(!names.includes('merge-gate'), 'merge-gate should be merged into review-and-release');
+
+      const designAssets = body.skills.find((skill) => skill.name === 'design-assets');
+      assert.ok(designAssets, 'design-assets should be present');
+      assert.equal(
+        designAssets.requiresMcp,
+        undefined,
+        'capability config alone should not create requiresMcp badges without manifest requires_mcp',
+      );
     } finally {
       await app.close();
       await rm(projectDir, { recursive: true, force: true });
     }
   });
 
-  it('exposes required MCP dependency status for routed skills', async () => {
+  it('exposes the 13-skill target profile without MCP dependency badges', async () => {
     const app = Fastify();
     await app.register(skillsRoutes);
     await app.ready();
@@ -287,24 +296,27 @@ describe('Skills Route', () => {
 
     assert.equal(res.statusCode, 200);
     const body = JSON.parse(res.body);
-    const browserAutomation = body.skills.find((skill) => skill.name === 'browser-automation');
-    const pencilDesign = body.skills.find((skill) => skill.name === 'pencil-design');
+    const names = body.skills.map((skill) => skill.name);
 
-    assert.ok(browserAutomation, 'browser-automation should be present in skills board');
-    assert.ok(pencilDesign, 'pencil-design should be present in skills board');
-    assert.deepEqual(
-      browserAutomation.requiresMcp?.map((dep) => dep.id),
-      ['playwright', 'claude-in-chrome', 'agent-browser', 'pinchtab'],
-      'browser-automation should declare all browser backend dependencies',
-    );
-    assert.deepEqual(
-      pencilDesign.requiresMcp?.map((dep) => dep.id),
-      ['pencil'],
-      'pencil-design should declare pencil dependency',
-    );
+    assert.equal(body.summary.total, 13);
+    assert.deepEqual(names, [
+      'feat-lifecycle',
+      'collaborative-thinking',
+      'writing-plans',
+      'tdd',
+      'debugging',
+      'quality-gate',
+      'review-and-release',
+      'multi-agent-collaboration',
+      'deep-research',
+      'browser-preview',
+      'design-assets',
+      'video-forge',
+      'writing-skills',
+    ]);
 
-    for (const dep of [...browserAutomation.requiresMcp, ...pencilDesign.requiresMcp]) {
-      assert.match(dep.status, /^(ready|missing|unresolved)$/);
+    for (const skill of body.skills) {
+      assert.equal(skill.requiresMcp, undefined, `${skill.name} should not declare MCP dependencies`);
     }
 
     await app.close();

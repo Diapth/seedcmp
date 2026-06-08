@@ -3,7 +3,7 @@ name: quality-gate
 description: >
   开发完成后的自检门禁：愿景对照 + spec 合规 + 验证。
   Use when: 开发完了准备提 review、声称完成了、准备交付。
-  Not for: 收到 review 反馈（用 receive-review）、merge（用 merge-gate）。
+  Not for: 收到 review 反馈（用 review-and-release）、merge（用 review-and-release）。
   Output: Spec 合规报告（含愿景覆盖度）。
 triggers:
   - "开发完了"
@@ -14,7 +14,7 @@ triggers:
 
 > **SOP 位置**: 本 skill 是 `sop-definitions/development.yaml` stage `quality_gate` 的执行细节。
 > **SOP definition**: `sop-definitions/development.yaml` stage `quality_gate`。
-> **上一步**: `impl` stage | **下一步**: `request-review`（review stage）
+> **上一步**: `impl` stage | **下一步**: `review-and-release`（review stage）
 
 # Quality Gate
 
@@ -279,14 +279,13 @@ pnpm -r --if-present run build → exit 0 ✅
 | Skill | 关注点 | 时机 |
 |-------|--------|------|
 | **quality-gate（本 skill）** | spec 对照 + 证据验证 | 提 review 之前 |
-| `merge-gate` | reviewer 是否放行、P1/P2 是否全修 | 合入 main 之前 |
-| `receive-review` | 如何处理 reviewer 的反馈 | 收到 review 之后 |
+| `review-and-release` | 请求 review、处理反馈、确认放行、合入发布 | quality-gate 之后 |
 
-一句话：quality-gate 是"你自己检查自己"，merge-gate 是"reviewer 放行你"，receive-review 是"你处理 reviewer 的意见"。
+一句话：quality-gate 是"你自己检查自己"，review-and-release 是"请别人看、处理意见、再发布"。
 
 ## 下一步
 
-Quality Gate 通过后 → **直接加载 `request-review`** skill 请求 review（SOP stage `review`）。不要停下来问铲屎官"要不要继续"（§17）。
+Quality Gate 通过后 → **直接加载 `review-and-release`** skill 请求 review（SOP stage `review`）。不要停下来问铲屎官"要不要继续"（§17）。
 
 Gate 未通过时：
 - **P1 遗漏** → 补完再过 gate

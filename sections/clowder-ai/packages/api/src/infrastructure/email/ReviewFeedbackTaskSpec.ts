@@ -217,7 +217,7 @@ export function createReviewFeedbackTaskSpec(opts: ReviewFeedbackTaskSpecOptions
           try {
             const hasChangesRequested = signal.newDecisions.some((d) => d.state === 'CHANGES_REQUESTED');
             const hasApproved = !hasChangesRequested && signal.newDecisions.some((d) => d.state === 'APPROVED');
-            const suggestedSkill = hasChangesRequested ? 'receive-review' : hasApproved ? 'merge-gate' : undefined;
+            const suggestedSkill = hasChangesRequested || hasApproved ? 'review-and-release' : undefined;
             const coalesceTargetCatId = routeResult.catId || task.ownerCatId || 'unassigned';
 
             const policy: ConnectorTriggerPolicy = {

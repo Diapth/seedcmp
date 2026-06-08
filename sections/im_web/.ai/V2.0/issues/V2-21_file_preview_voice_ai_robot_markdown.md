@@ -66,7 +66,7 @@ In progress
   - passed after aligning the robot test helper to the documented normal MySQL user.
 - Browser visual audit:
   - Script: `sections/im_web/.ai/V2.0/issues/tests-e2e/v2-21-20260526-visual/audit.cjs`
-  - Target: `http://100.79.157.76:3000`
+  - Target: `http://localhost:3000`
   - Screenshots:
     - `sections/im_web/.ai/V2.0/issues/imgs/v2-21-20260526-visual/01-login.png`
     - `sections/im_web/.ai/V2.0/issues/imgs/v2-21-20260526-visual/02-chat-shell.png`

@@ -808,7 +808,7 @@ describe('Session Hooks Routes', () => {
         method: 'POST',
         url: '/api/sessions/sop-bookmark',
         headers: authHeaders(),
-        payload: { cliSessionId: 'cli-sop-3', skill: 'merge-gate', sopStage: 'merge' },
+        payload: { cliSessionId: 'cli-sop-3', skill: 'review-and-release', sopStage: 'merge' },
       });
 
       const res = await app.inject({
@@ -818,7 +818,7 @@ describe('Session Hooks Routes', () => {
       });
 
       const body = JSON.parse(res.payload);
-      assert.equal(body.skill, 'merge-gate');
+      assert.equal(body.skill, 'review-and-release');
       assert.equal(body.sopStage, 'merge');
     });
 
@@ -875,7 +875,7 @@ describe('Session Hooks Routes', () => {
           method: 'POST',
           url: '/api/sessions/sop-bookmark',
           headers: authHeaders(),
-          payload: { cliSessionId: 'cli-new', skill: 'merge-gate', sopStage: 'merge' },
+          payload: { cliSessionId: 'cli-new', skill: 'review-and-release', sopStage: 'merge' },
         });
       } finally {
         Date.now = realNow;

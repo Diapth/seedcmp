@@ -4,8 +4,8 @@ services:
     image: registry.cn-shanghai.aliyuncs.com/wukongim/wukongim:latest
     restart: always
     environment:
-      WK_EXTERNAL_WSADDR: ws://100.79.157.76:5200
-      WK_EXTERNAL_WSSADDR: wss://100.79.157.76:5210
+      WK_EXTERNAL_WSADDR: ws://localhost:5200
+      WK_EXTERNAL_WSSADDR: wss://localhost:5210
     ports:
       - "5100:5100"
       - "5200:5200"

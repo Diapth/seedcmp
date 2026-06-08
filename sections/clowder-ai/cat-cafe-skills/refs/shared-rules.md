@@ -175,8 +175,8 @@ AI agent 100x 执行速度下，**方向正确性**的价值远大于**启动便
 自动检测：`scripts/check-hotfix-pattern.mjs`
 
 **跨猫 review 铁律**：hotfix PR 必须跨族（preferred）或同族不同个体 review，不允许 self-merge。
-- merge-gate 检测到 `hotfix` label → 强制校验 reviewer ≠ author
-- 无 review 放行 → merge-gate BLOCKED
+- review-and-release 检测到 `hotfix` label → 强制校验 reviewer ≠ author
+- 无 review 放行 → review-and-release BLOCKED
 
 **quality-gate 自检禁止**：检测到 hotfix 模式时，作者不得自行通过 quality-gate（必须由另一只猫执行 quality-gate）。
 - 原因：hotfix 心态容易自我说服"够用了"，跨猫审视打破惯性
@@ -446,10 +446,10 @@ commit body 补一行 `Why:` 说明决策理由。
 
 | 场景 | 路径 | 加载什么 |
 |------|------|---------|
-| 一行 typo / ≤5 行 bug fix | **轻量**：直接改 → 测试 → commit push | 不需要 worktree/skill |
+| 一行 typo / ≤5 行 bug fix | **轻量**：直接改 → 测试 → commit push | 不需要 workspace/skill |
 | 共享文档 / 提示词修改 | **轻量**：改 → 跑测试 → sync → commit push | 不碰 runtime 代码 |
-| 跨模块 feature / 新 API | **完整**：feat-lifecycle → design gate → worktree → tdd → quality-gate → review → merge | 每步加载对应 skill |
-| 紧急 P0 bug | **中间**：debugging → 直接在 main 或 worktree 修 → 测试 → commit push → 事后补 review | 速度优先但留证据 |
+| 跨模块 feature / 新 API | **完整**：feat-lifecycle → design gate → workspace → tdd → quality-gate → review → merge | 每步加载对应 skill |
+| 紧急 P0 bug | **中间**：debugging → 直接在 main 或 workspace 修 → 测试 → commit push → 事后补 review | 速度优先但留证据 |
 
 ## 12. Runtime 单实例保护（Anti-Self-TERM）
 
@@ -457,7 +457,7 @@ commit body 补一行 `Why:` 说明决策理由。
 - `../cat-cafe-runtime` 的 `localhost:3003/3004` 默认视为**在线 runtime 端口**；对这两个端口做浏览器 / Playwright / curl 操作，等同于在操作 runtime，不是本地沙箱。
 - 在 runtime 会话中禁止执行重启命令：`pnpm start`、`pnpm runtime:start`、`./scripts/start-dev.sh`。
 - 前端证据采集先复用现有服务：先查 `curl -sf http://localhost:3004/health`。
-- 如果目的是验证**未合入的本地改动**，必须先确认“当前 CWD / worktree”和“要访问的 URL”属于同一实例；看到 `3003/3004` 就先停下来，确认自己是不是误打到了 runtime。
+- 如果目的是验证**未合入的本地改动**，必须先确认“当前 CWD / workspace”和“要访问的 URL”属于同一实例；看到 `3003/3004` 就先停下来，确认自己是不是误打到了 runtime。
 - 必须重启时先拿到铲屎官明确授权，再用 `CAT_CAFE_RUNTIME_RESTART_OK=1` 执行。
 - `--force` 只用于同步/脏树场景，不是重启 runtime 的授权令牌。
 
@@ -502,7 +502,7 @@ commit body 补一行 `Why:` 说明决策理由。
 | 2 | **SHA** | `基于 abc1234` |
 | 3 | **是否 rebase 到最新 main** | `已 rebase origin/main` 或 `未 rebase（基于 3 天前的 main）` |
 
-**merge 前的全量门禁**：`pnpm gate`（= `scripts/pre-merge-check.sh`），自动 rebase + build + test + lint + check，通过后打印三件套。详见 `merge-gate` skill。
+**merge 前的全量门禁**：`pnpm gate`（= `scripts/pre-merge-check.sh`），自动 rebase + build + test + lint + check，通过后打印三件套。详见 `review-and-release` skill。
 
 ## 14b. Rebase 冲突三屏规则
 
@@ -567,9 +567,9 @@ git show :3:<path>   # THEIRS（main 上的版本）
 | L3 | `.github/workflows/shared-state-guard.yml` | PR 含共享状态变更 → **硬拦** |
 
 **Review 守护的字段**（不做机器拦截）：
-- `docs/features/F*.md` 的 status/owner 字段变更也应在 main，但整文件可在 worktree 改
+- `docs/features/F*.md` 的 status/owner 字段变更也应在 main，但整文件可在 workspace 改
 
-**规则**：在 main 上改，改完立刻 commit + push。在 worktree 改 → 冲突 + 污染 feature PR + 其他猫看不到更新。
+**规则**：在 main 上改，改完立刻 commit + push。在 workspace 改 → 冲突 + 污染 feature PR + 其他猫看不到更新。
 
 ## 15. 阻塞依赖必须双写到可追溯状态
 
@@ -737,6 +737,6 @@ beforeEach(() => {
 
 **不要依赖**："测试通常不会真发 HTTP"——子进程继承父 env 是 OS 级行为，不是 shell quirk。fail-closed (closed port) > fail-fast (mock only)。
 
-**为什么不放 worktree skill 的 `.env`**：`.env` 只影响 dev server 启动；node:test 子进程不读 `.env`，它继承的是父 shell 的真 env。所以护栏必须在 test setup 里。
+**为什么不放 workspace skill 的 `.env`**：`.env` 只影响 dev server 启动；node:test 子进程不读 `.env`，它继承的是父 shell 的真 env。所以护栏必须在 test setup 里。
 
 **违反代价**：用真身份发测试 payload 到铲屎官 thread / 其他猫 thread，看起来像 spam / cron job / 幻觉。已发出去的消息**不可撤回**。

@@ -110,19 +110,19 @@
       "samples": [
         {
           "account": "B",
-          "url": "http://100.79.157.76:8090/v1/coversation/clearUnread",
+          "url": "http://localhost:8090/v1/coversation/clearUnread",
           "method": "PUT",
           "failure": "net::ERR_ABORTED"
         },
         {
           "account": "B",
-          "url": "http://100.79.157.76:8090/v1/coversation/clearUnread",
+          "url": "http://localhost:8090/v1/coversation/clearUnread",
           "method": "PUT",
           "failure": "net::ERR_ABORTED"
         },
         {
           "account": "A",
-          "url": "http://100.79.157.76:8090/v1/conversations/c9d61c7f903c48ca93458e50436fca6e/2/extra",
+          "url": "http://localhost:8090/v1/conversations/c9d61c7f903c48ca93458e50436fca6e/2/extra",
           "status": 400,
           "method": "POST"
         }
@@ -383,19 +383,19 @@
   "networkErrors": [
     {
       "account": "B",
-      "url": "http://100.79.157.76:8090/v1/coversation/clearUnread",
+      "url": "http://localhost:8090/v1/coversation/clearUnread",
       "method": "PUT",
       "failure": "net::ERR_ABORTED"
     },
     {
       "account": "B",
-      "url": "http://100.79.157.76:8090/v1/coversation/clearUnread",
+      "url": "http://localhost:8090/v1/coversation/clearUnread",
       "method": "PUT",
       "failure": "net::ERR_ABORTED"
     },
     {
       "account": "A",
-      "url": "http://100.79.157.76:8090/v1/conversations/c9d61c7f903c48ca93458e50436fca6e/2/extra",
+      "url": "http://localhost:8090/v1/conversations/c9d61c7f903c48ca93458e50436fca6e/2/extra",
       "status": 400,
       "method": "POST"
     }

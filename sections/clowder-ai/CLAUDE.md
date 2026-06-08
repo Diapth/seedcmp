@@ -14,8 +14,7 @@ See `cat-cafe-skills/` for the full skill-based workflow:
 - `feat-lifecycle` — Feature lifecycle management
 - `tdd` — Test-driven development
 - `quality-gate` — Pre-review self-check
-- `request-review` — Cross-cat review requests
-- `merge-gate` — Merge approval process
+- `review-and-release` — Review requests, feedback handling, and merge/release
 
 ## Code Standards
 - File size: 200 lines warning / 350 hard limit

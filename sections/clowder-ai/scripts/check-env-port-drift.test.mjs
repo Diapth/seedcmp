@@ -1530,18 +1530,22 @@ describe(
   'Public-facing skill docs avoid home-only API defaults',
   { skip: !isHomeRepo && 'sync infrastructure not present (open-source repo)' },
   () => {
-    it('workspace-navigator uses API_SERVER_PORT env instead of hardcoded 3002 fallbacks', () => {
-      const content = readFileSync(resolve(ROOT, 'cat-cafe-skills/workspace-navigator/SKILL.md'), 'utf-8');
-      assert.doesNotMatch(
-        content,
-        /API_SERVER_PORT=3004|API_SERVER_PORT:-3004/,
-        'workspace-navigator should not hardcode the home-only API default in public-facing usage guidance',
+    it('target skills do not preserve workspace-navigator API port guidance', () => {
+      assert.equal(
+        existsSync(resolve(ROOT, 'cat-cafe-skills/workspace-navigator/SKILL.md')),
+        false,
+        'workspace-navigator should not remain in the target skill profile',
       );
-      assert.match(
-        content,
-        /API_PORT="\$\{API_SERVER_PORT:\?set API_SERVER_PORT before calling Navigate API\}"/,
-        'workspace-navigator should teach readers to source the API port from the runtime environment',
-      );
+
+      const skillDocs = ['browser-preview', 'deep-research', 'design-assets', 'multi-agent-collaboration'];
+      for (const skillName of skillDocs) {
+        const content = readFileSync(resolve(ROOT, `cat-cafe-skills/${skillName}/SKILL.md`), 'utf-8');
+        assert.doesNotMatch(
+          content,
+          /API_SERVER_PORT=3004|API_SERVER_PORT:-3004/,
+          `${skillName} should not hardcode the public API default in skill guidance`,
+        );
+      }
     });
   },
 );

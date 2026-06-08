@@ -10,7 +10,7 @@ Medium
 
 ## Finding
 
-IM Web browser runtime code still defaulted the TangSeng HTTP API, media preview origin, object storage origin, and WuKongIM websocket fallback host to `100.79.157.76`. That made the current machine work, but made a fresh machine or CI environment depend on one local topology.
+IM Web browser runtime code still defaulted the TangSeng HTTP API, media preview origin, object storage origin, and WuKongIM websocket fallback host to `localhost`. That made the current machine work, but made a fresh machine or CI environment depend on one local topology.
 
 ## Impact
 

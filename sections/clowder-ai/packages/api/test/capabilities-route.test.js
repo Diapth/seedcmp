@@ -156,20 +156,20 @@ describe('PATCH capabilities logic', () => {
           source: 'cat-cafe',
           mcpServer: { command: 'node', args: ['server.js'] },
         },
-        { id: 'cross-cat-handoff', type: 'skill', enabled: true, source: 'external' },
+        { id: 'multi-agent-collaboration', type: 'skill', enabled: true, source: 'external' },
       ],
     });
 
     const config = await readCapabilitiesConfig(dir);
     assert.ok(config);
-    const skill = config.capabilities.find((c) => c.type === 'skill' && c.id === 'cross-cat-handoff');
+    const skill = config.capabilities.find((c) => c.type === 'skill' && c.id === 'multi-agent-collaboration');
     assert.ok(skill);
     skill.enabled = false;
     await writeCapabilitiesConfig(dir, config);
 
     const updated = await readCapabilitiesConfig(dir);
     assert.ok(updated);
-    const updatedSkill = updated.capabilities.find((c) => c.id === 'cross-cat-handoff');
+    const updatedSkill = updated.capabilities.find((c) => c.id === 'multi-agent-collaboration');
     assert.equal(updatedSkill?.enabled, false);
     assert.equal(updatedSkill?.type, 'skill');
   });

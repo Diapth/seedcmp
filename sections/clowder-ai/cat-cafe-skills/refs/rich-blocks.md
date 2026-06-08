@@ -1,6 +1,6 @@
 # Rich Blocks Reference
 
-> 降级自 `rich-messaging` skill。按需查阅。
+> 降级自 `design-assets` skill。按需查阅。
 
 ## 何时用 Rich Block
 
@@ -58,7 +58,7 @@ Codex `image_gen` 和 Antigravity 生成的图片现已**自动发布**：
 
 **手动发布**（仅当自动路径不适用时）：调用 `publishGeneratedImage({ sourcePath, mimeType, publicationKey, provider, toolName })`。
 
-不要把”源码仓里存在这个文件”和”当前 API 正在服务这个文件”混为一谈。runtime 可能跑在另一套 worktree / 另一份 `packages/api/uploads/`。
+不要把”源码仓里存在这个文件”和”当前 API 正在服务这个文件”混为一谈。runtime 可能跑在另一套 workspace / 另一份 `packages/api/uploads/`。
 | interactive | interactiveType, options (id+label) | title, description, maxSelect, allowRandom, messageTemplate |
 | html_widget | html | title, height (50-2000, default 300) |
 

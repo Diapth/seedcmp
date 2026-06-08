@@ -11,7 +11,7 @@
 
 ## 问题描述
 
-使用 `sections/ui` 在 `http://100.79.157.76:5173/` 进行双账号验收时，普通群聊功能通过；但真实多智能体项目群链路失败。
+使用 `sections/ui` 在 `http://localhost:5173/` 进行双账号验收时，普通群聊功能通过；但真实多智能体项目群链路失败。
 
 验收账号：
 
@@ -41,7 +41,7 @@
 
 ## 复现步骤
 
-1. 启动 `sections/ui` H5，并打开 `http://100.79.157.76:5173/`。
+1. 启动 `sections/ui` H5，并打开 `http://localhost:5173/`。
 2. 使用 API 登录 `13733632709` 和 `18337488675`。
 3. 使用 `13733632709` 调用 `POST /v1/group/create` 创建普通群，members 传入 `18337488675` 的 uid。
 4. 两个账号分别登录 H5，打开普通群，互发消息。
@@ -118,8 +118,8 @@ const agentBoard = computed(() => {
 
 ```bash
 cd /home/leng/.codex/skills/playwright-skill \
-  && TARGET_URL='http://100.79.157.76:5173' \
-     API_BASE='http://100.79.157.76:3000/v1' \
+  && TARGET_URL='http://localhost:5173' \
+     API_BASE='http://localhost:3000/v1' \
      REPO_ROOT='/media/leng/DiskB1/exp/seedcmp' \
      node run.js /tmp/playwright-test-sections-ui-group-multi-agent.js
 

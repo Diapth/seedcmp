@@ -11,7 +11,7 @@
 
 ## 问题描述
 
-使用 `sections/ui` 在 `http://100.79.157.76:5173/` 验收智能体链路时，可以在智能体面板创建名称为 `测试名称161757` 的自定义智能体，选择 `Claude Code` 平台，填写 DeepSeek API Key、`https://api.deepseek.com/v1` 和 `deepseek-chat`，并打开该智能体单聊。
+使用 `sections/ui` 在 `http://localhost:5173/` 验收智能体链路时，可以在智能体面板创建名称为 `测试名称161757` 的自定义智能体，选择 `Claude Code` 平台，填写 DeepSeek API Key、`https://api.deepseek.com/v1` 和 `deepseek-chat`，并打开该智能体单聊。
 
 但代码和验收结果显示：该自定义智能体只是写入前端 Pinia store，并不会注册到后端/Clowder，也不会在单聊时调用 DeepSeek 或 Claude Code 运行时。单聊发送消息后只是用户本地消息；本轮为了继续验收 Markdown、HTML 文件、群聊 @ 和共享文件的 UI 展示能力，后续智能体回复由 Playwright 注入本地消息完成，不能证明真实模型链路可用。
 
@@ -37,7 +37,7 @@
 
 ## 复现步骤
 
-1. 打开 `http://100.79.157.76:5173/` 并登录 `13733632709`。
+1. 打开 `http://localhost:5173/` 并登录 `13733632709`。
 2. 进入智能体面板，点击 `创建智能体`。
 3. 填写名称 `测试名称161757`、别名 `test1757`。
 4. 选择运行平台 `Claude Code`，接入方式 `API Key`。
@@ -145,8 +145,8 @@ export function isClowderDirectCatConversation(conversation = {}) {
 
 ```bash
 cd /home/leng/.codex/skills/playwright-skill \
-  && TARGET_URL='http://100.79.157.76:5173' \
-     API_BASE='http://100.79.157.76:3000/v1' \
+  && TARGET_URL='http://localhost:5173' \
+     API_BASE='http://localhost:3000/v1' \
      REPO_ROOT='/media/leng/DiskB1/exp/seedcmp' \
      DEEPSEEK_API_KEY="$DEEPSEEK_API_KEY" \
      node run.js /tmp/playwright-test-sections-ui-agent-chain.js

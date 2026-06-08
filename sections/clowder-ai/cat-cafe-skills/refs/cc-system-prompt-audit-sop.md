@@ -28,7 +28,7 @@ CLI 每次版本升级可能**新增功能性指令**——不重拆 = L0 §2 �
 ## 步骤
 
 ```bash
-# 0. 在 worktree（改 L0 = 非 trivial，开 worktree）
+# 0. 在 workspace（改 L0 = 非 trivial，开 workspace）
 # 1. diff 当前 CLI vs 最新归档
 node scripts/audit-claude-code-system-prompt.mjs --cli claude \
   --diff docs/audits/cc-system-prompt-v<上一版本>.md
@@ -43,11 +43,11 @@ node scripts/audit-claude-code-system-prompt.mjs --cli codex \
    客观性/能力指令"。逐条判断它是否已被 L0 §2 carry-over 覆盖：
    - 已覆盖（同义表述）→ 仅更新归档 doc，注明"已在 L0 §2"
    - 未覆盖 → step 3
-3. **提案 L0 §2 carry-over 更新**：在 worktree 改
+3. **提案 L0 §2 carry-over 更新**：在 workspace 改
    `assets/system-prompts/system-prompt-l0.md` §2，把新功能性指令的**语义**
    补进去（不是逐字抄 CC 原文——L0 是重写版；抓"删了猫会丢什么能力"）。
    跑 `compile-system-prompt-l0.test.mjs` 守护 → quality-gate →
-   request-review（跨族）→ merge-gate。
+   review-and-release（跨族）→ review-and-release。
 4. **归档新版本**（每次升级必做，无论有无 diff——留漂移痕迹）：
    ```bash
    node scripts/audit-claude-code-system-prompt.mjs --cli claude \

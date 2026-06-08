@@ -78,7 +78,7 @@ func TestOutboundPayloadBuildsImageMessage(t *testing.T) {
 		Content:        "y = sin(x) 函数图像",
 		Media: &OutboundMediaPayload{
 			Type:     "image",
-			URL:      "http://100.79.157.76:3003/api/connector-media/sinx.png",
+			URL:      "http://localhost:3003/api/connector-media/sinx.png",
 			FileName: "sinx.png",
 			Size:     4096,
 		},
@@ -94,7 +94,7 @@ func TestOutboundPayloadBuildsImageMessage(t *testing.T) {
 	var body map[string]interface{}
 	require.NoError(t, json.Unmarshal(req.Payload, &body))
 	assert.Equal(t, float64(common.Image), body["type"])
-	assert.Equal(t, "http://100.79.157.76:3003/api/connector-media/sinx.png", body["url"])
+	assert.Equal(t, "http://localhost:3003/api/connector-media/sinx.png", body["url"])
 	assert.Equal(t, "sinx.png", body["name"])
 	assert.Equal(t, "y = sin(x) 函数图像", body["content"])
 	assert.Equal(t, "im-web", body["connector_id"])
@@ -111,7 +111,7 @@ func TestOutboundPayloadBuildsFileMessage(t *testing.T) {
 		Content:        "我整理了一份会议纪要。",
 		Media: &OutboundMediaPayload{
 			Type:     "file",
-			URL:      "http://100.79.157.76:3003/api/connector-media/notes.md",
+			URL:      "http://localhost:3003/api/connector-media/notes.md",
 			FileName: "notes.md",
 			Size:     2048,
 		},
@@ -127,7 +127,7 @@ func TestOutboundPayloadBuildsFileMessage(t *testing.T) {
 	var body map[string]interface{}
 	require.NoError(t, json.Unmarshal(req.Payload, &body))
 	assert.Equal(t, float64(common.File), body["type"])
-	assert.Equal(t, "http://100.79.157.76:3003/api/connector-media/notes.md", body["url"])
+	assert.Equal(t, "http://localhost:3003/api/connector-media/notes.md", body["url"])
 	assert.Equal(t, "notes.md", body["name"])
 	assert.Equal(t, "我整理了一份会议纪要。", body["content"])
 	assert.Equal(t, "im-web", body["connector_id"])

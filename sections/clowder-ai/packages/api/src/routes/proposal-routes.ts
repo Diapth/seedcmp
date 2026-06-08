@@ -190,7 +190,7 @@ export const proposalRoutes: FastifyPluginAsync<ProposalRoutesOptions> = async (
     }
     if (finalInitialMessage) {
       try {
-        // F128 (thread-orchestration skill Step 5 enforcement): inject the
+        // F128 (multi-agent-collaboration protocol): inject the
         // "## 主 Thread" header into the first sub-thread message so cats
         // inside the new thread can locate the parent and report back when
         // work completes. Cat-typed initialMessage often omits this header,

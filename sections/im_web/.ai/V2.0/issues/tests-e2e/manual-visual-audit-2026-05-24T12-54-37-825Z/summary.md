@@ -1,6 +1,6 @@
 # Manual Visual Audit manual-visual-audit-2026-05-24T12-54-37-825Z
 
-- Target: http://100.79.157.76:3000
+- Target: http://localhost:3000
 - Account: 18337488675
 - Checks: 11
 - Failed: 4
@@ -25,7 +25,7 @@
 - V2-14 文件消息卡片布局越界或尺寸异常: `{"name":"V2-14 文件消息卡片布局越界或尺寸异常","status":"fail","offenders":[{"isMe":true,"cell":{"x":1099.21875,"y":564.28125,"width":324.78125,"height":66},"bubble":{"x":1229.140625,"y":564.28125,"width":194.859375,"height":66},"container":{"x":1099.21875,"y":564.28125,"width":324.78125,"height":66},"row":{"x":316,"y":564.28125,"width":1108,"height":66},"bubbleMaxWidth":"60%","bubbleWidth":"194.859px"},{"isMe":true,"cell":{"x":1099.21875,"y":646.28125,"width":324.78125,"height":66},"bubble":{"x":1229.140625,"y":646.28125,"width":194.859375,"height":66},"container":{"x":1099.21875,"y":646.28125,"width":324.78125,"height":66},"row":{"x":316,"y":646.28125,"width":1108,"height":66},"bubbleMaxWidth":"60%","bubbleWidth":"194.859px"}],"all":[{"isMe":true,"cell":{"x":1099.21875,"y":564.28125,"width":324.78125,"height":66},"bubble":{"x":1229.140625,"y":564.28125,"width":194.859375,"height":66},"container":{"x":1099.21875,"y":564.28125,"width":324.78125,"height":66},"row":{"x":316,"y":564.28125,"width":1108,"height":66},"bubbleMaxWidth":"60%","bubbleWidth":"194.859px"},{"isMe":true,"cell":{"x":1099.21875,"y":646.28125,"width":324.78125,"height":66},"bubble":{"x":1229.140625,"y":646.28125,"width":194.859375,"height":66},"container":{"x":1099.21875,"y":646.28125,"width":324.78125,"height":66},"row":{"x":316,"y":646.28125,"width":1108,"height":66},"bubbleMaxWidth":"60%","bubbleWidth":"194.859px"}]}`
 - US2 群聊设置入口不可见: `{"name":"US2 群聊设置入口不可见","status":"fail"}`
 - 控制台严重错误检查: `{"name":"控制台严重错误检查","status":"fail","count":1,"samples":[{"type":"error","text":"Failed to load resource: the server responded with a status of 400 (Bad Request)"}]}`
-- 网络错误检查: `{"name":"网络错误检查","status":"fail","count":1,"samples":[{"url":"http://100.79.157.76:8090/v1/search/global","status":400}]}`
+- 网络错误检查: `{"name":"网络错误检查","status":"fail","count":1,"samples":[{"url":"http://localhost:8090/v1/search/global","status":400}]}`
 
 ## Screenshots
 - /media/leng/DiskB1/exp/seedcmp/sections/im_web/.ai/V2.0/issues/imgs/manual-visual-audit-2026-05-24T12-54-37-825Z/01-login-page.png

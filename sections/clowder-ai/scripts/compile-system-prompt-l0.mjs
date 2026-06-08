@@ -122,7 +122,7 @@ const WORKFLOW_TRIGGERS_INLINE = {
     '### 执行纪律',
     '- 加载 Skill 后直接执行第一步（产出 > 复述）',
     '- 接球后静默执行：收到"放行"后沉默做到下一状态迁移点（BLOCKED / REVIEW READY / DONE）',
-    '- 声明 = 执行：说"我进 merge gate"必须同 turn 加载 skill 并执行',
+    '- 声明 = 执行：说"我进 review-and-release"必须同 turn 加载 skill 并执行',
     '- 只发状态迁移消息，中间产物留在代码里',
     '- 完成任务后必须 @ 下一棒',
     '- 若识别到角色不匹配或方向有问题，先通知对方再执行（Rule 0）',
@@ -136,7 +136,7 @@ const WORKFLOW_TRIGGERS_INLINE = {
     '### 长任务纪律（Codex CLI harness 专属）',
     '- `exec_command` 返回 `session_id` = 命令存活；同 `session_id` 续 `write_stdin`，别因暂无输出另起命令。',
     "- 无头 harness 里 `bash &` / `nohup` / `disown` / `setsid` 是伪后台（父进程退出子进程随之死）；真后台用 Node `spawn(..., { detached: true, stdio: 'ignore' })` + `unref()`。",
-    '- Fire-and-forget（含 `pnpm gate` / `pnpm test` / merge-gate）必须约定 `pid` / `log` / `exit` 探针——无探针不算启动成功；轮询是验结果不是续命。',
+    '- Fire-and-forget（含 `pnpm gate` / `pnpm test` / review-and-release）必须约定 `pid` / `log` / `exit` 探针——无探针不算启动成功；轮询是验结果不是续命。',
   ].join('\n'),
   siamese: [
     '## 工作流（主动 @ 触发点）',
