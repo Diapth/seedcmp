@@ -68,6 +68,11 @@
           @contextmenu.prevent.stop="handleContextMenu"
           @longpress="handleLongPress"
         >
+          <view v-if="isPinnedContext" class="pin-context-badge flex-row align-center">
+            <AppIcon name="pin" :size="11" color="currentColor" />
+            <text>长期上下文</text>
+          </view>
+
           <!-- Text Message -->
           <text
             v-if="data.type === 'text'"
@@ -197,6 +202,8 @@ const myAvatar = computed(() => {
 const myName = computed(() => {
   return appStore.currentUser?.nickname || appStore.currentUser?.name || '我';
 });
+
+const isPinnedContext = computed(() => props.data.remoteExtra?.isPinned || props.data.isPinned);
 
 // 拆分文本为 mention 段(高亮) + 普通段
 const textSegments = computed(() => {
@@ -339,6 +346,27 @@ function openLightbox(images, index) {
   box-shadow: 0 1px 2px 0 rgba(0, 0, 0, 0.05);
   word-break: break-word;
   max-width: 100%;
+}
+
+.pin-context-badge {
+  width: fit-content;
+  max-width: 100%;
+  min-height: 20px;
+  margin-bottom: 6px;
+  padding: 0 6px;
+  gap: 3px;
+  border-radius: 6px;
+  background-color: rgba(255, 255, 255, 0.18);
+  color: currentColor;
+  font-size: 11px;
+  line-height: 1;
+  font-weight: 700;
+  box-sizing: border-box;
+}
+
+.bubble-other .pin-context-badge {
+  background-color: var(--color-primary-light);
+  color: var(--color-primary);
 }
 
 .bubble-me {
