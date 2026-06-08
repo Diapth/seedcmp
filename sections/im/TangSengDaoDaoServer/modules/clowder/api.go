@@ -99,6 +99,9 @@ func (c *Clowder) Route(r *wkhttp.WKHttp) {
 		auth.GET("/thread/:threadId/coordinations", c.proxyThreadCoordinations)
 		auth.GET("/thread/:threadId/artifacts", c.proxyThreadArtifacts)
 		auth.POST("/thread/:threadId/artifacts", c.proxyPostThreadArtifact)
+		auth.GET("/thread/:threadId/manual-context-pins", c.proxyListManualContextPins)
+		auth.POST("/thread/:threadId/manual-context-pins", c.proxyUpsertManualContextPin)
+		auth.DELETE("/thread/:threadId/manual-context-pins/:pinId", c.proxyRemoveManualContextPin)
 		auth.GET("/thread/:threadId/workspaces", c.proxyThreadWorkspaces)
 		auth.GET("/thread/:threadId/workspace-binding", c.proxyGetThreadWorkspaceBinding)
 		auth.PUT("/thread/:threadId/workspace-binding", c.proxyPutThreadWorkspaceBinding)
@@ -608,6 +611,38 @@ func (c *Clowder) proxyPostThreadArtifact(ctx *wkhttp.Context) {
 
 	respBody, _ := io.ReadAll(res.Body)
 	ctx.Data(res.StatusCode, "application/json; charset=utf-8", respBody)
+}
+
+func (c *Clowder) proxyListManualContextPins(ctx *wkhttp.Context) {
+	threadID := strings.TrimSpace(ctx.Param("threadId"))
+	if threadID == "" {
+		ctx.JSON(http.StatusBadRequest, map[string]string{"error": "thread_id_required"})
+		return
+	}
+	c.proxyToClowder(ctx, http.MethodGet, "/api/threads/"+url.PathEscape(threadID)+"/manual-context-pins", nil, "manual_context_pins_unavailable")
+}
+
+func (c *Clowder) proxyUpsertManualContextPin(ctx *wkhttp.Context) {
+	threadID := strings.TrimSpace(ctx.Param("threadId"))
+	if threadID == "" {
+		ctx.JSON(http.StatusBadRequest, map[string]string{"error": "thread_id_required"})
+		return
+	}
+	body, ok := c.readJSONBody(ctx)
+	if !ok {
+		return
+	}
+	c.proxyToClowder(ctx, http.MethodPost, "/api/threads/"+url.PathEscape(threadID)+"/manual-context-pins", bytes.NewReader(body), "manual_context_pin_upsert_unavailable")
+}
+
+func (c *Clowder) proxyRemoveManualContextPin(ctx *wkhttp.Context) {
+	threadID := strings.TrimSpace(ctx.Param("threadId"))
+	pinID := strings.TrimSpace(ctx.Param("pinId"))
+	if threadID == "" || pinID == "" {
+		ctx.JSON(http.StatusBadRequest, map[string]string{"error": "thread_id_and_pin_id_required"})
+		return
+	}
+	c.proxyToClowder(ctx, http.MethodDelete, "/api/threads/"+url.PathEscape(threadID)+"/manual-context-pins/"+url.PathEscape(pinID), nil, "manual_context_pin_remove_unavailable")
 }
 
 // proxyThreadWorkspaces proxies `GET /api/threads/:threadId/workspaces`
