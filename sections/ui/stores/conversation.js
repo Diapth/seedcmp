@@ -6,6 +6,7 @@ import {
   conversationDraftKey,
   dropMockConversations,
   mergeRemoteDrafts,
+  shouldPersistConversationDraft,
   upsertGroupConversation
 } from '@/services/native-im/conversation-state';
 import {
@@ -189,6 +190,9 @@ export const useConversationStore = defineStore('conversation', {
       }
     },
     updateConversationDraft(id, draftText, options = {}) {
+      const conversation = typeof id === 'string'
+        ? this.conversations.find((item) => item.id === id)
+        : id;
       const identity = this.getConversationIdentity(id);
       const key = conversationDraftKey(identity.channelId, identity.channelType);
       const normalizedDraft = String(draftText || '');
@@ -207,7 +211,11 @@ export const useConversationStore = defineStore('conversation', {
       }
       writeDraftCache(cache);
 
-      if (options.persist === false || !identity.channelId) return;
+      if (
+        options.persist === false
+        || !identity.channelId
+        || !shouldPersistConversationDraft(conversation, identity)
+      ) return;
       this.draftDirtyKeys[key] = true;
       if (this.draftSyncTimers[key]) {
         clearTimeout(this.draftSyncTimers[key]);

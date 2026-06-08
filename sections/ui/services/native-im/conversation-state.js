@@ -54,6 +54,13 @@ export function conversationDraftKey(channelId, channelType = 1) {
   return `${clean(channelId)}-${Number(channelType || 1)}`;
 }
 
+export function shouldPersistConversationDraft(conversation = {}, identity = {}) {
+  const channelId = clean(identity.channelId || conversation.channelId || conversation.channel_id || conversation.id);
+  if (!channelId) return false;
+  if (conversation.source === 'mock' || conversation.type === 'robot' || conversation.isAgent) return false;
+  return true;
+}
+
 function conversationIdentity(conversation = {}) {
   return {
     channelId: clean(conversation.channelId || conversation.channel_id || conversation.id),

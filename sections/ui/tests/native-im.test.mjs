@@ -1,11 +1,15 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
 
-import { createNativeImService } from '../services/native-im/service.js';
+import {
+  createNativeImService,
+  selectWsAddressForBrowser
+} from '../services/native-im/service.js';
 import {
   applyDraftToConversationList,
   mergeRemoteDrafts,
   normalizeNativeGroup,
+  shouldPersistConversationDraft,
   upsertGroupConversation
 } from '../services/native-im/conversation-state.js';
 import { normalizeConversation } from '../services/native-im/normalizers.js';
@@ -118,6 +122,44 @@ test('conversation helpers merge local and remote drafts predictably', () => {
   assert.equal(withLocal[0].draft, '本机草稿');
   assert.equal(merged[0].draft, '本机草稿');
   assert.equal(cleanMerged[0].draft, '远端草稿');
+});
+
+test('conversation draft persistence skips local robot and mock conversations', () => {
+  assert.equal(
+    shouldPersistConversationDraft({ id: 'clowder_ai', channelId: 'clowder_ai', channelType: 1, type: 'robot', isAgent: true }),
+    false
+  );
+  assert.equal(
+    shouldPersistConversationDraft({ id: '2', channelId: '2', channelType: 2, type: 'group', source: 'mock' }),
+    false
+  );
+  assert.equal(
+    shouldPersistConversationDraft({ id: 'group-a', channelId: 'group-a', channelType: 2, type: 'group' }),
+    true
+  );
+});
+
+test('websocket address selection prefers ws for local http h5 sessions', () => {
+  assert.equal(
+    selectWsAddressForBrowser({
+      wss_addr: 'wss://100.79.157.76:5210/',
+      ws_addr: '100.79.157.76:5210'
+    }, {
+      protocol: 'http:',
+      locationHostname: '100.79.157.76'
+    }),
+    'ws://100.79.157.76:5210/'
+  );
+  assert.equal(
+    selectWsAddressForBrowser({
+      wss_addr: 'wss://im.example.com/ws',
+      ws_addr: 'im.example.com/ws'
+    }, {
+      protocol: 'https:',
+      locationHostname: 'app.example.com'
+    }),
+    'wss://im.example.com/ws'
+  );
 });
 
 test('conversation helpers normalize groups and upsert channelType 2 conversations', () => {

@@ -129,6 +129,29 @@ function extractWsAddrs(resp = {}) {
     .filter(Boolean);
 }
 
+function browserProtocol(options = {}) {
+  return options.protocol || (typeof window !== 'undefined' ? window.location.protocol : '');
+}
+
+function hostnameFromUrl(value = '') {
+  try {
+    return new URL(value).hostname;
+  } catch {
+    return '';
+  }
+}
+
+function isLocalNetworkHost(hostname = '') {
+  const host = String(hostname || '').toLowerCase();
+  if (!host) return false;
+  if (host === 'localhost' || host === '0.0.0.0' || host === '127.0.0.1') return true;
+  if (/^(10|192\.168)\./.test(host)) return true;
+  const parts = host.split('.').map((part) => Number(part));
+  if (parts.length !== 4 || parts.some((part) => !Number.isFinite(part))) return false;
+  return parts[0] === 172 && parts[1] >= 16 && parts[1] <= 31
+    || parts[0] === 100 && parts[1] >= 64 && parts[1] <= 127;
+}
+
 export function normalizeWsAddressForBrowser(addr = '', options = {}) {
   const raw = String(addr || '').trim();
   if (!raw) return '';
@@ -145,7 +168,7 @@ export function normalizeWsAddressForBrowser(addr = '', options = {}) {
     if (wildcardHosts.has(url.hostname) && browserHostname) {
       url.hostname = browserHostname;
     }
-    const protocol = options.protocol || (typeof window !== 'undefined' ? window.location.protocol : '');
+    const protocol = browserProtocol(options);
     if (protocol === 'https:' && url.protocol === 'ws:') {
       url.protocol = 'wss:';
     }
@@ -153,6 +176,20 @@ export function normalizeWsAddressForBrowser(addr = '', options = {}) {
   } catch {
     return raw;
   }
+}
+
+export function selectWsAddressForBrowser(resp = {}, options = {}) {
+  const addrs = extractWsAddrs(resp).map((addr) => normalizeWsAddressForBrowser(addr, options)).filter(Boolean);
+  if (!addrs.length) return '';
+  const protocol = browserProtocol(options);
+  const preferred = protocol === 'https:'
+    ? addrs.find((addr) => addr.startsWith('wss://'))
+    : addrs.find((addr) => addr.startsWith('ws://'));
+  const selected = preferred || addrs[0];
+  if (protocol === 'http:' && selected.startsWith('wss://') && isLocalNetworkHost(hostnameFromUrl(selected))) {
+    return selected.replace(/^wss:\/\//i, 'ws://');
+  }
+  return selected;
 }
 
 function messageChannelIdentity(message = {}) {
@@ -281,8 +318,8 @@ export function createNativeImService(options = {}) {
     shared.config.provider.connectAddrCallback = async (callback) => {
       const uid = shared.config.uid || readStorage('app_user_uid') || '';
       const resp = await client.get(`users/${encodeURIComponent(uid)}/im`);
-      const addrs = extractWsAddrs(resp);
-      if (addrs[0]) callback(normalizeWsAddressForBrowser(addrs[0]));
+      const addr = selectWsAddressForBrowser(resp);
+      if (addr) callback(addr);
     };
     shared.config.provider.syncConversationsCallback = async () => {
       const conversations = await syncConversations();
