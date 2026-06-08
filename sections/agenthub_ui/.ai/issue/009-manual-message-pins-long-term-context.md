@@ -134,10 +134,13 @@ type ManualContextPin = {
 
 | 测试类型 | 命令 / 操作 | 结果 |
 |---|---|---|
-| Layer 1 Build Gate | `pnpm type-check && pnpm lint && pnpm test:unit` | Pending |
-| Layer 2 Component | Message context menu pin/unpin state | Pending |
-| Layer 3 Store | `pinnedMessages` hydration + optimistic update + rollback | Pending |
-| Layer 5 E2E | H5 pin -> refresh -> context briefing visible -> unpin | Pending |
+| Layer 1 Unit Gate | `PNPM_CONFIG_VERIFY_DEPS_BEFORE_RUN=false pnpm test:unit` in `sections/agenthub_ui` | PASS - 9 files / 93 tests |
+| Layer 1 H5 Build Gate | `PNPM_CONFIG_VERIFY_DEPS_BEFORE_RUN=false pnpm build:h5` in `sections/agenthub_ui` | PASS - build complete; existing Sass/dynamic import warnings only |
+| Layer 1 Clowder API Gate | `pnpm build && node --test test/agent-router-manual-context-pins.test.js test/manual-context-pins.test.js test/f148-context-transport.test.js test/f148-assemble-incremental.test.js test/f148-context-briefing.test.js` in `sections/clowder-ai/packages/api` | PASS - 121 tests |
+| Layer 1 TangSeng Proxy Gate | `go test ./modules/clowder` in `sections/im/TangSengDaoDaoServer` | PASS |
+| Layer 2 Component | Message menu label, bubble badge, pinned context panel, degraded status contract | Covered by `tests/unit/manual-message-pins-smoke.spec.js` and H5 build |
+| Layer 3 Store | `pinnedMessages` hydration, optimistic toggle, reset, unavailable placeholder | Covered by `tests/unit/im-domain.spec.js` |
+| Layer 5 E2E | `node .ai/tests/manual-message-pins-smoke.mjs` | BLOCKED - requires `TEST_PASSWORD`, H5 URL / IM Web URL, and explicit authorization to use/start the live runtime stack |
 
 ---
 
@@ -155,18 +158,65 @@ Issue 009 实施沿用该契约：能解析出 thread id 时把 message pin mirr
 
 ## 修复记录
 
-暂无。此 issue 用于立项和实现追踪。
+### 2026-06-08 implementation branch
+
+- `5e62d2f` - 确认 AgentHub conversation -> Clowder thread binding 契约。
+- `4da8051` - 补齐 AgentHub pinned message API parity。
+- `cc5714e` - Message store 支持 pin toggle、hydration、unavailable placeholder 与 reset。
+- `250e0de` - 接入消息菜单、气泡 badge、会话 pinned context panel。
+- `fcb3ecc` - 新增 Clowder manual context pin API、store port、Redis store 与 AgentHub mirror。
+- `debd5a9` - F148 context assembly 注入 manual pins，并在 briefing 展示数量与摘要。
+- `e38c83b` - 补齐 live H5 smoke 脚本与 TangSeng source-status proxy。
+- `7c96c81` - 强化 live smoke 对 degraded label 的强断言，并修复 manual pin 同毫秒排序稳定性。
 
 ---
 
 ## 测试结果
 
 ```bash
-# Not run: issue proposal only.
+# 2026-06-08, branch feat/manual-message-pins, HEAD 7c96c81
+cd sections/agenthub_ui
+PNPM_CONFIG_VERIFY_DEPS_BEFORE_RUN=false pnpm test:unit
+# PASS: 9 test files, 93 tests
+
+PNPM_CONFIG_VERIFY_DEPS_BEFORE_RUN=false pnpm build:h5
+# PASS: build complete
+
+cd ../clowder-ai/packages/api
+pnpm build && node --test test/agent-router-manual-context-pins.test.js test/manual-context-pins.test.js test/f148-context-transport.test.js test/f148-assemble-incremental.test.js test/f148-context-briefing.test.js
+# PASS: 121 tests
+
+cd ../../im/TangSengDaoDaoServer
+go test ./modules/clowder
+# PASS
+
+cd /home/yunyi/Desktop/Bytedance_cmp/cat-cafe-manual-message-pins
+node --check sections/agenthub_ui/.ai/tests/manual-message-pins-smoke.mjs
+git diff --check
+# PASS
+
+# Not run:
+cd sections/agenthub_ui
+node .ai/tests/manual-message-pins-smoke.mjs
+# BLOCKED: TEST_PASSWORD is not set; H5 / IM Web live runtime URLs are not set;
+# protected runtime stack must not be started or targeted without explicit user authorization.
 ```
 
 ---
 
 ## 关闭备注
 
-待实现后补充 PR、截图证据和 context assembly 验证记录。
+Implementation is present on `feat/manual-message-pins` through `7c96c81`, and non-live gates cover API adapter, store behavior, Clowder routes/store, F148 priority/briefing, degraded exclusion, H5 build, smoke-script contract, and TangSeng proxy.
+
+Do not close Issue 009 yet. The plan's final close condition still requires live H5 evidence under `sections/agenthub_ui/.ai/tests-e2e/manual-pins-<timestamp>/` containing:
+
+- `01-menu-pin.png`
+- `02-badge-after-pin.png`
+- `03-refresh-pin-list.png`
+- `04-briefing-manual-pin.png`
+- `05-unpin-removed.png`
+- `06-degraded-source-deleted.png`
+- `diagnostics.log`
+- `network.json`
+
+To finish: set `TEST_PASSWORD` and the target H5 / IM Web URLs, explicitly authorize live runtime validation, then run `node .ai/tests/manual-message-pins-smoke.mjs` from `sections/agenthub_ui`.
