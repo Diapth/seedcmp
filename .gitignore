@@ -13,7 +13,11 @@ __pycache__/
 .pnpm-home/
 
 sections/im_web/assets
-
+manual-test-artifacts/
+screenshots/
+tests/
+workspaces/
+maomi_workspace/
 # IM backend sources are tracked for V2/V3 integration.
 sections/im/*
 !sections/im/TangSengDaoDaoServer/
