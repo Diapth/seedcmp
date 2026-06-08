@@ -957,11 +957,17 @@ function handleCreate() {
       return;
     }
 
-    agentStore.createAgent(payload);
+    const createdId = agentStore.createAgent(payload);
+    const createdAgent = agentStore.agents.find(agent => agent.id === createdId);
+    if (createdAgent) {
+      convStore.upsertAgentConversation(createdAgent);
+      convStore.setActiveId(createdId);
+      uni.setStorageSync('active_conversation_id', createdId);
+    }
     submitting.value = false;
     uni.showToast({ title: '智能体已部署', icon: 'success' });
     setTimeout(() => {
-      uni.redirectTo({ url: '/pages/agents/index' });
+      uni.redirectTo({ url: `/pages/chat/detail?id=${encodeURIComponent(createdId)}` });
     }, 700);
   }, 600);
 }

@@ -9,6 +9,7 @@ import {
   isSelfSender,
   mergeNativeMessageIntoList,
   mergeNativeMessageLists,
+  mergeAgentReplyEventIntoList,
   resolveSelfAvatar,
   resolveSelfId,
   resolveSelfName
@@ -320,6 +321,19 @@ export const useMessageStore = defineStore('message', {
         }
       }
       return received;
+    },
+    receiveAgentReplyEvent(conversationId, event = {}) {
+      if (!conversationId) return [];
+      const convStore = useConversationStore();
+      if (!this.messages[conversationId]) this.messages[conversationId] = [];
+
+      this.messages[conversationId] = mergeAgentReplyEventIntoList(this.messages[conversationId], event);
+      const conversation = findConversation(convStore, conversationId);
+      const latest = this.messages[conversationId]?.at(-1);
+      if (conversation && latest) {
+        updateConversationSummary(conversation, latest, readCurrentUser());
+      }
+      return this.messages[conversationId];
     },
     updateNativeSendStatus(ack = {}) {
       if (!ack.clientSeq) return null;

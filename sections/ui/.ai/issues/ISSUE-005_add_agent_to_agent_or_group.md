@@ -1,6 +1,6 @@
 # [ISSUE-005] 实现在智能体中添加智能体
 
-**状态**：Open
+**状态**：Resolved
 **创建时间**：2026-06-08
 **标签**：feature, clowder, agent, membership
 
@@ -61,13 +61,13 @@ sections/im_web/packages/datasource-vue/src/stores/clowderStore.ts:1225-1292
 
 ## 修复记录
 
-待修复。
+新增 `createAgentMember` 和 `conversationStore.addAgentMember`；群成员添加弹窗现在把未加入群聊的智能体合并到候选列表，添加后以 `isAgent/alias` 成员身份进入群成员列表并可作为 `@` 候选。
 
 ---
 
 ## 测试结果
 
-建议增加 group member 页面、输入框 @ 候选、Clowder prompt 更新测试。
+已新增 agent member helper 回归测试；浏览器验收在 375x844、768x1024、1024x768、1440x900 打开群成员添加弹窗并确认 Codex 智能体候选可见。自动化命令全部通过。
 
 ---
 

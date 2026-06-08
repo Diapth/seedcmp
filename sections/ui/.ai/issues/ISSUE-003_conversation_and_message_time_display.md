@@ -1,6 +1,6 @@
 # [ISSUE-003] 实现群聊和单人聊天会话的时间显示
 
-**状态**：Open
+**状态**：Resolved
 **创建时间**：2026-06-08
 **标签**：feature, ui, conversation, time
 
@@ -58,13 +58,13 @@ sections/im_web/packages/datasource-vue/src/stores/conversationStore.ts:475, 536
 
 ## 修复记录
 
-待修复。
+新增 `normalizeTimestampMs` 并复用到聊天/会话时间格式化，秒级和毫秒级 timestamp 都会正确显示；消息时间分割阈值按 issue 调整为 5 分钟。浏览器验收同时覆盖消息列表时间分割不会出现 1970 年错误。
 
 ---
 
 ## 测试结果
 
-建议增加格式化工具测试和消息列表渲染 smoke。
+已新增秒/毫秒时间格式化和 5 分钟分割测试；`npm run test:native-im` 通过。`npm run build:h5`、`npm run test:smoke` 和四视口浏览器验收通过。
 
 ---
 

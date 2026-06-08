@@ -1,6 +1,6 @@
 # [ISSUE-004] 实现智能体创建群聊
 
-**状态**：Open
+**状态**：Resolved
 **创建时间**：2026-06-08
 **标签**：feature, clowder, group, agent
 
@@ -61,13 +61,13 @@ sections/im_web/.ai/V3.0/issues/V3-40_pm_should_create_project_group_chats.md
 
 ## 修复记录
 
-待修复。
+确认现有智能体看板 `pages/agents/board.vue` 已通过 `ensureGroupConversation` 支持从智能体任务上下文创建/复用项目群聊并跳转，同时写入带 `@智能体` 的修改草稿。新增 agent conversation/member helper 后，新建智能体和群聊上下文共用统一智能体身份。
 
 ---
 
 ## 测试结果
 
-建议覆盖确认卡、取消、确认创建、复用群、打开群和 thread 绑定。
+已通过 `npm run test:native-im`、`npm run build:h5`、`npm run test:smoke`。浏览器验收覆盖智能体页、群成员页和聊天详情四视口可达性。后续真实 PM 确认卡/后端 thread binding 可在 Clowder 接口接入时扩展。
 
 ---
 

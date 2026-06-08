@@ -34,7 +34,154 @@ function messageDigest(message = {}) {
   return clean(message.content) || '收到一条新消息';
 }
 
+function normalizeTimestampMs(value, fallback = Date.now()) {
+  const next = safeNumber(value, fallback);
+  return next > 100000000000 ? next : next * 1000;
+}
+
+function normalizeStreamPhase(event = {}) {
+  const raw = clean(event.phase || event.stage || event.event || event.status || event.type).toLowerCase();
+  if (['thinking', 'placeholder', 'start', 'created'].includes(raw)) return 'placeholder';
+  if (['chunk', 'delta', 'streaming'].includes(raw)) return 'chunk';
+  if (['final', 'done', 'completed', 'complete'].includes(raw)) return 'final';
+  return event.delta ? 'chunk' : 'final';
+}
+
+function normalizeAgentFile(file = {}, streamKey = '', index = 0) {
+  const name = firstNonEmpty(file.fileName, file.name, file.title, `智能体文件-${index + 1}`);
+  const url = firstNonEmpty(file.url, file.sourceUrl, file.contentUrl, file.path);
+  return {
+    id: firstNonEmpty(file.id, file.fileId, `${streamKey}-file-${index}`),
+    type: 'file',
+    content: name,
+    name,
+    fileName: name,
+    fileSize: file.fileSize || file.size || '',
+    fileSizeBytes: safeNumber(file.fileSizeBytes ?? file.bytes, 0),
+    fileType: firstNonEmpty(file.fileType, file.ext, name.split('.').pop()),
+    mimeType: firstNonEmpty(file.mimeType, file.type),
+    url,
+    sourceUrl: firstNonEmpty(file.sourceUrl, url),
+    contentUrl: firstNonEmpty(file.contentUrl, url),
+    previewContent: firstNonEmpty(file.previewContent, file.contentText, file.markdown, file.text),
+    generatedByAgent: true,
+    source: 'clowder',
+    raw: file
+  };
+}
+
+export function normalizeAgentReplyEvent(event = {}) {
+  const streamKey = firstNonEmpty(
+    event.streamKey,
+    event.stream_key,
+    event.streamId,
+    event.stream_id,
+    event.clientMsgNo,
+    event.client_msg_no,
+    event.messageId,
+    event.message_id,
+    event.id
+  );
+  const phase = normalizeStreamPhase(event);
+  const content = firstNonEmpty(event.content, event.text, event.markdown, event.message);
+  const delta = firstNonEmpty(event.delta, event.contentDelta, event.content_delta, phase === 'chunk' ? content : '');
+  const files = firstArray(event.files, event.attachments, event.generatedFiles, event.generated_files)
+    .map((file, index) => normalizeAgentFile(file, streamKey, index));
+
+  return {
+    streamKey,
+    phase,
+    content,
+    delta,
+    files,
+    senderId: firstNonEmpty(event.senderId, event.sender_id, event.agentId, event.agent_id, 'clowder'),
+    senderName: firstNonEmpty(event.senderName, event.sender_name, event.agentName, event.agent_name, 'Clowder AI'),
+    senderAvatar: firstNonEmpty(event.senderAvatar, event.sender_avatar),
+    time: normalizeTimestampMs(event.time ?? event.timestamp ?? event.createdAt ?? event.created_at),
+    raw: event
+  };
+}
+
+function firstArray(...values) {
+  for (const value of values) {
+    if (Array.isArray(value)) return value;
+  }
+  return [];
+}
+
+export function mergeAgentReplyEventIntoList(messages = [], event = {}) {
+  const normalized = normalizeAgentReplyEvent(event);
+  if (!normalized.streamKey) return [...messages];
+
+  const next = [...messages];
+  const index = next.findIndex((message) => {
+    const key = firstNonEmpty(message.streamKey, message.clientMsgNo, message.messageId, message.id);
+    return key === normalized.streamKey;
+  });
+  const existing = index >= 0 ? next[index] : null;
+  const isFinal = normalized.phase === 'final';
+  const content = isFinal
+    ? (normalized.content || existing?.content || normalized.delta)
+    : normalized.phase === 'chunk'
+      ? `${existing?.content || ''}${normalized.delta || normalized.content}`
+      : (normalized.content || existing?.content || '正在思考...');
+
+  const merged = {
+    reactions: [],
+    replyRef: null,
+    mentions: [],
+    ...(existing || {}),
+    id: normalized.streamKey,
+    clientMsgNo: normalized.streamKey,
+    streamKey: normalized.streamKey,
+    senderId: normalized.senderId,
+    senderName: normalized.senderName,
+    senderAvatar: normalized.senderAvatar,
+    type: 'text',
+    content,
+    time: existing?.time || normalized.time,
+    status: isFinal ? 'success' : 'sending',
+    streaming: !isFinal,
+    renderMode: 'markdown',
+    source: 'clowder',
+    raw: normalized.raw
+  };
+
+  if (index >= 0) {
+    next[index] = merged;
+  } else {
+    next.push(merged);
+  }
+
+  if (isFinal && normalized.files.length) {
+    normalized.files.forEach((file, fileIndex) => {
+      const id = file.id || `${normalized.streamKey}-file-${fileIndex}`;
+      const fileMessage = {
+        reactions: [],
+        replyRef: null,
+        mentions: [],
+        ...file,
+        id,
+        senderId: normalized.senderId,
+        senderName: normalized.senderName,
+        senderAvatar: normalized.senderAvatar,
+        status: 'success',
+        time: normalized.time + fileIndex + 1
+      };
+      const existingFileIndex = next.findIndex((message) => message.id === id);
+      if (existingFileIndex >= 0) {
+        next[existingFileIndex] = { ...next[existingFileIndex], ...fileMessage };
+      } else {
+        next.push(fileMessage);
+      }
+    });
+  }
+
+  return sortMessages(next);
+}
+
 export function collectSelfIds(currentUser = {}) {
+  currentUser = currentUser || {};
   const raw = currentUser.raw || {};
   const ids = [
     'me',
@@ -57,20 +204,24 @@ export function collectSelfIds(currentUser = {}) {
 }
 
 export function isSelfSender(senderId, currentUser = {}) {
+  currentUser = currentUser || {};
   const id = clean(senderId);
   if (!id) return false;
   return collectSelfIds(currentUser).has(id);
 }
 
 export function resolveSelfId(currentUser = {}) {
+  currentUser = currentUser || {};
   return firstNonEmpty(currentUser.id, currentUser.uid, currentUser.raw?.uid, 'me');
 }
 
 export function resolveSelfName(currentUser = {}, fallback = '我') {
+  currentUser = currentUser || {};
   return firstNonEmpty(currentUser.remark, currentUser.nickname, currentUser.name, currentUser.raw?.name, fallback);
 }
 
 export function resolveSelfAvatar(currentUser = {}) {
+  currentUser = currentUser || {};
   return firstNonEmpty(currentUser.avatar, currentUser.logo, currentUser.raw?.avatar, currentUser.raw?.logo);
 }
 

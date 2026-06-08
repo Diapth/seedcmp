@@ -8,6 +8,10 @@ import {
   mergeRemoteDrafts,
   upsertGroupConversation
 } from '@/services/native-im/conversation-state';
+import {
+  createAgentConversation,
+  createAgentMember
+} from '@/services/native-im/agent-state';
 
 function channelTypeFromConversation(conversation = {}) {
   if (conversation.channelType) return Number(conversation.channelType);
@@ -337,6 +341,12 @@ export const useConversationStore = defineStore('conversation', {
         this.members[convId].push({ isMuted: false, role: 'member', ...member });
       }
     },
+    addAgentMember(convId, agent) {
+      const member = createAgentMember(agent);
+      if (!member.id) return null;
+      this.addMember(convId, member);
+      return this.members[convId].find((item) => item.id === member.id) || null;
+    },
     removeMember(convId, memberId) {
       if (!this.members[convId]) return;
       this.members[convId] = this.members[convId].filter((m) => m.id !== memberId);
@@ -425,6 +435,23 @@ export const useConversationStore = defineStore('conversation', {
     upsertGroupConversation(group) {
       this.conversations = upsertGroupConversation(this.conversations, group);
       return this.conversations.find((item) => item.id === (group.id || group.groupNo || group.group_no)) || null;
+    },
+    upsertAgentConversation(agent) {
+      const nextConversation = createAgentConversation(agent);
+      if (!nextConversation.id) return null;
+      const existing = this.conversations.find((item) => item.id === nextConversation.id);
+      if (existing) {
+        Object.assign(existing, {
+          ...nextConversation,
+          draft: existing.draft || nextConversation.draft,
+          unread: existing.unread || 0,
+          isPinned: existing.isPinned || nextConversation.isPinned,
+          isMuted: existing.isMuted || nextConversation.isMuted
+        });
+      } else {
+        this.conversations.unshift(nextConversation);
+      }
+      return this.conversations.find((item) => item.id === nextConversation.id) || null;
     },
     applyNativeGroups(groups = []) {
       groups.forEach((group) => {

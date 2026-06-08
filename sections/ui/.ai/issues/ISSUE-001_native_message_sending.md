@@ -1,6 +1,6 @@
 # [ISSUE-001] 实现用户与群聊或其他用户的消息发送
 
-**状态**：Open
+**状态**：Resolved
 **创建时间**：2026-06-08
 **标签**：feature, native-im, message, group
 
@@ -60,19 +60,21 @@ sections/im_web/packages/datasource-vue/src/stores/messageStore.ts:1471-1532
 
 ## 修复记录
 
-待修复。
+已确认 `MessageInput.vue` 的文本、图片、文件、语音入口统一 emit 到 `messageStore.sendNativeMessage`；`sendNativeMessage` 负责 pending 入列、SDK 文本/媒体发送、文件上传、ACK/echo 合并、失败状态和历史同步合并。补充空用户 smoke 回归，避免未登录演示数据渲染崩溃。
 
 ---
 
 ## 测试结果
 
-建议新增：
+已通过：
 
 ```bash
 npm run test:native-im
-npm run test:smoke
 npm run build:h5
+npm run test:smoke
 ```
+
+浏览器验收：`http://localhost:5173/`，375x844、768x1024、1024x768、1440x900 均通过。
 
 ---
 

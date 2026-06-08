@@ -1,18 +1,22 @@
+import { normalizeTimestampMs } from './formatMessage.js';
+
 export function formatTime(timestamp) {
   if (!timestamp) return '';
-  const date = new Date(timestamp);
+  const normalized = normalizeTimestampMs(timestamp);
+  if (!normalized) return '';
+  const date = new Date(normalized);
   const now = new Date();
   
   const today = new Date(now.getFullYear(), now.getMonth(), now.getDate()).getTime();
   const yesterday = today - 24 * 3600 * 1000;
   
-  if (timestamp >= today) {
+  if (normalized >= today) {
     const hrs = String(date.getHours()).padStart(2, '0');
     const mins = String(date.getMinutes()).padStart(2, '0');
     return `${hrs}:${mins}`;
-  } else if (timestamp >= yesterday) {
+  } else if (normalized >= yesterday) {
     return '昨天';
-  } else if (now.getTime() - timestamp < 7 * 24 * 3600 * 1000) {
+  } else if (now.getTime() - normalized < 7 * 24 * 3600 * 1000) {
     const days = ['星期日', '星期一', '星期二', '星期三', '星期四', '星期五', '星期六'];
     return days[date.getDay()];
   } else {

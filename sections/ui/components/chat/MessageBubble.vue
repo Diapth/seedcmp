@@ -70,7 +70,7 @@
         >
           <!-- Text Message -->
           <text
-            v-if="data.type === 'text'"
+            v-if="data.type === 'text' && !isMarkdownText"
             class="bubble-text"
             space="emsp"
           ><text
@@ -78,6 +78,11 @@
               :key="idx"
               :class="{ 'mention-highlight': seg.mention }"
             >{{ seg.text }}</text></text>
+          <view
+            v-else-if="data.type === 'text' && isMarkdownText"
+            class="bubble-markdown"
+            v-html="renderedMarkdown"
+          />
 
           <!-- Image Message -->
           <image
@@ -139,6 +144,7 @@
 
 <script setup>
 import { computed } from 'vue';
+import MarkdownIt from 'markdown-it';
 import { useAppStore } from '@/stores/app';
 import AppAvatar from '../common/AppAvatar.vue';
 import AppIcon from '../common/AppIcon.vue';
@@ -177,6 +183,13 @@ const emit = defineEmits([
 ]);
 
 const appStore = useAppStore();
+const markdown = new MarkdownIt({
+  html: false,
+  linkify: true,
+  breaks: true
+});
+
+markdown.validateLink = (url) => /^(https?:|mailto:|tel:)/i.test(url || '');
 
 const isMe = computed(() => {
   return isSelfSender(props.data.senderId, appStore.currentUser);
@@ -213,6 +226,14 @@ const textSegments = computed(() => {
   }
   return segments;
 });
+
+const isMarkdownText = computed(() => {
+  if (props.data.renderMode === 'markdown' || props.data.isMarkdown) return true;
+  if (props.data.source === 'clowder') return true;
+  return /(^|\n)(#{1,6}\s|```|\|.+\||[-*]\s|\d+\.\s|>\s)/.test(props.data.content || '');
+});
+
+const renderedMarkdown = computed(() => markdown.render(props.data.content || ''));
 
 function handleContextMenu(e) {
   emit('contextmenu', { event: e, msg: props.data });
@@ -358,6 +379,70 @@ function openLightbox(images, index) {
   max-width: 200px;
   border-radius: 8px;
   display: block;
+}
+
+.bubble-markdown {
+  max-width: 100%;
+  overflow-x: auto;
+  font-size: 14px;
+  line-height: 1.6;
+}
+
+.bubble-markdown :deep(p) {
+  margin: 0 0 8px;
+}
+
+.bubble-markdown :deep(p:last-child) {
+  margin-bottom: 0;
+}
+
+.bubble-markdown :deep(pre) {
+  margin: 8px 0;
+  padding: 10px;
+  border-radius: 8px;
+  overflow-x: auto;
+  background-color: rgba(15, 23, 42, 0.08);
+}
+
+.bubble-markdown :deep(code) {
+  padding: 1px 4px;
+  border-radius: 4px;
+  background-color: rgba(15, 23, 42, 0.08);
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+  font-size: 0.92em;
+}
+
+.bubble-markdown :deep(pre code) {
+  padding: 0;
+  background-color: transparent;
+}
+
+.bubble-markdown :deep(table) {
+  width: max-content;
+  max-width: 100%;
+  margin: 8px 0;
+  border-collapse: collapse;
+  font-size: 13px;
+}
+
+.bubble-markdown :deep(th),
+.bubble-markdown :deep(td) {
+  padding: 6px 8px;
+  border: 1px solid rgba(148, 163, 184, 0.42);
+  text-align: left;
+  white-space: nowrap;
+}
+
+.bubble-markdown :deep(ul),
+.bubble-markdown :deep(ol) {
+  margin: 8px 0;
+  padding-left: 20px;
+}
+
+.bubble-markdown :deep(a) {
+  color: currentColor;
+  text-decoration: underline;
+  text-underline-offset: 2px;
 }
 
 .bubble-image-only,
