@@ -664,6 +664,133 @@ test('agent placeholder ack adds reaction to user prompt instead of visible thin
   assert.deepEqual(acknowledged[0].reactions, [{ emoji: '👀', userIds: ['clowder:opus'], count: 1 }]);
 });
 
+test('native clowder placeholder without target reacts to latest self prompt and stays hidden', () => {
+  const userPrompt = {
+    id: 'prompt-real-ack-1',
+    messageId: 'prompt-real-ack-1',
+    clientMsgNo: 'prompt-real-ack-1',
+    senderId: 'u1',
+    senderName: '我',
+    content: '真实账号问题复现',
+    type: 'text',
+    status: 'success',
+    time: 1000,
+    reactions: []
+  };
+  const placeholder = normalizeMessage({
+    message_id: 'placeholder-real-1',
+    from_uid: 'clowder_cat:opus',
+    payload: JSON.stringify({
+      type: 1000,
+      event: 'clowder_stream',
+      stream_key: 'im-web-real-placeholder-1',
+      phase: 'placeholder',
+      content: '【布偶猫🐱】🤔 思考中...',
+      markdown: true
+    }),
+    timestamp: 2
+  });
+
+  const merged = messageState.mergeNativeMessageIntoList(
+    [userPrompt],
+    placeholder,
+    {
+      currentUser: { id: 'u1' },
+      conversation: { id: 'clowder_cat:opus', type: 'robot', source: 'clowder' }
+    }
+  );
+
+  assert.equal(merged.length, 1);
+  assert.equal(merged[0].id, 'prompt-real-ack-1');
+  assert.deepEqual(merged[0].reactions, [{ emoji: '👀', userIds: ['clowder_cat:opus'], count: 1 }]);
+  assert.equal(merged.some((message) => /思考中/.test(String(message.content || ''))), false);
+});
+
+test('synced clowder history restores cached prompt after refresh and filters standalone thinking placeholders', () => {
+  const cachedPrompt = {
+    id: 'cached-refresh-prompt-1',
+    messageId: 'cached-refresh-prompt-1',
+    clientMsgNo: 'cached-refresh-prompt-1',
+    senderId: 'u1',
+    senderName: '我',
+    content: '刷新后仍应显示这条用户消息',
+    type: 'text',
+    status: 'success',
+    source: 'clowder',
+    time: 1000,
+    reactions: []
+  };
+  const placeholder = normalizeMessage({
+    message_id: 'placeholder-refresh-1',
+    from_uid: 'clowder_cat:opus',
+    payload: JSON.stringify({
+      type: 1000,
+      event: 'clowder_stream',
+      stream_key: 'im-web-refresh-placeholder-1',
+      phase: 'placeholder',
+      content: '【布偶猫🐱】🤔 思考中...',
+      markdown: true
+    }),
+    timestamp: 2
+  });
+  const finalReply = normalizeMessage({
+    message_id: 'final-refresh-1',
+    from_uid: 'clowder_cat:opus',
+    payload: JSON.stringify({
+      type: 1,
+      content: '刷新后仍应显示这条用户消息 收到，宪宪确认通过 ✅'
+    }),
+    timestamp: 3
+  });
+
+  const merged = messageState.mergeSyncedMessagesPreservingLocalContext(
+    [],
+    [placeholder, finalReply],
+    {
+      currentUser: { id: 'u1' },
+      conversation: { id: 'clowder_cat:opus', type: 'robot', source: 'clowder' },
+      preservedContextMessages: [cachedPrompt]
+    }
+  );
+
+  assert.deepEqual(merged.map((message) => message.id), ['cached-refresh-prompt-1', 'final-refresh-1']);
+  assert.deepEqual(merged[0].reactions, [{ emoji: '👀', userIds: ['clowder_cat:opus'], count: 1 }]);
+  assert.equal(merged.some((message) => /思考中/.test(String(message.content || ''))), false);
+});
+
+test('clowder prompt context cache survives refresh and deduplicates prompts per account conversation', () => {
+  assert.equal(typeof messageState.rememberClowderPromptContext, 'function');
+  assert.equal(typeof messageState.readClowderPromptContext, 'function');
+  const values = new Map();
+  const storage = {
+    getStorageSync: (key) => values.get(key) || '',
+    setStorageSync: (key, value) => values.set(key, value)
+  };
+  const currentUser = { id: 'u1', name: '我' };
+  const prompt = {
+    id: 'remote-prompt-cache-1',
+    messageId: 'remote-prompt-cache-1',
+    clientMsgNo: 'local-prompt-cache-1',
+    senderId: 'u1',
+    senderName: '我',
+    content: '缓存这条真实用户消息',
+    type: 'text',
+    status: 'success',
+    time: 1000,
+    reactions: []
+  };
+
+  messageState.rememberClowderPromptContext(storage, 'clowder_cat:opus', prompt, currentUser);
+  messageState.rememberClowderPromptContext(storage, 'clowder_cat:opus', prompt, currentUser);
+
+  const restored = messageState.readClowderPromptContext(storage, 'clowder_cat:opus', currentUser);
+
+  assert.equal(restored.length, 1);
+  assert.equal(restored[0].id, 'remote-prompt-cache-1');
+  assert.equal(restored[0].content, '缓存这条真实用户消息');
+  assert.equal(restored[0].senderId, 'u1');
+});
+
 test('native clowder stream system events normalize as mergeable markdown deltas', () => {
   const chunk = normalizeMessage({
     message_id: 'evt-chunk-1',
