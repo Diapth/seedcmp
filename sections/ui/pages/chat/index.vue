@@ -451,6 +451,7 @@ onMounted(() => {
   const persistedId = uni.getStorageSync('active_conversation_id');
   if (persistedId) {
     convStore.setActiveId(persistedId);
+    convStore.markConversationRead(persistedId, { silent: true });
     syncActiveMessages({ silent: true });
   }
   appStore.bootstrapNativeSession();
@@ -460,6 +461,7 @@ onMounted(() => {
 function handleSelectConversation(id) {
   uni.setStorageSync('active_conversation_id', id);
   convStore.setActiveId(id);
+  convStore.markConversationRead(id, { silent: true });
   syncActiveMessages({ silent: true });
   closeFilePreview();
   closeMemberProfile();
