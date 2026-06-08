@@ -4,6 +4,7 @@ import { notifyMessage } from '@/composables/useSystemNotification';
 import { nativeImService } from '@/services/native-im/service';
 import {
   conversationSummaryForMessage,
+  createClowderMarkdownStreamEvents,
   createClientMsgNo,
   enrichNativeMessageSender,
   isSelfSender,
@@ -348,6 +349,20 @@ export const useMessageStore = defineStore('message', {
         updateConversationSummary(conversation, latest, readCurrentUser());
       }
       return this.messages[conversationId];
+    },
+    startClowderMarkdownStream(conversationId, prompt = '', options = {}) {
+      if (!conversationId) return [];
+      const events = createClowderMarkdownStreamEvents(prompt, options);
+      const intervalMs = Number(options.intervalMs ?? 120);
+      events.forEach((event, index) => {
+        const deliver = () => this.receiveAgentReplyEvent(conversationId, event);
+        if (options.immediate) {
+          deliver();
+        } else {
+          setTimeout(deliver, Math.max(0, intervalMs) * index);
+        }
+      });
+      return events;
     },
     updateNativeSendStatus(ack = {}) {
       if (!ack.clientSeq) return null;

@@ -304,6 +304,7 @@ import AppContextMenu from '@/components/common/AppContextMenu.vue';
 import ContactCard from '@/components/contacts/ContactCard.vue';
 import AgentProfilePanel from '@/components/agents/AgentProfilePanel.vue';
 import {
+  isClowderConversation,
   isSelfSender,
   resolveSelfAvatar,
   resolveSelfId,
@@ -564,6 +565,7 @@ async function syncActiveMessages(options = {}) {
 }
 
 async function handleSendMessage({ type, content, fileName, fileSize, fileSizeBytes, replyRef, previewContent, fileType, mimeType, path, file, url }) {
+  const conversation = activeConversation.value;
   const sender = {
     id: appStore.currentUser?.id || 'me',
     name: appStore.currentUser?.nickname || '我'
@@ -593,7 +595,7 @@ async function handleSendMessage({ type, content, fileName, fileSize, fileSizeBy
   }
   if (replyRef) extra.replyRef = replyRef;
 
-  await messageStore.sendNativeMessage(activeConversation.value || convStore.activeId, {
+  await messageStore.sendNativeMessage(conversation || convStore.activeId, {
     type,
     content,
     fileName,
@@ -608,6 +610,9 @@ async function handleSendMessage({ type, content, fileName, fileSize, fileSizeBy
     url,
     mentions: extra.mentions || []
   }, sender);
+  if (type === 'text' && isClowderConversation(conversation)) {
+    messageStore.startClowderMarkdownStream(conversation.id, content);
+  }
   replyTarget.value = null;
 }
 
