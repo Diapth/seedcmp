@@ -76,6 +76,7 @@
 
         <view class="chat-messages-area flex-1">
           <MessageList
+            ref="messageListRef"
             :list="messagesList"
             :is-group="activeConversation.type === 'group'"
             @message-contextmenu="openContextMenu"
@@ -168,6 +169,8 @@
         @preview-file="openFilePreview"
         @member-contextmenu="openMemberContextMenu"
         @select-member="openMemberProfile"
+        @jump-message="jumpToMessage"
+        @unpin-message="unpinPinnedMessage"
       />
     </view>
 
@@ -286,6 +289,7 @@ import { useConversationStore } from '@/stores/conversation';
 import { useMessageStore } from '@/stores/message';
 import { useContactStore } from '@/stores/contact';
 import { useAgentStore } from '@/stores/agent';
+import { useClowderStore } from '@/stores/clowder.js';
 import { useDeploymentStore } from '@/stores/deployment.js';
 import { storage } from '@/utils/storage.js';
 import { isClowderConversation } from '@/utils/clowder-conversation.js';
@@ -314,6 +318,7 @@ const convStore = useConversationStore();
 const messageStore = useMessageStore();
 const contactStore = useContactStore();
 const agentStore = useAgentStore();
+const clowderStore = useClowderStore();
 const deploymentStore = useDeploymentStore();
 
 const showNotificationBanner = ref(true);
@@ -325,6 +330,7 @@ const menuY = ref(0);
 const previewVisible = ref(false);
 const selectedPreviewFile = ref(null);
 const profilePaneVisible = ref(false);
+const messageListRef = ref(null);
 const mobileSearchOpen = ref(false);
 const mobileSearchFocused = ref(false);
 const mobileSearchQuery = ref('');
@@ -505,6 +511,7 @@ async function hydrateActiveMessages(conversation = activeConversation.value) {
   messageHydrationInFlight.add(key);
   try {
     await messageStore.syncMessages(channelId, channelType, { limit: 30, hydrateVisibleHistory: true });
+    await messageStore.syncPinnedMessages(channelId, channelType).catch(() => undefined);
     scheduleVisibleHistoryRefresh(conversation);
   } catch (err) {
     console.warn('[chat] message hydration failed', err);
@@ -531,6 +538,7 @@ function scheduleVisibleHistoryRefresh(conversation = activeConversation.value) 
       messageStore.syncMessages(channelId, channelType, { limit: 30, hydrateVisibleHistory: true }).catch((err) => {
         console.warn('[chat] visible history refresh failed', err);
       });
+      messageStore.syncPinnedMessages(channelId, channelType).catch(() => undefined);
     }, delay);
     visibleHistoryTimers.push(timer);
   });
@@ -746,7 +754,76 @@ function handleMenuAction({ action, msg, emoji }) {
     emojiPickerMode.value = 'reaction';
     selectedMenuMsg.value = msg;
     emojiPickerVisible.value = true;
+  } else if (action === 'pin-context' || action === 'unpin-context') {
+    toggleMessagePin(conv, msg);
   }
+}
+
+async function toggleMessagePin(conversation, msg) {
+  const channelId = conversationChannelId(conversation);
+  const channelType = conversationChannelType(conversation);
+  if (!channelId || !channelType || !msg) return;
+  const willPin = !(msg.remoteExtra?.isPinned || msg.isPinned);
+  try {
+    const updated = await messageStore.togglePinnedMessage(channelId, channelType, msg);
+    await mirrorManualContextPin(conversation, updated, willPin);
+    uni.showToast({ title: willPin ? '已加入长期上下文' : '已取消长期上下文 pin', icon: 'none' });
+  } catch (err) {
+    console.warn('[chat] toggle message pin failed', err);
+    uni.showToast({ title: '长期上下文 pin 失败', icon: 'none' });
+  }
+}
+
+async function mirrorManualContextPin(conversation, msg, shouldPin) {
+  const threadId = await resolveConversationThreadId(conversation);
+  if (!threadId) return;
+  const messageId = msg.messageID || msg.id || msg.clientMsgNo;
+  if (!messageId) return;
+  if (shouldPin && typeof clowderStore.upsertManualContextPin === 'function') {
+    await clowderStore.upsertManualContextPin(threadId, buildManualContextPinPayload(conversation, msg)).catch(() => undefined);
+  } else if (!shouldPin && typeof clowderStore.removeManualContextPin === 'function') {
+    await clowderStore.removeManualContextPin(threadId, messageId).catch(() => undefined);
+  }
+}
+
+async function resolveConversationThreadId(conversation) {
+  const channelId = conversationChannelId(conversation);
+  const channelType = conversationChannelType(conversation);
+  const key = `${channelId}-${channelType}`;
+  const cached = clowderStore.bindings[key] || clowderStore.conversations[key]?.binding || conversation?.raw || {};
+  let threadId = bindingThreadId(cached);
+  if (!threadId && channelId && typeof clowderStore.fetchBinding === 'function') {
+    const state = await clowderStore.fetchBinding(channelId, channelType).catch(() => null);
+    threadId = bindingThreadId(state?.binding || state || {});
+  }
+  return threadId;
+}
+
+function bindingThreadId(binding = {}) {
+  return String(binding.threadId || binding.thread_id || binding.projectThreadId || binding.project_thread_id || '');
+}
+
+function buildManualContextPinPayload(conversation, msg) {
+  return {
+    channelId: conversationChannelId(conversation),
+    channelType: conversationChannelType(conversation),
+    messageId: String(msg.messageID || msg.id || msg.clientMsgNo || ''),
+    messageSeq: Number(msg.messageSeq || 0),
+    clientMsgNo: msg.clientMsgNo || '',
+    contentExcerpt: String(msg.content || '').slice(0, 500),
+    senderName: msg.senderName || msg.senderId || '',
+    pinnedBy: appStore.currentUser?.uid || appStore.currentUser?.id || 'me',
+    status: 'active'
+  };
+}
+
+function jumpToMessage(messageRef) {
+  const ok = messageListRef.value?.scrollToMessage?.(messageRef);
+  if (!ok) uni.showToast({ title: '原消息暂不可见', icon: 'none' });
+}
+
+function unpinPinnedMessage(pin) {
+  toggleMessagePin(activeConversation.value, pin);
 }
 
 function handleFilePreviewQuote(payload) {

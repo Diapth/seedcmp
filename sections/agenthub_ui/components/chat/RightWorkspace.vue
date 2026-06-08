@@ -14,6 +14,13 @@
         <ClowderPanel :conversation-id="conversation.id" />
       </template>
       <template v-else-if="conversation.type === 'group'">
+        <PinnedContextPanel
+          :channel-id="groupChannelId"
+          :channel-type="groupChannelType"
+          :thread-id="projectThreadId"
+          @jump-message="$emit('jump-message', $event)"
+          @unpin="$emit('unpin-message', $event)"
+        />
         <view v-if="groupWorkspaceMode === 'project' && projectThreadId" class="project-workspace flex-column">
           <view class="board-topbar flex-row align-center justify-between">
             <button class="board-back flex-row align-center" @click="showGroupInfo">
@@ -55,6 +62,13 @@
         />
       </template>
       <template v-else>
+        <PinnedContextPanel
+          :channel-id="conversationChannelId"
+          :channel-type="conversationChannelType"
+          :thread-id="conversationThreadId"
+          @jump-message="$emit('jump-message', $event)"
+          @unpin="$emit('unpin-message', $event)"
+        />
         <view class="workspace-section flex-column align-center">
           <!-- Avatar and name -->
           <AppAvatar
@@ -112,6 +126,7 @@ import AppAvatar from '../common/AppAvatar.vue';
 import AppIcon from '../common/AppIcon.vue';
 import ClowderPanel from './ClowderPanel.vue';
 import GroupInfoPanel from './GroupInfoPanel.vue';
+import PinnedContextPanel from './PinnedContextPanel.vue';
 import ProjectArtifactsPanel from './ProjectArtifactsPanel.vue';
 import ProjectKanbanPanel from './ProjectKanbanPanel.vue';
 
@@ -122,7 +137,7 @@ const props = defineProps({
   }
 });
 
-const emit = defineEmits(['close', 'update-conversation', 'preview-file', 'member-contextmenu', 'select-member']);
+const emit = defineEmits(['close', 'update-conversation', 'preview-file', 'member-contextmenu', 'select-member', 'jump-message', 'unpin-message']);
 
 const messageStore = useMessageStore();
 const groupStore = useGroupStore();
@@ -173,6 +188,11 @@ const sharedFiles = computed(() => {
   return msgs.filter((m) => m.type === 'file');
 });
 
+const conversationChannelId = computed(() => String(props.conversation?.channelId || props.conversation?.id || ''));
+const conversationChannelType = computed(() => Number(props.conversation?.channelType || (props.conversation?.type === 'group' ? 2 : 1)));
+const conversationKey = computed(() => `${conversationChannelId.value}-${conversationChannelType.value}`);
+const conversationBinding = computed(() => clowderStore.bindings[conversationKey.value] || clowderStore.conversations[conversationKey.value]?.binding || null);
+const conversationThreadId = computed(() => bindingThreadId(conversationBinding.value || props.conversation?.raw || {}));
 const groupChannelId = computed(() => String(props.conversation?.channelId || props.conversation?.id || ''));
 const groupChannelType = computed(() => Number(props.conversation?.channelType || 2));
 const groupConversationKey = computed(() => `${groupChannelId.value}-${groupChannelType.value}`);

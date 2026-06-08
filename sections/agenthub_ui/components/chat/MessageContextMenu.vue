@@ -68,6 +68,7 @@ const authStore = useAuthStore();
 const appStore = useAppStore();
 
 const isDesktopMode = computed(() => props.isDesktop);
+const isPinned = computed(() => props.msg?.remoteExtra?.isPinned || props.msg?.isPinned);
 const isMyMsg = computed(() => {
   if (!props.msg) return false;
   const currentUid = authStore.uid || appStore.currentUser?.uid || appStore.currentUser?.id || '';
@@ -103,6 +104,13 @@ const menuItems = computed(() => {
       disabled: isRevoked.value
     }
   ];
+
+  items.push({
+    action: isPinned.value ? 'unpin-context' : 'pin-context',
+    label: isPinned.value ? '取消长期上下文 pin' : 'Pin 为长期上下文',
+    icon: 'pin',
+    disabled: isRevoked.value
+  });
 
   if (isMyMsg.value && !isRevoked.value) {
     items.push({

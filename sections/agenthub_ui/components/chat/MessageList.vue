@@ -7,6 +7,7 @@
   >
     <view class="message-list-inner">
       <template v-for="(msg, index) in list" :key="msg.id">
+        <view :id="messageDomId(msg)" class="message-list-item">
         <view v-if="shouldShowTime(index)" class="message-time-row">
           <text class="message-time-text">{{ displayTime(msg) }}</text>
         </view>
@@ -24,6 +25,7 @@
           @open-file="$emit('message-open-file', $event)"
           @preview-file="$emit('message-preview-file', $event)"
         />
+        </view>
       </template>
       <!-- Bottom Anchor to auto scroll to -->
       <view id="bottom-anchor" class="bottom-anchor-element" />
@@ -90,6 +92,30 @@ function shouldShowTime(index) {
 function displayTime(msg) {
   return formatChatTime(msg?.time);
 }
+
+function messageDomId(msg = {}) {
+  const ref = String(msg.messageID || msg.messageId || msg.id || msg.clientMsgNo || '');
+  return `message-${ref.replace(/[^a-zA-Z0-9_-]/g, '-')}`;
+}
+
+function scrollToMessage(messageRef) {
+  const ref = String(messageRef || '');
+  const message = props.list.find((msg) =>
+    String(msg.id || '') === ref ||
+    String(msg.messageID || '') === ref ||
+    String(msg.messageId || '') === ref ||
+    String(msg.clientMsgNo || '') === ref ||
+    (msg.messageSeq !== undefined && String(msg.messageSeq) === ref)
+  );
+  if (!message) return false;
+  scrollToId.value = '';
+  nextTick(() => {
+    scrollToId.value = messageDomId(message);
+  });
+  return true;
+}
+
+defineExpose({ scrollToMessage });
 </script>
 
 <style scoped>
@@ -101,6 +127,9 @@ function displayTime(msg) {
 .message-list-inner {
   padding-top: 18px;
   padding-bottom: 20px;
+}
+.message-list-item {
+  min-height: 1px;
 }
 .message-time-row {
   display: flex;
