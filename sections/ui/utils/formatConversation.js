@@ -1,5 +1,11 @@
 import { normalizeTimestampMs } from './formatMessage.js';
 
+export function formatConversationPreview(value = '') {
+  return String(value || '')
+    .replace(/\s+/g, ' ')
+    .trim();
+}
+
 export function formatTime(timestamp) {
   if (!timestamp) return '';
   const normalized = normalizeTimestampMs(timestamp);
@@ -33,6 +39,7 @@ export function formatUnread(unreadCount) {
 }
 
 export default {
+  formatConversationPreview,
   formatTime,
   formatUnread
 };

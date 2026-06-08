@@ -19,6 +19,9 @@ import {
 } from '../services/native-im/normalizers.js';
 import * as messageState from '../services/native-im/message-state.js';
 import {
+  formatConversationPreview
+} from '../utils/formatConversation.js';
+import {
   formatChatTime,
   shouldShowMessageTime
 } from '../utils/formatMessage.js';
@@ -354,6 +357,21 @@ test('conversation helpers merge local and remote drafts predictably', () => {
   assert.equal(withLocal[0].draft, '本机草稿');
   assert.equal(merged[0].draft, '本机草稿');
   assert.equal(cleanMerged[0].draft, '远端草稿');
+});
+
+test('conversation helpers keep locally cleared drafts from stale remote restore', () => {
+  const conversations = [{ id: 'g1', channelId: 'g1', channelType: 2, draft: '' }];
+  const merged = mergeRemoteDrafts(conversations, [{ channelId: 'g1', channelType: 2, draft: '远端旧草稿' }], {
+    clearedKeys: new Set(['g1-2'])
+  });
+
+  assert.equal(merged[0].draft, '');
+});
+
+test('conversation preview normalizes long multiline text to a single line', () => {
+  const preview = formatConversationPreview('第一行\n第二行   |  很长的 markdown 内容');
+
+  assert.equal(preview, '第一行 第二行 | 很长的 markdown 内容');
 });
 
 test('conversation draft persistence skips local robot and mock conversations', () => {
