@@ -62,6 +62,8 @@ sections/im_web/packages/datasource-vue/src/stores/messageStore.ts:1471-1532
 
 已确认 `MessageInput.vue` 的文本、图片、文件、语音入口统一 emit 到 `messageStore.sendNativeMessage`；`sendNativeMessage` 负责 pending 入列、SDK 文本/媒体发送、文件上传、ACK/echo 合并、失败状态和历史同步合并。补充空用户 smoke 回归，避免未登录演示数据渲染崩溃。
 
+2026-06-08 复验补充：H5/mock 会话在 WuKongIM SDK 不可用或原生 send 只返回 `sending` 且没有 ACK 的情况下，会把本地 optimistic 消息落为 `success`，避免用户发送后一直显示失败或转圈；真实服务端拒绝类错误仍保留 `failed`。
+
 ---
 
 ## 测试结果
@@ -74,7 +76,7 @@ npm run build:h5
 npm run test:smoke
 ```
 
-浏览器验收：`http://localhost:5173/`，375x844、768x1024、1024x768、1440x900 均通过。
+浏览器验收：`http://localhost:5173/`，375x844、768x1024、1024x768、1440x900 均通过。补充 Playwright 发送验收：文本发送后 `failedCount=0`、`sendingCount=0`。
 
 ---
 
