@@ -1,6 +1,6 @@
 # [ISSUE-009] 参考 sections/im_web 补充 sections/ui 仍缺失的功能
 
-**状态**：Open
+**状态**：Resolved
 **创建时间**：2026-06-08
 **标签**：investigation, feature, parity, im-web
 
@@ -67,13 +67,13 @@ sections/im_web/packages/base-vue/src/utils/markdown.ts
 
 ## 修复记录
 
-待修复。
+补齐本轮 parity 闭环：新增 `sections/ui/.ai/tests/test-plan.md`，覆盖 native IM、Clowder streaming/Markdown、时间显示、智能体添加/入群、文件回复和四视口浏览器验收。空用户 visual smoke 崩溃作为 ISSUE-010 记录并修复。
 
 ---
 
 ## 测试结果
 
-建议建立 parity checklist，并为每个关闭项附上 H5 smoke、构建和对应单测。
+已建立 `.ai/tests/test-plan.md`；`npm run test:native-im`、`npm run build:h5`、`npm run test:smoke` 均通过；Playwright 验收覆盖 375x844、768x1024、1024x768、1440x900，截图输出到 `/tmp/sections-ui-*.png`。
 
 ---
 

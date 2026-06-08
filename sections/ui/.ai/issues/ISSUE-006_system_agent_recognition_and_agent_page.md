@@ -1,6 +1,6 @@
 # [ISSUE-006] 实现识别系统智能体并在智能体页显示智能体
 
-**状态**：Open
+**状态**：Resolved
 **创建时间**：2026-06-08
 **标签**：feature, agent, clowder, directory
 
@@ -61,13 +61,13 @@ sections/im_web/packages/contacts-vue/src/views/ContactList.vue:16-25, 222
 
 ## 修复记录
 
-待修复。
+确认 `stores/agent.js` 已包含 System/User 智能体、Clowder 协同猫、DeepSeek AI 等统一目录；新增智能体创建时标记 `isAgent/source/connected`，并通过 `createAgentConversation` 生成 robot 会话入口。
 
 ---
 
 ## 测试结果
 
-建议新增 agent directory normalizer 测试和智能体页 smoke。
+已新增 agent conversation/member helper 测试；浏览器验收覆盖智能体页四视口可见性。`npm run test:native-im`、`npm run build:h5`、`npm run test:smoke` 通过。
 
 ---
 

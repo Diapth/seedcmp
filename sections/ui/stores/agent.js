@@ -405,6 +405,9 @@ export const useAgentStore = defineStore('agent', {
       this.agents.push({
         ...agent,
         id,
+        isAgent: true,
+        source: 'user',
+        connected: true,
         status: 'active',
         creator: 'User'
       });

@@ -1,6 +1,6 @@
 # [ISSUE-007] 实现智能体的添加功能
 
-**状态**：Open
+**状态**：Resolved
 **创建时间**：2026-06-08
 **标签**：feature, clowder, agent, onboarding
 
@@ -65,13 +65,13 @@ sections/im_web/packages/datasource-vue/src/stores/clowderStore.ts:1011-1027
 
 ## 修复记录
 
-待修复。
+新建智能体后不再只回到列表：`pages/agents/new.vue` 会创建智能体、同步 robot 直聊会话、设置 active conversation，并跳转到 `/pages/chat/detail?id=<agentId>`。群成员添加页可继续将该智能体加入群聊。
 
 ---
 
 ## 测试结果
 
-建议覆盖创建表单校验、创建成功目录刷新、失败状态和直聊跳转。
+已通过 agent helper 单测和浏览器四视口验收，新建智能体表单可达，智能体页/群成员页可达。`npm run test:native-im`、`npm run build:h5`、`npm run test:smoke` 通过。
 
 ---
 

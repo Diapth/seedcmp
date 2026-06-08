@@ -16,8 +16,14 @@ export function getMessageSummary(msg) {
   }
 }
 
-const THREE_MINUTES = 3 * 60 * 1000;
+const FIVE_MINUTES = 5 * 60 * 1000;
 const WEEKDAY_LABELS = ['星期日', '星期一', '星期二', '星期三', '星期四', '星期五', '星期六'];
+
+export function normalizeTimestampMs(timestamp, fallback = 0) {
+  const value = Number(timestamp);
+  if (!Number.isFinite(value) || value <= 0) return fallback;
+  return value > 100000000000 ? value : value * 1000;
+}
 
 function padTime(value) {
   return String(value).padStart(2, '0');
@@ -39,8 +45,8 @@ function startOfWeek(date) {
 export function formatChatTime(timestamp, nowValue = Date.now()) {
   if (!timestamp) return '';
 
-  const timeValue = Number(timestamp);
-  if (Number.isNaN(timeValue)) return '';
+  const timeValue = normalizeTimestampMs(timestamp);
+  if (!timeValue) return '';
 
   const date = new Date(timeValue);
   const now = new Date(nowValue);
@@ -65,11 +71,11 @@ export function formatChatTime(timestamp, nowValue = Date.now()) {
   return `${date.getFullYear()}年${date.getMonth() + 1}月${date.getDate()}日 ${clock}`;
 }
 
-export function shouldShowMessageTime(current, previous, threshold = THREE_MINUTES) {
-  const currentTime = Number(current?.time || 0);
+export function shouldShowMessageTime(current, previous, threshold = FIVE_MINUTES) {
+  const currentTime = normalizeTimestampMs(current?.time || 0);
   if (!currentTime) return false;
 
-  const previousTime = Number(previous?.time || 0);
+  const previousTime = normalizeTimestampMs(previous?.time || 0);
   if (!previousTime) return true;
 
   return currentTime - previousTime > threshold;

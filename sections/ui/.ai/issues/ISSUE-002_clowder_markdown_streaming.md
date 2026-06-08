@@ -1,6 +1,6 @@
 # [ISSUE-002] 实现 Clowder AI 回复的 Markdown 流式输出和流式转换
 
-**状态**：Open
+**状态**：Resolved
 **创建时间**：2026-06-08
 **标签**：feature, clowder, streaming, markdown
 
@@ -58,13 +58,13 @@ sections/im_web/.ai/V3.0/issues/V3-18_cat_group_chat_mentions_context_media_and_
 
 ## 修复记录
 
-待修复。
+新增 `mergeAgentReplyEventIntoList` / `normalizeAgentReplyEvent`，将 placeholder、chunk、final 按稳定 `streamKey` 合并为同一条可见 Markdown 回复；final 阶段可追加智能体生成文件卡片。`messageStore.receiveAgentReplyEvent` 接入该合并逻辑，`MessageBubble.vue` 对 Clowder/Markdown 文本使用 `markdown-it` 安全渲染。
 
 ---
 
 ## 测试结果
 
-建议新增 Markdown 表格渲染测试、stream merge 测试，以及浏览器 smoke。
+已新增并通过 Clowder stream merge + Markdown + generated file 回归测试；`npm run test:native-im`、`npm run build:h5`、`npm run test:smoke` 均通过。浏览器四视口验收无 JS 运行时错误。
 
 ---
 

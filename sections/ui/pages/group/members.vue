@@ -142,6 +142,7 @@ import { ref, computed, onMounted } from 'vue';
 import { useContactStore } from '@/stores/contact';
 import { useConversationStore } from '@/stores/conversation';
 import { useGroupStore } from '@/stores/group';
+import { useAgentStore } from '@/stores/agent';
 import { useNavigationStore } from '@/stores/navigation';
 import { useContextMenu } from '@/composables/useContextMenu';
 import { useConfirm } from '@/composables/useConfirm';
@@ -156,6 +157,7 @@ import ContactCard from '@/components/contacts/ContactCard.vue';
 const contactStore = useContactStore();
 const convStore = useConversationStore();
 const groupStore = useGroupStore();
+const agentStore = useAgentStore();
 const navStore = useNavigationStore();
 const ctxMenu = useContextMenu();
 const ctxTarget = ref(null);
@@ -201,9 +203,20 @@ const filteredMembers = computed(() => {
 });
 
 const availableContacts = computed(() => {
-  return contactStore.contacts.filter(
-    (c) => !members.value.some((m) => m.id === c.id)
-  );
+  const contacts = contactStore.contacts
+    .filter((c) => !members.value.some((m) => m.id === c.id))
+    .map((contact) => ({ ...contact, inviteType: 'contact' }));
+  const agents = agentStore.agents
+    .filter((agent) => !members.value.some((m) => m.id === agent.id))
+    .map((agent) => ({
+      id: `agent:${agent.id}`,
+      agentId: agent.id,
+      nickname: agent.name,
+      avatar: agent.avatar,
+      inviteType: 'agent',
+      alias: agent.alias
+    }));
+  return [...agents, ...contacts];
 });
 
 function getRoleText(role) {
@@ -245,6 +258,12 @@ function handleAddConfirm() {
     return;
   }
   selectedContacts.value.forEach((id) => {
+    if (id.startsWith('agent:')) {
+      const agentId = id.slice('agent:'.length);
+      const agent = agentStore.agents.find((item) => item.id === agentId);
+      if (agent) convStore.addAgentMember('2', agent);
+      return;
+    }
     const contact = contactStore.contacts.find((c) => c.id === id);
     if (contact) {
       convStore.addMember('2', {

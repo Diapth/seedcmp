@@ -1,6 +1,6 @@
 # [ISSUE-008] 实现智能体的流式回复以及文件回复功能
 
-**状态**：Open
+**状态**：Resolved
 **创建时间**：2026-06-08
 **标签**：feature, clowder, streaming, file
 
@@ -61,13 +61,13 @@ sections/im_web/apps/chat/src/components/ChatSidePreview.vue:1-53
 
 ## 修复记录
 
-待修复。
+`mergeAgentReplyEventIntoList` 支持 final 阶段携带 `files/attachments/generatedFiles`，并转换为 IM 文件卡片消息，保留 `generatedByAgent/source/url/previewContent` 等字段；流式文本仍合并为一条 Markdown 回复。
 
 ---
 
 ## 测试结果
 
-建议新增 Clowder outbound file fixture、文件卡片渲染测试、文件预览 smoke。
+已新增 generated file fixture 单测并通过；浏览器验收覆盖文件页/文件卡片入口四视口可达。`npm run test:native-im`、`npm run build:h5`、`npm run test:smoke` 通过。
 
 ---
 

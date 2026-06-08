@@ -8,6 +8,11 @@ import {
   normalizeNativeGroup,
   upsertGroupConversation
 } from '../services/native-im/conversation-state.js';
+import * as messageState from '../services/native-im/message-state.js';
+import {
+  formatChatTime,
+  shouldShowMessageTime
+} from '../utils/formatMessage.js';
 
 function makeRequestStub(responses = {}) {
   const calls = [];
@@ -125,4 +130,89 @@ test('conversation helpers normalize groups and upsert channelType 2 conversatio
   assert.equal(conversations[0].type, 'group');
   assert.equal(conversations[0].name, '项目群');
   assert.equal(conversations[0].memberCount, 5);
+});
+
+test('time helpers accept second and millisecond timestamps with five minute message dividers', () => {
+  const now = new Date(2026, 5, 8, 12, 0, 0).getTime();
+  const tenFiveMs = new Date(2026, 5, 8, 10, 5, 0).getTime();
+  const tenFiveSeconds = Math.floor(tenFiveMs / 1000);
+
+  assert.equal(formatChatTime(tenFiveSeconds, now), '10:05');
+  assert.equal(formatChatTime(tenFiveMs, now), '10:05');
+  assert.equal(
+    shouldShowMessageTime({ time: now }, { time: now - 4 * 60 * 1000 }),
+    false
+  );
+  assert.equal(
+    shouldShowMessageTime({ time: now }, { time: now - 6 * 60 * 1000 }),
+    true
+  );
+});
+
+test('clowder stream events merge placeholder chunks final markdown and generated files', () => {
+  assert.equal(typeof messageState.mergeAgentReplyEventIntoList, 'function');
+
+  let list = messageState.mergeAgentReplyEventIntoList([], {
+    streamKey: 'stream-1',
+    phase: 'placeholder',
+    senderId: 'clowder',
+    senderName: 'Clowder 协同猫',
+    content: '正在思考...'
+  });
+
+  list = messageState.mergeAgentReplyEventIntoList(list, {
+    streamKey: 'stream-1',
+    phase: 'chunk',
+    delta: '| 名称 | 状态 |\\n| --- | --- |\\n'
+  });
+
+  list = messageState.mergeAgentReplyEventIntoList(list, {
+    streamKey: 'stream-1',
+    phase: 'final',
+    content: '| 名称 | 状态 |\\n| --- | --- |\\n| Codex | 完成 |',
+    files: [{ id: 'report', name: '验收报告.md', url: '/files/report.md', size: 1024 }]
+  });
+
+  assert.equal(list.length, 2);
+  assert.equal(list[0].id, 'stream-1');
+  assert.equal(list[0].status, 'success');
+  assert.equal(list[0].streaming, false);
+  assert.equal(list[0].renderMode, 'markdown');
+  assert.match(list[0].content, /Codex/);
+  assert.equal(list[1].type, 'file');
+  assert.equal(list[1].fileName, '验收报告.md');
+  assert.equal(list[1].generatedByAgent, true);
+});
+
+test('message sender helpers tolerate empty current user during anonymous visual smoke', () => {
+  assert.equal(messageState.isSelfSender('me', null), true);
+  assert.equal(messageState.resolveSelfId(null), 'me');
+  assert.equal(messageState.resolveSelfName(null), '我');
+  assert.equal(messageState.resolveSelfAvatar(null), '');
+});
+
+test('agent helpers create direct conversations and group mention members', async () => {
+  const {
+    createAgentConversation,
+    createAgentMember
+  } = await import('../services/native-im/agent-state.js');
+
+  const agent = {
+    id: 'codex',
+    name: 'Codex',
+    alias: '@codex',
+    desc: '代码生成专家',
+    status: 'active'
+  };
+
+  const conversation = createAgentConversation(agent);
+  const member = createAgentMember(agent);
+
+  assert.equal(conversation.id, 'codex');
+  assert.equal(conversation.type, 'robot');
+  assert.equal(conversation.lastMessage, '代码生成专家');
+  assert.equal(member.id, 'codex');
+  assert.equal(member.nickname, 'Codex');
+  assert.equal(member.isAgent, true);
+  assert.equal(member.alias, '@codex');
 });
