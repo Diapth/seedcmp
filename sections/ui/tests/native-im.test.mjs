@@ -314,6 +314,33 @@ test('native service sends direct clowder cat messages through conversation brid
   assert.equal(sent.channelId, 'clowder_cat:opus');
   assert.equal(sent.channelType, 1);
   assert.equal(sent.status, 'success');
+  assert.equal(sent.source, 'clowder');
+  assert.equal(sent.localEcho, true);
+});
+
+test('native service treats direct clowder bridge 2xx wait status as local success', async () => {
+  const request = makeRequestStub({
+    'POST clowder/conversation/message': {
+      messageId: 'bridge-wait',
+      status: 0
+    }
+  });
+  const service = createNativeImService({
+    baseUrl: '/v1/',
+    request,
+    getToken: () => 'token'
+  });
+
+  const sent = await service.sendClowderConversationMessage({
+    channelId: 'clowder_cat:xtz',
+    channelType: 1,
+    text: '你可以干啥',
+    directCatId: 'xtz'
+  });
+
+  assert.equal(sent.id, 'bridge-wait');
+  assert.equal(sent.status, 'success');
+  assert.equal(sent.localEcho, true);
 });
 
 test('native service uploads files before returning a public media url', async () => {
@@ -632,6 +659,39 @@ test('native clowder reaction event adds an idempotent emoji to the target user 
 
   assert.equal(event.isSilentSystem, true);
   assert.deepEqual(twice[0].reactions, [{ emoji: '❤️', userIds: ['clowder'], count: 1 }]);
+});
+
+test('direct clowder bridge send success clears the local pending user bubble', () => {
+  const pending = {
+    id: 'local-prompt-1',
+    clientMsgNo: 'local-prompt-1',
+    senderId: 'u1',
+    senderName: '我',
+    content: '你可以干啥',
+    type: 'text',
+    status: 'sending',
+    time: 1000
+  };
+  const bridgeAck = {
+    id: 'bridge-message-1',
+    messageId: 'bridge-message-1',
+    content: '你可以干啥',
+    type: 'text',
+    status: 'success',
+    source: 'clowder',
+    localEcho: true,
+    time: 1005
+  };
+
+  const merged = messageState.mergeNativeMessageIntoList([pending], bridgeAck, {
+    currentUser: { id: 'u1' },
+    conversation: { id: 'clowder_cat:xtz', channelId: 'clowder_cat:xtz', type: 'robot', source: 'clowder' }
+  });
+
+  assert.equal(merged.length, 1);
+  assert.equal(merged[0].id, 'bridge-message-1');
+  assert.equal(merged[0].status, 'success');
+  assert.equal(merged[0].senderId, 'u1');
 });
 
 test('synced clowder history preserves local successful user prompt until backend echo arrives', () => {

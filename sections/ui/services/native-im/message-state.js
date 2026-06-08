@@ -656,6 +656,27 @@ export function findSelfEchoIndex(messages = [], incoming = {}, currentUser = {}
   return -1;
 }
 
+function findLocalEchoAckIndex(messages = [], incoming = {}, currentUser = {}, options = {}) {
+  if (!incoming.localEcho || clean(incoming.status) !== 'success') return -1;
+
+  const incomingContent = contentKey(incoming);
+  if (!incomingContent) return -1;
+
+  const incomingTime = safeNumber(incoming.time, 0);
+  const timeWindowMs = options.timeWindowMs || 15000;
+
+  for (let index = messages.length - 1; index >= 0; index -= 1) {
+    const candidate = messages[index];
+    if (clean(candidate.status) !== 'sending') continue;
+    if (!isSelfSender(candidate.senderId || candidate.from_uid || candidate.fromUID, currentUser)) continue;
+    if (contentKey(candidate) !== incomingContent) continue;
+    const candidateTime = safeNumber(candidate.time, 0);
+    if (incomingTime && candidateTime && Math.abs(incomingTime - candidateTime) > timeWindowMs) continue;
+    return index;
+  }
+  return -1;
+}
+
 export function mergeNativeMessageIntoList(messages = [], incoming = {}, options = {}) {
   const currentUser = options.currentUser || {};
   const conversation = options.conversation || {};
@@ -737,6 +758,21 @@ export function mergeNativeMessageIntoList(messages = [], incoming = {}, options
       ...enrichedIncoming,
       id: firstNonEmpty(enrichedIncoming.id, next[echoIndex].id),
       status: enrichedIncoming.status || 'success'
+    };
+    return sortMessages(next);
+  }
+
+  const localEchoAckIndex = findLocalEchoAckIndex(next, enrichedIncoming, currentUser, options);
+  if (localEchoAckIndex >= 0) {
+    const existing = next[localEchoAckIndex];
+    next[localEchoAckIndex] = {
+      ...existing,
+      ...enrichedIncoming,
+      senderId: firstNonEmpty(enrichedIncoming.senderId, existing.senderId),
+      senderName: firstNonEmpty(enrichedIncoming.senderName, existing.senderName),
+      senderAvatar: firstNonEmpty(enrichedIncoming.senderAvatar, existing.senderAvatar),
+      id: firstNonEmpty(enrichedIncoming.id, existing.id),
+      status: 'success'
     };
     return sortMessages(next);
   }

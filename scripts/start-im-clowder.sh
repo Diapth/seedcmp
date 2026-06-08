@@ -1,16 +1,16 @@
 #!/usr/bin/env bash
 set -Eeuo pipefail
 
-# AgentHub UI H5 前端（seedcmp/sections/ui）默认不启动。
-# 设置 AGENTHUB_UI=1 即可在 start 时一并拉起：
+# AgentHub UI H5 前端（seedcmp/sections/ui）是默认前端。
 #
-#   AGENTHUB_UI=1 seedcmp/scripts/start-im-clowder.sh start
+#   seedcmp/scripts/start-im-clowder.sh start
 #
 # 启动后访问：
 #   http://localhost:5173/#/pages/login/index
 # 已登录可直接进：
 #   http://localhost:5173/#/pages/chat/index
 # 如果 5173 被占用，uni/vite 会自动换端口，查看日志输出里的实际 URL。
+# 旧版 sections/im_web 前端默认不启动；需要时设置 LEGACY_IM_WEB=1。
 
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 RUN_DIR="$ROOT_DIR/.seedcmp-run"
@@ -20,21 +20,23 @@ PID_DIR="$RUN_DIR/pids"
 CLOWDER_DIR="$ROOT_DIR/sections/clowder-ai"
 WK_DIR="$ROOT_DIR/sections/im/WuKongIM"
 TSDD_DIR="$ROOT_DIR/sections/im/TangSengDaoDaoServer"
-IM_WEB_DIR="$ROOT_DIR/sections/im_web"
+LEGACY_IM_WEB_DIR="$ROOT_DIR/sections/im_web"
 AGENTHUB_UI_DIR="$ROOT_DIR/sections/ui"
-IM_WEB_VERSION_LABEL="${IM_WEB_VERSION_LABEL:-IM Web V3.0 (TangSengDaoDao Vue + Clowder bridge)}"
+UI_VERSION_LABEL="${UI_VERSION_LABEL:-AgentHub UI H5 (seedcmp/sections/ui)}"
 
 CLOWDER_URL="${CLOWDER_URL:-${CAT_CAFE_API_URL:-http://127.0.0.1:3004}}"
 CLOWDER_WEB_URL="${CLOWDER_WEB_URL:-http://127.0.0.1:3003}"
 CLOWDER_API_PORT="${CLOWDER_API_PORT:-3004}"
 CLOWDER_WEB_PORT="${CLOWDER_WEB_PORT:-3003}"
 # Start the clowder-ai web (PWA, port 3003) alongside the API? Default: off.
-# Single-web entry goal: most users only need IM Web (3000). Flip on with
+# Single-web entry goal: most users only need AgentHub UI (5173). Flip on with
 # CLOWDER_WEB=1 when you want the Clowder MissionControl / FeatureBoard UI.
 CLOWDER_WEB="${CLOWDER_WEB:-0}"
 # Start the AgentHub UI H5 frontend (seedcmp/sections/ui, port 5173).
-# Default: off. Set AGENTHUB_UI=1 to launch alongside the IM stack.
 AGENTHUB_UI="${AGENTHUB_UI:-1}"
+# Start the old TangSengDaoDao Vue IM Web frontend (seedcmp/sections/im_web,
+# port 3000). Default: off because AgentHub UI is the primary frontend.
+LEGACY_IM_WEB="${LEGACY_IM_WEB:-0}"
 CLOWDER_CONNECTOR_SECRET="${CLOWDER_CONNECTOR_SECRET:-dev-shared-secret}"
 CLOWDER_CONNECTOR_ID="${CLOWDER_CONNECTOR_ID:-im-web}"
 CLOWDER_DEFAULT_OWNER_USER_ID="${CLOWDER_DEFAULT_OWNER_USER_ID:-user-1}"
@@ -78,20 +80,21 @@ Usage:
 
 Starts the integrated seedcmp demo:
   Docker: MySQL, Redis, MinIO
-  Local:  WuKongIM, Clowder, TangSengDaoDaoServer, IM Web
+  Local:  WuKongIM, Clowder, TangSengDaoDaoServer, AgentHub UI
 
 By default only the Clowder API (3004) is started — the clowder-ai web
 on 3003 is a developer / admin surface and is opt-in via CLOWDER_WEB=1.
-This keeps the day-to-day IM Web flow on a single web origin (3000).
+The day-to-day frontend is AgentHub UI from sections/ui on port 5173.
 
 Notes:
   start reuses existing local processes. Use restart after code changes.
 
 Environment overrides:
-  CLOWDER_URL=http://127.0.0.1:3004       (API origin; im_web talks to this)
+  CLOWDER_URL=http://127.0.0.1:3004       (API origin; frontends talk to this)
   CLOWDER_WEB_URL=http://127.0.0.1:3003   (clowder-ai web origin; admin)
   CLOWDER_WEB=0|1                         (default 0; set 1 to launch web)
-  AGENTHUB_UI=0|1                         (default 0; set 1 to launch AgentHub UI H5 on 5173)
+  AGENTHUB_UI=0|1                         (default 1; set 0 to skip AgentHub UI H5 on 5173)
+  LEGACY_IM_WEB=0|1                       (default 0; set 1 to launch old IM Web on 3000)
   CLOWDER_CONNECTOR_SECRET=dev-shared-secret
   CLOWDER_DEFAULT_OWNER_USER_ID=user-1
   CLOWDER_PNPM_VERSION=9.15.4
@@ -422,14 +425,14 @@ ensure_tangseng() {
 
 ensure_node_deps() {
   require_cmd corepack
-  if [ ! -d "$IM_WEB_DIR/node_modules" ]; then
-    log "installing IM Web dependencies..."
-    (cd "$IM_WEB_DIR" && corepack pnpm install)
-  fi
   if [ "$AGENTHUB_UI" = "1" ] && [ ! -d "$AGENTHUB_UI_DIR/node_modules" ]; then
     log "installing AgentHub UI dependencies..."
     # CI=1 disables pnpm's interactive "reinstall modules?" prompt.
     (cd "$AGENTHUB_UI_DIR" && CI=1 corepack pnpm install)
+  fi
+  if [ "$LEGACY_IM_WEB" = "1" ] && [ ! -d "$LEGACY_IM_WEB_DIR/node_modules" ]; then
+    log "installing legacy IM Web dependencies..."
+    (cd "$LEGACY_IM_WEB_DIR" && corepack pnpm install)
   fi
   if [ ! -d "$CLOWDER_DIR/node_modules" ]; then
     log "installing Clowder dependencies..."
@@ -498,7 +501,7 @@ start_all() {
   ensure_clowder_pnpm_wrapper
 
   # Single-web-entry default: start only the Clowder API (port 3004) so the
-  # user can run with just IM Web (3000). When CLOWDER_WEB=1, fall back to
+  # user can run with just AgentHub UI (5173). When CLOWDER_WEB=1, fall back to
   # the integrated start:direct launcher which boots both API and the
   # clowder-ai web (port 3003) in one go.
   if [ "$CLOWDER_WEB" = "1" ]; then
@@ -556,17 +559,22 @@ start_all() {
     ./tsdd_server -config ./configs/tsdd.yaml
   wait_bg_port tangseng 127.0.0.1 8090 "TangSeng API" "$TANGSENG_WAIT_TIMEOUT"
 
-  # im_web uses CLOWDER_URL (the API) — never the web — for V3.0 chat flows.
-  # The single-web goal is achieved by leaving the clowder-ai web
-  # uninstalled unless CLOWDER_WEB=1 was passed.
-  start_bg im-web "$IM_WEB_DIR" env \
-    CHOKIDAR_USEPOLLING="$IM_WEB_CHOKIDAR_USEPOLLING" \
-    CHOKIDAR_INTERVAL="$IM_WEB_CHOKIDAR_INTERVAL" \
-    VITE_API_BASE_URL=http://127.0.0.1:8090/v1/ \
-    VITE_TANGSENG_PROXY_TARGET=http://127.0.0.1:8090 \
-    VITE_CLOWDER_PUBLIC_URL="$CLOWDER_URL" \
-    corepack pnpm --filter chat dev --host 0.0.0.0
-  wait_bg_port im-web 127.0.0.1 3000 "IM Web"
+  if [ "$LEGACY_IM_WEB" != "1" ]; then
+    stop_pid im-web
+    stop_project_port 3000 "Legacy IM Web"
+  fi
+
+  if [ "$LEGACY_IM_WEB" = "1" ]; then
+    # Legacy im_web uses CLOWDER_URL (the API) — never the web — for V3.0 chat flows.
+    start_bg im-web "$LEGACY_IM_WEB_DIR" env \
+      CHOKIDAR_USEPOLLING="$IM_WEB_CHOKIDAR_USEPOLLING" \
+      CHOKIDAR_INTERVAL="$IM_WEB_CHOKIDAR_INTERVAL" \
+      VITE_API_BASE_URL=http://127.0.0.1:8090/v1/ \
+      VITE_TANGSENG_PROXY_TARGET=http://127.0.0.1:8090 \
+      VITE_CLOWDER_PUBLIC_URL="$CLOWDER_URL" \
+      corepack pnpm --filter chat dev --host 0.0.0.0
+    wait_bg_port im-web 127.0.0.1 3000 "Legacy IM Web"
+  fi
 
   if [ "$AGENTHUB_UI" = "1" ]; then
     # --host makes the Vite dev server bind to 0.0.0.0 so the H5 frontend is
@@ -579,13 +587,15 @@ start_all() {
   fi
 
   log "ready:"
-  log "  IM Web:  http://localhost:3000"
+  if [ "$AGENTHUB_UI" = "1" ]; then
+    log "  AgentHub UI: http://localhost:5173 (vite may have auto-selected another port; see $LOG_DIR/agenthub-ui.log)"
+  fi
+  if [ "$LEGACY_IM_WEB" = "1" ]; then
+    log "  Legacy IM Web: http://localhost:3000"
+  fi
   log "  Clowder API: http://localhost:3004"
   if [ "$CLOWDER_WEB" = "1" ]; then
     log "  Clowder Web: $CLOWDER_WEB_URL (admin / MissionControl)"
-  fi
-  if [ "$AGENTHUB_UI" = "1" ]; then
-    log "  AgentHub UI: http://localhost:5173 (vite may have auto-selected another port; see $LOG_DIR/agenthub-ui.log)"
   fi
   log "  Logs:    $LOG_DIR"
 }
@@ -602,7 +612,7 @@ stop_all() {
   stop_pid clowder
   stop_pid wukongim
   stop_project_port 5173 "AgentHub UI"
-  stop_project_port 3000 "IM Web"
+  stop_project_port 3000 "Legacy IM Web"
   stop_project_port 8090 "TangSeng API"
   stop_project_port 6979 "TangSeng gRPC"
   stop_project_port 3003 "Clowder Web"
@@ -658,8 +668,9 @@ status_runtime_one() {
 
 status_all() {
   log "runtime:"
-  printf '  %-16s %s\n' "im-version" "$IM_WEB_VERSION_LABEL"
-  printf '  %-16s %s\n' "im-web-dir" "$IM_WEB_DIR"
+  printf '  %-16s %s\n' "ui-version" "$UI_VERSION_LABEL"
+  printf '  %-16s %s\n' "agenthub-ui-dir" "$AGENTHUB_UI_DIR"
+  printf '  %-16s %s\n' "legacy-im-dir" "$LEGACY_IM_WEB_DIR"
   printf '  %-16s %s\n' "tangseng-dir" "$TSDD_DIR"
   if [ -x "$TSDD_DIR/tsdd_server" ]; then
     printf '  %-16s %s\n' "tangseng-bin" "$(stat -c '%y' "$TSDD_DIR/tsdd_server" 2>/dev/null || echo unknown)"
@@ -696,7 +707,7 @@ status_all() {
     fi
   fi
   log "ports:"
-  for item in "5001 WuKongIM" "3004 Clowder-API" "3003 Clowder-Web" "8090 TangSeng" "3000 IM-Web" "5173 AgentHub-UI"; do
+  for item in "5001 WuKongIM" "3004 Clowder-API" "3003 Clowder-Web" "8090 TangSeng" "3000 Legacy-IM-Web" "5173 AgentHub-UI"; do
     set -- $item
     if (echo >"/dev/tcp/127.0.0.1/$1") >/dev/null 2>&1; then
       printf '  %-5s open    %s\n' "$1" "$2"
@@ -714,7 +725,7 @@ show_logs() {
   fi
   log "available logs:"
   ls -1 "$LOG_DIR" 2>/dev/null || true
-  log "use: scripts/start-im-clowder.sh logs im-web"
+  log "use: scripts/start-im-clowder.sh logs agenthub-ui"
 }
 
 case "${1:-start}" in

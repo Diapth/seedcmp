@@ -569,11 +569,13 @@ export function createNativeImService(options = {}) {
         ...source,
         message_id: source.message_id || source.messageId || source.id || resp.message_id || resp.messageId || resp.id,
         payload: source.payload || { type: 1, content: trimmedText },
-        status: source.status || resp.status || 'success'
+        status: 'success'
       }),
       channelId: String(channelId),
       channelType: Number(channelType),
-      content: trimmedText
+      content: trimmedText,
+      source: 'clowder',
+      localEcho: true
     };
   }
 
