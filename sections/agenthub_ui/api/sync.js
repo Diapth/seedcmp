@@ -48,5 +48,11 @@ export const syncApi = {
   },
   pinMessage(data) {
     return request('message/pinned', { method: 'POST', data });
+  },
+  syncPinnedMessages(data) {
+    return request('message/pinned/sync', { method: 'POST', data });
+  },
+  clearPinnedMessages(data) {
+    return request('message/pinned/clear', { method: 'POST', data });
   }
 };

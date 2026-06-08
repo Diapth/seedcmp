@@ -8,6 +8,7 @@ import {
   setRefreshHandler,
   setRequestAdapter
 } from '../../utils/request.js';
+import { syncApi } from '../../api/sync.js';
 
 describe('request runtime adapter', () => {
   beforeEach(() => {
@@ -67,5 +68,24 @@ describe('request runtime adapter', () => {
       code: 40042,
       message: '参数错误'
     });
+  });
+
+  it('posts pinned message sync and clear requests through the AgentHub adapter', async () => {
+    const adapter = vi.fn(async () => ({ status: 200, data: { code: 0, data: { ok: true } } }));
+    setRequestAdapter(adapter);
+
+    await syncApi.syncPinnedMessages({ channel_id: 'g1', channel_type: 2, version: 0 });
+    await syncApi.clearPinnedMessages({ channel_id: 'g1', channel_type: 2 });
+
+    expect(adapter).toHaveBeenNthCalledWith(1, expect.objectContaining({
+      url: expect.stringContaining('/message/pinned/sync'),
+      method: 'POST',
+      data: { channel_id: 'g1', channel_type: 2, version: 0 }
+    }));
+    expect(adapter).toHaveBeenNthCalledWith(2, expect.objectContaining({
+      url: expect.stringContaining('/message/pinned/clear'),
+      method: 'POST',
+      data: { channel_id: 'g1', channel_type: 2 }
+    }));
   });
 });
