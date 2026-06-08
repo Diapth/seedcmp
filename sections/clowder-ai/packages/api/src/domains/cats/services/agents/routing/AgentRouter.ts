@@ -39,6 +39,7 @@ import type { TranscriptReader } from '../../session/TranscriptReader.js';
 import type { TranscriptWriter } from '../../session/TranscriptWriter.js';
 import { DeliveryCursorStore } from '../../stores/ports/DeliveryCursorStore.js';
 import type { IDraftStore } from '../../stores/ports/DraftStore.js';
+import type { IManualContextPinStore } from '../../stores/ports/ManualContextPinStore.js';
 import type { IMessageStore } from '../../stores/ports/MessageStore.js';
 import type { ISessionChainStore } from '../../stores/ports/SessionChainStore.js';
 import type { ITaskStore } from '../../stores/ports/TaskStore.js';
@@ -214,6 +215,8 @@ export interface AgentRouterOptions {
   packStore?: import('../../../../packs/PackStore.js').PackStore;
   /** F148: Evidence store for hierarchical context recall */
   evidenceStore?: import('../../../../memory/interfaces.js').IEvidenceStore;
+  /** 009: User-selected long-term context pins for F148 context injection */
+  manualContextPinStore?: IManualContextPinStore;
   /** F150: Tool usage counter */
   toolUsageCounter?: import('../../tool-usage/ToolUsageCounter.js').ToolUsageCounter;
   /** F188 Phase F AC-F10: Tool event log (append-only sequence) */
@@ -278,6 +281,7 @@ export class AgentRouter {
     | undefined;
   private packStore?: import('../../../../packs/PackStore.js').PackStore;
   private evidenceStore?: import('../../../../memory/interfaces.js').IEvidenceStore;
+  private manualContextPinStore?: IManualContextPinStore;
   /** F150 */
   private toolUsageCounter?: import('../../tool-usage/ToolUsageCounter.js').ToolUsageCounter;
   /** F188 Phase F AC-F10 */
@@ -332,6 +336,7 @@ export class AgentRouter {
     this.signalArticleLookup = options.signalArticleLookup;
     this.packStore = options.packStore;
     this.evidenceStore = options.evidenceStore;
+    this.manualContextPinStore = options.manualContextPinStore;
     this.toolUsageCounter = options.toolUsageCounter;
     this.toolEventLog = options.toolEventLog;
     this.skillLoadEventLog = options.skillLoadEventLog;
@@ -917,6 +922,7 @@ export class AgentRouter {
       ...(this.socketManager ? { socketManager: this.socketManager } : {}),
       ...(this.packStore ? { packStore: this.packStore } : {}),
       ...(this.evidenceStore ? { evidenceStore: this.evidenceStore } : {}),
+      ...(this.manualContextPinStore ? { manualContextPinStore: this.manualContextPinStore } : {}),
       ...(this.toolUsageCounter ? { toolUsageCounter: this.toolUsageCounter } : {}),
       ...(this.toolEventLog ? { toolEventLog: this.toolEventLog } : {}),
       ...(this.skillLoadEventLog ? { skillLoadEventLog: this.skillLoadEventLog } : {}),

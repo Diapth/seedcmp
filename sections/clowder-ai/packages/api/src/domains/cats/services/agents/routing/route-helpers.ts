@@ -15,6 +15,10 @@ import { formatMessage } from '../../context/ContextAssembler.js';
 import { checkContextBudget, type DegradationResult } from '../../orchestration/DegradationPolicy.js';
 import { DeliveryCursorStore } from '../../stores/ports/DeliveryCursorStore.js';
 import type { IDraftStore } from '../../stores/ports/DraftStore.js';
+import type {
+  IManualContextPinStore,
+  ManualContextPinSummary,
+} from '../../stores/ports/ManualContextPinStore.js';
 import type { IMessageStore, StoredMessage, StoredToolEvent } from '../../stores/ports/MessageStore.js';
 import type { Thread } from '../../stores/ports/ThreadStore.js';
 import { canViewMessage } from '../../stores/visibility.js';
@@ -27,10 +31,12 @@ import {
   buildTombstone,
   detectRecentBurst,
   formatAnchors,
+  formatManualContextPins,
   formatTombstone,
   recallEvidence,
   scrubToolPayloads,
   selectAnchors,
+  stripInjectedHistoryEnvelopes,
 } from './context-transport.js';
 import { extractBatonContext, formatNavigationHeader, summarizeActiveTasks } from './navigation-context.js';
 import { rankArtifactSources } from './source-ranking.js';
@@ -54,6 +60,8 @@ export interface RouteStrategyDeps {
   packStore?: import('../../../../packs/PackStore.js').PackStore;
   /** F148: Evidence store for context recall (optional, fail-open) */
   evidenceStore?: import('../../../../memory/interfaces.js').IEvidenceStore;
+  /** 009: User-selected long-term context pins (optional, fail-open) */
+  manualContextPinStore?: IManualContextPinStore;
   /** F150: Tool usage counter (fire-and-forget INCR on tool_use events) */
   toolUsageCounter?: import('../../tool-usage/ToolUsageCounter.js').ToolUsageCounter;
   /** F188 Phase F AC-F10: Tool event log (append-only sequence, fire-and-forget) */
@@ -168,6 +176,7 @@ export interface IncrementalContextResult {
     activeTasks?: import('./navigation-context.js').TaskSummary[];
     recentArtifacts?: import('./artifact-tracking.js').RecentArtifact[];
     rankedSources?: import('./source-ranking.js').RankedSource[];
+    manualContextPins?: ManualContextPinSummary[];
   };
   /** F148 Phase F: Navigation context header (injected on ALL paths — KD-7) */
   navigationHeader?: string;
@@ -524,35 +533,34 @@ export function createRoutingMessageTransform(explicitCatId?: CatId): RoutedMess
 }
 
 export function sanitizeInjectedContent(content: string): string {
-  const lines = content.split('\n');
-  const kept: string[] = [];
-  let skippingHistoryEnvelope = false;
+  return stripLeakedToolCallPayload(stripInjectedHistoryEnvelopes(content)).trim();
+}
 
-  for (const line of lines) {
-    const trimmed = line.trim();
-    const isHistoryHeader =
-      line.startsWith('[对话历史 - 最近 ') ||
-      line.startsWith('[对话历史增量 - 未发送过 ') ||
-      line.startsWith('[对话历史增量 - 智能窗口');
-
-    if (!skippingHistoryEnvelope && isHistoryHeader) {
-      // Drop known injected history envelopes only.
-      skippingHistoryEnvelope = true;
-      continue;
-    }
-
-    if (skippingHistoryEnvelope) {
-      // Use unique terminator to avoid false matches with markdown `---`
-      if (trimmed === '[/对话历史]' || trimmed === '---') {
-        skippingHistoryEnvelope = false;
-      }
-      continue;
-    }
-
-    kept.push(line);
+async function loadManualContextPins(
+  store: IManualContextPinStore | undefined,
+  threadId: string,
+  userId: string,
+): Promise<ManualContextPinSummary[]> {
+  if (!store) return [];
+  try {
+    const pins = await Promise.resolve(store.listActive(threadId, { userId, limit: 5 }));
+    return pins.map((pin) => ({
+      id: pin.id,
+      messageId: pin.messageId,
+      contentExcerpt: pin.contentExcerpt,
+      ...(pin.senderName ? { senderName: pin.senderName } : {}),
+      pinnedBy: pin.pinnedBy,
+      pinnedAt: pin.pinnedAt,
+      status: pin.status,
+    }));
+  } catch {
+    return [];
   }
+}
 
-  return stripLeakedToolCallPayload(kept.join('\n')).trim();
+function joinContextPrefix(navigationHeader: string, manualContextPinLines: readonly string[]): string {
+  if (manualContextPinLines.length === 0) return navigationHeader;
+  return `${navigationHeader}\n${manualContextPinLines.join('\n')}`;
 }
 
 /**
@@ -745,6 +753,8 @@ export async function assembleIncrementalContext(
     batonCandidateCount: batonCandidates.length,
   });
 
+  const manualContextPins = await loadManualContextPins(deps.manualContextPinStore, threadId, userId);
+
   // F148: Smart window — cold mention detection
   // P1-review: short-circuit on count first — avoid O(n) tokenize when count already triggers
   const hcConfig = DEFAULT_HIERARCHICAL_CONTEXT;
@@ -783,6 +793,7 @@ export async function assembleIncrementalContext(
       recentArtifacts,
       rankedSources,
       storedLedgerArtifacts,
+      manualContextPins,
     );
   }
 
@@ -793,6 +804,8 @@ export async function assembleIncrementalContext(
   const budget = getCatContextBudget(catId as string);
   const wasCapped = relevant.length > budget.maxMessages;
   const capped = wasCapped ? relevant.slice(-budget.maxMessages) : relevant;
+  const manualContextPinLines = formatManualContextPins(manualContextPins, budget.maxContentLengthPerMsg, sanitizeInjectedContent);
+  const contextPrefix = joinContextPrefix(navigationHeader, manualContextPinLines);
 
   // Metadata must be based on the FINAL capped set, not pre-cap `relevant`
   const includesCurrentUserMessage = Boolean(currentUserMessageId && capped.some((m) => m.id === currentUserMessageId));
@@ -800,13 +813,13 @@ export async function assembleIncrementalContext(
   if (capped.length === 0) {
     return cursor
       ? {
-          contextText: navigationHeader,
+          contextText: contextPrefix,
           boundaryId: cursor,
           includesCurrentUserMessage,
           currentMessageFilteredOut,
           navigationHeader,
         }
-      : { contextText: navigationHeader, includesCurrentUserMessage, currentMessageFilteredOut, navigationHeader };
+      : { contextText: contextPrefix, includesCurrentUserMessage, currentMessageFilteredOut, navigationHeader };
   }
 
   const truncateLimit = budget.maxContentLengthPerMsg;
@@ -843,7 +856,8 @@ export async function assembleIncrementalContext(
   let tokenTrimStart = 0;
   if (effectiveTokenBudget > 0) {
     const perLineTokens = lines.map((l) => estimateTokens(l));
-    const totalTokens = perLineTokens.reduce((a, b) => a + b, 0);
+    const manualContextTokens = manualContextPinLines.length > 0 ? estimateTokens(manualContextPinLines.join('\n')) : 0;
+    const totalTokens = manualContextTokens + perLineTokens.reduce((a, b) => a + b, 0);
     if (totalTokens > effectiveTokenBudget) {
       tokenTrimmed = true;
       // Scan from oldest: accumulate tokens to drop until remainder fits budget
@@ -872,14 +886,14 @@ export async function assembleIncrementalContext(
   if (finalCapped.length === 0) {
     return cursor
       ? {
-          contextText: navigationHeader,
+          contextText: contextPrefix,
           boundaryId: cursor,
           includesCurrentUserMessage: false,
           currentMessageFilteredOut,
           navigationHeader,
         }
       : {
-          contextText: navigationHeader,
+          contextText: contextPrefix,
           includesCurrentUserMessage: false,
           currentMessageFilteredOut,
           navigationHeader,
@@ -897,7 +911,7 @@ export async function assembleIncrementalContext(
 
   const boundaryId = finalCapped[finalCapped.length - 1]?.id;
   return {
-    contextText: `${navigationHeader}\n[对话历史增量 - 未发送过 ${finalCapped.length} 条]\n${finalLines.join('\n')}\n[/对话历史]`,
+    contextText: `${contextPrefix}\n[对话历史增量 - 未发送过 ${finalCapped.length} 条]\n${finalLines.join('\n')}\n[/对话历史]`,
     boundaryId,
     includesCurrentUserMessage: finalIncludesCurrentUserMessage,
     currentMessageFilteredOut,
@@ -926,9 +940,11 @@ async function assembleSmartWindowContext(
   recentArtifacts: import('./artifact-tracking.js').RecentArtifact[],
   rankedSources: import('./source-ranking.js').RankedSource[],
   preReadStoredArtifacts: import('./artifact-tracking.js').RecentArtifact[],
+  manualContextPins: ManualContextPinSummary[],
 ): Promise<IncrementalContextResult> {
   const budget = getCatContextBudget(catId as string);
   const truncateLimit = budget.maxContentLengthPerMsg;
+  const manualContextPinLines = formatManualContextPins(manualContextPins, truncateLimit, sanitizeInjectedContent);
 
   // 1. Burst detection
   const { burst, omitted } = detectRecentBurst(relevant, hcConfig);
@@ -1106,6 +1122,7 @@ async function assembleSmartWindowContext(
   let finalTombstoneText = tombstoneText;
   let finalCoverageMapText = coverageMapText;
   let finalThreadMemoryText = threadMemoryText;
+  const finalManualContextPinLines = [...manualContextPinLines];
   let tokenDegradation: string | undefined;
 
   const totalTokens = () =>
@@ -1113,6 +1130,7 @@ async function assembleSmartWindowContext(
       [
         finalCoverageMapText,
         finalThreadMemoryText,
+        ...finalManualContextPinLines,
         finalTombstoneText,
         ...finalAnchorLines,
         ...finalEvidenceLines,
@@ -1175,6 +1193,7 @@ async function assembleSmartWindowContext(
   const sections: string[] = [];
   if (finalCoverageMapText) sections.push(finalCoverageMapText);
   if (finalThreadMemoryText) sections.push(finalThreadMemoryText);
+  if (finalManualContextPinLines.length > 0) sections.push(...finalManualContextPinLines);
   if (finalTombstoneText) sections.push(finalTombstoneText);
   if (finalAnchorLines.length > 0) sections.push(...finalAnchorLines);
   if (finalEvidenceLines.length > 0) {
@@ -1219,6 +1238,7 @@ async function assembleSmartWindowContext(
         return merged.length > 0 ? { recentArtifacts: merged } : {};
       })(),
       ...(rankedSources.length > 0 ? { rankedSources } : {}),
+      ...(finalManualContextPinLines.length > 0 ? { manualContextPins } : {}),
     },
     navigationHeader,
   };
