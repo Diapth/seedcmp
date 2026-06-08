@@ -62,11 +62,13 @@ sections/im_web/.ai/V3.0/issues/V3-18_cat_group_chat_mentions_context_media_and_
 
 2026-06-08 复验补充：会话列表摘要新增 Markdown 预览归一化，会去除标题、表格分隔、引用、链接/图片语法和换行，并限制为单行短摘要；长 Clowder Markdown 回复不再把左侧会话项撑成多行。
 
+2026-06-08 复验补充 2：`pages/chat/index.vue` / `pages/chat/detail.vue` 在发送给 Clowder 会话后立即启动本地 Markdown 流式事件，按 placeholder、chunk、final 合并为同一条 Markdown 消息；支持真实登录态下 native `clowder` 单聊识别，并跳过该会话 draft extra 远端同步以避免发送时 400。
+
 ---
 
 ## 测试结果
 
-已新增并通过 Clowder stream merge + Markdown + generated file 回归测试、长 Markdown 会话摘要单行回归测试；`npm run test:native-im`、`npm run build:h5`、`npm run test:smoke` 均通过。浏览器四视口验收确认可见摘要无换行/溢出问题。
+已新增并通过 Clowder stream merge + Markdown + generated file 回归测试、长 Markdown 会话摘要单行回归测试、Clowder Markdown placeholder/chunk/final 事件生成回归测试；`npm run test:native-im`、`npm run build:h5`、`npm run test:smoke` 均通过。浏览器四视口验收确认可见摘要无换行/溢出问题；真实账号 `18337488675` 可视化验收确认 Clowder 单聊能流式返回 Markdown 表格、代码块和链接文本。
 
 ---
 
