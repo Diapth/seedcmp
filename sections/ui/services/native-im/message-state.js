@@ -11,6 +11,32 @@ function firstNonEmpty(...values) {
   return '';
 }
 
+export function toConversationPreview(value, maxLength = 80) {
+  const source = clean(value);
+  if (!source) return '';
+  const text = source
+    .replace(/```[\s\S]*?```/g, (block) => {
+      const inner = block.replace(/^```[^\n]*\n?/, '').replace(/```$/, '').trim();
+      return inner || '[代码]';
+    })
+    .split(/\r?\n/)
+    .filter((line) => !/^\s*\|?\s*:?-{3,}:?\s*(\|\s*:?-{3,}:?\s*)+\|?\s*$/.test(line))
+    .join(' ')
+    .replace(/!\[([^\]]*)\]\([^)]+\)/g, (_, alt) => clean(alt) || '[图片]')
+    .replace(/\[([^\]]+)\]\([^)]+\)/g, '$1')
+    .replace(/`([^`]+)`/g, '$1')
+    .replace(/(^|\s)#{1,6}\s*/g, '$1')
+    .replace(/(^|\s)>\s*/g, '$1')
+    .replace(/(^|\s)([-*+]|\d+\.)\s+/g, '$1')
+    .replace(/[*_~]{1,3}/g, '')
+    .replace(/[|]/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim();
+  if (!text) return '';
+  if (text.length <= maxLength) return text;
+  return `${text.slice(0, Math.max(0, maxLength - 3)).trim()}...`;
+}
+
 function safeNumber(value, fallback = 0) {
   const next = Number(value);
   return Number.isFinite(next) ? next : fallback;
@@ -30,8 +56,8 @@ function contentKey(message = {}) {
 function messageDigest(message = {}) {
   if (message.type === 'image') return '[图片]';
   if (message.type === 'voice') return '[语音]';
-  if (message.type === 'file') return `[文件] ${message.fileName || message.name || message.content || ''}`.trim();
-  return clean(message.content) || '收到一条新消息';
+  if (message.type === 'file') return toConversationPreview(`[文件] ${message.fileName || message.name || message.content || ''}`);
+  return toConversationPreview(message.content) || '收到一条新消息';
 }
 
 function normalizeTimestampMs(value, fallback = Date.now()) {
@@ -235,6 +261,13 @@ export function conversationSummaryForMessage(message = {}, currentUser = {}, co
     return senderName ? `${senderName}: ${digest}` : digest;
   }
   return digest;
+}
+
+export function shouldKeepLocalSendSuccess(error = {}, conversation = {}) {
+  const text = firstNonEmpty(error.msg, error.message, error.error?.msg, error.error?.message);
+  if (error.sdkUnavailable) return true;
+  if (/wukongimjssdk|WKSDK\.shared|chatManager|send unavailable|不可用|未安装/i.test(text)) return true;
+  return conversation?.source === 'mock' && /network|runtime|request|fetch|uni\./i.test(text);
 }
 
 export function createClientMsgNo(prefix = 'ui') {

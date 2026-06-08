@@ -12,7 +12,8 @@ import {
   mergeAgentReplyEventIntoList,
   resolveSelfAvatar,
   resolveSelfId,
-  resolveSelfName
+  resolveSelfName,
+  shouldKeepLocalSendSuccess
 } from '@/services/native-im/message-state';
 
 function defaultMsg(overrides = {}) {
@@ -212,9 +213,15 @@ export const useMessageStore = defineStore('message', {
             { currentUser, conversation }
           );
         } catch (error) {
-          local.status = 'failed';
-          local.nativeError = errorText(error);
-          this.syncError = errorText(error);
+          if (shouldKeepLocalSendSuccess(error, conversation)) {
+            local.status = 'success';
+            local.nativeError = '';
+            this.syncError = '';
+          } else {
+            local.status = 'failed';
+            local.nativeError = errorText(error);
+            this.syncError = errorText(error);
+          }
         }
         return local;
       }
@@ -240,9 +247,15 @@ export const useMessageStore = defineStore('message', {
           { currentUser, conversation }
         );
       } catch (error) {
-        local.status = 'failed';
-        local.nativeError = errorText(error);
-        this.syncError = errorText(error);
+        if (shouldKeepLocalSendSuccess(error, conversation)) {
+          local.status = 'success';
+          local.nativeError = '';
+          this.syncError = '';
+        } else {
+          local.status = 'failed';
+          local.nativeError = errorText(error);
+          this.syncError = errorText(error);
+        }
       }
       return local;
     },

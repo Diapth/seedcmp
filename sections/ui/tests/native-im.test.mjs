@@ -222,6 +222,48 @@ test('clowder stream events merge placeholder chunks final markdown and generate
   assert.equal(list[1].generatedByAgent, true);
 });
 
+test('conversation summary turns long clowder markdown into one line preview', () => {
+  const summary = messageState.conversationSummaryForMessage({
+    senderId: 'clowder',
+    senderName: 'Clowder AI',
+    type: 'text',
+    content: [
+      '## 当前在线猫猫',
+      '',
+      '| 猫猫 | 状态 | 任务 |',
+      '| --- | --- | --- |',
+      '| Codex | 在线 | 修复消息发送 |',
+      '| Claude Code | 忙碌 | 复核 Markdown 渲染 |',
+      '',
+      '> 以上信息会继续同步更新。'
+    ].join('\n')
+  }, {}, { type: 'robot' });
+
+  assert.equal(summary.includes('\n'), false);
+  assert.equal(summary.includes('|'), false);
+  assert.equal(summary.includes('---'), false);
+  assert.match(summary, /^当前在线猫猫/);
+  assert.ok(summary.length <= 80);
+});
+
+test('sdk unavailable send errors keep local h5 demo messages successful', () => {
+  assert.equal(typeof messageState.shouldKeepLocalSendSuccess, 'function');
+  assert.equal(
+    messageState.shouldKeepLocalSendSuccess(
+      { msg: 'WKSDK.shared 不可用', sdkUnavailable: true },
+      { id: 'clowder', type: 'robot', source: 'mock' }
+    ),
+    true
+  );
+  assert.equal(
+    messageState.shouldKeepLocalSendSuccess(
+      { message: 'server rejected message' },
+      { id: '2', type: 'group' }
+    ),
+    false
+  );
+});
+
 test('message sender helpers tolerate empty current user during anonymous visual smoke', () => {
   assert.equal(messageState.isSelfSender('me', null), true);
   assert.equal(messageState.resolveSelfId(null), 'me');
