@@ -14,7 +14,7 @@ Thumbs.db
 issues/screenshots/
 issues/prototypes/
 **/screenshots/
-.ai/
+.ai/*
 tests/
 tests-e2e/
 test-results/
@@ -24,3 +24,14 @@ scripts/inspect*.mjs
 scripts/phase*-verify*.mjs
 scripts/verify-*.mjs
 scripts/smoke-test.js
+
+# Track AI workflow markdown; keep generated screenshots/artifacts ignored.
+!.ai/issues/
+.ai/issues/*
+!.ai/issues/*.md
+!.ai/tests/
+.ai/tests/*
+!.ai/tests/*.md
+!.ai/plans/
+.ai/plans/*
+!.ai/plans/*.md

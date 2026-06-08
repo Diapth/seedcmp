@@ -3,6 +3,8 @@
 **状态**：Open
 **创建时间**：2026-06-09
 **标签**：bug / settings / device-management / h5
+**AI修复模式**：Direct Fix
+**计划路径**：N/A
 
 ---
 
@@ -12,7 +14,7 @@
 
 本次证据目录：
 
-`sections/ui/.ai/tests-e2e/ui-user-settings-20260608162821/`
+`seedcmp/sections/ui/.ai/tests/ui-user-settings-20260608162821/`
 
 关键截图：
 

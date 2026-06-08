@@ -3,6 +3,8 @@
 **状态**：Resolved
 **创建时间**：2026-06-08
 **标签**：feature, clowder, group, agent
+**AI修复模式**：Plan First
+**计划路径**：sections/ui/.ai/plans/ISSUE-004_agent_creates_group_chat.md
 
 ---
 

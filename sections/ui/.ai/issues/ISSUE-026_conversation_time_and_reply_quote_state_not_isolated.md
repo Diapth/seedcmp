@@ -3,6 +3,8 @@
 **状态**：Open
 **创建时间**：2026-06-09
 **标签**：bug / chat / conversation-list / reply / file-quote
+**AI修复模式**：Plan First
+**计划路径**：sections/ui/.ai/plans/ISSUE-026_conversation_time_and_reply_quote_state_not_isolated.md
 
 ---
 
@@ -16,7 +18,7 @@
 
 本次证据目录：
 
-`sections/ui/.ai/tests-e2e/ui-reply-time-bugs-20260608163629/`
+`seedcmp/sections/ui/.ai/tests/ui-reply-time-bugs-20260608163629/`
 
 关键截图：
 

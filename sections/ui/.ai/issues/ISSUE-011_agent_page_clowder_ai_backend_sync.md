@@ -3,6 +3,8 @@
 **状态**：Open
 **创建时间**：2026-06-08
 **标签**：feature, clowder, agent, streaming, multi-account, kanban
+**AI修复模式**：Plan First
+**计划路径**：sections/ui/.ai/plans/ISSUE-011_agent_page_clowder_ai_backend_sync.md
 
 ---
 

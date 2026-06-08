@@ -3,6 +3,8 @@
 **状态**：Resolved
 **创建时间**：2026-06-08
 **标签**：feature, clowder, streaming, file
+**AI修复模式**：Plan First
+**计划路径**：sections/ui/.ai/plans/ISSUE-008_agent_streaming_and_file_reply.md
 
 ---
 

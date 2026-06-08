@@ -3,6 +3,8 @@
 **状态**：Resolved
 **创建时间**：2026-06-08
 **标签**：bug, clowder, agent, message-history
+**AI修复模式**：Plan First
+**计划路径**：sections/ui/.ai/plans/ISSUE-012_agent_chat_history_loses_user_messages.md
 
 ---
 
@@ -138,8 +140,8 @@ npm run test:smoke
 ```text
 URL: http://localhost:5173/#/pages/chat/index
 截图:
-/tmp/issue-012-014-01-user-prompt.png
-/tmp/issue-012-014-04-final-history-preserved.png
+seedcmp/sections/ui/.ai/tests/issue-012-014-01-user-prompt.png
+seedcmp/sections/ui/.ai/tests/issue-012-014-04-final-history-preserved.png
 ```
 
 验证结果：用户消息和智能体 final 回复同时保留；模拟后端历史只返回智能体回复后，用户 prompt 仍保留。受限于本地未接真实 Clowder/TangSeng 后端，本次浏览器验证使用本地可控事件注入。

@@ -3,6 +3,8 @@
 **状态**：Open
 **创建时间**：2026-06-09
 **标签**：bug / agent / file-preview / html
+**AI修复模式**：Direct Fix
+**计划路径**：N/A
 
 ---
 
@@ -12,7 +14,7 @@
 
 本次证据目录：
 
-`sections/ui/.ai/tests-e2e/ui-agent-chain-20260608161757/`
+`seedcmp/sections/ui/.ai/tests/ui-agent-chain-20260608161757/`
 
 关键截图：
 

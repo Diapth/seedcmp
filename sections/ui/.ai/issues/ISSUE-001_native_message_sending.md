@@ -3,6 +3,8 @@
 **状态**：Resolved
 **创建时间**：2026-06-08
 **标签**：feature, native-im, message, group
+**AI修复模式**：Plan First
+**计划路径**：sections/ui/.ai/plans/ISSUE-001_native_message_sending.md
 
 ---
 
@@ -83,12 +85,12 @@ npm run test:smoke
 再次复验：`npm run test:native-im`、`npm run build:h5`、`npm run test:smoke` 通过；Playwright 在 `http://localhost:5174/` 验收单聊/群聊文本、图片、文件发送，并覆盖 375x844、768x1024、1024x768、1440x900 截图。截图：
 
 ```text
-/tmp/issue-001-native-message-single-desktop.png
-/tmp/issue-001-native-message-group-desktop.png
-/tmp/issue-001-native-message-desktop.png
-/tmp/issue-001-native-message-tablet.png
-/tmp/issue-001-native-message-landscape.png
-/tmp/issue-001-native-message-mobile.png
+seedcmp/sections/ui/.ai/tests/issue-001-native-message-single-desktop.png
+seedcmp/sections/ui/.ai/tests/issue-001-native-message-group-desktop.png
+seedcmp/sections/ui/.ai/tests/issue-001-native-message-desktop.png
+seedcmp/sections/ui/.ai/tests/issue-001-native-message-tablet.png
+seedcmp/sections/ui/.ai/tests/issue-001-native-message-landscape.png
+seedcmp/sections/ui/.ai/tests/issue-001-native-message-mobile.png
 ```
 
 ---

@@ -3,6 +3,8 @@
 **状态**：Resolved
 **创建时间**：2026-06-08
 **标签**：bug, visual-smoke, message, anonymous
+**AI修复模式**：Direct Fix
+**计划路径**：N/A
 
 ---
 

@@ -9,9 +9,42 @@
 2. `npm run build:h5`
 3. `npm run test:smoke`
 
+## AI 修复模式
+
+每个 issue 顶部必须标注 `AI修复模式`：
+
+- `Direct Fix`：适用于单点 UI、页面跳转、局部状态、文案/样式、空值保护等问题。AI 可以直接根据 issue 修复，但仍要补充必要测试/截图验证。
+- `Plan First`：适用于跨 store/service/API/后端、多账号同步、文件收发、智能体运行时、真实流式链路、多个子问题合并的问题。AI 必须先在 `sections/ui/.ai/plans/` 写计划，计划确认后再动代码。
+
+`Plan First` 计划至少包含：
+
+- 目标与非目标。
+- 预计修改文件。
+- TDD/回归测试步骤。
+- Playwright/浏览器截图验收步骤。
+- 截图输出目录，必须是 `seedcmp/sections/ui/.ai/tests/`。
+- 分阶段中文 commit 列表。
+
+## 阶段性提交
+
+AI 每完成一个可验证的阶段性工作，必须提交一次中文 commit。不要把多个无关阶段堆成一个大提交。
+
+推荐 commit 格式：
+
+- `计划：梳理 ISSUE-019 群文件上传修复步骤`
+- `测试：补充群文件接收方可见回归`
+- `修复：群文件消息同步到接收方`
+- `验证：记录 ISSUE-019 浏览器验收截图`
+
+阶段性提交前必须完成该阶段对应的最小验证；如果验证受阻，要在 issue 的测试结果中写明阻塞原因和已完成的替代检查。
+
 ## 浏览器验收
 
 目标地址：`http://localhost:5173/`
+
+截图输出目录：`seedcmp/sections/ui/.ai/tests/`
+
+AI/Playwright 验收必须把截图、trace 截图和人工复核截图写入上述目录；建议按 issue 或验收批次建立子目录，例如 `seedcmp/sections/ui/.ai/tests/ISSUE-019-group-file-upload-YYYYMMDDHHmmss/`。不要写入 `/tmp` 或 `seedcmp/sections/ui/.ai/tests-e2e`。
 
 视口：
 - 375x844

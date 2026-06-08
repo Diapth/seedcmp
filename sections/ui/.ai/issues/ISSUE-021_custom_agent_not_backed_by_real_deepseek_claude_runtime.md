@@ -3,6 +3,8 @@
 **状态**：Open
 **创建时间**：2026-06-09
 **标签**：bug / agent / clowder / deepseek / runtime
+**AI修复模式**：Plan First
+**计划路径**：sections/ui/.ai/plans/ISSUE-021_custom_agent_not_backed_by_real_deepseek_claude_runtime.md
 
 ---
 
@@ -14,7 +16,7 @@
 
 本次证据目录：
 
-`sections/ui/.ai/tests-e2e/ui-agent-chain-20260608161757/`
+`seedcmp/sections/ui/.ai/tests/ui-agent-chain-20260608161757/`
 
 关键截图：
 

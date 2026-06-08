@@ -3,6 +3,8 @@
 **状态**：Open
 **创建时间**：2026-06-08
 **标签**：bug / investigation / multi-agent / group-chat
+**AI修复模式**：Plan First
+**计划路径**：sections/ui/.ai/plans/ISSUE-015_real_multi_agent_project_group_not_synced.md
 
 ---
 
@@ -17,7 +19,7 @@
 
 本次证据目录：
 
-`sections/ui/.ai/tests-e2e/ui-group-multi-agent-20260608154418/`
+`seedcmp/sections/ui/.ai/tests/ui-group-multi-agent-20260608154418/`
 
 关键结论：
 

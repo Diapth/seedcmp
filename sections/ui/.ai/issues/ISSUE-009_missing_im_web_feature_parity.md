@@ -3,6 +3,8 @@
 **状态**：Resolved
 **创建时间**：2026-06-08
 **标签**：investigation, feature, parity, im-web
+**AI修复模式**：Plan First
+**计划路径**：sections/ui/.ai/plans/ISSUE-009_missing_im_web_feature_parity.md
 
 ---
 
@@ -73,7 +75,7 @@ sections/im_web/packages/base-vue/src/utils/markdown.ts
 
 ## 测试结果
 
-已建立 `.ai/tests/test-plan.md`；`npm run test:native-im`、`npm run build:h5`、`npm run test:smoke` 均通过；Playwright 验收覆盖 375x844、768x1024、1024x768、1440x900，截图输出到 `/tmp/sections-ui-*.png`。
+已建立 `.ai/tests/test-plan.md`；`npm run test:native-im`、`npm run build:h5`、`npm run test:smoke` 均通过；Playwright 验收覆盖 375x844、768x1024、1024x768、1440x900，截图输出到 `seedcmp/sections/ui/.ai/tests/sections-ui-*.png`。
 
 ---
 

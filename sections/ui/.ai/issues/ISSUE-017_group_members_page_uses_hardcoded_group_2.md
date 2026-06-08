@@ -3,6 +3,8 @@
 **状态**：Open
 **创建时间**：2026-06-09
 **标签**：bug / group-chat / members / h5
+**AI修复模式**：Direct Fix
+**计划路径**：N/A
 
 ---
 
@@ -14,7 +16,7 @@
 
 本次证据目录：
 
-`sections/ui/.ai/tests-e2e/ui-group-deep-20260608160100/`
+`seedcmp/sections/ui/.ai/tests/ui-group-deep-20260608160100/`
 
 关键截图：
 

@@ -3,6 +3,8 @@
 **状态**：<!-- Open / In Progress / Resolved / Closed -->
 **创建时间**：
 **标签**：<!-- bug / feature / refactor / investigation -->
+**AI修复模式**：<!-- Direct Fix / Plan First -->
+**计划路径**：<!-- Direct Fix 写 N/A；Plan First 写 sections/ui/.ai/plans/ISSUE-XXX_xxx.md -->
 
 ---
 
@@ -10,7 +12,11 @@
 
 描述用户遇到的具体问题或你发现的问题。
 
-(注：图片应以该issue的序号+图的序号标注，如02_1.png)
+测试截图目录：`seedcmp/sections/ui/.ai/tests/`
+
+建议按 issue 建子目录：`seedcmp/sections/ui/.ai/tests/ISSUE-XXX-简短主题-YYYYMMDDHHmmss/`
+
+注：图片应以该 issue 的序号 + 图的序号标注，如 `02_1.png`。AI/Playwright 验收生成的截图不要写入 `/tmp` 或 `seedcmp/sections/ui/.ai/tests-e2e`。
 ---
 
 ## 复现步骤
