@@ -7,12 +7,15 @@ import {
   createClowderMarkdownStreamEvents,
   createClientMsgNo,
   enrichNativeMessageSender,
+  isClowderConversation,
   isClowderDirectCatConversation,
   isVisibleChatMessage,
   isSelfSender,
   mergeNativeMessageIntoList,
   mergeSyncedMessagesPreservingLocalContext,
   mergeAgentReplyEventIntoList,
+  readClowderPromptContext,
+  rememberClowderPromptContext,
   resolveClowderDirectCatId,
   resolveOutboundSender,
   resolveLocalSendStatus,
@@ -70,8 +73,26 @@ function readCurrentUser() {
   }
 }
 
+function storageRuntime() {
+  return typeof uni === 'undefined' ? null : uni;
+}
+
 function findConversation(convStore, conversationId) {
   return convStore.conversations.find((item) => item.id === conversationId) || null;
+}
+
+function shouldCacheClowderPrompt(conversation = {}) {
+  return isClowderConversation(conversation) || isClowderDirectCatConversation(conversation);
+}
+
+function rememberPromptContext(conversationId, message, currentUser, conversation) {
+  if (!conversationId || !message || !shouldCacheClowderPrompt(conversation)) return;
+  rememberClowderPromptContext(storageRuntime(), conversationId, message, currentUser);
+}
+
+function readPromptContext(conversationId, currentUser, conversation) {
+  if (!conversationId || !shouldCacheClowderPrompt(conversation)) return [];
+  return readClowderPromptContext(storageRuntime(), conversationId, currentUser);
 }
 
 export const useMessageStore = defineStore('message', {
@@ -263,6 +284,9 @@ export const useMessageStore = defineStore('message', {
           status: resolveLocalSendStatus(sent, conversation),
           time: sent.time || local.time
         });
+        if (sentMessage.status === 'success') {
+          rememberPromptContext(conversationId, sentMessage, currentUser, routeContext);
+        }
         this.messages[conversationId] = mergeNativeMessageIntoList(
           this.messages[conversationId] || [],
           sentMessage,
@@ -290,14 +314,16 @@ export const useMessageStore = defineStore('message', {
       try {
         const currentUser = readCurrentUser();
         const conversation = findConversation(convStore, identity.conversationId);
+        const routeContext = conversation || identity;
         const synced = (await nativeImService.syncMessages(identity.channelId, identity.channelType, {
           limit: options.limit || 30,
           startSeq: options.startSeq || 0,
           endSeq: options.endSeq || 0,
           pullMode: options.pullMode
         })).map((message) => defaultMsg(enrichNativeMessageSender(message, conversation, currentUser)));
+        const preservedContextMessages = readPromptContext(identity.conversationId, currentUser, routeContext);
         this.messages[identity.conversationId] = synced.length
-          ? mergeSyncedMessagesPreservingLocalContext(this.messages[identity.conversationId] || [], synced, { currentUser, conversation })
+          ? mergeSyncedMessagesPreservingLocalContext(this.messages[identity.conversationId] || [], synced, { currentUser, conversation: routeContext, preservedContextMessages })
           : this.messages[identity.conversationId] || [];
         const latest = (this.messages[identity.conversationId] || []).filter(isVisibleChatMessage).at(-1);
         updateConversationSummary(conversation, latest, currentUser);

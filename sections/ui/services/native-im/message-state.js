@@ -390,6 +390,89 @@ export function resolveSelfAvatar(currentUser = {}) {
   return firstNonEmpty(currentUser.avatar, currentUser.logo, currentUser.raw?.avatar, currentUser.raw?.logo);
 }
 
+function storageGet(storage, key) {
+  if (!storage || !key) return '';
+  try {
+    if (typeof storage.getStorageSync === 'function') return storage.getStorageSync(key) || '';
+    if (typeof storage.getItem === 'function') return storage.getItem(key) || '';
+  } catch {
+    return '';
+  }
+  return '';
+}
+
+function storageSet(storage, key, value) {
+  if (!storage || !key) return;
+  try {
+    if (typeof storage.setStorageSync === 'function') {
+      storage.setStorageSync(key, value);
+      return;
+    }
+    if (typeof storage.setItem === 'function') storage.setItem(key, value);
+  } catch {
+    // A failed prompt cache write must not interrupt message sending.
+  }
+}
+
+function promptContextStorageKey(conversationId, currentUser = {}) {
+  return `clowder_prompt_context:${clean(resolveSelfId(currentUser))}:${clean(conversationId)}`;
+}
+
+function normalizePromptContextMessage(message = {}, currentUser = {}) {
+  if (!message || !isVisibleChatMessage(message)) return null;
+  if (!isSelfSender(message.senderId || message.from_uid || message.fromUID, currentUser)) return null;
+  const content = clean(message.content);
+  if (!content || (message.type && message.type !== 'text')) return null;
+  const id = firstNonEmpty(message.id, message.messageId, message.clientMsgNo);
+  if (!id) return null;
+  return {
+    id,
+    messageId: firstNonEmpty(message.messageId, message.id),
+    clientMsgNo: firstNonEmpty(message.clientMsgNo, message.id),
+    senderId: resolveSelfId(currentUser),
+    senderName: firstNonEmpty(message.senderName, resolveSelfName(currentUser)),
+    senderAvatar: firstNonEmpty(message.senderAvatar, resolveSelfAvatar(currentUser)),
+    content,
+    type: 'text',
+    status: 'success',
+    source: 'clowder',
+    time: safeNumber(message.time, Date.now()),
+    reactions: Array.isArray(message.reactions) ? message.reactions : [],
+    replyRef: message.replyRef || null,
+    mentions: Array.isArray(message.mentions) ? message.mentions : []
+  };
+}
+
+export function readClowderPromptContext(storage, conversationId, currentUser = {}) {
+  const key = promptContextStorageKey(conversationId, currentUser);
+  const raw = storageGet(storage, key);
+  if (!raw) return [];
+  try {
+    const parsed = JSON.parse(raw);
+    return firstArray(parsed)
+      .map((message) => normalizePromptContextMessage(message, currentUser))
+      .filter(Boolean);
+  } catch {
+    return [];
+  }
+}
+
+export function rememberClowderPromptContext(storage, conversationId, message = {}, currentUser = {}, options = {}) {
+  const normalized = normalizePromptContextMessage(message, currentUser);
+  if (!normalized) return readClowderPromptContext(storage, conversationId, currentUser);
+
+  const limit = Math.max(1, safeNumber(options.limit, 20));
+  const existing = readClowderPromptContext(storage, conversationId, currentUser);
+  const key = messageIdentityKey(normalized);
+  const next = [
+    ...existing.filter((item) => messageIdentityKey(item) !== key),
+    normalized
+  ].slice(-limit);
+
+  storageSet(storage, promptContextStorageKey(conversationId, currentUser), JSON.stringify(next));
+  return next;
+}
+
 export function resolveOutboundSender(currentUser = {}, sender = {}) {
   currentUser = currentUser || {};
   sender = sender || {};
@@ -504,6 +587,35 @@ export function applyReactionEventIntoList(messages = [], event = {}) {
   });
 }
 
+function findLatestSelfPromptIndex(messages = [], incoming = {}, options = {}) {
+  const currentUser = options.currentUser || {};
+  const incomingTime = safeNumber(incoming.time, 0);
+  const timeWindowMs = options.ackTimeWindowMs || 10 * 60 * 1000;
+
+  for (let index = messages.length - 1; index >= 0; index -= 1) {
+    const candidate = messages[index];
+    if (!isVisibleChatMessage(candidate)) continue;
+    if (!isSelfSender(candidate.senderId || candidate.from_uid || candidate.fromUID, currentUser)) continue;
+    if (candidate.type && candidate.type !== 'text') continue;
+    if (!contentKey(candidate)) continue;
+    const candidateTime = safeNumber(candidate.time, 0);
+    if (incomingTime && candidateTime && candidateTime - incomingTime > timeWindowMs) continue;
+    if (incomingTime && candidateTime && incomingTime - candidateTime > timeWindowMs) continue;
+    return index;
+  }
+  return -1;
+}
+
+function applyReactionToLatestSelfPrompt(messages = [], incoming = {}, options = {}) {
+  const index = findLatestSelfPromptIndex(messages, incoming, options);
+  if (index < 0) return [...messages];
+  return applyReactionEventIntoList(messages, {
+    targetMessageId: messageIdentityKey(messages[index]),
+    emoji: firstNonEmpty(incoming.emoji, incoming.reaction, incoming.ackEmoji, incoming.ack_emoji, '👀'),
+    userId: firstNonEmpty(incoming.senderId, incoming.sender_id, incoming.agentId, incoming.agent_id, 'clowder')
+  });
+}
+
 export function enrichNativeMessageSender(message = {}, conversation = {}, currentUser = {}) {
   const next = { ...message };
   if (isSelfSender(next.senderId || next.from_uid || next.fromUID, currentUser)) {
@@ -558,6 +670,16 @@ export function mergeNativeMessageIntoList(messages = [], incoming = {}, options
     ).toLowerCase();
     if (phase === 'cleanup') {
       return [...messages];
+    }
+    if (phase === 'placeholder') {
+      if (enrichedIncoming.targetMessageId) {
+        return applyReactionEventIntoList(messages, {
+          targetMessageId: enrichedIncoming.targetMessageId,
+          emoji: firstNonEmpty(enrichedIncoming.emoji, enrichedIncoming.reaction, '👀'),
+          userId: firstNonEmpty(enrichedIncoming.senderId, 'clowder')
+        });
+      }
+      return applyReactionToLatestSelfPrompt(messages, enrichedIncoming, options);
     }
     const isFinal = phase === 'final';
     const streamMessage = {
@@ -646,7 +768,12 @@ function shouldPreserveLocalContextMessage(message = {}, incoming = [], options 
 }
 
 export function mergeSyncedMessagesPreservingLocalContext(current = [], incoming = [], options = {}) {
-  const preserved = current.filter((message) => shouldPreserveLocalContextMessage(message, incoming, options));
+  const contextMessages = firstArray(options.preservedContextMessages, options.localContextMessages)
+    .filter((message) => shouldPreserveLocalContextMessage(message, incoming, options));
+  const preserved = [
+    ...contextMessages,
+    ...current.filter((message) => shouldPreserveLocalContextMessage(message, incoming, options))
+  ];
   return mergeNativeMessageLists(preserved, incoming, options);
 }
 
