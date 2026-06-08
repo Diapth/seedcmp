@@ -55,11 +55,21 @@ export const clowderApi = {
   getThreadArtifacts(threadId) {
     return request(`clowder/thread/${encodeURIComponent(threadId)}/artifacts`);
   },
-  listManualContextPins(threadId) {
-    return request(`clowder/thread/${encodeURIComponent(threadId)}/manual-context-pins`);
+  listManualContextPins(threadId, options = {}) {
+    const query = paramsQuery({
+      includeInactive: options.includeInactive ? 1 : undefined,
+      limit: options.limit
+    });
+    return request(`clowder/thread/${encodeURIComponent(threadId)}/manual-context-pins${query ? `?${query}` : ''}`);
   },
   upsertManualContextPin(threadId, data) {
     return request(`clowder/thread/${encodeURIComponent(threadId)}/manual-context-pins`, { method: 'POST', data });
+  },
+  markManualContextPinSourceStatus(threadId, data) {
+    return request(`clowder/thread/${encodeURIComponent(threadId)}/manual-context-pins/source-status`, {
+      method: 'PATCH',
+      data
+    });
   },
   removeManualContextPin(threadId, pinId) {
     return request(`clowder/thread/${encodeURIComponent(threadId)}/manual-context-pins/${encodeURIComponent(pinId)}`, {
