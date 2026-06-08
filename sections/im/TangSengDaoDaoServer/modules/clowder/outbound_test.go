@@ -43,6 +43,32 @@ func TestOutboundPayloadBuildsDirectMarkdownMessage(t *testing.T) {
 	assert.Equal(t, "invoke-1", body["invocation_id"])
 }
 
+func TestInboundPromptBuildsPersistedUserTextMessage(t *testing.T) {
+	req, err := BuildInboundPersistMessage(conversationRefRequest{
+		ChannelID:   "clowder_cat:opus",
+		ChannelType: common.ChannelTypePerson.Uint8(),
+		Text:        "请用一句话回复",
+		DirectCatID: "opus",
+	}, "user-1")
+
+	require.NoError(t, err)
+	assert.Equal(t, "clowder_cat:opus", req.ChannelID)
+	assert.Equal(t, common.ChannelTypePerson.Uint8(), req.ChannelType)
+	assert.Equal(t, "user-1", req.FromUID)
+	assert.Equal(t, 1, req.Header.RedDot)
+	assert.Equal(t, 0, req.Header.NoPersist)
+
+	var body map[string]interface{}
+	require.NoError(t, json.Unmarshal(req.Payload, &body))
+	assert.Equal(t, float64(common.Text), body["type"])
+	assert.Equal(t, "请用一句话回复", body["content"])
+	assert.Equal(t, "请用一句话回复", body["text"])
+	assert.Equal(t, "im-web", body["connector_id"])
+	assert.Equal(t, "clowder_user_prompt", body["source"])
+	assert.Equal(t, "opus", body["direct_cat_id"])
+	assert.NotContains(t, body["content"], "@opus")
+}
+
 func TestOutboundPayloadBuildsImageMessage(t *testing.T) {
 	payload := OutboundPayload{
 		ConnectorID:    ConnectorID,
