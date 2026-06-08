@@ -4,6 +4,7 @@ import { nativeImService } from '@/services/native-im/service';
 import { useContactStore } from '@/stores/contact';
 import { useConversationStore } from '@/stores/conversation';
 import { useMessageStore } from '@/stores/message';
+import { resolveSelfId } from '@/services/native-im/message-state';
 
 function parseStorageJSON(key) {
   const raw = uni.getStorageSync(key);
@@ -48,8 +49,9 @@ export const useAppStore = defineStore('app', {
       this.token = token;
       uni.setStorageSync('app_user', JSON.stringify(user));
       uni.setStorageSync('app_token', token);
-      if (user?.id || user?.uid) {
-        uni.setStorageSync('app_user_uid', user.id || user.uid);
+      const uid = resolveSelfId(user);
+      if (uid && uid !== 'me') {
+        uni.setStorageSync('app_user_uid', uid);
       }
     },
     async loginWithPassword({ username, password }) {
@@ -68,12 +70,13 @@ export const useAppStore = defineStore('app', {
       }
     },
     async initializeNativeIm(options = {}) {
-      if (!this.currentUser?.id || !this.token) return { connected: false, reason: 'missing-session' };
+      const uid = resolveSelfId(this.currentUser);
+      if (!uid || uid === 'me' || !this.token) return { connected: false, reason: 'missing-session' };
       this.connectionState = 'connecting';
       this.nativeError = '';
       try {
         const result = await nativeImService.initializeSdk({
-          uid: this.currentUser.id,
+          uid,
           token: this.token,
           onMessage: (message) => {
             const messageStore = useMessageStore();
@@ -115,7 +118,8 @@ export const useAppStore = defineStore('app', {
       }
     },
     async bootstrapNativeSession() {
-      if (!this.currentUser?.id || !this.token) return;
+      const uid = resolveSelfId(this.currentUser);
+      if (!uid || uid === 'me' || !this.token) return;
       await this.initializeNativeIm({ sync: true });
     },
     async syncNativeBootData() {

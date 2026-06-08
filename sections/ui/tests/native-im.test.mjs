@@ -393,6 +393,29 @@ test('native normalizer renders group system event messages with concrete text',
   );
 });
 
+test('self id resolver accepts backend userId user_id and raw id shapes', () => {
+  assert.equal(messageState.resolveSelfId({ userId: 'u-userId' }), 'u-userId');
+  assert.equal(messageState.resolveSelfId({ user_id: 'u-user-id' }), 'u-user-id');
+  assert.equal(messageState.resolveSelfId({ raw: { id: 'u-raw-id' } }), 'u-raw-id');
+});
+
+test('outbound sender prefers real current user over page fallback sender', () => {
+  const sender = messageState.resolveOutboundSender({
+    uid: 'u100',
+    nickname: '真实用户',
+    avatar: '/avatar/u100.png'
+  }, {
+    id: 'me',
+    name: '我'
+  });
+
+  assert.deepEqual(sender, {
+    id: 'u100',
+    name: '真实用户',
+    avatar: '/avatar/u100.png'
+  });
+});
+
 test('sdk unavailable send errors keep local h5 demo messages successful', () => {
   assert.equal(typeof messageState.shouldKeepLocalSendSuccess, 'function');
   assert.equal(
@@ -424,6 +447,31 @@ test('mock h5 native send results do not leave local messages sending forever', 
   assert.equal(
     messageState.resolveLocalSendStatus({ status: 'sending' }, { id: 'g1', type: 'group' }),
     'sending'
+  );
+});
+
+test('mock h5 media messages stay local successful when no upload backend exists', () => {
+  assert.equal(typeof messageState.shouldUseLocalMockMediaSuccess, 'function');
+  assert.equal(
+    messageState.shouldUseLocalMockMediaSuccess(
+      { id: '2', type: 'group', source: 'mock' },
+      { type: 'image', url: 'blob:http://localhost/mock-image' }
+    ),
+    true
+  );
+  assert.equal(
+    messageState.shouldKeepLocalSendSuccess(
+      { msg: '未获取到上传地址' },
+      { id: '2', type: 'group', source: 'mock' }
+    ),
+    true
+  );
+  assert.equal(
+    messageState.shouldUseLocalMockMediaSuccess(
+      { id: 'real-g1', type: 'group' },
+      { type: 'file', url: '/tmp/report.txt' }
+    ),
+    false
   );
 });
 
