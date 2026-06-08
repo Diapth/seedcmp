@@ -268,6 +268,7 @@ test('clowder helper creates markdown placeholder chunks and final event', () =>
   assert.equal(typeof messageState.isClowderConversation, 'function');
   assert.equal(typeof messageState.createClowderMarkdownStreamEvents, 'function');
   assert.equal(messageState.isClowderConversation({ id: 'clowder_ai', name: 'Clowder AI', type: 'robot' }), true);
+  assert.equal(messageState.isClowderConversation({ id: 'clowder', name: 'clowder', type: 'single' }), true);
 
   const events = messageState.createClowderMarkdownStreamEvents('请用 markdown 表格总结当前任务', {
     streamKey: 'clowder-test-stream',
