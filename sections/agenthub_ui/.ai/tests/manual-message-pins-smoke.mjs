@@ -319,20 +319,9 @@ async function verifyDegradedSourceDeleted(page) {
   await page.reload({ waitUntil: 'domcontentloaded' });
   await page.waitForTimeout(1200);
   const degraded = page.getByText('来源已删除').first();
-  if (await degraded.count().catch(() => 0)) {
-    await degraded.waitFor({ state: 'visible', timeout: 5000 });
-  } else {
-    diagnostics.push({
-      at: new Date().toISOString(),
-      step: 'degraded-label-not-visible',
-      ok: false,
-      detail: {
-        expected: '来源已删除',
-        note: 'Clowder source status was marked source_deleted; visible panel degradation also depends on IM pinned sync surfacing the deleted source.'
-      }
-    });
-  }
+  await degraded.waitFor({ state: 'visible', timeout: 10000 });
   await page.screenshot({ path: path.join(evidenceDir, '06-degraded-source-deleted.png'), fullPage: true });
+  record('verifyDegradedSourceDeleted', true, { expected: '来源已删除' });
 }
 
 async function main() {

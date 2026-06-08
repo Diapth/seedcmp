@@ -18,6 +18,39 @@ async function createApp() {
 }
 
 describe('Manual context pins routes', () => {
+  test('store newest ordering is stable when updates share the same millisecond', async () => {
+    const { ManualContextPinStore } = await import('../dist/domains/cats/services/stores/ports/ManualContextPinStore.js');
+    const manualContextPinStore = new ManualContextPinStore();
+    const sameTimestamp = '2026-06-08T00:00:00.000Z';
+
+    const first = manualContextPinStore.upsert({
+      threadId: 'thread-1',
+      userId: 'manual-pin-user',
+      channelId: 'group-1',
+      channelType: 2,
+      messageId: 'm-1',
+      contentExcerpt: '第一条',
+      pinnedBy: 'manual-pin-user',
+      status: 'active',
+    });
+    const second = manualContextPinStore.upsert({
+      threadId: 'thread-1',
+      userId: 'manual-pin-user',
+      channelId: 'group-1',
+      channelType: 2,
+      messageId: 'm-2',
+      contentExcerpt: '第二条',
+      pinnedBy: 'manual-pin-user',
+      status: 'active',
+    });
+    first.updatedAt = sameTimestamp;
+    second.updatedAt = sameTimestamp;
+
+    const pins = manualContextPinStore.listActive('thread-1', { userId: 'manual-pin-user', limit: 1 });
+    assert.equal(pins.length, 1);
+    assert.equal(pins[0].messageId, 'm-2');
+  });
+
   test('upserts by messageId and lists active pins newest first with limit', async () => {
     const { app } = await createApp();
 

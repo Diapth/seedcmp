@@ -48,4 +48,10 @@ describe('manual message pins smoke script contract', () => {
       expect(panelSource).toContain(contract);
     });
   });
+
+  it('fails the live smoke when the degraded source label is not visible', () => {
+    expect(smokeSource).toContain("page.getByText('来源已删除').first()");
+    expect(smokeSource).toContain('degraded.waitFor({ state: \'visible\'');
+    expect(smokeSource).not.toContain('degraded-label-not-visible');
+  });
 });
