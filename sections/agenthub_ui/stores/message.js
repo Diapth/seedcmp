@@ -169,11 +169,21 @@ function buildMessageDisplayContext(channelId, channelType) {
 
 function createDisplayInboundMessage(raw = {}, userCache = {}, currentUser = {}) {
   const message = createInboundMessage(raw, userCache);
+  const remoteExtra = normalizeRemoteExtra(raw.message_extra ?? raw.messageExtra ?? raw.remote_extra ?? raw.remoteExtra);
   const currentUid = String(currentUser.uid || currentUser.id || '');
   const isMe = message.senderId === 'me' || (currentUid && message.senderId === currentUid);
-  if (!isMe) return { ...message, isMe: false };
-  return {
+  const withExtra = {
     ...message,
+    messageID: String(raw.message_idstr || raw.message_id || raw.messageID || raw.id || message.id || ''),
+    remoteExtra,
+    raw: {
+      ...(message.raw || {}),
+      remoteExtra
+    }
+  };
+  if (!isMe) return { ...withExtra, isMe: false };
+  return {
+    ...withExtra,
     isMe: true,
     senderName: message.senderName && message.senderName !== message.senderId ? message.senderName : (currentUser.name || currentUser.nickname || '我'),
     senderAvatar: message.senderAvatar || currentUser.avatar || ''
@@ -182,6 +192,78 @@ function createDisplayInboundMessage(raw = {}, userCache = {}, currentUser = {})
 
 function conversationMessageSummary(message = {}, channelType = 1) {
   return messageSummary(message, { withSender: toBackendChannelType(channelType) === 2 });
+}
+
+function normalizeRemoteExtra(extra) {
+  if (!extra) return {};
+  if (typeof extra === 'string') {
+    try {
+      const parsed = JSON.parse(extra);
+      return parsed && typeof parsed === 'object' ? parsed : {};
+    } catch {
+      return {};
+    }
+  }
+  return extra && typeof extra === 'object' ? { ...extra } : {};
+}
+
+function pickPinnedMessageId(message = {}) {
+  return String(message.messageID || message.messageId || message.message_idstr || message.message_id || message.id || '');
+}
+
+function pinStatus(record = {}) {
+  if (record.status) return String(record.status);
+  if (record.is_deleted === 1 || record.isDeleted === true) return 'removed';
+  if (record.source_deleted === 1 || record.sourceDeleted === true) return 'source_deleted';
+  if (record.permission_denied === 1 || record.permissionDenied === true) return 'permission_denied';
+  return 'active';
+}
+
+function applyPinnedState(message, pinned = true, status = 'active') {
+  if (!message) return message;
+  message.remoteExtra = {
+    ...(message.remoteExtra || {}),
+    isPinned: pinned,
+    pinStatus: pinned ? status : 'removed'
+  };
+  message.raw = {
+    ...(message.raw || {}),
+    remoteExtra: message.remoteExtra
+  };
+  message.isPinned = pinned;
+  return message;
+}
+
+function createUnavailablePinnedMessage(record = {}, channelId = '', channelType = 1) {
+  const messageId = String(record.message_idstr || record.message_id || record.messageID || record.id || '');
+  const status = pinStatus(record);
+  return defaultMsg({
+    id: messageId,
+    messageID: messageId,
+    clientMsgNo: record.client_msg_no || record.clientMsgNo || `pinned-${messageId}`,
+    messageSeq: Number(record.message_seq || record.messageSeq || 0),
+    senderId: record.from_uid || record.fromUID || '',
+    senderName: record.from_name || record.senderName || '',
+    content: '置顶消息暂不可预览',
+    type: 'system',
+    time: normalizePinnedTimestamp(record.updated_at || record.updatedAt || record.created_at || record.createdAt || record.timestamp),
+    channelId,
+    channelType: toBackendChannelType(channelType),
+    remoteExtra: {
+      isPinned: true,
+      unavailable: true,
+      pinStatus: status
+    }
+  });
+}
+
+function normalizePinnedTimestamp(value) {
+  const numeric = Number(value);
+  if (Number.isFinite(numeric) && numeric > 0) {
+    return numeric < 1_000_000_000_000 ? numeric * 1000 : numeric;
+  }
+  const parsed = Date.parse(String(value || '').replace(' ', 'T'));
+  return Number.isFinite(parsed) && parsed > 0 ? parsed : 0;
 }
 
 async function sendSdkTextMessage() {
@@ -207,6 +289,7 @@ export const useMessageStore = defineStore('message', {
     typingState: {},
     reminders: [],
     pinnedMessages: {},
+    pinnedVersions: {},
     loading: false,
     lastError: ''
   }),
@@ -453,6 +536,97 @@ export const useMessageStore = defineStore('message', {
         this.loading = false;
       }
     },
+    getPinnedMessages(channelId, channelType = 1) {
+      return this.pinnedMessages[channelKey(channelId, toBackendChannelType(channelType))] || [];
+    },
+    async togglePinnedMessage(channelId, channelType = 1, msg = {}) {
+      const backendType = toBackendChannelType(channelType || msg.channelType || 1);
+      const messageId = pickPinnedMessageId(msg);
+      if (!channelId || !messageId) {
+        throw new AppError('缺少置顶消息参数', { code: 'PIN_MESSAGE_INVALID' });
+      }
+      await syncApi.pinMessage({
+        channel_id: channelId,
+        channel_type: backendType,
+        message_id: messageId,
+        message_seq: Number(msg.messageSeq || msg.message_seq || 0)
+      });
+      const key = channelKey(channelId, backendType);
+      const nextPinned = !(msg.remoteExtra?.isPinned || msg.isPinned);
+      applyPinnedState(msg, nextPinned);
+      const current = this.pinnedMessages[key] || [];
+      if (nextPinned) {
+        this.pinnedMessages[key] = current.some((item) => pickPinnedMessageId(item) === messageId)
+          ? current.map((item) => pickPinnedMessageId(item) === messageId ? msg : item)
+          : [msg, ...current];
+      } else {
+        this.pinnedMessages[key] = current.filter((item) => pickPinnedMessageId(item) !== messageId);
+      }
+      return msg;
+    },
+    async syncPinnedMessages(channelId, channelType = 1) {
+      const backendType = toBackendChannelType(channelType);
+      const key = channelKey(channelId, backendType);
+      const response = await syncApi.syncPinnedMessages({
+        channel_id: channelId,
+        channel_type: backendType,
+        version: this.pinnedVersions[key] || 0
+      });
+      const data = response?.data || response || {};
+      const records = data.pinned_messages || data.pinnedMessages || data.pins || [];
+      const messagesById = new Map();
+      this.getMessages(channelId, backendType).forEach((message) => {
+        const id = pickPinnedMessageId(message);
+        if (id) messagesById.set(id, message);
+      });
+
+      const displayContext = buildMessageDisplayContext(channelId, backendType);
+      (data.messages || []).forEach((raw) => {
+        const msg = createDisplayInboundMessage({
+          channel_id: channelId,
+          channel_type: backendType,
+          ...raw
+        }, displayContext.userCache, displayContext.currentUser);
+        this.addRealtimeMessage(channelId, backendType, {
+          channel_id: channelId,
+          channel_type: backendType,
+          ...raw
+        });
+        const id = pickPinnedMessageId(msg);
+        const stored = this.findMessageByRef(channelId, id, backendType) || msg;
+        if (id) messagesById.set(id, stored);
+      });
+
+      let maxVersion = Number(this.pinnedVersions[key] || 0);
+      const pins = [];
+      records.forEach((record) => {
+        maxVersion = Math.max(maxVersion, Number(record.version || record.ver || 0));
+        const status = pinStatus(record);
+        if (status === 'removed') return;
+        const messageId = String(record.message_idstr || record.message_id || record.messageID || record.id || '');
+        const existing = messagesById.get(messageId);
+        if (existing && status === 'active') {
+          pins.push(applyPinnedState(existing, true, status));
+          return;
+        }
+        pins.push(createUnavailablePinnedMessage(record, channelId, backendType));
+      });
+      this.pinnedMessages[key] = pins;
+      this.pinnedVersions[key] = maxVersion;
+      return pins;
+    },
+    async clearPinnedMessages(channelId, channelType = 1) {
+      const backendType = toBackendChannelType(channelType);
+      await syncApi.clearPinnedMessages({
+        channel_id: channelId,
+        channel_type: backendType
+      });
+      const key = channelKey(channelId, backendType);
+      this.getPinnedMessages(channelId, backendType).forEach((msg) => applyPinnedState(msg, false));
+      this.pinnedMessages[key] = [];
+      this.pinnedVersions[key] = 0;
+      return [];
+    },
     async retryPendingQueue() {
       const pending = Object.values(this.pendingQueue);
       return pending;
@@ -548,6 +722,7 @@ export const useMessageStore = defineStore('message', {
       this.typingState = {};
       this.reminders = [];
       this.pinnedMessages = {};
+      this.pinnedVersions = {};
       this.loading = false;
       this.lastError = '';
     }

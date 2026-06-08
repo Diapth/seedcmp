@@ -713,6 +713,126 @@ describe('IM domain mapping and stores', () => {
     ]);
   });
 
+  it('toggles a message as pinned through the backend and local pinned bucket', async () => {
+    const adapter = vi.fn(async ({ url }) => {
+      expect(url).toContain('/message/pinned');
+      return { status: 200, data: { code: 0, data: {} } };
+    });
+    setRequestAdapter(adapter);
+    const messageStore = useMessageStore();
+    const msg = messageStore.addMessage('group-1', {
+      id: 'm-1',
+      messageID: 'm-1',
+      clientMsgNo: 'c-1',
+      messageSeq: 7,
+      content: '关键约束',
+      type: 'text',
+      remoteExtra: {}
+    }, 2);
+
+    const pinned = await messageStore.togglePinnedMessage('group-1', 2, msg);
+
+    expect(adapter).toHaveBeenCalledWith(expect.objectContaining({
+      data: {
+        channel_id: 'group-1',
+        channel_type: 2,
+        message_id: 'm-1',
+        message_seq: 7
+      }
+    }));
+    expect(pinned.remoteExtra.isPinned).toBe(true);
+    expect(messageStore.getPinnedMessages('group-1', 2)).toEqual([
+      expect.objectContaining({ id: 'm-1', remoteExtra: expect.objectContaining({ isPinned: true }) })
+    ]);
+  });
+
+  it('syncs pinned messages and marks existing messages as pinned', async () => {
+    setRequestAdapter(async ({ url }) => {
+      if (url.includes('/message/pinned/sync')) {
+        return {
+          status: 200,
+          data: {
+            code: 0,
+            data: {
+              pinned_messages: [{ message_id: 'm-1', message_seq: 7, version: 2 }],
+              messages: [{ message_id: 'm-1', message_seq: 7, from_uid: 'u-a', payload: { type: 1, text: '关键约束' } }]
+            }
+          }
+        };
+      }
+      throw new Error(`Unexpected request: ${url}`);
+    });
+
+    const messageStore = useMessageStore();
+    messageStore.addMessage('group-1', {
+      id: 'm-1',
+      messageID: 'm-1',
+      messageSeq: 7,
+      content: '关键约束',
+      type: 'text',
+      remoteExtra: {}
+    }, 2);
+
+    const pins = await messageStore.syncPinnedMessages('group-1', 2);
+
+    expect(pins).toEqual([
+      expect.objectContaining({
+        id: 'm-1',
+        content: '关键约束',
+        remoteExtra: expect.objectContaining({ isPinned: true })
+      })
+    ]);
+    expect(messageStore.pinnedVersions['group-1-2']).toBe(2);
+    expect(messageStore.getMessages('group-1', 2)[0].remoteExtra.isPinned).toBe(true);
+  });
+
+  it('keeps source-unavailable pinned messages as degraded placeholders', async () => {
+    setRequestAdapter(async ({ url }) => {
+      if (url.includes('/message/pinned/sync')) {
+        return {
+          status: 200,
+          data: {
+            code: 0,
+            data: {
+              pinned_messages: [{ message_id: 'missing-1', message_seq: 12, version: 4, status: 'source_deleted' }],
+              messages: []
+            }
+          }
+        };
+      }
+      throw new Error(`Unexpected request: ${url}`);
+    });
+
+    const messageStore = useMessageStore();
+    const pins = await messageStore.syncPinnedMessages('group-1', 2);
+
+    expect(pins).toEqual([
+      expect.objectContaining({
+        id: 'missing-1',
+        messageID: 'missing-1',
+        messageSeq: 12,
+        type: 'system',
+        content: '置顶消息暂不可预览',
+        remoteExtra: expect.objectContaining({
+          isPinned: true,
+          unavailable: true,
+          pinStatus: 'source_deleted'
+        })
+      })
+    ]);
+  });
+
+  it('clears pinned message buckets and versions on reset', () => {
+    const messageStore = useMessageStore();
+
+    messageStore.pinnedMessages['group-1-2'] = [{ id: 'm-1' }];
+    messageStore.pinnedVersions['group-1-2'] = 9;
+    messageStore.reset();
+
+    expect(messageStore.pinnedMessages).toEqual({});
+    expect(messageStore.pinnedVersions).toEqual({});
+  });
+
   it('still replaces a synthetic summary when visible history hydration runs', async () => {
     const conversationStore = useConversationStore();
     const messageStore = useMessageStore();
