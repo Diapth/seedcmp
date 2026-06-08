@@ -60,11 +60,13 @@ sections/im_web/.ai/V3.0/issues/V3-18_cat_group_chat_mentions_context_media_and_
 
 新增 `mergeAgentReplyEventIntoList` / `normalizeAgentReplyEvent`，将 placeholder、chunk、final 按稳定 `streamKey` 合并为同一条可见 Markdown 回复；final 阶段可追加智能体生成文件卡片。`messageStore.receiveAgentReplyEvent` 接入该合并逻辑，`MessageBubble.vue` 对 Clowder/Markdown 文本使用 `markdown-it` 安全渲染。
 
+2026-06-08 复验补充：会话列表摘要新增 Markdown 预览归一化，会去除标题、表格分隔、引用、链接/图片语法和换行，并限制为单行短摘要；长 Clowder Markdown 回复不再把左侧会话项撑成多行。
+
 ---
 
 ## 测试结果
 
-已新增并通过 Clowder stream merge + Markdown + generated file 回归测试；`npm run test:native-im`、`npm run build:h5`、`npm run test:smoke` 均通过。浏览器四视口验收无 JS 运行时错误。
+已新增并通过 Clowder stream merge + Markdown + generated file 回归测试、长 Markdown 会话摘要单行回归测试；`npm run test:native-im`、`npm run build:h5`、`npm run test:smoke` 均通过。浏览器四视口验收确认可见摘要无换行/溢出问题。
 
 ---
 
