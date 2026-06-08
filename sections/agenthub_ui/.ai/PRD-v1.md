@@ -2,7 +2,7 @@
 
 ## 1. 产品定位
 
-AgentHub UI V1 是一个基于 uni-app + Vue3 + Pinia 的多端协同通讯客户端，面向 Web/H5 与未来 Android APP-PLUS。它承接 im_web/TangSeng 的真实 IM 能力，并把 Clowder 多智能体协作、项目群、文件、部署与设置能力纳入同一套移动友好的 AgentHub 工作台。
+AgentHub UI V1 是一个基于 uni-app + Vue3 + Pinia 的多端协同通讯客户端，面向 Web/H5 与未来 Android APP-PLUS。它承接 im_web/TangSeng 的真实 IM 能力，并把 AgentHub 多智能体协作、项目群、文件、部署与设置能力纳入同一套移动友好的 AgentHub 工作台。
 
 V1 的核心目标不是做演示壳，而是把已经成型的 UI 接到真实 seedcmp 后端：用户登录后看到真实会话、真实群、真实消息、真实智能体能力边界；后端没有提供的功能必须显示 unavailable，不允许用 mock 或延迟动画假装成功。
 
@@ -12,13 +12,13 @@ V1 的核心目标不是做演示壳，而是把已经成型的 UI 接到真实 
 
 - 需要在移动端或轻量 Web 端跟进团队/智能体协作的用户。
 - 使用 im_web 的现有用户，希望在 AgentHub UI 中看到一致的会话、群聊、项目群和文件信息。
-- 需要和 Clowder cat、PM/coordinator、项目群协作的用户。
+- 需要和 AgentHub cat、PM/coordinator、项目群协作的用户。
 
 核心场景：
 
 1. 用户用真实账号登录 AgentHub UI。
 2. 用户进入聊天工作台，看到与 im_web 一致的会话列表。
-3. 用户打开 direct cat、PM 或项目群，继续真实 IM/Clowder 协作。
+3. 用户打开 direct cat、PM 或项目群，继续真实 IM/AgentHub 协作。
 4. 用户查看智能体目录、文件、设置、设备等能力；未接通后端的能力被明确标识。
 5. 移动端用户在 375px 宽度下仍能顺畅浏览会话和进入详情。
 
@@ -33,7 +33,7 @@ V1 的核心目标不是做演示壳，而是把已经成型的 UI 接到真实 
 - 真实消息：消息同步、发送入口、实时入库、去重、撤回/编辑/reaction 基础接口。
 - IM 动作：typing、撤回、reaction、清未读必须走真实 SDK/API 或真实本地状态合并，不允许只改 UI。
 - 真实群：我的群、群资料、成员、建群/退出/解散接口。
-- 真实 Clowder：cat directory、capabilities、conversation binding、group cats、project group、thread Kanban、thread artifacts、deployment API。
+- 真实 AgentHub：cat directory、capabilities、conversation binding、group cats、project group、thread Kanban、thread artifacts、deployment API。
 - 真实文件：文件列表、预览入口、不可用状态；未接入真实上传/下载时必须 explicit unavailable。
 - 设置：设备、二维码登录、skill 上传、通知状态；不可用时显式 unavailable。
 - 多端适配：H5 已验收；代码层使用 uni storage/request 抽象兼容 APP-PLUS。
@@ -95,18 +95,18 @@ V1 的核心目标不是做演示壳，而是把已经成型的 UI 接到真实 
 - 单测覆盖实时入库去重与字段稳定性。
 - E2E 覆盖 agenthub_ui 发消息后 im_web 无刷新收到。
 
-### FR-4 Clowder 与智能体
+### FR-4 AgentHub 与智能体
 
-- Agent directory 从 Clowder 后端读取。
+- Agent directory 从 AgentHub 后端读取。
 - 创建/连接/断开 cat 走真实 API。
 - OAuth/runtime/queue/groupDenied 等能力失败态必须在 store/UI 可见。
-- 项目群、deployment、thread artifacts/tasks 走 Clowder API。
-- 项目群右侧栏必须从真实 Clowder binding 解析 thread id 并挂载 Kanban / artifacts，不允许依赖本地 `agentStore.boards`。
+- 项目群、deployment、thread artifacts/tasks 走 AgentHub API。
+- 项目群右侧栏必须从真实 AgentHub binding 解析 thread id 并挂载 Kanban / artifacts，不允许依赖本地 `agentStore.boards`。
 
 验收：
 
 - `stores/agent.js` 默认无硬编码 agent fixture。
-- `stores/clowder.js` 能拉 capabilities 并暴露 disabledReason。
+- `stores/AgentHub.js` 能拉 capabilities 并暴露 disabledReason。
 - 后端不可用时显示 unavailable，不伪造成功。
 
 ### FR-5 文件与设置
@@ -137,7 +137,7 @@ V1 的核心目标不是做演示壳，而是把已经成型的 UI 接到真实 
 
 - 真实网络：不接 mock server。
 - 错误可见：后端失败显示真实错误或 unavailable。
-- 测试保护：核心 mapper/request/auth/user/im/conversation/clowder 逻辑有单测。
+- 测试保护：核心 mapper/request/auth/user/im/conversation/AgentHub 逻辑有单测。
 - 构建可靠：`npm run build:h5` 必须成功。
 - 安全：验收文档不记录完整 token/密码。
 - 可移植：H5 使用 fetch，非 H5 可走 `uni.request`；storage 走 uni/localStorage fallback。
@@ -151,7 +151,7 @@ V1 的核心目标不是做演示壳，而是把已经成型的 UI 接到真实 
 3. `npm run test:e2e:realtime` 通过并保存截图、events、WS frames。
 4. 真实 H5 登录成功。
 5. agenthub_ui 与 im_web 对照关键会话一致。
-6. 项目群、PM、Clowder AI 会话可见。
+6. 项目群、PM、AgentHub AI 会话可见。
 7. 无 `未命名会话` / `1970`。
 8. 浏览器无 pageerror、无未处理 requestfailed，且无未解释的 HTTP 4xx/5xx；能力探测型 404 或已知非阻断 400 必须在验收报告记录。
 9. 截图证据保存到 `issues/screenshots/` 或 `.ai/tests-e2e/`。

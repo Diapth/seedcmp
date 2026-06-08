@@ -1,6 +1,17 @@
 #!/usr/bin/env bash
 set -Eeuo pipefail
 
+# AgentHub UI H5 前端（seedcmp/sections/ui）默认不启动。
+# 设置 AGENTHUB_UI=1 即可在 start 时一并拉起：
+#
+#   AGENTHUB_UI=1 seedcmp/scripts/start-im-clowder.sh start
+#
+# 启动后访问：
+#   http://localhost:5173/#/pages/login/index
+# 已登录可直接进：
+#   http://localhost:5173/#/pages/chat/index
+# 如果 5173 被占用，uni/vite 会自动换端口，查看日志输出里的实际 URL。
+
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 RUN_DIR="$ROOT_DIR/.seedcmp-run"
 LOG_DIR="$RUN_DIR/logs"
@@ -10,6 +21,7 @@ CLOWDER_DIR="$ROOT_DIR/sections/clowder-ai"
 WK_DIR="$ROOT_DIR/sections/im/WuKongIM"
 TSDD_DIR="$ROOT_DIR/sections/im/TangSengDaoDaoServer"
 IM_WEB_DIR="$ROOT_DIR/sections/im_web"
+AGENTHUB_UI_DIR="$ROOT_DIR/sections/ui"
 IM_WEB_VERSION_LABEL="${IM_WEB_VERSION_LABEL:-IM Web V3.0 (TangSengDaoDao Vue + Clowder bridge)}"
 
 CLOWDER_URL="${CLOWDER_URL:-${CAT_CAFE_API_URL:-http://127.0.0.1:3004}}"
@@ -20,6 +32,9 @@ CLOWDER_WEB_PORT="${CLOWDER_WEB_PORT:-3003}"
 # Single-web entry goal: most users only need IM Web (3000). Flip on with
 # CLOWDER_WEB=1 when you want the Clowder MissionControl / FeatureBoard UI.
 CLOWDER_WEB="${CLOWDER_WEB:-0}"
+# Start the AgentHub UI H5 frontend (seedcmp/sections/ui, port 5173).
+# Default: off. Set AGENTHUB_UI=1 to launch alongside the IM stack.
+AGENTHUB_UI="${AGENTHUB_UI:-1}"
 CLOWDER_CONNECTOR_SECRET="${CLOWDER_CONNECTOR_SECRET:-dev-shared-secret}"
 CLOWDER_CONNECTOR_ID="${CLOWDER_CONNECTOR_ID:-im-web}"
 CLOWDER_DEFAULT_OWNER_USER_ID="${CLOWDER_DEFAULT_OWNER_USER_ID:-user-1}"
@@ -76,6 +91,7 @@ Environment overrides:
   CLOWDER_URL=http://127.0.0.1:3004       (API origin; im_web talks to this)
   CLOWDER_WEB_URL=http://127.0.0.1:3003   (clowder-ai web origin; admin)
   CLOWDER_WEB=0|1                         (default 0; set 1 to launch web)
+  AGENTHUB_UI=0|1                         (default 0; set 1 to launch AgentHub UI H5 on 5173)
   CLOWDER_CONNECTOR_SECRET=dev-shared-secret
   CLOWDER_DEFAULT_OWNER_USER_ID=user-1
   CLOWDER_PNPM_VERSION=9.15.4
@@ -218,6 +234,40 @@ wait_bg_port() {
     fi
     sleep 1
   done
+  printf '[seedcmp] %s did not open %s:%s. See: %s\n' "$label" "$host" "$port" "$log_file" >&2
+  exit 1
+}
+
+# Like wait_bg_port, but tolerates the port staying closed when the process is
+# still alive. Useful for Vite/Uni dev servers that auto-pick another port when
+# the default is occupied.
+wait_bg_port_flexible() {
+  local process_name="$1"
+  local host="$2"
+  local port="$3"
+  local label="$4"
+  local max="${5:-30}"
+  local pid_file="$PID_DIR/$process_name.pid"
+  local log_file="$LOG_DIR/$process_name.log"
+  local pid=""
+
+  [ -f "$pid_file" ] && pid="$(cat "$pid_file" 2>/dev/null || true)"
+  log "waiting for $label on $host:$port (vite may auto-select another port)..."
+  for _ in $(seq 1 "$max"); do
+    if port_open "$host" "$port"; then
+      return
+    fi
+    if [ -n "$pid" ] && ! kill -0 "$pid" >/dev/null 2>&1; then
+      printf '[seedcmp] %s exited before opening %s:%s. See: %s\n' "$label" "$host" "$port" "$log_file" >&2
+      exit 1
+    fi
+    sleep 1
+  done
+
+  if [ -n "$pid" ] && kill -0 "$pid" >/dev/null 2>&1; then
+    log "$label did not open $host:$port but process is alive; see $log_file for the actual URL"
+    return
+  fi
   printf '[seedcmp] %s did not open %s:%s. See: %s\n' "$label" "$host" "$port" "$log_file" >&2
   exit 1
 }
@@ -376,6 +426,11 @@ ensure_node_deps() {
     log "installing IM Web dependencies..."
     (cd "$IM_WEB_DIR" && corepack pnpm install)
   fi
+  if [ "$AGENTHUB_UI" = "1" ] && [ ! -d "$AGENTHUB_UI_DIR/node_modules" ]; then
+    log "installing AgentHub UI dependencies..."
+    # CI=1 disables pnpm's interactive "reinstall modules?" prompt.
+    (cd "$AGENTHUB_UI_DIR" && CI=1 corepack pnpm install)
+  fi
   if [ ! -d "$CLOWDER_DIR/node_modules" ]; then
     log "installing Clowder dependencies..."
     ensure_clowder_pnpm_wrapper
@@ -513,16 +568,30 @@ start_all() {
     corepack pnpm --filter chat dev --host 0.0.0.0
   wait_bg_port im-web 127.0.0.1 3000 "IM Web"
 
+  if [ "$AGENTHUB_UI" = "1" ]; then
+    # --host makes the Vite dev server bind to 0.0.0.0 so the H5 frontend is
+    # reachable from the LAN. Vite defaults to port 5173 and auto-increments
+    # if it is occupied; the flexible wait tolerates that.
+    start_bg agenthub-ui "$AGENTHUB_UI_DIR" env \
+      PNPM_CONFIG_VERIFY_DEPS_BEFORE_RUN=false \
+      corepack pnpm dev:h5 --host
+    wait_bg_port_flexible agenthub-ui 127.0.0.1 5173 "AgentHub UI"
+  fi
+
   log "ready:"
   log "  IM Web:  http://localhost:3000"
   log "  Clowder API: http://localhost:3004"
   if [ "$CLOWDER_WEB" = "1" ]; then
     log "  Clowder Web: $CLOWDER_WEB_URL (admin / MissionControl)"
   fi
+  if [ "$AGENTHUB_UI" = "1" ]; then
+    log "  AgentHub UI: http://localhost:5173 (vite may have auto-selected another port; see $LOG_DIR/agenthub-ui.log)"
+  fi
   log "  Logs:    $LOG_DIR"
 }
 
 stop_all() {
+  stop_pid agenthub-ui
   stop_pid im-web
   stop_pid tangseng
   # Either the unified `clowder-web` name (when CLOWDER_WEB=1) or the
@@ -532,6 +601,7 @@ stop_all() {
   stop_pid clowder-api
   stop_pid clowder
   stop_pid wukongim
+  stop_project_port 5173 "AgentHub UI"
   stop_project_port 3000 "IM Web"
   stop_project_port 8090 "TangSeng API"
   stop_project_port 6979 "TangSeng gRPC"
@@ -596,6 +666,7 @@ status_all() {
   fi
   status_runtime_one tangseng
   status_runtime_one im-web
+  status_runtime_one agenthub-ui
   log "processes:"
   status_one wukongim
   # Either clowder-api (default, API-only) or clowder-web (when CLOWDER_WEB=1).
@@ -606,6 +677,7 @@ status_all() {
   fi
   status_one tangseng
   status_one im-web
+  status_one agenthub-ui
   if command -v docker >/dev/null 2>&1; then
     log "containers:"
     local containers=("$MYSQL_CONTAINER" "$MINIO_CONTAINER")
@@ -624,7 +696,7 @@ status_all() {
     fi
   fi
   log "ports:"
-  for item in "5001 WuKongIM" "3004 Clowder-API" "3003 Clowder-Web" "8090 TangSeng" "3000 IM-Web"; do
+  for item in "5001 WuKongIM" "3004 Clowder-API" "3003 Clowder-Web" "8090 TangSeng" "3000 IM-Web" "5173 AgentHub-UI"; do
     set -- $item
     if (echo >"/dev/tcp/127.0.0.1/$1") >/dev/null 2>&1; then
       printf '  %-5s open    %s\n' "$1" "$2"
