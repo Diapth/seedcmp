@@ -479,6 +479,65 @@ describe('Clowder and agent stores', () => {
     expect(calls.map((call) => call.method)).toEqual(['GET', 'POST', 'DELETE']);
   });
 
+  it('lists inactive manual pins and marks source status through Clowder thread endpoints', async () => {
+    const calls = [];
+    setRequestAdapter(async ({ url, method, data }) => {
+      calls.push({ url, method, data });
+      if (method === 'GET') {
+        expect(url).toContain('/clowder/thread/thread-1/manual-context-pins');
+        expect(url).toContain('includeInactive=1');
+        return {
+          status: 200,
+          data: {
+            code: 0,
+            data: {
+              pins: [
+                {
+                  id: 'pin-1',
+                  threadId: 'thread-1',
+                  messageId: 'm-1',
+                  contentExcerpt: '关键约束',
+                  status: 'source_deleted'
+                }
+              ]
+            }
+          }
+        };
+      }
+      if (method === 'PATCH') {
+        expect(url).toContain('/clowder/thread/thread-1/manual-context-pins/source-status');
+        expect(data).toMatchObject({ messageId: 'm-1', status: 'source_deleted' });
+        return {
+          status: 200,
+          data: {
+            code: 0,
+            data: {
+              pins: [
+                {
+                  id: 'pin-1',
+                  threadId: 'thread-1',
+                  messageId: 'm-1',
+                  contentExcerpt: '关键约束',
+                  status: 'source_deleted'
+                }
+              ]
+            }
+          }
+        };
+      }
+      throw new Error(`unexpected ${method} ${url}`);
+    });
+
+    const clowderStore = useClowderStore();
+    const inactive = await clowderStore.listManualContextPins('thread-1', { includeInactive: true });
+    const degraded = await clowderStore.markManualContextPinSourceStatus('thread-1', 'm-1', 'source_deleted');
+
+    expect(inactive[0]).toMatchObject({ status: 'source_deleted' });
+    expect(degraded[0]).toMatchObject({ messageId: 'm-1', status: 'source_deleted' });
+    expect(clowderStore.manualContextPins['thread-1'][0]).toMatchObject({ status: 'source_deleted' });
+    expect(calls.map((call) => call.method)).toEqual(['GET', 'PATCH']);
+  });
+
   it('loads active project-group bindings by project group number for refreshed group chats', async () => {
     setRequestAdapter(async ({ url, method }) => {
       expect(method).toBe('GET');

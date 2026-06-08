@@ -3,6 +3,7 @@ import type {
   IManualContextPinStore,
   ManualContextPinInput,
   ManualContextPinListOptions,
+  ManualContextPinStatus,
 } from '../domains/cats/services/stores/ports/ManualContextPinStore.js';
 import { normalizeManualContextPinLimit } from '../domains/cats/services/stores/ports/ManualContextPinStore.js';
 import { resolveUserId } from '../utils/request-identity.js';
@@ -34,6 +35,7 @@ interface ManualContextPinBody {
   sender_name?: string;
   pinnedBy?: string;
   pinned_by?: string;
+  status?: string;
   userId?: string;
   user_id?: string;
 }
@@ -57,6 +59,11 @@ function optionalNumber(value: unknown): number | undefined {
 
 function includeInactiveFromQuery(value: unknown): boolean {
   return value === true || value === '1' || value === 'true' || value === 'yes';
+}
+
+function sourceStatusFromBody(value: unknown): Extract<ManualContextPinStatus, 'source_deleted' | 'permission_denied'> | '' {
+  if (value === 'source_deleted' || value === 'permission_denied') return value;
+  return '';
 }
 
 function buildPinInput(threadId: string, userId: string, body: ManualContextPinBody): ManualContextPinInput | null {
@@ -129,6 +136,29 @@ export const manualContextPinsRoutes: FastifyPluginAsync<ManualContextPinsRoutes
       : await Promise.resolve(opts.manualContextPinStore.listActive(threadId, options));
     return reply.send({ threadId, pins });
   });
+
+  app.patch<{ Params: RouteParams; Body: ManualContextPinBody }>(
+    '/api/threads/:threadId/manual-context-pins/source-status',
+    async (request, reply) => {
+      const threadId = threadIdFromParams(request);
+      if (!threadId) return reply.status(400).send({ error: 'threadId is required' });
+      const body = request.body ?? {};
+      const userId = resolveUserId(request, {
+        fallbackUserId: body.userId ?? body.user_id,
+        ...(opts.defaultUserId ? { defaultUserId: opts.defaultUserId } : {}),
+      });
+      if (!userId) return reply.status(401).send({ error: 'user identity is required' });
+
+      const messageId = nonEmptyString(body.messageId ?? body.message_id);
+      const status = sourceStatusFromBody(body.status);
+      if (!messageId || !status) {
+        return reply.status(400).send({ error: 'messageId and source status are required' });
+      }
+
+      const pins = await Promise.resolve(opts.manualContextPinStore.markSourceStatus(threadId, messageId, status, userId));
+      return reply.send({ threadId, pins });
+    },
+  );
 
   app.delete<{ Params: RouteParams }>('/api/threads/:threadId/manual-context-pins/:pinId', async (request, reply) => {
     const threadId = threadIdFromParams(request);

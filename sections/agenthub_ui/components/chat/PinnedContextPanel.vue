@@ -41,8 +41,9 @@
 </template>
 
 <script setup>
-import { computed } from 'vue';
+import { computed, watch } from 'vue';
 import { useMessageStore } from '@/stores/message';
+import { useClowderStore } from '@/stores/clowder.js';
 import AppIcon from '../common/AppIcon.vue';
 
 const props = defineProps({
@@ -54,8 +55,10 @@ const props = defineProps({
 defineEmits(['jump-message', 'unpin']);
 
 const messageStore = useMessageStore();
+const clowderStore = useClowderStore();
 
 const pins = computed(() => messageStore.getPinnedMessages(props.channelId, props.channelType));
+const clowderPins = computed(() => props.threadId ? (clowderStore.manualContextPins[props.threadId] || []) : []);
 const subtitle = computed(() => {
   if (!pins.value.length) return '从消息菜单 pin 关键约束';
   if (!props.threadId) return '已保存到 IM，未注入 Clowder';
@@ -70,12 +73,34 @@ function pinKey(pin = {}) {
   return `${messageRef(pin)}:${pin.messageSeq || pin.clientMsgNo || 'pin'}`;
 }
 
+function clowderPinFor(pin = {}) {
+  const ids = [
+    pin.messageID,
+    pin.messageId,
+    pin.message_id,
+    pin.id,
+    pin.clientMsgNo,
+    pin.client_msg_no
+  ].map((value) => String(value || '')).filter(Boolean);
+  const excerpt = String(pin.content || pin.text || '');
+  return clowderPins.value.find((item) => (
+    ids.includes(String(item.messageId || item.message_id || '')) ||
+    (excerpt && String(item.contentExcerpt || item.content_excerpt || '').includes(excerpt.slice(0, 80)))
+  )) || null;
+}
+
+function pinStatus(pin = {}) {
+  const clowderStatus = clowderPinFor(pin)?.status;
+  return clowderStatus || pin.remoteExtra?.pinStatus || 'active';
+}
+
 function isDegraded(pin = {}) {
-  return Boolean(pin.remoteExtra?.unavailable || pin.remoteExtra?.pinStatus === 'source_deleted' || pin.remoteExtra?.pinStatus === 'permission_denied');
+  const status = pinStatus(pin);
+  return Boolean(pin.remoteExtra?.unavailable || status === 'source_deleted' || status === 'permission_denied');
 }
 
 function stateLabel(pin = {}) {
-  const status = pin.remoteExtra?.pinStatus || 'active';
+  const status = pinStatus(pin);
   if (status === 'source_deleted') return '来源已删除';
   if (status === 'permission_denied') return '无权限';
   if (pin.remoteExtra?.unavailable) return '不可预览';
@@ -86,6 +111,14 @@ function stateLabel(pin = {}) {
 function excerpt(pin = {}) {
   return String(pin.content || pin.text || '置顶消息暂不可预览').slice(0, 96);
 }
+
+watch(
+  () => props.threadId,
+  (threadId) => {
+    if (threadId) clowderStore.listManualContextPins(props.threadId, { includeInactive: true }).catch(() => undefined);
+  },
+  { immediate: true }
+);
 </script>
 
 <style scoped>

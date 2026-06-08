@@ -149,6 +149,44 @@ describe('Manual context pins routes', () => {
     assert.equal(all.json().pins[0].status, 'source_deleted');
   });
 
+  test('PATCH source status marks matching pins degraded for live verification', async () => {
+    const { app } = await createApp();
+
+    await app.inject({
+      method: 'POST',
+      url: '/api/threads/thread-1/manual-context-pins',
+      headers: USER_HEADER,
+      payload: {
+        channelId: 'group-1',
+        channelType: 2,
+        messageId: 'm-deleted',
+        contentExcerpt: '删除后不应注入',
+        senderName: 'PM',
+        pinnedBy: 'manual-pin-user',
+      },
+    });
+
+    const patched = await app.inject({
+      method: 'PATCH',
+      url: '/api/threads/thread-1/manual-context-pins/source-status',
+      headers: USER_HEADER,
+      payload: {
+        messageId: 'm-deleted',
+        status: 'source_deleted',
+      },
+    });
+    assert.equal(patched.statusCode, 200);
+    assert.equal(patched.json().pins[0].status, 'source_deleted');
+
+    const active = await app.inject({
+      method: 'GET',
+      url: '/api/threads/thread-1/manual-context-pins',
+      headers: USER_HEADER,
+    });
+    assert.equal(active.statusCode, 200);
+    assert.equal(active.json().pins.length, 0);
+  });
+
   test('missing required payload fields fail closed', async () => {
     const { app } = await createApp();
     const response = await app.inject({
