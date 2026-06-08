@@ -1780,6 +1780,16 @@ func (c *Clowder) conversationMessage(ctx *wkhttp.Context) {
 		ctx.JSON(http.StatusBadRequest, map[string]string{"error": "channel_and_text_required"})
 		return
 	}
+	msgReq, err := BuildInboundPersistMessage(req, ctx.GetLoginUID())
+	if err != nil {
+		ctx.JSON(http.StatusBadRequest, map[string]string{"error": "invalid_message", "message": err.Error()})
+		return
+	}
+	if err := c.ctx.SendMessage(msgReq); err != nil {
+		c.Error("persist clowder inbound message failed")
+		ctx.JSON(http.StatusBadGateway, map[string]string{"error": "persist_failed", "message": err.Error()})
+		return
+	}
 	response, err := c.sendInboundTextWithRouting(req.ChannelID, req.ChannelType, ctx.GetLoginUID(), routeTextForCatRequest(req), req.DirectCatID, req.TargetCatIDs, req.PromptContext)
 	if err != nil {
 		ctx.JSON(http.StatusBadGateway, map[string]string{"error": "message_failed", "message": err.Error()})

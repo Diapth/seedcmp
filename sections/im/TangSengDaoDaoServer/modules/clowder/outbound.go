@@ -52,6 +52,51 @@ func BuildOutboundMessage(payload OutboundPayload) (*config.MsgSendReq, error) {
 	return BuildOutboundMessageWithDefaultRecipient(payload, "")
 }
 
+func BuildInboundPersistMessage(req conversationRefRequest, userID string) (*config.MsgSendReq, error) {
+	channelID := strings.TrimSpace(req.ChannelID)
+	if channelID == "" || req.ChannelType == 0 {
+		return nil, errors.New("empty inbound clowder channel")
+	}
+	fromUID := strings.TrimSpace(userID)
+	if fromUID == "" {
+		return nil, errors.New("empty inbound clowder sender")
+	}
+	content := strings.TrimSpace(req.Text)
+	if content == "" {
+		return nil, errors.New("empty inbound clowder content")
+	}
+
+	body := map[string]interface{}{
+		"type":         common.Text,
+		"content":      content,
+		"text":         content,
+		"connector_id": ConnectorID,
+		"source":       "clowder_user_prompt",
+	}
+	if directCatID := strings.TrimSpace(req.DirectCatID); directCatID != "" {
+		body["direct_cat_id"] = directCatID
+	}
+	if targetCatIDs := cleanStringList(req.TargetCatIDs); len(targetCatIDs) > 0 {
+		body["target_cat_ids"] = targetCatIDs
+	}
+	if promptContext := strings.TrimSpace(req.PromptContext); promptContext != "" {
+		body["prompt_context"] = promptContext
+	}
+	bodyBytes, err := json.Marshal(body)
+	if err != nil {
+		return nil, err
+	}
+	return &config.MsgSendReq{
+		Header: config.MsgHeader{
+			RedDot: 1,
+		},
+		ChannelID:   channelID,
+		ChannelType: req.ChannelType,
+		FromUID:     fromUID,
+		Payload:     bodyBytes,
+	}, nil
+}
+
 func BuildOutboundMessageWithDefaultRecipient(payload OutboundPayload, defaultRecipientUID string) (*config.MsgSendReq, error) {
 	channelType, channelID, err := parseExternalChatID(payload.ExternalChatID)
 	if err != nil {
@@ -196,7 +241,7 @@ func buildOutboundReactionEvent(payload OutboundPayload, channelType uint8, chan
 	return &config.MsgSendReq{
 		Header: config.MsgHeader{
 			NoPersist: 1,
-			RedDot:   0,
+			RedDot:    0,
 		},
 		ChannelID:   channelID,
 		ChannelType: channelType,
