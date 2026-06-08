@@ -130,6 +130,10 @@ test('conversation draft persistence skips local robot and mock conversations', 
     false
   );
   assert.equal(
+    shouldPersistConversationDraft({ id: 'clowder', channelId: 'clowder', channelType: 1, type: 'single' }),
+    false
+  );
+  assert.equal(
     shouldPersistConversationDraft({ id: '2', channelId: '2', channelType: 2, type: 'group', source: 'mock' }),
     false
   );
