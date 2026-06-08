@@ -28,7 +28,7 @@
           {{ formatDraftPreview(data.draft) }}
         </text>
         <text class="item-msg-text" v-else>
-          {{ data.lastMessage }}
+          {{ formatConversationPreview(data.lastMessage) }}
         </text>
 
         <!-- Icons/Badges -->
@@ -45,7 +45,7 @@
 </template>
 
 <script setup>
-import { formatTime, formatUnread } from '@/utils/formatConversation';
+import { formatConversationPreview, formatTime, formatUnread } from '@/utils/formatConversation';
 import AppAvatar from '../common/AppAvatar.vue';
 import AppIcon from '../common/AppIcon.vue';
 
@@ -111,6 +111,8 @@ function formatDraftPreview(value) {
 }
 
 .info-top {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
   width: 100%;
   min-width: 0;
   gap: 8px;
@@ -118,7 +120,6 @@ function formatDraftPreview(value) {
 
 .item-name {
   display: block;
-  flex: 1 1 auto;
   min-width: 0;
   font-size: 15px;
   font-weight: 600;
@@ -126,7 +127,6 @@ function formatDraftPreview(value) {
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
-  max-width: 160px;
 }
 
 .item-time {
@@ -136,6 +136,8 @@ function formatDraftPreview(value) {
 }
 
 .info-bottom {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
   width: 100%;
   min-width: 0;
   gap: 6px;
@@ -144,21 +146,19 @@ function formatDraftPreview(value) {
 
 .item-msg-text {
   display: block;
-  flex: 1 1 auto;
   min-width: 0;
   font-size: 13px;
   color: var(--color-text-secondary);
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
-  width: 0;
+  word-break: keep-all;
   max-width: none;
   line-height: 18px;
 }
 
 .item-msg-draft {
   display: block;
-  flex: 1 1 auto;
   min-width: 0;
   font-size: 13px;
   color: var(--color-error);
@@ -166,7 +166,7 @@ function formatDraftPreview(value) {
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
-  width: 0;
+  word-break: keep-all;
   max-width: none;
   line-height: 18px;
 }

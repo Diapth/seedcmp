@@ -47,6 +47,10 @@ function draftStorageKey() {
   return `agenthub:conversation-drafts:${readCurrentUserId()}`;
 }
 
+function draftClearStorageKey() {
+  return `agenthub:conversation-draft-clears:${readCurrentUserId()}`;
+}
+
 function readDraftCache() {
   if (typeof uni === 'undefined' || typeof uni.getStorageSync !== 'function') return {};
   try {
@@ -64,6 +68,58 @@ function writeDraftCache(cache) {
   } catch {
     // local draft storage must never block typing
   }
+}
+
+const DRAFT_CLEAR_TTL_MS = 24 * 60 * 60 * 1000;
+
+function readDraftClearCache() {
+  if (typeof uni === 'undefined' || typeof uni.getStorageSync !== 'function') return {};
+  try {
+    const raw = uni.getStorageSync(draftClearStorageKey());
+    const parsed = raw ? JSON.parse(raw) : {};
+    const now = Date.now();
+    const fresh = {};
+    Object.entries(parsed || {}).forEach(([key, value]) => {
+      const timestamp = Number(value || 0);
+      if (timestamp && now - timestamp < DRAFT_CLEAR_TTL_MS) {
+        fresh[key] = timestamp;
+      }
+    });
+    if (Object.keys(fresh).length !== Object.keys(parsed || {}).length) {
+      writeDraftClearCache(fresh);
+    }
+    return fresh;
+  } catch {
+    return {};
+  }
+}
+
+function writeDraftClearCache(cache) {
+  if (typeof uni === 'undefined' || typeof uni.setStorageSync !== 'function') return;
+  try {
+    uni.setStorageSync(draftClearStorageKey(), JSON.stringify(cache || {}));
+  } catch {
+    // local draft-clear storage must never block typing
+  }
+}
+
+function markDraftCleared(key) {
+  if (!key) return;
+  const cache = readDraftClearCache();
+  cache[key] = Date.now();
+  writeDraftClearCache(cache);
+}
+
+function forgetDraftCleared(key) {
+  if (!key) return;
+  const cache = readDraftClearCache();
+  if (!Object.prototype.hasOwnProperty.call(cache, key)) return;
+  delete cache[key];
+  writeDraftClearCache(cache);
+}
+
+function readDraftClearedKeys() {
+  return new Set(Object.keys(readDraftClearCache()));
 }
 
 export const useConversationStore = defineStore('conversation', {
@@ -224,8 +280,10 @@ export const useConversationStore = defineStore('conversation', {
       const cache = readDraftCache();
       if (normalizedDraft) {
         cache[key] = normalizedDraft;
+        forgetDraftCleared(key);
       } else {
         delete cache[key];
+        markDraftCleared(key);
       }
       writeDraftCache(cache);
 
@@ -237,9 +295,9 @@ export const useConversationStore = defineStore('conversation', {
       this.draftDirtyKeys[key] = true;
       if (this.draftSyncTimers[key]) {
         clearTimeout(this.draftSyncTimers[key]);
-      }
-      this.draftSyncTimers[key] = setTimeout(async () => {
         delete this.draftSyncTimers[key];
+      }
+      const persistDraft = async () => {
         try {
           await nativeImService.updateConversationExtra({
             channelId: identity.channelId,
@@ -250,6 +308,14 @@ export const useConversationStore = defineStore('conversation', {
         } catch (error) {
           this.syncError = errorText(error);
         }
+      };
+      if (!normalizedDraft) {
+        persistDraft();
+        return;
+      }
+      this.draftSyncTimers[key] = setTimeout(async () => {
+        delete this.draftSyncTimers[key];
+        await persistDraft();
       }, options.delayMs ?? 600);
     },
     // PR-9 新增 actions
@@ -386,6 +452,7 @@ export const useConversationStore = defineStore('conversation', {
         this.conversations = dropMockConversations(this.conversations);
       }
       const draftCache = readDraftCache();
+      const clearedDraftKeys = readDraftClearedKeys();
       list.forEach((nativeConversation) => {
         const existing = this.conversations.find((item) => {
           if (nativeConversation.key && item.key === nativeConversation.key) return true;
@@ -408,10 +475,18 @@ export const useConversationStore = defineStore('conversation', {
             nativeConversation.channelType || channelTypeFromConversation(nativeConversation)
           );
           const hasRemoteDraft = Object.prototype.hasOwnProperty.call(nativeConversation, 'draft');
-          const draft = this.draftDirtyKeys[key]
+          const hasClearedDraft = clearedDraftKeys.has(key);
+          const remoteDraft = hasRemoteDraft ? String(nativeConversation.draft || '') : '';
+          if (hasRemoteDraft && !remoteDraft && hasClearedDraft) {
+            forgetDraftCleared(key);
+            clearedDraftKeys.delete(key);
+          }
+          const draft = hasClearedDraft
+            ? ''
+            : this.draftDirtyKeys[key]
             ? existing.draft || ''
             : hasRemoteDraft
-              ? String(nativeConversation.draft || '')
+              ? remoteDraft
               : (draftCache[key] || existing.draft || '');
           const localHidden = this.isHidden.includes(existing.id);
           Object.assign(existing, nativeConversation, {
@@ -425,17 +500,19 @@ export const useConversationStore = defineStore('conversation', {
           }
           if (localHidden && !this.isHidden.includes(existing.id)) this.isHidden.push(existing.id);
         } else {
+          const key = conversationDraftKey(nativeConversation.channelId || nativeConversation.id, nativeConversation.channelType);
           this.conversations.push({
             unread: 0,
             isPinned: false,
             isMuted: false,
-            draft: draftCache[conversationDraftKey(nativeConversation.channelId || nativeConversation.id, nativeConversation.channelType)] || nativeConversation.draft || '',
+            draft: clearedDraftKeys.has(key) ? '' : (draftCache[key] || nativeConversation.draft || ''),
             ...nativeConversation
           });
         }
       });
       this.conversations = mergeRemoteDrafts(this.conversations, list, {
-        dirtyKeys: new Set(Object.keys(this.draftDirtyKeys))
+        dirtyKeys: new Set(Object.keys(this.draftDirtyKeys)),
+        clearedKeys: readDraftClearedKeys()
       });
       this.conversations = sortConversations(this.conversations);
       this.lastNativeSyncAt = Date.now();

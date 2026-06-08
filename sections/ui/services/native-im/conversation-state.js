@@ -81,6 +81,7 @@ export function applyDraftToConversationList(conversations = [], channelId, chan
 
 export function mergeRemoteDrafts(conversations = [], remoteDrafts = [], options = {}) {
   const dirtyKeys = options.dirtyKeys || new Set();
+  const clearedKeys = options.clearedKeys || new Set();
   const draftByKey = new Map();
   remoteDrafts.forEach((item) => {
     const channelId = item.channelId || item.channel_id || item.id;
@@ -94,6 +95,7 @@ export function mergeRemoteDrafts(conversations = [], remoteDrafts = [], options
   return conversations.map((conversation) => {
     const identity = conversationIdentity(conversation);
     const key = conversationDraftKey(identity.channelId, identity.channelType);
+    if (clearedKeys.has(key)) return { ...conversation, draft: '' };
     if (!draftByKey.has(key) || dirtyKeys.has(key)) return conversation;
     return { ...conversation, draft: draftByKey.get(key) || '' };
   });
