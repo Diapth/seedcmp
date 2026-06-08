@@ -85,6 +85,211 @@ test('native service exposes group creation and member sync APIs', async () => {
   assert.equal(members[0].role, 'admin');
 });
 
+test('native service fetches clowder cat directory as agent cards', async () => {
+  const rawAgent = {
+    catId: 'xtz',
+    displayName: '协调者',
+    mentionPatterns: ['@xtz', '@协调者'],
+    personalitySummary: '稳健拆解任务',
+    capabilitySummary: '需求澄清、多智能体编排',
+    available: true,
+    preferred: true
+  };
+  const request = makeRequestStub({
+    'GET clowder/cats?includeUnavailable=true': {
+      agents: [rawAgent],
+      preferredCatIds: ['xtz']
+    }
+  });
+  const service = createNativeImService({
+    baseUrl: '/v1/',
+    request,
+    getToken: () => 'token'
+  });
+
+  const directory = await service.fetchClowderCatDirectory({ includeUnavailable: true });
+
+  assert.equal(request.calls[0].method, 'GET');
+  assert.equal(request.calls[0].url, '/v1/clowder/cats?includeUnavailable=true');
+  assert.equal(directory.agents.length, 1);
+  assert.deepEqual(directory.agents[0], {
+    id: 'xtz',
+    uid: 'xtz',
+    name: '协调者',
+    nickname: '协调者',
+    alias: '@xtz',
+    desc: '需求澄清、多智能体编排',
+    avatar: '',
+    status: 'active',
+    creator: 'System',
+    platform: 'clowder',
+    accessMode: 'backend',
+    model: '',
+    accountRef: '',
+    apiKey: '',
+    apiUrl: '',
+    customModel: '',
+    systemPrompt: '稳健拆解任务',
+    roleTemplate: 'general',
+    templateId: 'general',
+    capabilityTags: ['需求澄清', '多智能体编排'],
+    isAgent: true,
+    connected: true,
+    source: 'clowder',
+    preferred: true,
+    raw: rawAgent
+  });
+});
+
+test('native service scans clowder templates as official agent cards', async () => {
+  const rawTemplate = {
+    roleTemplateId: 'coordinator',
+    catId: 'coordinator',
+    displayName: 'Clowder AI',
+    mentionPatterns: ['@clowder', '@协调者'],
+    personalitySummary: '官方协同调度',
+    capabilitySummary: '多智能体编排、任务拆解',
+    cloneable: true,
+    source: 'role-template'
+  };
+  const request = makeRequestStub({
+    'GET clowder/cats?includeUnavailable=true': {
+      agents: [],
+      templates: [rawTemplate]
+    }
+  });
+  const service = createNativeImService({
+    baseUrl: '/v1/',
+    request,
+    getToken: () => 'token'
+  });
+
+  const directory = await service.fetchClowderCatDirectory({ includeUnavailable: true });
+
+  assert.equal(directory.agents.length, 1);
+  assert.equal(directory.agents[0].id, 'coordinator');
+  assert.equal(directory.agents[0].name, 'Clowder AI');
+  assert.equal(directory.agents[0].creator, 'System');
+  assert.equal(directory.agents[0].source, 'clowder');
+  assert.equal(directory.agents[0].raw.source, 'role-template');
+  assert.deepEqual(directory.agents[0].capabilityTags, ['多智能体编排', '任务拆解']);
+});
+
+test('native service falls back to direct clowder api when tangseng cat proxy fails', async () => {
+  const calls = [];
+  const request = async (options) => {
+    calls.push(options);
+    if (options.url === '/v1/clowder/cats?includeUnavailable=true') {
+      return {
+        statusCode: 502,
+        data: { error: 'cat_directory_unavailable', message: 'clowder cat templates failed' }
+      };
+    }
+    if (options.url === '/clowder-api/api/cat-templates') {
+      return {
+        statusCode: 200,
+        data: {
+          templates: [
+            {
+              id: 'architect',
+              name: '布偶猫（架构师）',
+              nickname: '宪宪',
+              roleDescription: '主架构师',
+              personality: '温柔但有主见',
+              teamStrengths: '架构设计、写代码一把好手'
+            }
+          ]
+        }
+      };
+    }
+    return { statusCode: 404, data: { msg: `unexpected ${options.url}` } };
+  };
+  const service = createNativeImService({
+    baseUrl: '/v1/',
+    clowderBaseUrl: '/clowder-api/api/',
+    request,
+    getToken: () => 'token'
+  });
+
+  const directory = await service.fetchClowderCatDirectory({ includeUnavailable: true });
+
+  assert.equal(calls[0].url, '/v1/clowder/cats?includeUnavailable=true');
+  assert.equal(calls[1].url, '/clowder-api/api/cat-templates');
+  assert.equal(directory.agents.length, 1);
+  assert.equal(directory.agents[0].id, 'architect');
+  assert.equal(directory.agents[0].name, '布偶猫（架构师）');
+  assert.equal(directory.agents[0].creator, 'System');
+});
+
+test('native service can prefer direct clowder api for global official directory', async () => {
+  const calls = [];
+  const request = async (options) => {
+    calls.push(options);
+    if (options.url === '/clowder-api/api/cat-templates') {
+      return {
+        statusCode: 200,
+        data: {
+          templates: [
+            {
+              id: 'qa',
+              name: '英短（QA工程师）',
+              teamStrengths: '自动化测试、回归验证'
+            }
+          ]
+        }
+      };
+    }
+    return { statusCode: 404, data: { msg: `unexpected ${options.url}` } };
+  };
+  const service = createNativeImService({
+    baseUrl: '/v1/',
+    clowderBaseUrl: '/clowder-api/api/',
+    request,
+    getToken: () => 'token'
+  });
+
+  const directory = await service.fetchClowderCatDirectory({ preferDirect: true });
+
+  assert.equal(calls[0].url, '/clowder-api/api/cat-templates');
+  assert.equal(calls.some((call) => call.url.startsWith('/v1/clowder/cats')), false);
+  assert.equal(directory.agents[0].id, 'qa');
+  assert.equal(directory.agents[0].creator, 'System');
+});
+
+test('native service sends direct clowder cat messages through conversation bridge', async () => {
+  const request = makeRequestStub({
+    'POST clowder/conversation/message': {
+      message_id: 'bridge-1',
+      status: 'success'
+    }
+  });
+  const service = createNativeImService({
+    baseUrl: '/v1/',
+    request,
+    getToken: () => 'token'
+  });
+
+  const sent = await service.sendClowderConversationMessage({
+    channelId: 'clowder_cat:opus',
+    channelType: 1,
+    text: '你好',
+    directCatId: 'opus'
+  });
+
+  assert.equal(request.calls[0].method, 'POST');
+  assert.equal(request.calls[0].url, '/v1/clowder/conversation/message');
+  assert.deepEqual(request.calls[0].data, {
+    channelId: 'clowder_cat:opus',
+    channelType: 1,
+    text: '你好',
+    directCatId: 'opus'
+  });
+  assert.equal(sent.id, 'bridge-1');
+  assert.equal(sent.channelId, 'clowder_cat:opus');
+  assert.equal(sent.channelType, 1);
+  assert.equal(sent.status, 'success');
+});
+
 test('native service uploads files before returning a public media url', async () => {
   const uploaded = [];
   const request = makeRequestStub({
@@ -485,7 +690,9 @@ test('message sender helpers tolerate empty current user during anonymous visual
 test('agent helpers create direct conversations and group mention members', async () => {
   const {
     createAgentConversation,
-    createAgentMember
+    createAgentMember,
+    getClowderCatIdFromContactId,
+    shouldPreserveClowderAgentDisplayName
   } = await import('../services/native-im/agent-state.js');
 
   const agent = {
@@ -506,4 +713,67 @@ test('agent helpers create direct conversations and group mention members', asyn
   assert.equal(member.nickname, 'Codex');
   assert.equal(member.isAgent, true);
   assert.equal(member.alias, '@codex');
+
+  const clowderConversation = createAgentConversation({
+    id: 'opus',
+    name: '布偶猫',
+    source: 'clowder',
+    raw: { catId: 'opus' },
+    desc: '官方猫猫'
+  });
+  assert.equal(clowderConversation.id, 'clowder_cat:opus');
+  assert.equal(clowderConversation.channelId, 'clowder_cat:opus');
+  assert.equal(clowderConversation.channelType, 1);
+  assert.equal(clowderConversation.type, 'robot');
+  assert.equal(clowderConversation.source, 'clowder');
+  assert.equal(clowderConversation.agentId, 'opus');
+  assert.equal(clowderConversation.directCatId, 'opus');
+  assert.equal(getClowderCatIdFromContactId('clowder_cat:opus'), 'opus');
+  assert.equal(
+    shouldPreserveClowderAgentDisplayName(clowderConversation, {
+      id: 'clowder_cat:opus',
+      channelId: 'clowder_cat:opus',
+      name: 'clowder_cat:opus'
+    }),
+    true
+  );
+  assert.equal(
+    shouldPreserveClowderAgentDisplayName(clowderConversation, {
+      id: 'clowder_cat:opus',
+      channelId: 'clowder_cat:opus',
+      name: '布偶猫',
+      type: 'single'
+    }),
+    true
+  );
+});
+
+test('clowder direct cat conversations are detected for bridge routing', () => {
+  assert.equal(typeof messageState.isClowderDirectCatConversation, 'function');
+  assert.equal(
+    messageState.isClowderDirectCatConversation({
+      id: 'clowder_cat:opus',
+      channelId: 'clowder_cat:opus',
+      channelType: 1,
+      source: 'clowder',
+      directCatId: 'opus'
+    }),
+    true
+  );
+  assert.equal(
+    messageState.resolveClowderDirectCatId({
+      id: 'clowder_cat:opus',
+      channelId: 'clowder_cat:opus'
+    }),
+    'opus'
+  );
+  assert.equal(
+    messageState.isClowderDirectCatConversation({
+      id: 'g1',
+      channelId: 'g1',
+      channelType: 2,
+      type: 'group'
+    }),
+    false
+  );
 });

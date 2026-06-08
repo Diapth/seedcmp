@@ -81,29 +81,14 @@ const statusText = computed(() => {
 
 function startChat() {
   const agent = props.agent;
-  
-  let conv = convStore.conversations.find(c => c.id === agent.id);
-  if (!conv) {
-    conv = {
-      id: agent.id,
-      name: agent.name,
-      avatar: agent.avatar,
-      type: 'robot',
-      unread: 0,
-      lastMessage: agent.desc,
-      lastTime: Date.now(),
-      isPinned: false,
-      isMuted: false,
-      draft: ''
-    };
-    convStore.conversations.push(conv);
-  }
-  
-  if (!msgStore.messages[agent.id]) {
-    msgStore.messages[agent.id] = [
+  const conv = convStore.upsertAgentConversation(agent);
+  const conversationId = conv?.id || agent.id;
+
+  if (!msgStore.messages[conversationId]) {
+    msgStore.messages[conversationId] = [
       {
         id: Date.now().toString(),
-        senderId: agent.id,
+        senderId: conv?.agentId || agent.id,
         senderName: agent.name,
         content: `你好！我是 "${agent.name}"，很高兴为您服务。${agent.desc}`,
         type: 'text',
@@ -112,9 +97,9 @@ function startChat() {
       }
     ];
   }
-  
-  convStore.setActiveId(agent.id);
-  uni.setStorageSync('active_conversation_id', agent.id);
+
+  convStore.setActiveId(conversationId);
+  uni.setStorageSync('active_conversation_id', conversationId);
   uni.redirectTo({
     url: '/pages/chat/index'
   });

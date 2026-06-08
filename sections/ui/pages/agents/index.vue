@@ -217,6 +217,7 @@ const ownedAgentCount = computed(() => {
 
 onMounted(() => {
   navStore.setActiveModule('agents');
+  agentStore.fetchNativeAgents({ silent: true });
 });
 
 function goCreate() {
