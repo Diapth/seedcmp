@@ -615,6 +615,16 @@ export function createNativeImService(options = {}) {
     return client.post(`conversations/${encodeURIComponent(String(channelId))}/${Number(channelType)}/extra`, payload);
   }
 
+  async function clearConversationUnread({ channelId, channelType = CHANNEL_TYPE_PERSON, unread = 0, messageSeq = 0 } = {}) {
+    if (!channelId) throw { msg: 'channelId不能为空' };
+    return client.put('coversation/clearUnread', {
+      channel_id: String(channelId),
+      channel_type: Number(channelType),
+      unread: Number(unread || 0),
+      message_seq: Number(messageSeq || 0)
+    });
+  }
+
   async function uploadChatFile({ channelId, channelType = CHANNEL_TYPE_PERSON, file, type = 'chat' } = {}) {
     if (!channelId) throw { msg: 'channelId不能为空' };
     if (!file) throw { msg: '请选择文件' };
@@ -816,6 +826,7 @@ export function createNativeImService(options = {}) {
     uploadChatFile,
     updateConversationSettings,
     updateConversationExtra,
+    clearConversationUnread,
     syncFriends,
     searchUser,
     applyFriend,

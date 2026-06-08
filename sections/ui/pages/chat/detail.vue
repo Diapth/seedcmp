@@ -457,6 +457,7 @@ onMounted(() => {
   const id = currentPage?.$page?.options?.id || '1';
   const atMemberId = currentPage?.$page?.options?.at;
   convStore.setActiveId(id);
+  convStore.markConversationRead(id, { silent: true });
   syncActiveMessages({ silent: true });
   appStore.bootstrapNativeSession();
   groupStore.syncNativeGroups({ silent: true });
@@ -573,6 +574,7 @@ function navigateToConversationProfile(conversation) {
 
 function handleSelectConversation(id) {
   convStore.setActiveId(id);
+  convStore.markConversationRead(id, { silent: true });
   syncActiveMessages({ silent: true });
   closeFilePreview();
   closeMemberProfile();

@@ -190,6 +190,23 @@ export const useConversationStore = defineStore('conversation', {
         conv.unread = 0;
       }
     },
+    async markConversationRead(conversationOrId, options = {}) {
+      const identity = this.getConversationIdentity(conversationOrId);
+      const conversationId = identity.conversationId || identity.channelId;
+      if (conversationId) this.clearUnread(conversationId);
+      if (options.persist === false || !identity.channelId) return null;
+      try {
+        return await nativeImService.clearConversationUnread({
+          channelId: identity.channelId,
+          channelType: identity.channelType,
+          messageSeq: options.messageSeq || 0
+        });
+      } catch (error) {
+        this.syncError = errorText(error);
+        if (!options.silent) throw error;
+        return null;
+      }
+    },
     updateConversationDraft(id, draftText, options = {}) {
       const conversation = typeof id === 'string'
         ? this.conversations.find((item) => item.id === id)
@@ -403,6 +420,9 @@ export const useConversationStore = defineStore('conversation', {
             isMuted: existing.isMuted || nativeConversation.isMuted,
             ...preservedAgentDisplay
           });
+          if (existing.id === this.activeId) {
+            existing.unread = 0;
+          }
           if (localHidden && !this.isHidden.includes(existing.id)) this.isHidden.push(existing.id);
         } else {
           this.conversations.push({

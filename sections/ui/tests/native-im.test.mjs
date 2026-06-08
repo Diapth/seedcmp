@@ -59,6 +59,29 @@ test('native service updates remote conversation draft extra', async () => {
   });
 });
 
+test('native service clears remote conversation unread count', async () => {
+  const request = makeRequestStub();
+  const service = createNativeImService({
+    baseUrl: '/v1/',
+    request,
+    getToken: () => 'token'
+  });
+
+  await service.clearConversationUnread({
+    channelId: 'clowder_cat:opus',
+    channelType: 1
+  });
+
+  assert.equal(request.calls[0].method, 'PUT');
+  assert.equal(request.calls[0].url, '/v1/coversation/clearUnread');
+  assert.deepEqual(request.calls[0].data, {
+    channel_id: 'clowder_cat:opus',
+    channel_type: 1,
+    unread: 0,
+    message_seq: 0
+  });
+});
+
 test('native service exposes group creation and member sync APIs', async () => {
   const request = makeRequestStub({
     'POST group/create': { group_no: 'g100', name: '研发群' },
