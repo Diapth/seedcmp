@@ -13,6 +13,13 @@ import { ManualContextPinKeys } from '../redis-keys/manual-context-pin-keys.js';
 
 const DEFAULT_ACTIVE_LIMIT = 5;
 
+function pinSortScore(pin: Pick<ManualContextPin, 'id' | 'updatedAt'>): string {
+  const updatedAt = Date.parse(pin.updatedAt);
+  const sequence = Number(pin.id.split('-')[1] ?? 0);
+  const score = updatedAt + (Number.isFinite(sequence) ? sequence / 1_000_000 : 0);
+  return String(score);
+}
+
 export class RedisManualContextPinStore implements IManualContextPinStore {
   constructor(private readonly redis: RedisClient) {}
 
@@ -36,7 +43,7 @@ export class RedisManualContextPinStore implements IManualContextPinStore {
     const pipeline = this.redis.multi();
     pipeline.hset(ManualContextPinKeys.detail(id), this.serialize(pin));
     pipeline.set(subjectKey, id);
-    pipeline.zadd(ManualContextPinKeys.threadUser(pin.threadId, pin.userId), String(Date.parse(pin.updatedAt)), id);
+    pipeline.zadd(ManualContextPinKeys.threadUser(pin.threadId, pin.userId), pinSortScore(pin), id);
     await pipeline.exec();
     return pin;
   }
@@ -124,7 +131,7 @@ export class RedisManualContextPinStore implements IManualContextPinStore {
   private async write(pin: ManualContextPin): Promise<void> {
     const pipeline = this.redis.multi();
     pipeline.hset(ManualContextPinKeys.detail(pin.id), this.serialize(pin));
-    pipeline.zadd(ManualContextPinKeys.threadUser(pin.threadId, pin.userId), String(Date.parse(pin.updatedAt)), pin.id);
+    pipeline.zadd(ManualContextPinKeys.threadUser(pin.threadId, pin.userId), pinSortScore(pin), pin.id);
     await pipeline.exec();
   }
 

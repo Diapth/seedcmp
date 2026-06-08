@@ -55,6 +55,12 @@ export interface IManualContextPinStore {
 
 const DEFAULT_ACTIVE_LIMIT = 5;
 
+export function compareManualContextPinsNewestFirst(a: ManualContextPin, b: ManualContextPin): number {
+  const updatedDelta = Date.parse(b.updatedAt) - Date.parse(a.updatedAt);
+  if (updatedDelta !== 0) return updatedDelta;
+  return b.id.localeCompare(a.id);
+}
+
 export function isActiveManualContextPinStatus(status: ManualContextPinStatus): boolean {
   return status === 'active';
 }
@@ -98,7 +104,7 @@ export class ManualContextPinStore implements IManualContextPinStore {
       .filter((pin) => pin.threadId === threadId)
       .filter((pin) => !options.userId || pin.userId === options.userId)
       .filter((pin) => options.includeInactive || isActiveManualContextPinStatus(pin.status))
-      .sort((a, b) => Date.parse(b.updatedAt) - Date.parse(a.updatedAt));
+      .sort(compareManualContextPinsNewestFirst);
     return pins.slice(0, limit);
   }
 
