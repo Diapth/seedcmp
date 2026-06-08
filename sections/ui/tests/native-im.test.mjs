@@ -8,6 +8,7 @@ import {
   normalizeNativeGroup,
   upsertGroupConversation
 } from '../services/native-im/conversation-state.js';
+import { normalizeConversation } from '../services/native-im/normalizers.js';
 import * as messageState from '../services/native-im/message-state.js';
 import {
   formatChatTime,
@@ -130,6 +131,43 @@ test('conversation helpers normalize groups and upsert channelType 2 conversatio
   assert.equal(conversations[0].type, 'group');
   assert.equal(conversations[0].name, '项目群');
   assert.equal(conversations[0].memberCount, 5);
+});
+
+test('conversation normalizer uses last message timestamp instead of sync time fallback', () => {
+  const conversation = normalizeConversation({
+    channel_id: 'g-last',
+    channel_type: 2,
+    recents: [
+      {
+        timestamp: 1780490300,
+        payload: JSON.stringify({ type: 1, content: '最后一条群消息' })
+      }
+    ]
+  }, {
+    name: '最后消息群'
+  });
+
+  assert.equal(conversation.lastMessage, '最后一条群消息');
+  assert.equal(conversation.lastTime, 1780490300000);
+});
+
+test('group upsert uses group last message time and does not invent current time', () => {
+  const withLastMessage = upsertGroupConversation([], {
+    group_no: 'g-last',
+    name: '最后消息群',
+    last_msg_time: 1780490300,
+    last_message: {
+      payload: JSON.stringify({ type: 1, content: '群里真实最后消息' })
+    }
+  });
+  const withoutAnyMessageTime = upsertGroupConversation([], {
+    group_no: 'g-empty',
+    name: '空时间群'
+  });
+
+  assert.equal(withLastMessage[0].lastMessage, '群里真实最后消息');
+  assert.equal(withLastMessage[0].lastTime, 1780490300000);
+  assert.equal(withoutAnyMessageTime[0].lastTime, 0);
 });
 
 test('time helpers accept second and millisecond timestamps with five minute message dividers', () => {
