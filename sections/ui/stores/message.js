@@ -7,6 +7,7 @@ import {
   createClowderMarkdownStreamEvents,
   createClientMsgNo,
   enrichNativeMessageSender,
+  isVisibleChatMessage,
   isSelfSender,
   mergeNativeMessageIntoList,
   mergeNativeMessageLists,
@@ -30,6 +31,8 @@ function defaultMsg(overrides = {}) {
 }
 
 function messageSummary(message) {
+  if (!isVisibleChatMessage(message)) return '';
+  if (message.type === 'system') return message.content || '';
   if (message.type === 'image') return '[图片]';
   if (message.type === 'voice') return '[语音]';
   if (message.type === 'file') return `[文件] ${message.fileName || message.name || message.content || ''}`.trim();
@@ -43,7 +46,12 @@ function isLocalMediaUrl(url = '') {
 
 function updateConversationSummary(conversation, message, currentUser = {}) {
   if (!conversation || !message) return;
-  conversation.lastMessage = conversationSummaryForMessage(message, currentUser, conversation);
+  const summary = conversationSummaryForMessage(message, currentUser, conversation);
+  if (!summary) {
+    if (!conversation.lastTime && message.time) conversation.lastTime = message.time;
+    return;
+  }
+  conversation.lastMessage = summary;
   conversation.lastTime = message.time || Date.now();
 }
 
@@ -282,7 +290,7 @@ export const useMessageStore = defineStore('message', {
         this.messages[identity.conversationId] = synced.length
           ? mergeNativeMessageLists(localPending, synced, { currentUser, conversation })
           : this.messages[identity.conversationId] || [];
-        const latest = this.messages[identity.conversationId]?.at(-1);
+        const latest = (this.messages[identity.conversationId] || []).filter(isVisibleChatMessage).at(-1);
         updateConversationSummary(conversation, latest, currentUser);
         this.syncState = 'success';
         return this.messages[identity.conversationId];
@@ -326,12 +334,13 @@ export const useMessageStore = defineStore('message', {
         received,
         { currentUser, conversation }
       );
+      const visibleReceived = isVisibleChatMessage(received);
       if (conversation) {
         updateConversationSummary(conversation, received, currentUser);
-        if (convStore.activeId !== conversationId) {
+        if (visibleReceived && convStore.activeId !== conversationId) {
           conversation.unread = (conversation.unread || 0) + 1;
         }
-        if (!conversation.isMuted) {
+        if (visibleReceived && !conversation.isMuted) {
           notifyMessage({ conversation, message: received });
         }
       }

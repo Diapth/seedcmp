@@ -12,7 +12,11 @@ import {
   shouldPersistConversationDraft,
   upsertGroupConversation
 } from '../services/native-im/conversation-state.js';
-import { normalizeConversation } from '../services/native-im/normalizers.js';
+import {
+  normalizeContent,
+  normalizeConversation,
+  normalizeMessage
+} from '../services/native-im/normalizers.js';
 import * as messageState from '../services/native-im/message-state.js';
 import {
   formatChatTime,
@@ -325,6 +329,55 @@ test('conversation summary turns long clowder markdown into one line preview', (
   assert.equal(summary.includes('---'), false);
   assert.match(summary, /^当前在线猫猫/);
   assert.ok(summary.length <= 80);
+});
+
+test('native normalizer hides empty time-only system messages from chat and digest', () => {
+  const normalized = normalizeMessage({
+    message_id: 'sys-time-1',
+    timestamp: 1780490400,
+    content: JSON.stringify({ type: 1000, time: 1780490400 })
+  });
+
+  assert.equal(normalized.type, 'system');
+  assert.equal(normalized.content, '');
+  assert.equal(normalized.isSilentSystem, true);
+  assert.equal(messageState.isVisibleChatMessage(normalized), false);
+  assert.equal(
+    messageState.conversationSummaryForMessage(normalized, {}, { type: 'single' }),
+    ''
+  );
+});
+
+test('native normalizer renders group system event messages with concrete text', () => {
+  assert.deepEqual(
+    normalizeContent({
+      type: 1000,
+      event: 'group_member_add',
+      operator_name: '张伟',
+      members: [{ name: '李四' }, { uid: 'u5', name: '王五' }]
+    }),
+    {
+      type: 'system',
+      content: '张伟 邀请 李四、王五 加入群聊',
+      systemEvent: 'group_member_add',
+      isSilentSystem: false
+    }
+  );
+
+  assert.equal(
+    normalizeContent({
+      type: 1000,
+      event: 'group_notice_update',
+      operator_name: '群主',
+      notice: '今晚 8 点发布新公告'
+    }).content,
+    '群主 修改了群公告：今晚 8 点发布新公告'
+  );
+
+  assert.equal(
+    normalizeContent({ type: 99, event: 'group_exit', operator_name: '李四' }).content,
+    '李四 退出了群聊'
+  );
 });
 
 test('sdk unavailable send errors keep local h5 demo messages successful', () => {

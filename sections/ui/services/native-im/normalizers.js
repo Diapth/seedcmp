@@ -11,6 +11,28 @@ function firstNonEmpty(...values) {
   return '';
 }
 
+function clean(value) {
+  if (value === undefined || value === null) return '';
+  return String(value).trim();
+}
+
+function firstText(...values) {
+  for (const value of values) {
+    if (value === undefined || value === null) continue;
+    if (typeof value === 'object') continue;
+    const text = String(value).trim();
+    if (text) return text;
+  }
+  return '';
+}
+
+function firstArray(...values) {
+  for (const value of values) {
+    if (Array.isArray(value)) return value;
+  }
+  return [];
+}
+
 function toNumber(value, fallback = 0) {
   const next = Number(value);
   return Number.isFinite(next) ? next : fallback;
@@ -56,10 +78,165 @@ function parsePayload(payload) {
   }
 }
 
+function normalizeEventName(value) {
+  return clean(value)
+    .replace(/([a-z0-9])([A-Z])/g, '$1_$2')
+    .replace(/[\s-]+/g, '_')
+    .toLowerCase();
+}
+
+function memberDisplayName(member) {
+  if (member && typeof member === 'object') {
+    return firstText(member.remark, member.nickname, member.name, member.uid, member.id);
+  }
+  return firstText(member);
+}
+
+function memberListText(...values) {
+  const members = firstArray(...values);
+  if (!members.length) {
+    const text = firstText(...values);
+    return text;
+  }
+  return members.map(memberDisplayName).filter(Boolean).join('、');
+}
+
+function hasNoticeChange(content = {}) {
+  const fields = firstArray(content.fields, content.changedFields, content.changed_fields);
+  return Boolean(
+    firstText(content.notice, content.announcement, content.newNotice, content.new_notice, content.newAnnouncement, content.new_announcement)
+    || fields.some((field) => /notice|announcement/i.test(String(field)))
+  );
+}
+
+export function resolveSystemMessageContent(content = {}) {
+  const event = normalizeEventName(firstText(content.event, content.type_name, content.typeName, content.action, content.cmd));
+  const explicitText = firstText(content.text, content.title, content.message);
+  if (explicitText) {
+    return { text: explicitText, event, isSilentSystem: false };
+  }
+
+  const operator = firstText(
+    content.operator_name,
+    content.operatorName,
+    content.inviter_name,
+    content.inviterName,
+    content.from_name,
+    content.fromName,
+    content.creator_name,
+    content.creatorName,
+    content.senderName,
+    content.operator,
+    content.inviter,
+    '有人'
+  );
+  const members = memberListText(
+    content.members,
+    content.memberNames,
+    content.member_names,
+    content.users,
+    content.uids,
+    content.invitees,
+    content.removed,
+    content.removees
+  );
+  const notice = firstText(
+    content.notice,
+    content.announcement,
+    content.newNotice,
+    content.new_notice,
+    content.newAnnouncement,
+    content.new_announcement
+  );
+
+  switch (event) {
+    case 'group_create':
+      return { text: `${operator} 创建了群聊`, event, isSilentSystem: false };
+    case 'group_member_add':
+    case 'member_add':
+    case 'group_join':
+    case 'join_group':
+    case 'invite':
+      return {
+        text: members ? `${operator} 邀请 ${members} 加入群聊` : `${operator} 邀请新成员加入群聊`,
+        event,
+        isSilentSystem: false
+      };
+    case 'group_member_remove':
+    case 'member_remove':
+    case 'group_kick':
+    case 'kick':
+      return {
+        text: members ? `${operator} 将 ${members} 移出群聊` : `${operator} 移出了群成员`,
+        event,
+        isSilentSystem: false
+      };
+    case 'group_exit':
+    case 'group_leave':
+    case 'leave_group':
+    case 'quit_group':
+      return { text: `${operator} 退出了群聊`, event, isSilentSystem: false };
+    case 'group_disband':
+      return { text: `${operator} 解散了群聊`, event, isSilentSystem: false };
+    case 'group_notice_update':
+    case 'group_announcement_update':
+    case 'notice_update':
+    case 'announcement_update':
+      return {
+        text: `${operator} 修改了群公告${notice ? `：${notice}` : ''}`,
+        event,
+        isSilentSystem: false
+      };
+    case 'group_update':
+    case 'group_profile_update':
+      if (hasNoticeChange(content)) {
+        return {
+          text: `${operator} 修改了群公告${notice ? `：${notice}` : ''}`,
+          event,
+          isSilentSystem: false
+        };
+      }
+      return { text: `${operator} 更新了群资料`, event, isSilentSystem: false };
+    default:
+      return {
+        text: event ? '系统通知' : '',
+        event,
+        isSilentSystem: !event
+      };
+  }
+}
+
 export function normalizeContent(payload) {
-  const content = parsePayload(payload?.payload || payload?.content || payload);
-  const type = toNumber(content.type || content.contentType || payload?.content_type || payload?.contentType || 1, 1);
-  const text = firstNonEmpty(content.content, content.text, content.title, payload?.content, payload?.text);
+  const envelope = payload && typeof payload === 'object' ? payload : {};
+  const rawSource = envelope.payload ?? envelope.contentObj ?? envelope.content ?? payload;
+  const parsed = parsePayload(rawSource);
+  const nestedSource = parsed.contentObj
+    ?? parsed.payload
+    ?? (parsed.content && typeof parsed.content === 'object' ? parsed.content : undefined);
+  const nested = nestedSource ? parsePayload(nestedSource) : {};
+  const content = { ...envelope, ...parsed, ...nested };
+  const type = toNumber(
+    envelope.type
+      ?? envelope.contentType
+      ?? envelope.content_type
+      ?? parsed.type
+      ?? parsed.contentType
+      ?? parsed.content_type
+      ?? nested.type
+      ?? nested.contentType
+      ?? 1,
+    1
+  );
+  const text = firstText(
+    parsed.content,
+    parsed.text,
+    parsed.title,
+    nested.content,
+    nested.text,
+    nested.title,
+    envelope.text,
+    envelope.title
+  );
   const name = firstNonEmpty(content.name, content.fileName, payload?.name, payload?.file_name);
 
   if (type === 2) {
@@ -79,7 +256,13 @@ export function normalizeContent(payload) {
     };
   }
   if (type === 99 || type === 1000) {
-    return { type: 'system', content: text || '[系统消息]' };
+    const system = resolveSystemMessageContent({ ...content, text });
+    return {
+      type: 'system',
+      content: system.text,
+      systemEvent: system.event,
+      isSilentSystem: system.isSilentSystem
+    };
   }
 
   return { type: 'text', content: text || '' };
