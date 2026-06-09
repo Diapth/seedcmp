@@ -1,9 +1,13 @@
 import { defineStore } from 'pinia';
 import { useConversationStore } from '@/stores/conversation';
+import { useGroupStore } from '@/stores/group';
 import { notifyMessage } from '@/composables/useSystemNotification';
 import { nativeImService } from '@/services/native-im/service';
 import {
+  buildProjectGroupEnsurePayload,
   isProjectGroupConfirmationMessage,
+  projectGroupCreatedPatch,
+  projectGroupFailedPatch,
   updateProjectGroupConfirmationMessage,
   upsertProjectGroupConfirmationMessage
 } from '@/services/native-im/project-group';
@@ -85,6 +89,28 @@ function storageRuntime() {
 
 function findConversation(convStore, conversationId) {
   return convStore.conversations.find((item) => item.id === conversationId) || null;
+}
+
+function cleanCatId(value = '') {
+  return String(value || '').trim().replace(/^clowder_cat:/, '');
+}
+
+function matchingAgentsForCatIds(agents = [], catIds = []) {
+  const wanted = new Set((catIds || []).map(cleanCatId).filter(Boolean));
+  if (!wanted.size) return [];
+  return agents.filter((agent) => {
+    const ids = [
+      agent.id,
+      agent.uid,
+      agent.catId,
+      agent.cat_id,
+      agent.directCatId,
+      agent.direct_cat_id,
+      agent.agentId,
+      agent.agent_id
+    ].map(cleanCatId).filter(Boolean);
+    return ids.some((id) => wanted.has(id));
+  });
 }
 
 function shouldCacheClowderPrompt(conversation = {}) {
@@ -411,6 +437,68 @@ export const useMessageStore = defineStore('message', {
       return (this.messages[conversationId] || []).find((message) => (
         message.id === cardId || message.projectGroupCard?.cardId === cardId
       )) || null;
+    },
+    async confirmProjectGroupFromCard(conversationId, cardId, options = {}) {
+      const list = this.messages[conversationId] || [];
+      const message = list.find((item) => item.id === cardId || item.projectGroupCard?.cardId === cardId);
+      const card = message?.projectGroupCard;
+      if (!card) return null;
+      if (card.status === 'creating' || card.status === 'created') return message;
+
+      this.updateProjectGroupConfirmation(conversationId, cardId, { status: 'creating' });
+      try {
+        const ensurePayload = buildProjectGroupEnsurePayload(card, {
+          currentUser: options.currentUser || readCurrentUser()
+        });
+        const ensured = await nativeImService.ensureProjectGroup(ensurePayload);
+        const createdPatch = projectGroupCreatedPatch(ensured, card);
+        const groupId = createdPatch.projectGroupNo;
+        if (!groupId) throw { msg: '项目群编号缺失' };
+
+        const groupName = createdPatch.projectGroupName || card.projectName || 'Clowder 项目群';
+        const catIds = createdPatch.catMemberIds?.length
+          ? createdPatch.catMemberIds
+          : (card.catMemberIds || card.targetCatIds || card.workerCatIds || []);
+        const agents = matchingAgentsForCatIds(options.agents || [], catIds);
+
+        await nativeImService.syncGroupCats({
+          groupId,
+          groupName,
+          catIds,
+          agents,
+          prompt: `项目群「${groupName}」已创建，请按用户原始任务协作执行。`,
+          autoReplyMode: 'mentions_only'
+        });
+
+        const memberCount = new Set([...(ensurePayload.userMemberIds || []), ...catIds]).size || undefined;
+        const group = {
+          id: groupId,
+          group_no: groupId,
+          name: groupName,
+          member_count: memberCount,
+          source: 'clowder',
+          isProjectGroup: true
+        };
+        const convStore = useConversationStore();
+        const groupStore = useGroupStore();
+        groupStore.addGroup(group);
+        convStore.upsertGroupConversation(group);
+        agents.forEach((agent) => convStore.addAgentMember(groupId, agent));
+
+        if (card.sourceText) {
+          await nativeImService.sendClowderConversationMessage({
+            channelId: groupId,
+            channelType: 2,
+            text: card.sourceText,
+            targetCatIds: card.targetCatIds || card.workerCatIds || [],
+            promptContext: `项目群：${groupName}`
+          });
+        }
+
+        return this.updateProjectGroupConfirmation(conversationId, cardId, createdPatch);
+      } catch (error) {
+        return this.updateProjectGroupConfirmation(conversationId, cardId, projectGroupFailedPatch(error));
+      }
     },
     startClowderMarkdownStream(conversationId, prompt = '', options = {}) {
       if (!conversationId) return [];

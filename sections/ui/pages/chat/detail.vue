@@ -695,10 +695,16 @@ function handleProjectGroupCancel(payload = {}) {
   messageStore.updateProjectGroupConfirmation(convStore.activeId, cardId, { status: 'cancelled' });
 }
 
-function handleProjectGroupConfirm(payload = {}) {
+async function handleProjectGroupConfirm(payload = {}) {
   const cardId = projectGroupCardMessageId(payload);
   if (!cardId) return;
-  messageStore.updateProjectGroupConfirmation(convStore.activeId, cardId, { status: 'creating' });
+  const message = await messageStore.confirmProjectGroupFromCard(convStore.activeId, cardId, {
+    currentUser: appStore.currentUser || {},
+    agents: agentStore.agents
+  });
+  if (message?.projectGroupCard?.status === 'failed') {
+    uni.showToast({ title: message.projectGroupCard.error || '项目群创建失败', icon: 'none' });
+  }
 }
 
 function handleProjectGroupOpen(payload = {}) {

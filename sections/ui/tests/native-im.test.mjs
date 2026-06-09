@@ -665,6 +665,64 @@ test('project group confirmation trigger is limited to coordinator direct chats'
   assert.deepEqual(cardInput.targetCatIds, ['codex', 'claude']);
 });
 
+test('project group confirmation builds ensure payload and created patch', async () => {
+  const {
+    buildProjectGroupEnsurePayload,
+    projectGroupCreatedPatch,
+    projectGroupFailedPatch
+  } = await import('../services/native-im/project-group.js');
+  const card = {
+    projectName: 'ISSUE-029项目群',
+    pmDirectChannelId: 'clowder_cat:coordinator',
+    pmDirectChannelType: 1,
+    pmDirectThreadId: 'thread-direct',
+    projectThreadId: 'thread-project',
+    pmMemberId: 'clowder_cat:coordinator',
+    userMemberIds: ['u-owner'],
+    catMemberIds: ['coordinator', 'codex'],
+    targetCatIds: ['codex'],
+    sourceText: '请拆解任务'
+  };
+
+  assert.deepEqual(buildProjectGroupEnsurePayload(card), {
+    projectName: 'ISSUE-029项目群',
+    pmDirectChannelId: 'clowder_cat:coordinator',
+    pmDirectChannelType: 1,
+    pmDirectThreadId: 'thread-direct',
+    projectThreadId: 'thread-project',
+    pmMemberId: 'clowder_cat:coordinator',
+    userMemberIds: ['u-owner'],
+    catMemberIds: ['coordinator', 'codex'],
+    createdBy: 'user'
+  });
+
+  const created = projectGroupCreatedPatch({
+    binding: {
+      id: 'binding-029',
+      projectGroupNo: 'g-029',
+      projectName: 'ISSUE-029项目群',
+      projectThreadId: 'thread-project',
+      catMemberIds: ['coordinator', 'codex']
+    },
+    reused: true
+  }, card);
+
+  assert.deepEqual(created, {
+    status: 'created',
+    projectGroupNo: 'g-029',
+    projectGroupName: 'ISSUE-029项目群',
+    projectBindingId: 'binding-029',
+    projectThreadId: 'thread-project',
+    catMemberIds: ['coordinator', 'codex'],
+    reused: true,
+    error: ''
+  });
+  assert.deepEqual(projectGroupFailedPatch({ msg: 'sync failed' }), {
+    status: 'failed',
+    error: 'sync failed'
+  });
+});
+
 test('clowder project binding and thread tasks normalize into a group board', () => {
   const board = normalizeClowderProjectBoard({
     binding: {

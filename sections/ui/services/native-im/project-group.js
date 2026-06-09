@@ -324,3 +324,48 @@ export function updateProjectGroupConfirmationMessage(list = [], cardId = '', pa
     };
   });
 }
+
+export function buildProjectGroupEnsurePayload(card = {}, options = {}) {
+  const currentUser = options.currentUser || {};
+  const userId = firstText(currentUser.id, currentUser.uid, currentUser.userId, currentUser.raw?.uid, currentUser.raw?.id);
+  const payload = {
+    projectName: firstText(card.projectName, card.projectGroupName, 'Clowder 项目群'),
+    workspaceId: firstText(card.workspaceId),
+    pmDirectChannelId: firstText(card.pmDirectChannelId),
+    pmDirectChannelType: Number(card.pmDirectChannelType || 1),
+    pmDirectThreadId: firstText(card.pmDirectThreadId),
+    projectThreadId: firstText(card.projectThreadId),
+    pmMemberId: firstText(card.pmMemberId, card.coordinator?.id ? `${CLOWDER_CAT_CONTACT_PREFIX}${cleanCatId(card.coordinator.id)}` : ''),
+    userMemberIds: uniqueStrings([...(card.userMemberIds || []), userId]),
+    catMemberIds: uniqueStrings([...(card.catMemberIds || []), ...(card.targetCatIds || []), ...(card.workerCatIds || [])]),
+    createdBy: firstText(card.createdBy, 'user')
+  };
+  Object.keys(payload).forEach((key) => {
+    if (payload[key] === '' || payload[key] === undefined || payload[key] === null) delete payload[key];
+    if (Array.isArray(payload[key]) && payload[key].length === 0) delete payload[key];
+  });
+  return payload;
+}
+
+export function projectGroupCreatedPatch(resp = {}, card = {}) {
+  const binding = resp.binding || resp.data?.binding || resp.data || resp;
+  const groupNo = firstText(binding.projectGroupNo, binding.project_group_no, binding.groupNo, binding.group_no, card.projectGroupNo);
+  const projectName = firstText(binding.projectName, binding.project_name, binding.name, card.projectGroupName, card.projectName);
+  return {
+    status: 'created',
+    projectGroupNo: groupNo,
+    projectGroupName: projectName,
+    projectBindingId: firstText(binding.id, binding.bindingId, binding.binding_id, card.projectBindingId),
+    projectThreadId: firstText(binding.projectThreadId, binding.project_thread_id, binding.threadId, binding.thread_id, card.projectThreadId),
+    catMemberIds: uniqueStrings(binding.catMemberIds || binding.cat_member_ids || card.catMemberIds || []),
+    reused: Boolean(resp.reused ?? resp.data?.reused ?? binding.reused ?? card.reused),
+    error: ''
+  };
+}
+
+export function projectGroupFailedPatch(error = '') {
+  return {
+    status: 'failed',
+    error: cardErrorText(error)
+  };
+}
