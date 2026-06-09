@@ -467,6 +467,48 @@ test('native service mutates user skill ownership and assignments by explicit id
   ]);
 });
 
+test('native service uploads skill packages through multipart upload runtime', async () => {
+  const uploadCalls = [];
+  const service = createNativeImService({
+    baseUrl: '/v1/',
+    request: makeRequestStub(),
+    getToken: () => 'token',
+    uploadRequest: async (options) => {
+      uploadCalls.push(options);
+      return {
+        skill: {
+          id: 'uploaded-skill-1',
+          name: 'review-helper',
+          enabled: true,
+          sourceType: 'uploaded',
+          agentIds: ['codex']
+        }
+      };
+    }
+  });
+
+  const uploaded = await service.uploadSkillPackage({
+    name: 'review-helper.skill.zip',
+    file: {
+      name: 'review-helper.skill.zip',
+      tempFilePath: '/tmp/review-helper.skill.zip'
+    }
+  });
+
+  assert.equal(uploaded.id, 'uploaded-skill-1');
+  assert.equal(uploaded.sourceType, 'uploaded');
+  assert.deepEqual(uploaded.agentIds, ['codex']);
+  assert.deepEqual(uploadCalls, [{
+    url: '/v1/clowder/skills/upload',
+    file: {
+      name: 'review-helper.skill.zip',
+      tempFilePath: '/tmp/review-helper.skill.zip'
+    },
+    fieldName: 'file',
+    headers: { token: 'token' }
+  }]);
+});
+
 test('skill catalog preview does not assign every catalog skill to every agent', () => {
   const preview = normalizeSkillCatalogPreview({
     codex: [{ name: 'tdd', category: '工程', description: '测试驱动', mounted: true }],

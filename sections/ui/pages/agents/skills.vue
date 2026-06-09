@@ -8,7 +8,7 @@
           </view>
           <view class="title-stack flex-column">
             <text class="title">技能库</text>
-            <text class="subtitle">查看本地 Skill、上传打包文件并预览渲染后的文档</text>
+            <text class="subtitle">管理我的 Skill、市场添加与智能体分配</text>
           </view>
         </view>
         <view class="header-actions flex-row align-center gap-2">
@@ -16,7 +16,7 @@
             <AppIcon name="agents" :size="16" color="var(--color-primary)" />
             <text>智能体库</text>
           </button>
-          <button class="header-action primary flex-row align-center gap-2" @click="showUiToast('上传技能包')">
+          <button class="header-action primary flex-row align-center gap-2" :disabled="isBusy" @click="handleUpload">
             <AppIcon name="upload" :size="16" color="#ffffff" />
             <text>上传技能包</text>
           </button>
@@ -33,38 +33,38 @@
                     <AppIcon name="package" :size="18" color="var(--color-primary)" />
                   </view>
                   <view class="flex-column">
-                    <text class="panel-title">上传打包好的 Skill</text>
-                    <text class="panel-subtitle">支持 .skill.zip / .zip 包，当前为 UI 占位</text>
+                    <text class="panel-title">上传 Skill 到我的空间</text>
+                    <text class="panel-subtitle">支持 .skill.zip / .zip，解析后默认归属当前用户</text>
                   </view>
                 </view>
-                <text class="ui-only-badge">UI only</text>
+                <text class="sync-badge">{{ skillStatusText }}</text>
               </view>
 
-              <view class="upload-dropzone flex-column align-center justify-center" @click="showUiToast('选择技能包')">
+              <view class="upload-dropzone flex-column align-center justify-center" @click="handleUpload">
                 <view class="upload-icon">
                   <AppIcon name="upload" :size="28" color="var(--color-primary)" />
                 </view>
                 <text class="upload-title">拖入或选择 skill 压缩包</text>
-                <text class="upload-desc">示例：ui-review.skill.zip，上传后会在这里展示解析结果</text>
+                <text class="upload-desc">{{ uploadHint }}</text>
                 <view class="upload-actions flex-row gap-2">
-                  <button class="upload-btn primary" @click.stop="showUiToast('选择技能包')">选择包</button>
-                  <button class="upload-btn secondary" @click.stop="showUiToast('导入技能')">导入到本地</button>
+                  <button class="upload-btn primary" :disabled="isBusy" @click.stop="handleUpload">选择包</button>
+                  <button class="upload-btn secondary" :disabled="isBusy" @click.stop="refreshSkills">刷新</button>
                 </view>
               </view>
             </view>
 
             <view class="stats-panel">
               <view class="stat-block">
-                <text class="stat-value">{{ skills.length }}</text>
-                <text class="stat-label">本地技能</text>
+                <text class="stat-value">{{ mySkills.length }}</text>
+                <text class="stat-label">我的 Skill</text>
               </view>
               <view class="stat-block">
                 <text class="stat-value">{{ enabledCount }}</text>
                 <text class="stat-label">已启用</text>
               </view>
               <view class="stat-block">
-                <text class="stat-value">{{ documentCount }}</text>
-                <text class="stat-label">文档</text>
+                <text class="stat-value">{{ marketplaceSkills.length }}</text>
+                <text class="stat-label">市场 Skill</text>
               </view>
               <view class="stat-block">
                 <text class="stat-value">{{ boundAgentCount }}</text>
@@ -76,6 +76,23 @@
           <view class="main-layout">
             <view class="catalog-panel flex-column">
               <view class="catalog-toolbar flex-column gap-3">
+                <view class="skill-tabs">
+                  <view
+                    class="skill-tab"
+                    :class="{ active: activeTab === 'mine' }"
+                    @click="switchTab('mine')"
+                  >
+                    <text>我的 Skill</text>
+                  </view>
+                  <view
+                    class="skill-tab"
+                    :class="{ active: activeTab === 'market' }"
+                    @click="switchTab('market')"
+                  >
+                    <text>Skill 市场</text>
+                  </view>
+                </view>
+
                 <view class="search-wrap flex-row align-center">
                   <AppIcon name="search" :size="18" color="var(--color-text-muted)" />
                   <input
@@ -116,15 +133,15 @@
                   <view class="skill-row-main flex-column">
                     <view class="skill-row-top flex-row align-center justify-between">
                       <text class="skill-row-name">{{ skill.name }}</text>
-                      <text class="skill-version">v{{ skill.version }}</text>
+                      <text class="skill-version">{{ skillRowStatus(skill) }}</text>
                     </view>
                     <text class="skill-row-desc">{{ skill.desc }}</text>
                     <view class="skill-row-meta flex-row align-center">
                       <text>{{ skill.category }}</text>
                       <view class="dot"></view>
-                      <text>{{ skill.status }}</text>
+                      <text>{{ skill.sourceType || skill.source }}</text>
                       <view class="dot"></view>
-                      <text>{{ skill.size }}</text>
+                      <text>{{ skillAgentSummary(skill) }}</text>
                     </view>
                   </view>
                 </view>
@@ -133,8 +150,8 @@
               <AppEmptyState
                 v-else
                 icon="bookmark"
-                title="没有匹配的技能"
-                description="请调整搜索关键词或筛选条件"
+                :title="activeTab === 'mine' ? '还没有添加 Skill' : '没有匹配的市场 Skill'"
+                :description="activeTab === 'mine' ? '从 Skill 市场添加，或上传 zip 到当前用户空间' : '请调整搜索关键词或刷新市场目录'"
               />
             </view>
 
@@ -153,8 +170,30 @@
                   </view>
                 </view>
                 <view class="detail-actions flex-row gap-2">
-                  <button class="detail-btn" @click="showUiToast('启用状态')">启用</button>
-                  <button class="detail-btn primary" @click="showUiToast('绑定智能体')">绑定智能体</button>
+                  <button
+                    v-if="activeTab === 'market'"
+                    class="detail-btn primary"
+                    :disabled="activeSkill.added || isBusy"
+                    @click="addSkill(activeSkill)"
+                  >{{ activeSkill.added ? '已添加' : '添加' }}</button>
+                  <button
+                    v-if="activeTab === 'mine'"
+                    class="detail-btn"
+                    :disabled="isBusy"
+                    @click="toggleActiveSkill"
+                  >{{ activeSkill.enabled === false ? '启用' : '停用' }}</button>
+                  <button
+                    v-if="activeTab === 'mine'"
+                    class="detail-btn primary"
+                    :disabled="isBusy"
+                    @click="saveActiveSkill"
+                  >保存</button>
+                  <button
+                    v-if="activeTab === 'mine'"
+                    class="detail-btn danger"
+                    :disabled="isBusy"
+                    @click="deleteActiveSkill"
+                  >删除</button>
                 </view>
               </view>
 
@@ -179,6 +218,33 @@
 
               <view class="detail-body">
                 <view class="side-info flex-column">
+                  <view class="info-section flex-column gap-2" v-if="activeTab === 'mine'">
+                    <view class="section-title flex-row align-center gap-2">
+                      <AppIcon name="settings" :size="15" color="var(--color-primary)" />
+                      <text>元数据</text>
+                    </view>
+                    <view class="skill-form flex-column">
+                      <input
+                        class="skill-form-input"
+                        v-model="editDraft.displayName"
+                        placeholder="Skill 名称"
+                        placeholder-style="color: var(--color-text-muted)"
+                      />
+                      <input
+                        class="skill-form-input"
+                        v-model="editDraft.category"
+                        placeholder="分类"
+                        placeholder-style="color: var(--color-text-muted)"
+                      />
+                      <textarea
+                        class="skill-form-textarea"
+                        v-model="editDraft.description"
+                        placeholder="描述"
+                        placeholder-style="color: var(--color-text-muted)"
+                      />
+                    </view>
+                  </view>
+
                   <view class="info-section flex-column gap-2">
                     <view class="section-title flex-row align-center gap-2">
                       <AppIcon name="agents" :size="15" color="var(--color-primary)" />
@@ -193,6 +259,29 @@
                         <text>{{ agent.name }}</text>
                       </view>
                       <text v-if="!boundAgents.length" class="muted-line">暂未绑定智能体</text>
+                    </view>
+                  </view>
+
+                  <view class="info-section flex-column gap-2" v-if="activeTab === 'mine'">
+                    <view class="section-title flex-row align-center justify-between">
+                      <view class="flex-row align-center gap-2">
+                        <AppIcon name="agents" :size="15" color="var(--color-primary)" />
+                        <text>分配给智能体</text>
+                      </view>
+                      <button class="mini-action" :disabled="isBusy" @click="saveAssignments">保存分配</button>
+                    </view>
+                    <view class="agent-toggle-list">
+                      <view
+                        v-for="agent in assignableAgents"
+                        :key="agent.id"
+                        class="agent-toggle"
+                        :class="{ selected: selectedAgentIds.includes(agent.id) }"
+                        @click="toggleAssignment(agent.id)"
+                      >
+                        <AppIcon :name="selectedAgentIds.includes(agent.id) ? 'check' : 'agents'" :size="14" color="currentColor" />
+                        <text>{{ agent.name }}</text>
+                      </view>
+                      <text v-if="!assignableAgents.length" class="muted-line">暂无可分配智能体</text>
                     </view>
                   </view>
 
@@ -288,16 +377,34 @@ const selectedSkillId = ref('');
 const selectedDocId = ref('');
 const searchQuery = ref('');
 const activeFilter = ref('all');
+const activeTab = ref('mine');
 const showSource = ref(false);
+const isBusy = ref(false);
+const uploadError = ref('');
+const editDraft = ref({
+  displayName: '',
+  category: '',
+  description: ''
+});
+const selectedAgentIds = ref([]);
 
 const filters = [
   { id: 'all', label: '全部', icon: 'grid' },
   { id: 'enabled', label: '已启用', icon: 'check' },
-  { id: 'trial', label: '试用', icon: 'clock' },
-  { id: 'local', label: '本地', icon: 'package' }
+  { id: 'assigned', label: '已分配', icon: 'agents' },
+  { id: 'available', label: '可添加', icon: 'package' }
 ];
 
-const skills = computed(() => agentStore.localSkills || []);
+const mySkills = computed(() => agentStore.userSkills || []);
+const marketplaceSkills = computed(() => agentStore.skillMarketplace || []);
+const skills = computed(() => activeTab.value === 'market' ? marketplaceSkills.value : mySkills.value);
+const isMarket = computed(() => activeTab.value === 'market');
+const uploadHint = computed(() => uploadError.value || '示例：ui-review.skill.zip，上传后会出现在“我的 Skill”');
+const skillStatusText = computed(() => {
+  if (isBusy.value) return '同步中';
+  if (agentStore.skillError) return '同步失败';
+  return '已接入';
+});
 
 const filteredSkills = computed(() => {
   const query = searchQuery.value.trim().toLowerCase();
@@ -312,9 +419,9 @@ const filteredSkills = computed(() => {
     const matchesQuery = !query || haystack.includes(query);
     const matchesFilter =
       activeFilter.value === 'all' ||
-      (activeFilter.value === 'enabled' && skill.status === '已启用') ||
-      (activeFilter.value === 'trial' && skill.status === '试用') ||
-      (activeFilter.value === 'local' && skill.source === '本地');
+      (activeFilter.value === 'enabled' && skill.enabled !== false) ||
+      (activeFilter.value === 'assigned' && (skill.agentIds || []).length > 0) ||
+      (activeFilter.value === 'available' && (isMarket.value ? !skill.added : skill.enabled !== false));
     return matchesQuery && matchesFilter;
   });
 });
@@ -331,16 +438,22 @@ const activeDocument = computed(() => {
 
 const renderedDocument = computed(() => markdown.render(activeDocument.value?.markdown || ''));
 
-const enabledCount = computed(() => skills.value.filter(skill => skill.status === '已启用').length);
-
-const documentCount = computed(() => skills.value.reduce((total, skill) => total + (skill.documents?.length || 0), 0));
+const enabledCount = computed(() => skills.value.filter(skill => skill.enabled !== false).length);
 
 const boundAgentCount = computed(() => {
   const ids = new Set();
-  skills.value.forEach((skill) => {
+  mySkills.value.forEach((skill) => {
     (skill.agentIds || []).forEach(id => ids.add(id));
   });
   return ids.size;
+});
+
+const assignableAgents = computed(() => {
+  return (agentStore.agents || []).filter((agent) => {
+    if (!agent.id) return false;
+    if (agent.connected === false || agent.available === false) return false;
+    return agent.source === 'clowder' || agent.isAgent || agent.type === 'robot';
+  });
 });
 
 const boundAgents = computed(() => {
@@ -353,11 +466,21 @@ const boundAgents = computed(() => {
 watch(activeSkill, (skill) => {
   selectedSkillId.value = skill?.id || '';
   selectedDocId.value = skill?.documents?.[0]?.id || '';
+  editDraft.value = {
+    displayName: skill?.displayName || skill?.name || '',
+    category: skill?.category || '',
+    description: skill?.description || skill?.desc || ''
+  };
+  selectedAgentIds.value = [...(skill?.agentIds || [])];
   showSource.value = false;
 });
 
-onMounted(() => {
+onMounted(async () => {
   navStore.setActiveModule('agents');
+  await Promise.allSettled([
+    agentStore.fetchNativeAgents({ silent: true }),
+    refreshSkills()
+  ]);
   const pages = getCurrentPages();
   const currentPage = pages[pages.length - 1];
   const initialSkillId = safeDecode(currentPage?.$page?.options?.skillId || '');
@@ -371,16 +494,162 @@ function selectSkill(id) {
   selectedSkillId.value = id;
 }
 
+function switchTab(tab) {
+  activeTab.value = tab;
+  activeFilter.value = 'all';
+  selectedSkillId.value = (tab === 'market' ? marketplaceSkills.value[0]?.id : mySkills.value[0]?.id) || '';
+}
+
 function selectDoc(id) {
   selectedDocId.value = id;
   showSource.value = false;
 }
 
-function showUiToast(action) {
-  uni.showToast({
-    title: `${action}为界面示意`,
-    icon: 'none'
+async function refreshSkills() {
+  isBusy.value = true;
+  uploadError.value = '';
+  try {
+    await agentStore.refreshSkills({ silent: true });
+  } catch (error) {
+    uploadError.value = errorText(error);
+  } finally {
+    isBusy.value = false;
+  }
+}
+
+async function handleUpload() {
+  if (isBusy.value) return;
+  if (typeof uni.chooseFile !== 'function') {
+    uploadError.value = '当前运行环境不支持文件选择';
+    uni.showToast({ title: uploadError.value, icon: 'none' });
+    return;
+  }
+  uni.chooseFile({
+    count: 1,
+    extension: ['.zip', '.skill.zip'],
+    success: async (res) => {
+      const file = res.tempFiles?.[0] || res.tempFilePaths?.[0];
+      if (!file) return;
+      isBusy.value = true;
+      uploadError.value = '';
+      try {
+        const uploaded = await agentStore.uploadSkillPackage(file);
+        activeTab.value = 'mine';
+        selectedSkillId.value = uploaded.id;
+        await agentStore.fetchSkillMarketplace({ silent: true });
+        uni.showToast({ title: '已上传 Skill', icon: 'success' });
+      } catch (error) {
+        uploadError.value = errorText(error);
+        uni.showToast({ title: uploadError.value, icon: 'none' });
+      } finally {
+        isBusy.value = false;
+      }
+    }
   });
+}
+
+async function addSkill(skill) {
+  if (!skill || isBusy.value || skill.added) return;
+  isBusy.value = true;
+  try {
+    const added = await agentStore.addMarketplaceSkill(skill.sourceId || skill.id);
+    activeTab.value = 'mine';
+    selectedSkillId.value = added.id;
+    uni.showToast({ title: '已添加到我的 Skill', icon: 'success' });
+  } catch (error) {
+    uni.showToast({ title: errorText(error), icon: 'none' });
+  } finally {
+    isBusy.value = false;
+  }
+}
+
+async function saveActiveSkill() {
+  if (!activeSkill.value || isBusy.value) return;
+  isBusy.value = true;
+  try {
+    await agentStore.updateUserSkill(activeSkill.value.id, {
+      displayName: editDraft.value.displayName,
+      category: editDraft.value.category,
+      description: editDraft.value.description
+    });
+    uni.showToast({ title: '已保存', icon: 'success' });
+  } catch (error) {
+    uni.showToast({ title: errorText(error), icon: 'none' });
+  } finally {
+    isBusy.value = false;
+  }
+}
+
+async function toggleActiveSkill() {
+  if (!activeSkill.value || isBusy.value) return;
+  isBusy.value = true;
+  try {
+    const enabled = activeSkill.value.enabled === false;
+    await agentStore.updateUserSkill(activeSkill.value.id, { enabled });
+    uni.showToast({ title: enabled ? '已启用' : '已停用', icon: 'success' });
+  } catch (error) {
+    uni.showToast({ title: errorText(error), icon: 'none' });
+  } finally {
+    isBusy.value = false;
+  }
+}
+
+function deleteActiveSkill() {
+  if (!activeSkill.value || isBusy.value) return;
+  uni.showModal({
+    title: '删除 Skill',
+    content: `从我的 Skill 中移除“${activeSkill.value.displayName || activeSkill.value.name}”？`,
+    success: async (res) => {
+      if (!res.confirm) return;
+      isBusy.value = true;
+      try {
+        const id = activeSkill.value.id;
+        await agentStore.deleteUserSkill(id);
+        selectedSkillId.value = mySkills.value[0]?.id || '';
+        uni.showToast({ title: '已删除', icon: 'success' });
+      } catch (error) {
+        uni.showToast({ title: errorText(error), icon: 'none' });
+      } finally {
+        isBusy.value = false;
+      }
+    }
+  });
+}
+
+function toggleAssignment(agentId) {
+  const id = String(agentId || '');
+  if (!id) return;
+  selectedAgentIds.value = selectedAgentIds.value.includes(id)
+    ? selectedAgentIds.value.filter((item) => item !== id)
+    : [...selectedAgentIds.value, id];
+}
+
+async function saveAssignments() {
+  if (!activeSkill.value || isBusy.value) return;
+  isBusy.value = true;
+  try {
+    await agentStore.updateSkillAssignments(activeSkill.value.id, selectedAgentIds.value);
+    uni.showToast({ title: '分配已保存', icon: 'success' });
+  } catch (error) {
+    uni.showToast({ title: errorText(error), icon: 'none' });
+  } finally {
+    isBusy.value = false;
+  }
+}
+
+function skillRowStatus(skill) {
+  if (activeTab.value === 'market') return skill.added ? '已添加' : (skill.mounted === false ? '未挂载' : '可添加');
+  return skill.enabled === false ? '已停用' : '已启用';
+}
+
+function skillAgentSummary(skill) {
+  const count = (skill.agentIds || []).length || skill.assignedAgentCount || 0;
+  if (activeTab.value === 'market') return skill.provider || skill.sourceType || 'market';
+  return count ? `${count} 个智能体` : '未分配';
+}
+
+function errorText(error) {
+  return error?.msg || error?.message || '操作失败';
 }
 
 function safeDecode(value) {
@@ -512,6 +781,19 @@ function goAgents() {
   box-shadow: 0 2px 8px rgba(0, 74, 198, 0.16);
 }
 
+.detail-btn.danger {
+  color: var(--color-error);
+  background-color: rgba(220, 38, 38, 0.08);
+  border-color: rgba(220, 38, 38, 0.2);
+}
+
+.detail-btn[disabled],
+.upload-btn[disabled],
+.header-action[disabled],
+.mini-action[disabled] {
+  opacity: 0.62;
+}
+
 .skills-scroll {
   height: 100%;
 }
@@ -580,13 +862,13 @@ function goAgents() {
   margin-top: 2px;
 }
 
-.ui-only-badge {
+.sync-badge {
   align-self: flex-start;
   height: 24px;
   padding: 0 8px;
   border-radius: 6px;
-  background-color: rgba(249, 115, 22, 0.12);
-  color: var(--color-warning);
+  background-color: rgba(0, 74, 198, 0.08);
+  color: var(--color-primary);
   font-size: 11px;
   font-weight: 800;
   display: flex;
@@ -679,6 +961,35 @@ function goAgents() {
 
 .catalog-toolbar {
   display: flex;
+}
+
+.skill-tabs {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 4px;
+  min-height: 42px;
+  padding: 4px;
+  border-radius: 8px;
+  background-color: var(--color-bg-muted);
+  box-sizing: border-box;
+}
+
+.skill-tab {
+  min-width: 0;
+  border-radius: 6px;
+  color: var(--color-text-secondary);
+  font-size: 13px;
+  font-weight: 800;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+}
+
+.skill-tab.active {
+  color: var(--color-primary);
+  background-color: var(--color-bg-surface);
+  box-shadow: 0 1px 2px rgba(15, 23, 42, 0.08);
 }
 
 .search-wrap {
@@ -990,6 +1301,84 @@ function goAgents() {
   font-size: 13px;
   font-weight: 800;
   color: var(--color-text-primary);
+}
+
+.skill-form {
+  display: flex;
+  gap: 8px;
+}
+
+.skill-form-input,
+.skill-form-textarea {
+  width: 100%;
+  box-sizing: border-box;
+  border-radius: 6px;
+  border: 1px solid var(--color-border);
+  background-color: var(--color-bg-base);
+  color: var(--color-text-primary);
+  font-size: 13px;
+  padding: 0 10px;
+}
+
+.skill-form-input {
+  height: 38px;
+}
+
+.skill-form-textarea {
+  min-height: 88px;
+  line-height: 20px;
+  padding-top: 8px;
+}
+
+.mini-action {
+  min-height: 32px;
+  margin: 0;
+  padding: 0 10px;
+  border-radius: 6px;
+  border: 1px solid var(--color-border);
+  background-color: var(--color-bg-muted);
+  color: var(--color-primary);
+  font-size: 12px;
+  font-weight: 800;
+}
+
+.mini-action::after {
+  border: none;
+}
+
+.agent-toggle-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.agent-toggle {
+  min-height: 32px;
+  max-width: 100%;
+  padding: 0 9px;
+  border-radius: 6px;
+  border: 1px solid var(--color-border);
+  background-color: var(--color-bg-muted);
+  color: var(--color-text-secondary);
+  font-size: 12px;
+  font-weight: 800;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  cursor: pointer;
+}
+
+.agent-toggle text {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.agent-toggle.selected {
+  color: var(--color-primary);
+  border-color: rgba(0, 74, 198, 0.2);
+  background-color: var(--color-primary-light);
 }
 
 .agent-chip-list,
@@ -1347,7 +1736,7 @@ function goAgents() {
     align-items: stretch;
   }
 
-  .ui-only-badge {
+  .sync-badge {
     align-self: flex-start;
   }
 

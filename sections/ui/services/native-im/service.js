@@ -42,6 +42,18 @@ function writeStorage(key, value) {
   }
 }
 
+function trimSlashes(value) {
+  return String(value || '').replace(/^\/+|\/+$/g, '');
+}
+
+function joinServiceUrl(baseUrl, path) {
+  const base = String(baseUrl || '').trim();
+  const normalizedPath = trimSlashes(path);
+  if (/^https?:\/\//i.test(normalizedPath)) return normalizedPath;
+  if (!base) return `/${normalizedPath}`;
+  return `${base.replace(/\/+$/, '')}/${normalizedPath}`;
+}
+
 function resolveDefaultBaseUrl() {
   const env = import.meta.env || {};
   return readStorage('native_api_base_url')
@@ -511,12 +523,12 @@ function resolveFileName(file = {}) {
   return safeFileName(file.name || file.fileName || file.tempFilePath?.split('/').pop() || file.path?.split('/').pop() || 'file');
 }
 
-function defaultUploadRequest({ url, file, fieldName = 'file' }) {
+function defaultUploadRequest({ url, file, fieldName = 'file', headers = {} }) {
   if (!url) return Promise.reject(new Error('upload url is empty'));
   if (typeof FormData !== 'undefined' && typeof fetch === 'function' && (file.file || file.blob || file instanceof Blob)) {
     const form = new FormData();
     form.append(fieldName, file.file || file.blob || file, resolveFileName(file));
-    return fetch(url, { method: 'POST', body: form }).then(async (response) => {
+    return fetch(url, { method: 'POST', headers, body: form }).then(async (response) => {
       const text = await response.text();
       if (!response.ok) throw new Error(text || `upload failed (${response.status})`);
       try {
@@ -532,6 +544,7 @@ function defaultUploadRequest({ url, file, fieldName = 'file' }) {
         url,
         filePath: file.path || file.tempFilePath || file.url,
         name: fieldName,
+        header: headers,
         success: (res) => {
           try {
             resolve(res.data ? JSON.parse(res.data) : {});
@@ -548,9 +561,10 @@ function defaultUploadRequest({ url, file, fieldName = 'file' }) {
 
 export function createNativeImService(options = {}) {
   const nativeBaseUrl = options.baseUrl || resolveDefaultBaseUrl();
+  const getToken = options.getToken || (() => readStorage('app_token'));
   const client = options.client || createNativeApiClient({
     baseUrl: nativeBaseUrl,
-    getToken: options.getToken || (() => readStorage('app_token')),
+    getToken,
     request: options.request
   });
   const clowderClient = options.clowderClient || createNativeApiClient({
@@ -1220,6 +1234,47 @@ export function createNativeImService(options = {}) {
   }
 
   async function uploadSkillPackage(payload = {}) {
+    const file = payload.file || payload.blob || payload;
+    const name = payload.name || file.name || payload.fileName || resolveFileName(file) || 'skill.zip';
+    const headers = {};
+    const token = getToken();
+    if (token) headers.token = token;
+    const uploadUrl = joinServiceUrl(nativeBaseUrl, 'clowder/skills/upload');
+    const hasBlobUpload = typeof Blob !== 'undefined' && (
+      file instanceof Blob ||
+      payload.blob instanceof Blob ||
+      payload.file instanceof Blob ||
+      file?.blob instanceof Blob ||
+      file?.file instanceof Blob
+    );
+    if (typeof FormData !== 'undefined' && typeof fetch === 'function' && hasBlobUpload) {
+      const form = new FormData();
+      const uploadFile = payload.blob || (payload.file instanceof Blob ? payload.file : null) || (file instanceof Blob ? file : null) || file.blob || file.file;
+      form.append('file', uploadFile, name);
+      const response = await fetch(uploadUrl, {
+        method: 'POST',
+        headers,
+        body: form
+      });
+      const text = await response.text();
+      let resp = {};
+      try {
+        resp = text ? JSON.parse(text) : {};
+      } catch {
+        resp = { msg: text };
+      }
+      if (!response.ok) throw { msg: resp.msg || resp.error || `上传失败 (${response.status})`, status: response.status };
+      return normalizeUserSkill(resp.skill || resp.data?.skill || resp.data || resp);
+    }
+    if (typeof file === 'string' || file?.path || file?.tempFilePath || file?.url || file?.blob) {
+      const uploaded = await uploadRequest({
+        url: uploadUrl,
+        file: typeof file === 'string' ? { name, path: file } : { ...file, name },
+        fieldName: 'file',
+        headers
+      });
+      return normalizeUserSkill(uploaded.skill || uploaded.data?.skill || uploaded.data || uploaded);
+    }
     const resp = await client.post('clowder/skills/upload', payload);
     return normalizeUserSkill(resp.skill || resp.data?.skill || resp.data || resp);
   }
