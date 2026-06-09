@@ -5,6 +5,7 @@ import {
   applyDraftToConversationList,
   conversationDraftKey,
   dropMockConversations,
+  mergeNativeConversationTimeline,
   mergeRemoteDrafts,
   shouldPersistConversationDraft,
   upsertGroupConversation
@@ -533,8 +534,10 @@ export const useConversationStore = defineStore('conversation', {
               ? remoteDraft
               : (draftCache[key] || existing.draft || '');
           const localHidden = this.isHidden.includes(existing.id);
+          const timeline = mergeNativeConversationTimeline(existing, nativeConversation);
           Object.assign(existing, nativeConversation, {
             draft,
+            ...timeline,
             isPinned: existing.isPinned || nativeConversation.isPinned,
             isMuted: existing.isMuted || nativeConversation.isMuted,
             ...preservedAgentDisplay

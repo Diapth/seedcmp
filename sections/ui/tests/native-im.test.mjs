@@ -9,6 +9,7 @@ import {
   applyDraftToConversationList,
   buildGroupScopedRoute,
   mergeRemoteDrafts,
+  mergeNativeConversationTimeline,
   normalizeNativeGroup,
   resolveGroupPageId,
   shouldPersistConversationDraft,
@@ -845,6 +846,42 @@ test('group upsert gives groups with a real last message a visible fallback time
   assert.equal(conversations[0].lastMessage, '群里有摘要但无时间');
   assert.ok(conversations[0].lastTime >= before);
   assert.ok(conversations[0].lastTime <= after);
+});
+
+test('conversation normalizer does not invent current time for empty remote group rows', () => {
+  const conversation = normalizeConversation({
+    channel_id: 'g-empty-remote',
+    channel_type: 2
+  }, {
+    name: '空远端群'
+  });
+
+  assert.equal(conversation.lastMessage, '');
+  assert.equal(conversation.lastTime, 0);
+});
+
+test('conversation merge preserves group create time fallback when remote sync has no time', () => {
+  const groupCreateTime = 1780488000000;
+  const conversations = upsertGroupConversation([], {
+    group_no: 'g-create-fallback',
+    name: '创建时间群',
+    created_at: groupCreateTime / 1000
+  });
+
+  const existing = conversations[0];
+  const remote = normalizeConversation({
+    channel_id: 'g-create-fallback',
+    channel_type: 2
+  }, {
+    name: '创建时间群'
+  });
+  const mergedTimeline = mergeNativeConversationTimeline(existing, remote);
+
+  assert.equal(existing.lastMessage, '你已加入群聊 创建时间群');
+  assert.equal(existing.lastTime, groupCreateTime);
+  assert.equal(remote.lastTime, 0);
+  assert.equal(mergedTimeline.lastMessage, '你已加入群聊 创建时间群');
+  assert.equal(mergedTimeline.lastTime, groupCreateTime);
 });
 
 test('native group mention messages preserve highlight metadata from synced payloads', () => {

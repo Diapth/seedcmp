@@ -211,3 +211,12 @@ export function upsertGroupConversation(conversations = [], group = {}) {
   };
   return next;
 }
+
+export function mergeNativeConversationTimeline(existing = {}, incoming = {}) {
+  const hasIncomingTime = Boolean(incoming.lastTime);
+  const hasIncomingMessage = clean(incoming.lastMessage);
+  return {
+    lastMessage: hasIncomingMessage ? incoming.lastMessage : (existing.lastMessage || ''),
+    lastTime: hasIncomingTime ? incoming.lastTime : (existing.lastTime || 0)
+  };
+}

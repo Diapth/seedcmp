@@ -559,6 +559,20 @@ function recentMessageFromInput(input = {}) {
   return Array.isArray(input.recents) ? input.recents[0] : null;
 }
 
+function hasDigestSource(input = {}) {
+  const recent = recentMessageFromInput(input);
+  const lastMessage = input.last_message || input.lastMessageObj;
+  return Boolean(
+    input.payload
+    || input.content
+    || input.lastMessage
+    || lastMessage?.payload
+    || lastMessage?.content
+    || recent?.payload
+    || recent?.content
+  );
+}
+
 function lastMessageTimeFromInput(input = {}) {
   const recent = recentMessageFromInput(input);
   const lastMessage = input.last_message || input.lastMessageObj || {};
@@ -588,7 +602,7 @@ export function normalizeConversation(input = {}, channelInfo = {}) {
   const isRobot = Number(channelInfo.robot || channelInfo.orgData?.robot || 0) === 1 || category === 'robot';
   const name = firstNonEmpty(channelInfo.remark, channelInfo.orgData?.remark, input.remark, channelInfo.name, channelInfo.title, input.name, channelId);
   const logo = firstNonEmpty(channelInfo.logo, channelInfo.avatar, input.avatar);
-  const lastMessage = messageDigestFromInput(input);
+  const lastMessage = hasDigestSource(input) ? messageDigestFromInput(input) : '';
   const lastTime = toTimestampMs(lastMessageTimeFromInput(input), lastMessage ? Date.now() : 0);
 
   return {
