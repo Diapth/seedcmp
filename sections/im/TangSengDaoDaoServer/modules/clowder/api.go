@@ -31,6 +31,11 @@ type Clowder struct {
 	createdCatContacts   map[string]map[string]ClowderAgent
 	projectGroupMu       sync.RWMutex
 	projectGroupBindings map[string]ProjectGroupBinding
+	skillMu              sync.RWMutex
+	skillSources         map[string]ClowderSkillSource
+	userSkills           map[string]map[string]ClowderUserSkill
+	nextSkillSourceSeq   int64
+	nextUserSkillSeq     int64
 	log.Log
 	config commonmodule.ClowderBridgeConfig
 }
@@ -44,6 +49,8 @@ func New(ctx *config.Context) *Clowder {
 		groupCatState:        map[string]groupCatSyncResponse{},
 		createdCatContacts:   map[string]map[string]ClowderAgent{},
 		projectGroupBindings: map[string]ProjectGroupBinding{},
+		skillSources:         map[string]ClowderSkillSource{},
+		userSkills:           map[string]map[string]ClowderUserSkill{},
 		Log:                  log.NewTLog("clowder"),
 		config:               commonmodule.ClowderBridgeConfigFromEnv(),
 	}
@@ -61,6 +68,14 @@ func (c *Clowder) Route(r *wkhttp.WKHttp) {
 		auth.GET("/conversation/agents", c.agentDirectory)
 		auth.GET("/cats", c.catDirectory)
 		auth.GET("/local-auth/capabilities", c.localAuthCapabilities)
+		auth.GET("/skills/summary", c.skillSummary)
+		auth.GET("/skills", c.userSkillList)
+		auth.GET("/skills/marketplace", c.skillMarketplace)
+		auth.POST("/skills/upload", c.uploadSkillPackage)
+		auth.POST("/skills/:sourceId/add", c.addMarketplaceSkill)
+		auth.RouterGroup.PATCH("/skills/:userSkillId", auth.L.WKHttpHandler(c.updateUserSkill))
+		auth.DELETE("/skills/:userSkillId", c.deleteUserSkill)
+		auth.PUT("/skills/:userSkillId/assignments", c.updateUserSkillAssignments)
 		auth.POST("/cats/connect", c.connectCatContact)
 		auth.POST("/cats", c.createCatAndConnect)
 		auth.DELETE("/cats/:catId", c.deleteCatContact)
