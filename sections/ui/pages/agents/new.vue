@@ -150,7 +150,7 @@
                       :key="p.value"
                       class="segmented-item flex-1 flex-row align-center justify-center"
                       :class="{ active: form.platform === p.value }"
-                      @click="form.platform = p.value; onFormChange()"
+                      @click="selectPlatform(p.value)"
                     >
                       <text>{{ p.label }}</text>
                     </view>
@@ -165,7 +165,7 @@
                       :key="m.value"
                       class="segmented-item flex-1 flex-row align-center justify-center"
                       :class="{ active: form.accessMode === m.value }"
-                      @click="form.accessMode = m.value; onFormChange()"
+                      @click="selectAccessMode(m.value)"
                     >
                       <text>{{ m.label }}</text>
                     </view>
@@ -173,8 +173,27 @@
                 </view>
               </view>
 
+              <view
+                v-if="isOAuthMode"
+                class="oauth-status"
+                :class="oauthStatus.state"
+              >
+                <view class="oauth-status-main flex-row align-center gap-2">
+                  <view class="oauth-badge">{{ oauthStatusBadge }}</view>
+                  <view class="oauth-copy flex-column gap-1 flex-1">
+                    <text class="oauth-title">{{ oauthStatus.message }}</text>
+                    <text v-if="oauthStatus.detail" class="oauth-detail">{{ oauthStatus.detail }}</text>
+                  </view>
+                  <button
+                    v-if="oauthStatus.state === 'error'"
+                    class="oauth-retry"
+                    @click="probeLocalOAuth(true)"
+                  >重试</button>
+                </view>
+              </view>
+
               <view class="form-grid">
-                <view class="input-group flex-column gap-1">
+                <view v-if="!isOAuthMode" class="input-group flex-column gap-1">
                   <text class="input-label">模型</text>
                   <picker @change="onModelChange" :value="modelIndex" :range="modelOptions" class="picker-trigger">
                     <view class="picker-value flex-row align-center justify-between">
@@ -189,11 +208,14 @@
                   <input
                     type="text"
                     v-model="form.accountRef"
-                    placeholder="openai-prod"
+                    :disabled="isOAuthMode"
+                    :placeholder="isOAuthMode ? oauthStatus.loginCommand : 'openai-prod'"
                     class="form-input"
+                    :class="{ disabled: isOAuthMode }"
                     placeholder-style="color: var(--color-text-muted)"
                     @input="onFormChange"
                   />
+                  <text v-if="isOAuthMode" class="input-hint">OAuth 模式使用本机 {{ oauthStatus.providerLabel }} CLI 登录态，账号引用由系统自动管理</text>
                 </view>
               </view>
 
@@ -521,6 +543,10 @@ import { useAgentStore } from '@/stores/agent';
 import { useConversationStore } from '@/stores/conversation';
 import { useNavigationStore } from '@/stores/navigation';
 import { useResponsiveLayout } from '@/composables/useResponsiveLayout';
+import {
+  defaultOAuthAccountRef,
+  resolveLocalOAuthStatus
+} from '@/services/native-im/oauth';
 import AppSubpageShell from '@/components/layout/AppSubpageShell.vue';
 import AppIcon from '@/components/common/AppIcon.vue';
 import AppAvatar from '@/components/common/AppAvatar.vue';
@@ -534,6 +560,8 @@ const { isDesktop } = useResponsiveLayout();
 onMounted(() => {
   navStore.setActiveModule('agents');
   loadEditingAgent();
+  syncOAuthAccountRef();
+  if (isOAuthMode.value) probeLocalOAuth();
 });
 
 function createDefaultForm() {
@@ -674,7 +702,27 @@ const currentPlatform = computed(() => {
   return platforms.find(p => p.value === form.value.platform) || platforms[0];
 });
 
+const isOAuthMode = computed(() => form.value.accessMode === 'oauth');
+
+const oauthStatus = computed(() => resolveLocalOAuthStatus({
+  accessMode: form.value.accessMode,
+  platform: form.value.platform,
+  capabilities: agentStore.localOAuthCapabilities,
+  loading: agentStore.localOAuthLoading,
+  error: agentStore.localOAuthError
+}));
+
+const oauthStatusBadge = computed(() => {
+  const state = oauthStatus.value.state;
+  if (state === 'loading') return '检查中';
+  if (state === 'ready') return '已配置';
+  if (state === 'missing') return '需登录';
+  if (state === 'error') return '检查失败';
+  return '';
+});
+
 const effectiveModel = computed(() => {
+  if (isOAuthMode.value) return '';
   if (form.value.accessMode === 'api-key' && form.value.customModel.trim()) {
     return form.value.customModel.trim();
   }
@@ -684,7 +732,7 @@ const effectiveModel = computed(() => {
 const checkList = computed(() => [
   { key: 'name', label: '基础信息已填写', passed: !!form.value.name.trim() },
   { key: 'role', label: '角色模板已选择', passed: !!form.value.roleTemplate },
-  { key: 'model', label: '模型账号可用', passed: !!form.value.accountRef.trim() && !!effectiveModel.value },
+  { key: 'model', label: isOAuthMode.value ? '本机 OAuth 已配置' : '模型账号可用', passed: isOAuthMode.value ? oauthStatus.value.canCreate : (!!form.value.accountRef.trim() && !!effectiveModel.value) },
   { key: 'tags', label: '能力标签已同步', passed: form.value.capabilityTags.length > 0 },
   { key: 'api', label: 'API 配置完整', passed: form.value.accessMode !== 'api-key' || ((isEditing.value || !!form.value.apiKey.trim()) && !!form.value.apiUrl.trim()) }
 ]);
@@ -694,6 +742,40 @@ const canSubmit = computed(() => {
 });
 
 function onFormChange() {}
+
+function syncOAuthAccountRef() {
+  if (!isOAuthMode.value) return;
+  form.value.accountRef = defaultOAuthAccountRef(form.value.platform);
+  form.value.customModel = '';
+}
+
+async function probeLocalOAuth(force = false) {
+  if (!isOAuthMode.value) return;
+  syncOAuthAccountRef();
+  try {
+    await agentStore.loadLocalOAuthCapabilities({ force });
+  } catch {
+    // The visible oauth status bar renders the store error.
+  }
+}
+
+function selectPlatform(value) {
+  form.value.platform = value;
+  syncOAuthAccountRef();
+  if (isOAuthMode.value) probeLocalOAuth(true);
+  onFormChange();
+}
+
+function selectAccessMode(value) {
+  form.value.accessMode = value;
+  if (isOAuthMode.value) {
+    syncOAuthAccountRef();
+    probeLocalOAuth();
+  } else if (!form.value.accountRef || ['codex', 'claude'].includes(form.value.accountRef)) {
+    form.value.accountRef = form.value.platform === 'claude-code' ? 'anthropic-prod' : 'openai-prod';
+  }
+  onFormChange();
+}
 
 function loadEditingAgent() {
   const pages = getCurrentPages();
@@ -737,6 +819,8 @@ function hydrateFormFromAgent(agent) {
   tagDraft.value = '';
   showApiKey.value = false;
   syncSelectorIndexes();
+  syncOAuthAccountRef();
+  if (isOAuthMode.value) probeLocalOAuth();
 }
 
 function syncSelectorIndexes() {
@@ -901,23 +985,24 @@ function maskKey(k) {
 }
 
 function buildAgentPayload() {
-  return {
+  const payload = {
     name: form.value.name.trim(),
     alias: '@' + form.value.aliasRaw.trim(),
     desc: form.value.desc.trim() || '由用户创建的智能体',
     avatar: editingAgent.value?.avatar || '',
     platform: form.value.platform,
     accessMode: form.value.accessMode,
-    model: effectiveModel.value,
-    accountRef: form.value.accountRef.trim(),
+    model: isOAuthMode.value ? '' : effectiveModel.value,
+    accountRef: isOAuthMode.value ? defaultOAuthAccountRef(form.value.platform) : form.value.accountRef.trim(),
     apiKey: form.value.accessMode === 'api-key' ? maskKey(form.value.apiKey) : '',
-    apiUrl: form.value.apiUrl.trim(),
-    customModel: form.value.customModel.trim(),
+    apiUrl: form.value.accessMode === 'api-key' ? form.value.apiUrl.trim() : '',
+    customModel: form.value.accessMode === 'api-key' ? form.value.customModel.trim() : '',
     systemPrompt: form.value.systemPrompt,
     roleTemplate: form.value.roleTemplate,
     templateId: form.value.templateId,
     capabilityTags: [...form.value.capabilityTags]
   };
+  return payload;
 }
 
 function syncAgentConversation(agentId, payload) {
@@ -1131,6 +1216,11 @@ async function handleCreate() {
   border-color: var(--color-primary);
   box-shadow: 0 0 0 3px rgba(0, 74, 198, 0.12);
 }
+.form-input.disabled {
+  color: var(--color-text-secondary);
+  background-color: var(--color-bg-muted);
+  cursor: not-allowed;
+}
 
 .form-textarea {
   background-color: var(--color-bg-base);
@@ -1278,6 +1368,79 @@ async function handleCreate() {
   background-color: var(--color-primary);
   color: #ffffff;
 }
+
+.oauth-status {
+  border: 1px solid var(--color-border);
+  border-radius: 10px;
+  padding: 12px;
+  background-color: var(--color-bg-surface);
+}
+.oauth-status.loading {
+  border-color: rgba(0, 74, 198, 0.24);
+  background-color: rgba(0, 74, 198, 0.05);
+}
+.oauth-status.ready {
+  border-color: rgba(16, 185, 129, 0.28);
+  background-color: rgba(16, 185, 129, 0.06);
+}
+.oauth-status.missing,
+.oauth-status.error {
+  border-color: rgba(245, 158, 11, 0.36);
+  background-color: rgba(245, 158, 11, 0.08);
+}
+.oauth-status-main {
+  display: flex;
+  min-width: 0;
+}
+.oauth-badge {
+  min-width: 56px;
+  height: 24px;
+  padding: 0 8px;
+  border-radius: 999px;
+  background-color: var(--color-bg-base);
+  color: var(--color-text-secondary);
+  font-size: 12px;
+  font-weight: 700;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+.oauth-status.ready .oauth-badge {
+  color: var(--color-success);
+}
+.oauth-status.missing .oauth-badge,
+.oauth-status.error .oauth-badge {
+  color: var(--color-warning);
+}
+.oauth-copy {
+  min-width: 0;
+  display: flex;
+}
+.oauth-title {
+  font-size: 13px;
+  line-height: 1.45;
+  color: var(--color-text-primary);
+  word-break: break-word;
+}
+.oauth-detail {
+  font-size: 12px;
+  line-height: 1.45;
+  color: var(--color-text-secondary);
+  word-break: break-word;
+}
+.oauth-retry {
+  height: 32px;
+  padding: 0 12px;
+  border-radius: 8px;
+  border: 1px solid var(--color-border);
+  background-color: var(--color-bg-base);
+  color: var(--color-text-primary);
+  font-size: 12px;
+  font-weight: 700;
+  flex-shrink: 0;
+}
+.oauth-retry::after { border: none; }
 
 .label-row {
   display: flex;
@@ -1714,5 +1877,15 @@ async function handleCreate() {
   .form-grid { grid-template-columns: 1fr; }
   .form-card { padding: 16px; }
   .preview-card, .check-card { padding: 16px; }
+  .oauth-status-main {
+    align-items: flex-start;
+    flex-wrap: wrap;
+  }
+  .oauth-copy {
+    flex-basis: calc(100% - 72px);
+  }
+  .oauth-retry {
+    margin-left: 64px;
+  }
 }
 </style>

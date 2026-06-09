@@ -10,6 +10,10 @@ import {
   normalizeFriendSearchResult,
   normalizeMessage
 } from './normalizers.js';
+import {
+  defaultOAuthAccountRef,
+  normalizeLocalOAuthCapabilities
+} from './oauth.js';
 
 const CHANNEL_TYPE_PERSON = 1;
 const CHANNEL_TYPE_GROUP = 2;
@@ -747,20 +751,31 @@ export function createNativeImService(options = {}) {
   }
 
   async function createClowderCat(agent = {}) {
+    const clientId = clientIdForAgentPlatform(agent.platform || agent.clientId);
+    const authType = authTypeForAccessMode(agent.accessMode || agent.authType);
     const payload = {
       name: firstNonEmpty(agent.name, agent.nickname),
       alias: firstNonEmpty(agent.alias),
       roleTemplateId: firstNonEmpty(agent.roleTemplateId, agent.roleTemplate, agent.templateId, 'general'),
-      clientId: clientIdForAgentPlatform(agent.platform || agent.clientId),
-      authType: authTypeForAccessMode(agent.accessMode || agent.authType),
-      accountRef: firstNonEmpty(agent.accountRef, agent.account_ref, 'default'),
-      defaultModel: firstNonEmpty(agent.defaultModel, agent.model, agent.customModel),
+      clientId,
+      authType,
+      accountRef: authType === 'oauth'
+        ? defaultOAuthAccountRef(clientId)
+        : firstNonEmpty(agent.accountRef, agent.account_ref, 'default'),
       personality: firstNonEmpty(agent.personality, agent.systemPrompt, agent.desc),
       capabilities: firstList(agent.capabilities, agent.capabilityTags).map(String).filter(Boolean)
     };
+    if (authType !== 'oauth') {
+      payload.defaultModel = firstNonEmpty(agent.defaultModel, agent.model, agent.customModel);
+    }
     if (!payload.name) throw { msg: '请输入智能体名称' };
     const resp = await client.post('clowder/cats', payload);
     return normalizeCreatedClowderCat(resp);
+  }
+
+  async function getLocalAuthCapabilities() {
+    const resp = await client.get('clowder/local-auth/capabilities');
+    return normalizeLocalOAuthCapabilities(resp);
   }
 
   async function updateConversationSettings({ channelId, channelType = CHANNEL_TYPE_PERSON, isPinned, isMuted } = {}) {
@@ -1058,6 +1073,7 @@ export function createNativeImService(options = {}) {
     sendTextMessage,
     sendClowderConversationMessage,
     createClowderCat,
+    getLocalAuthCapabilities,
     sendMediaMessage,
     uploadChatFile,
     updateConversationSettings,

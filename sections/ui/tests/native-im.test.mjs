@@ -6,6 +6,10 @@ import {
   selectWsAddressForBrowser
 } from '../services/native-im/service.js';
 import {
+  createLocalOAuthCapabilityLoader,
+  resolveLocalOAuthStatus
+} from '../services/native-im/oauth.js';
+import {
   applyDraftToConversationList,
   buildGroupScopedRoute,
   mergeRemoteDrafts,
@@ -653,6 +657,165 @@ test('native service creates custom clowder cats as routable direct agents', asy
   assert.equal(agent.source, 'clowder');
   assert.equal(agent.connected, true);
   assert.equal(agent.apiKey, '');
+});
+
+test('native service fetches local oauth capabilities by provider', async () => {
+  const request = makeRequestStub({
+    'GET clowder/local-auth/capabilities': {
+      providers: [
+        {
+          provider: 'codex',
+          authConfigured: true,
+          profile: 'default',
+          defaultModel: 'gpt-5.1-codex'
+        },
+        {
+          provider: 'claude',
+          authConfigured: false,
+          diagnostics: ['未找到 Claude Code 登录配置']
+        }
+      ]
+    }
+  });
+  const service = createNativeImService({
+    baseUrl: '/v1/',
+    request,
+    getToken: () => 'token'
+  });
+
+  const capabilities = await service.getLocalAuthCapabilities();
+
+  assert.equal(request.calls[0].method, 'GET');
+  assert.equal(request.calls[0].url, '/v1/clowder/local-auth/capabilities');
+  assert.equal(capabilities.codex.authConfigured, true);
+  assert.equal(capabilities.codex.defaultModel, 'gpt-5.1-codex');
+  assert.equal(capabilities.claude.authConfigured, false);
+  assert.deepEqual(capabilities.claude.diagnostics, ['未找到 Claude Code 登录配置']);
+});
+
+test('native service creates oauth clowder cats with local cli account refs', async () => {
+  const request = makeRequestStub({
+    'POST clowder/cats': {
+      agent: {
+        catId: 'oauth-codex',
+        displayName: 'OAuth Codex',
+        alias: '@oauth-codex',
+        platform: 'codex',
+        accessMode: 'oauth',
+        available: true,
+        connected: true
+      },
+      contact: {
+        connected: true,
+        source: 'runtime-created'
+      }
+    }
+  });
+  const service = createNativeImService({
+    baseUrl: '/v1/',
+    request,
+    getToken: () => 'token'
+  });
+
+  await service.createClowderCat({
+    name: 'OAuth Codex',
+    alias: '@oauth-codex',
+    roleTemplateId: 'engineer',
+    platform: 'codex',
+    accessMode: 'oauth',
+    accountRef: 'user-input-should-not-win',
+    defaultModel: 'should-not-submit',
+    personality: '使用本机 CLI 登录态',
+    capabilities: ['代码生成']
+  });
+
+  assert.equal(request.calls[0].method, 'POST');
+  assert.equal(request.calls[0].url, '/v1/clowder/cats');
+  assert.deepEqual(request.calls[0].data, {
+    name: 'OAuth Codex',
+    alias: '@oauth-codex',
+    roleTemplateId: 'engineer',
+    clientId: 'openai',
+    authType: 'oauth',
+    accountRef: 'codex',
+    personality: '使用本机 CLI 登录态',
+    capabilities: ['代码生成']
+  });
+  assert.equal(Object.prototype.hasOwnProperty.call(request.calls[0].data, 'defaultModel'), false);
+});
+
+test('local oauth capability loader dedupes concurrent probes and force refreshes', async () => {
+  let calls = 0;
+  const loader = createLocalOAuthCapabilityLoader(async () => {
+    calls += 1;
+    await Promise.resolve();
+    return {
+      providers: [
+        { provider: 'codex', authConfigured: true, defaultModel: 'gpt-5-codex' }
+      ]
+    };
+  });
+
+  const [first, second] = await Promise.all([loader.load(), loader.load()]);
+
+  assert.equal(calls, 1);
+  assert.equal(first, second);
+  assert.equal(loader.state.loading, false);
+  assert.equal(loader.state.capabilities.codex.authConfigured, true);
+
+  await loader.load({ force: true });
+
+  assert.equal(calls, 2);
+});
+
+test('local oauth status resolves ready missing error and idle states', () => {
+  const capabilities = {
+    codex: {
+      provider: 'codex',
+      authConfigured: true,
+      defaultModel: 'gpt-5-codex',
+      profile: 'default'
+    },
+    claude: {
+      provider: 'claude',
+      authConfigured: false,
+      diagnostics: ['请先运行 claude login']
+    }
+  };
+
+  assert.deepEqual(resolveLocalOAuthStatus({
+    accessMode: 'api-key',
+    platform: 'codex',
+    capabilities
+  }), {
+    state: 'idle',
+    provider: 'codex',
+    providerLabel: 'Codex',
+    loginCommand: 'codex login',
+    canCreate: true,
+    capability: null,
+    message: '',
+    detail: ''
+  });
+
+  const ready = resolveLocalOAuthStatus({ accessMode: 'oauth', platform: 'codex', capabilities });
+  assert.equal(ready.state, 'ready');
+  assert.equal(ready.canCreate, true);
+  assert.equal(ready.detail, '配置档：default · CLI 默认模型：gpt-5-codex');
+
+  const missing = resolveLocalOAuthStatus({ accessMode: 'oauth', platform: 'claude-code', capabilities });
+  assert.equal(missing.state, 'missing');
+  assert.equal(missing.canCreate, false);
+  assert.equal(missing.message, '请先运行 claude login');
+
+  const error = resolveLocalOAuthStatus({
+    accessMode: 'oauth',
+    platform: 'codex',
+    capabilities: {},
+    error: '探测接口不可用'
+  });
+  assert.equal(error.state, 'error');
+  assert.equal(error.canCreate, false);
 });
 
 test('native service uploads files before returning a public media url', async () => {

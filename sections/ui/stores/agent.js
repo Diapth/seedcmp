@@ -1,6 +1,10 @@
 import { defineStore } from 'pinia';
 import { nativeImService } from '@/services/native-im/service';
 import { normalizeClowderProjectBoard } from '@/services/native-im/project-board';
+import {
+  createLocalOAuthCapabilityLoader,
+  oauthProviderForPlatform
+} from '@/services/native-im/oauth';
 
 const STATIC_AGENT_IDS = new Set([
   'pm-agent',
@@ -42,6 +46,11 @@ export const useAgentStore = defineStore('agent', {
   state: () => ({
     syncState: 'idle',
     nativeError: '',
+    localOAuthCapabilities: {},
+    localOAuthLoading: false,
+    localOAuthError: '',
+    localOAuthLoaded: false,
+    localOAuthInflight: null,
     agents: [
       { id: 'pm-agent', name: 'PM 智能体', alias: '@pm', desc: '项目管理专家，辅助拆解计划与里程碑', avatar: '', status: 'active', creator: 'System', platform: 'claude-code', accessMode: 'oauth', model: 'Claude 3.5 Sonnet', accountRef: 'agenthub-default', apiKey: '', apiUrl: '', customModel: '', systemPrompt: '', roleTemplate: 'general', templateId: 'reviewer', capabilityTags: ['计划', '里程碑'] },
       { id: 'codex', name: 'Codex', alias: '@codex', desc: '代码生成专家，适合快速实现与重构', avatar: '', status: 'active', creator: 'System', platform: 'codex', accessMode: 'api-key', model: 'DeepSeek V3', accountRef: 'openai-prod', apiKey: '', apiUrl: 'https://api.deepseek.com/v1', customModel: '', systemPrompt: '', roleTemplate: 'engineer', templateId: 'engineer', capabilityTags: ['代码生成', '重构'] },
@@ -540,8 +549,52 @@ export const useAgentStore = defineStore('agent', {
         return { agents: [] };
       }
     },
+    async loadLocalOAuthCapabilities(options = {}) {
+      if (this.localOAuthInflight && !options.force) return this.localOAuthInflight;
+      if (this.localOAuthLoaded && !options.force) return this.localOAuthCapabilities;
+      const loader = createLocalOAuthCapabilityLoader(() => nativeImService.getLocalAuthCapabilities());
+      this.localOAuthLoading = true;
+      this.localOAuthError = '';
+      this.localOAuthInflight = loader.load({ force: true })
+        .then((capabilities) => {
+          this.localOAuthCapabilities = capabilities;
+          this.localOAuthLoaded = true;
+          this.localOAuthError = '';
+          return capabilities;
+        })
+        .catch((error) => {
+          this.localOAuthCapabilities = {};
+          this.localOAuthLoaded = false;
+          this.localOAuthError = agentErrorText(error);
+          throw error;
+        })
+        .finally(() => {
+          this.localOAuthLoading = false;
+          this.localOAuthInflight = null;
+        });
+      return this.localOAuthInflight;
+    },
+    resetLocalOAuth() {
+      this.localOAuthCapabilities = {};
+      this.localOAuthLoading = false;
+      this.localOAuthError = '';
+      this.localOAuthLoaded = false;
+      this.localOAuthInflight = null;
+    },
     async createAgent(agent) {
       try {
+        if (agent?.accessMode === 'oauth') {
+          const capabilities = this.localOAuthLoaded
+            ? this.localOAuthCapabilities
+            : await this.loadLocalOAuthCapabilities();
+          const provider = oauthProviderForPlatform(agent.platform);
+          if (capabilities?.[provider]?.authConfigured !== true) {
+            throw {
+              msg: provider === 'claude' ? '未检测到 Claude Code 本机登录' : '未检测到 Codex 本机登录',
+              preventLocalFallback: true
+            };
+          }
+        }
         const created = await nativeImService.createClowderCat({
           ...agent,
           roleTemplateId: agent.roleTemplate || agent.templateId,
@@ -568,6 +621,9 @@ export const useAgentStore = defineStore('agent', {
         return next.id;
       } catch (error) {
         this.nativeError = agentErrorText(error);
+        if (agent?.accessMode === 'oauth' || error?.preventLocalFallback) {
+          throw error;
+        }
         const id = 'agent-' + Date.now().toString();
         this.agents.push({
           ...agent,
