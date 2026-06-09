@@ -529,6 +529,83 @@ test('native service posts ensure project group and updates binding thread', asy
   assert.equal(updated.binding.projectThreadId, 'thread-updated');
 });
 
+test('project group confirmation card upserts and updates idempotently', async () => {
+  const {
+    isProjectGroupConfirmationMessage,
+    upsertProjectGroupConfirmationMessage,
+    updateProjectGroupConfirmationMessage
+  } = await import('../services/native-im/project-group.js');
+  const sourceMessage = {
+    id: 'prompt-029',
+    clientMsgNo: 'client-029',
+    content: '为 ISSUE-029 创建项目群，让 Codex 和 Claude 分工执行'
+  };
+
+  let list = upsertProjectGroupConfirmationMessage([], {
+    sourceMessage,
+    projectName: 'ISSUE-029项目群',
+    coordinator: { id: 'coordinator', name: 'PM' },
+    targetCatIds: ['codex'],
+    workerCatIds: ['codex']
+  });
+  list = upsertProjectGroupConfirmationMessage(list, {
+    sourceMessage,
+    projectName: 'ISSUE-029项目群',
+    coordinator: { id: 'coordinator', name: 'PM' },
+    targetCatIds: ['codex', 'claude'],
+    workerCatIds: ['codex', 'claude']
+  });
+
+  assert.equal(list.length, 1);
+  assert.equal(isProjectGroupConfirmationMessage(list[0]), true);
+  assert.equal(list[0].id, 'project-group-card:prompt-029');
+  assert.equal(list[0].type, 'project_group_confirmation');
+  assert.equal(list[0].projectGroupCard.status, 'pending_confirmation');
+  assert.deepEqual(list[0].projectGroupCard.targetCatIds, ['codex', 'claude']);
+  assert.equal(list[0].metadata.project_group_confirmation, true);
+
+  list = updateProjectGroupConfirmationMessage(list, 'project-group-card:prompt-029', {
+    status: 'created',
+    projectGroupNo: 'g-029',
+    projectGroupName: 'ISSUE-029项目群',
+    projectBindingId: 'binding-029',
+    reused: true
+  });
+
+  assert.equal(list.length, 1);
+  assert.equal(list[0].projectGroupCard.status, 'created');
+  assert.equal(list[0].projectGroupCard.projectGroupNo, 'g-029');
+  assert.equal(list[0].projectGroupCard.reused, true);
+  assert.match(list[0].content, /已复用项目群/);
+});
+
+test('project group confirmation card keeps one retryable failed state', async () => {
+  const {
+    upsertProjectGroupConfirmationMessage,
+    updateProjectGroupConfirmationMessage
+  } = await import('../services/native-im/project-group.js');
+  const sourceMessage = { id: 'prompt-failed', content: '创建项目群并拉 Codex' };
+  let list = upsertProjectGroupConfirmationMessage([], {
+    sourceMessage,
+    projectName: '失败项目群',
+    targetCatIds: ['codex']
+  });
+
+  list = updateProjectGroupConfirmationMessage(list, 'project-group-card:prompt-failed', {
+    status: 'failed',
+    error: { msg: 'sync group cats failed' }
+  });
+  list = updateProjectGroupConfirmationMessage(list, 'project-group-card:prompt-failed', {
+    status: 'failed',
+    error: '再次同步失败'
+  });
+
+  assert.equal(list.length, 1);
+  assert.equal(list[0].projectGroupCard.status, 'failed');
+  assert.equal(list[0].projectGroupCard.error, '再次同步失败');
+  assert.match(list[0].content, /创建失败/);
+});
+
 test('clowder project binding and thread tasks normalize into a group board', () => {
   const board = normalizeClowderProjectBoard({
     binding: {

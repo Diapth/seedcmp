@@ -3,6 +3,11 @@ import { useConversationStore } from '@/stores/conversation';
 import { notifyMessage } from '@/composables/useSystemNotification';
 import { nativeImService } from '@/services/native-im/service';
 import {
+  isProjectGroupConfirmationMessage,
+  updateProjectGroupConfirmationMessage,
+  upsertProjectGroupConfirmationMessage
+} from '@/services/native-im/project-group';
+import {
   conversationSummaryForMessage,
   createClowderMarkdownStreamEvents,
   createClientMsgNo,
@@ -36,6 +41,7 @@ function defaultMsg(overrides = {}) {
 
 function messageSummary(message) {
   if (!isVisibleChatMessage(message)) return '';
+  if (isProjectGroupConfirmationMessage(message)) return message.content || '项目群确认卡';
   if (message.type === 'system') return message.content || '';
   if (message.type === 'image') return '[图片]';
   if (message.type === 'voice') return '[语音]';
@@ -393,6 +399,18 @@ export const useMessageStore = defineStore('message', {
         updateConversationSummary(conversation, latest, readCurrentUser());
       }
       return this.messages[conversationId];
+    },
+    createProjectGroupConfirmation(conversationId, card = {}) {
+      if (!conversationId) return null;
+      this.messages[conversationId] = upsertProjectGroupConfirmationMessage(this.messages[conversationId] || [], card);
+      return this.messages[conversationId].find(isProjectGroupConfirmationMessage) || null;
+    },
+    updateProjectGroupConfirmation(conversationId, cardId, patch = {}) {
+      if (!conversationId || !cardId) return null;
+      this.messages[conversationId] = updateProjectGroupConfirmationMessage(this.messages[conversationId] || [], cardId, patch);
+      return (this.messages[conversationId] || []).find((message) => (
+        message.id === cardId || message.projectGroupCard?.cardId === cardId
+      )) || null;
     },
     startClowderMarkdownStream(conversationId, prompt = '', options = {}) {
       if (!conversationId) return [];
