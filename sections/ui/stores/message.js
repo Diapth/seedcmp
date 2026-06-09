@@ -4,6 +4,16 @@ import { useGroupStore } from '@/stores/group';
 import { notifyMessage } from '@/composables/useSystemNotification';
 import { nativeImService } from '@/services/native-im/service';
 import {
+  deploymentFailedPatch,
+  isDeploymentCardMessage,
+  shouldCreateDeploymentCard,
+  updateDeploymentCardMessage,
+  upsertDeploymentCardMessage,
+  deploymentCardId,
+  normalizeDeploymentRequest,
+  buildDeploymentCardMessage
+} from '@/services/native-im/deployment';
+import {
   buildProjectGroupEnsurePayload,
   isProjectGroupConfirmationMessage,
   projectGroupCreatedPatch,
@@ -45,6 +55,7 @@ function defaultMsg(overrides = {}) {
 
 function messageSummary(message) {
   if (!isVisibleChatMessage(message)) return '';
+  if (isDeploymentCardMessage(message)) return message.content || '部署确认卡';
   if (isProjectGroupConfirmationMessage(message)) return message.content || '项目群确认卡';
   if (message.type === 'system') return message.content || '';
   if (message.type === 'image') return '[图片]';
@@ -93,6 +104,15 @@ function findConversation(convStore, conversationId) {
 
 function cleanCatId(value = '') {
   return String(value || '').trim().replace(/^clowder_cat:/, '');
+}
+
+function firstText(...values) {
+  for (const value of values) {
+    if (value === undefined || value === null) continue;
+    const text = String(value).trim();
+    if (text) return text;
+  }
+  return '';
 }
 
 function matchingAgentsForCatIds(agents = [], catIds = []) {
@@ -437,6 +457,130 @@ export const useMessageStore = defineStore('message', {
       return (this.messages[conversationId] || []).find((message) => (
         message.id === cardId || message.projectGroupCard?.cardId === cardId
       )) || null;
+    },
+    createDeploymentCard(conversationId, input = {}) {
+      if (!conversationId) return null;
+      this.messages[conversationId] = upsertDeploymentCardMessage(this.messages[conversationId] || [], input);
+      return (this.messages[conversationId] || []).find((message) => (
+        isDeploymentCardMessage(message)
+        && message.deploymentCard?.deploymentRequestId === normalizeDeploymentRequest(input.deploymentRequest || input).id
+      )) || null;
+    },
+    updateDeploymentCard(conversationId, cardId, patch = {}) {
+      if (!conversationId || !cardId) return null;
+      this.messages[conversationId] = updateDeploymentCardMessage(this.messages[conversationId] || [], cardId, patch);
+      return (this.messages[conversationId] || []).find((message) => (
+        message.id === cardId || message.deploymentCard?.cardId === cardId || message.deploymentCard?.deploymentRequestId === cardId
+      )) || null;
+    },
+    async createDeploymentCardFromPrompt(conversation = {}, text = '', sourceMessage = {}, options = {}) {
+      const conversationId = conversation?.id || conversation?.conversationId || '';
+      if (!conversationId || sourceMessage?.status === 'failed') return null;
+      if (!shouldCreateDeploymentCard({ conversation, text })) return null;
+      const agent = options.agent || conversation;
+      try {
+        const sourceMessageId = firstText(sourceMessage.messageId, sourceMessage.id, sourceMessage.clientMsgNo);
+        const payload = {
+          channelId: firstText(conversation.channelId, conversation.id),
+          channelType: Number(conversation.channelType || conversation.channel_type || 1),
+          sourceMessageId,
+          cardMessageId: deploymentCardId(sourceMessageId || sourceMessage.clientMsgNo),
+          originalText: String(text || '').trim(),
+          target: options.target || '当前项目',
+          environment: options.environment || 'preview',
+          directCatId: cleanCatId(firstText(agent.directCatId, agent.catId, agent.id, conversation.directCatId, conversation.catId, conversation.id))
+        };
+        Object.keys(payload).forEach((key) => {
+          if (payload[key] === '' || payload[key] === undefined || payload[key] === null) delete payload[key];
+        });
+        const deploymentRequest = await nativeImService.createDeploymentRequest(payload);
+        return this.createDeploymentCard(conversationId, {
+          deploymentRequest,
+          sourceMessage,
+          conversation,
+          agent
+        });
+      } catch (error) {
+        const fallbackId = deploymentCardId(firstText(sourceMessage.messageId, sourceMessage.id, sourceMessage.clientMsgNo, Date.now()));
+        const fallbackMessage = buildDeploymentCardMessage({
+          id: fallbackId.replace(/^deployment-card-/, ''),
+          target: '当前项目',
+          environment: 'preview',
+          missingFields: [],
+          status: 'failed',
+          originalText: text,
+          failureReason: errorText(error)
+        }, { sourceMessage, conversation, agent });
+        this.messages[conversationId] = upsertDeploymentCardMessage(this.messages[conversationId] || [], {
+          deploymentRequest: fallbackMessage.deploymentCard.deploymentRequest,
+          sourceMessage,
+          conversation,
+          agent
+        });
+        return this.updateDeploymentCard(conversationId, fallbackMessage.id, deploymentFailedPatch(error));
+      }
+    },
+    async handleDeploymentAction(conversationId, cardId, action = 'confirm') {
+      const list = this.messages[conversationId] || [];
+      const message = list.find((item) => item.id === cardId || item.deploymentCard?.cardId === cardId);
+      const card = message?.deploymentCard;
+      if (!card) return null;
+      if (['running', 'queued', 'confirmed', 'submitting'].includes(card.status) && action === 'confirm') return message;
+
+      this.updateDeploymentCard(conversationId, cardId, { status: 'submitting', failureReason: '' });
+      try {
+        const response = await nativeImService.sendDeploymentAction({
+          deploymentRequestId: card.deploymentRequestId,
+          channelId: card.directChannelId,
+          channelType: Number(card.directChannelType || 1),
+          action,
+          actionId: `${card.deploymentRequestId}:${action}:${Date.now()}`,
+          cardMessageId: card.cardId,
+          sourceMessageId: card.sourceMessageId,
+          target: card.target === '待确认目标' ? '' : card.target,
+          environment: card.environment === '待确认环境' ? '' : card.environment,
+          directCatId: card.catId
+        });
+        const deploymentRequest = response.deploymentRequest
+          ? response.deploymentRequest
+          : normalizeDeploymentRequest({ ...card.deploymentRequest, status: response.status || (action === 'cancel' ? 'cancelled' : 'queued') });
+        const updated = this.createDeploymentCard(conversationId, {
+          deploymentRequest,
+          sourceMessage: { id: card.sourceMessageId, clientMsgNo: card.sourceClientMsgNo, content: card.originalText },
+          conversation: {
+            id: card.directChannelId,
+            channelId: card.directChannelId,
+            channelType: card.directChannelType,
+            directCatId: card.catId,
+            source: 'clowder',
+            type: 'robot'
+          },
+          agent: { id: card.catId, name: card.catDisplayName }
+        });
+        if (deploymentRequest.id && ['confirmed', 'queued', 'running'].includes(deploymentRequest.status)) {
+          try {
+            const latest = await nativeImService.fetchDeploymentRequest(deploymentRequest.id);
+            return this.createDeploymentCard(conversationId, {
+              deploymentRequest: latest,
+              sourceMessage: { id: card.sourceMessageId, clientMsgNo: card.sourceClientMsgNo, content: card.originalText },
+              conversation: {
+                id: card.directChannelId,
+                channelId: card.directChannelId,
+                channelType: card.directChannelType,
+                directCatId: card.catId,
+                source: 'clowder',
+                type: 'robot'
+              },
+              agent: { id: card.catId, name: card.catDisplayName }
+            });
+          } catch {
+            return updated;
+          }
+        }
+        return updated;
+      } catch (error) {
+        return this.updateDeploymentCard(conversationId, cardId, deploymentFailedPatch(error));
+      }
     },
     async confirmProjectGroupFromCard(conversationId, cardId, options = {}) {
       const list = this.messages[conversationId] || [];

@@ -90,6 +90,9 @@
             @project-group-cancel="handleProjectGroupCancel"
             @project-group-retry="handleProjectGroupConfirm"
             @project-group-open="handleProjectGroupOpen"
+            @deployment-confirm="handleDeploymentConfirm"
+            @deployment-cancel="handleDeploymentCancel"
+            @deployment-retry="handleDeploymentConfirm"
           />
         </view>
 
@@ -325,6 +328,9 @@ import {
   buildProjectGroupConfirmationInput,
   shouldCreateProjectGroupConfirmation
 } from '@/services/native-im/project-group';
+import {
+  shouldCreateDeploymentCard as shouldCreateDeploymentCardMessage
+} from '@/services/native-im/deployment';
 
 const { isDesktop } = useResponsiveLayout();
 const appStore = useAppStore();
@@ -635,6 +641,7 @@ async function handleSendMessage({ type, content, fileName, fileSize, fileSizeBy
   const localMessage = await sendPromise;
   if (type === 'text') {
     maybeCreateProjectGroupCard(conversation, content, localMessage);
+    await maybeCreateDeploymentCard(conversation, content, localMessage);
   }
   if (type === 'text' && shouldStartLocalClowderStream(conversation)) {
     messageStore.startClowderMarkdownStream(conversation.id, content, {
@@ -656,6 +663,13 @@ function maybeCreateProjectGroupCard(conversation, text, sourceMessage) {
     currentUser: appStore.currentUser || {},
     availableAgents: agentStore.agents
   }));
+}
+
+async function maybeCreateDeploymentCard(conversation, text, sourceMessage) {
+  if (!conversation || !text || sourceMessage?.status === 'failed') return null;
+  if (!shouldCreateDeploymentCardMessage({ conversation, text })) return null;
+  const agent = resolveAgentForConversation(conversation) || conversation;
+  return messageStore.createDeploymentCardFromPrompt(conversation, text, sourceMessage, { agent });
 }
 
 function projectGroupCardMessageId(payload = {}) {
@@ -688,6 +702,25 @@ function handleProjectGroupOpen(payload = {}) {
   }
   convStore.setActiveId(groupId);
   syncActiveMessages({ silent: true });
+}
+
+function deploymentCardMessageId(payload = {}) {
+  return payload.message?.id || payload.card?.cardId || payload.message?.deploymentCard?.cardId || '';
+}
+
+async function handleDeploymentConfirm(payload = {}) {
+  const cardId = deploymentCardMessageId(payload);
+  if (!cardId) return;
+  const message = await messageStore.handleDeploymentAction(convStore.activeId, cardId, 'confirm');
+  if (message?.deploymentCard?.status === 'failed') {
+    uni.showToast({ title: message.deploymentCard.failureReason || '部署失败', icon: 'none' });
+  }
+}
+
+async function handleDeploymentCancel(payload = {}) {
+  const cardId = deploymentCardMessageId(payload);
+  if (!cardId) return;
+  await messageStore.handleDeploymentAction(convStore.activeId, cardId, 'cancel');
 }
 
 function handleDraftChange(draftVal) {

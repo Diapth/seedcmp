@@ -187,6 +187,39 @@ export function upsertDeploymentCardMessage(list = [], input = {}) {
   return next;
 }
 
+export function updateDeploymentCardMessage(list = [], cardId = '', patch = {}) {
+  const id = String(cardId || '').trim();
+  if (!id) return list;
+  return list.map((message) => {
+    if (message.id !== id && message.deploymentCard?.cardId !== id && message.deploymentCard?.deploymentRequestId !== id) {
+      return message;
+    }
+    const mergedCard = {
+      ...(message.deploymentCard || {}),
+      ...patch,
+      cardId: message.deploymentCard?.cardId || id,
+      id: message.deploymentCard?.id || id,
+      status: patch.status || message.deploymentCard?.status || 'pending_confirmation',
+      downloadUrl: patch.downloadUrl || message.deploymentCard?.downloadUrl || '',
+      previewUrl: patch.previewUrl || message.deploymentCard?.previewUrl || '',
+      failureReason: firstText(patch.failureReason, patch.error, message.deploymentCard?.failureReason),
+      updatedAt: patch.updatedAt || Date.now()
+    };
+    mergedCard.statusLabel = deploymentStatusLabel(mergedCard.status);
+    return {
+      ...message,
+      status: 'success',
+      content: deploymentCardSummary(mergedCard),
+      deploymentCard: mergedCard,
+      metadata: {
+        ...(message.metadata || {}),
+        deployment_card: true,
+        deploymentCard: mergedCard
+      }
+    };
+  });
+}
+
 export function deploymentFailedPatch(error = '') {
   return {
     status: 'failed',

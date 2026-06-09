@@ -56,6 +56,7 @@ import {
   buildDeploymentCardMessage,
   isDeploymentCardMessage,
   shouldCreateDeploymentCard,
+  updateDeploymentCardMessage,
   upsertDeploymentCardMessage
 } from '../services/native-im/deployment.js';
 
@@ -690,6 +691,37 @@ test('deployment card helper upserts state and keeps preview urls', () => {
     agent: { id: 'codex', name: 'Codex' }
   });
   assert.equal(cardMessage.metadata.deployment_card, true);
+});
+
+test('deployment card helper updates running and terminal states by card id', () => {
+  const request = {
+    id: 'deploy-req-update',
+    target: 'demo-app',
+    environment: 'preview',
+    missingFields: [],
+    status: 'pending_confirmation',
+    downloadUrl: 'http://localhost:3004/api/deployments/job-update/download'
+  };
+  let list = upsertDeploymentCardMessage([], {
+    deploymentRequest: request,
+    sourceMessage: { id: 'msg-update', content: '部署 demo-app' },
+    conversation: { channelType: 1 },
+    agent: { id: 'codex', name: 'Codex' }
+  });
+
+  list = updateDeploymentCardMessage(list, 'deployment-card-deploy-req-update', { status: 'running' });
+  assert.equal(list[0].deploymentCard.status, 'running');
+  assert.equal(list[0].deploymentCard.statusLabel, '部署中');
+  assert.equal(list[0].deploymentCard.downloadUrl, 'http://localhost:3004/api/deployments/job-update/download');
+
+  list = updateDeploymentCardMessage(list, 'deployment-card-deploy-req-update', {
+    status: 'succeeded',
+    previewUrl: 'http://localhost:3004/api/deployments/job-update/preview'
+  });
+  assert.equal(list[0].deploymentCard.status, 'succeeded');
+  assert.equal(list[0].deploymentCard.statusLabel, '部署完成');
+  assert.equal(list[0].deploymentCard.previewUrl, 'http://localhost:3004/api/deployments/job-update/preview');
+  assert.match(list[0].content, /部署完成/);
 });
 
 test('skill catalog preview does not assign every catalog skill to every agent', () => {

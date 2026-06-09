@@ -69,7 +69,21 @@
           @longpress="handleLongPress"
         >
           <view
-            v-if="data.type === 'project_group_confirmation'"
+            v-if="data.type === 'deployment_card'"
+            class="bubble-deployment-card"
+          >
+            <DeploymentCard
+              :card="data.deploymentCard || {}"
+              :message="data"
+              @confirm="$emit('deployment-confirm', $event)"
+              @cancel="$emit('deployment-cancel', $event)"
+              @retry="$emit('deployment-retry', $event)"
+              @layout-change="$emit('layout-change')"
+            />
+          </view>
+
+          <view
+            v-else-if="data.type === 'project_group_confirmation'"
             class="bubble-project-card"
           >
             <CoordinatorProjectGroupCard
@@ -166,6 +180,7 @@ import FileCard from './FileCard.vue';
 import VoiceCard from './VoiceCard.vue';
 import MessageReactions from './MessageReactions.vue';
 import CoordinatorProjectGroupCard from './CoordinatorProjectGroupCard.vue';
+import DeploymentCard from './DeploymentCard.vue';
 import {
   isSelfSender,
   resolveSelfAvatar,
@@ -198,7 +213,11 @@ const emit = defineEmits([
   'project-group-confirm',
   'project-group-cancel',
   'project-group-retry',
-  'project-group-open'
+  'project-group-open',
+  'deployment-confirm',
+  'deployment-cancel',
+  'deployment-retry',
+  'layout-change'
 ]);
 
 const appStore = useAppStore();
@@ -496,10 +515,19 @@ function openLightbox(images, index) {
 .bubble-file-only.bubble-me,
 .bubble-voice-only.bubble-me,
 .bubble-image-only.bubble-me,
-.bubble-project_group_confirmation.bubble-me {
+.bubble-project_group_confirmation.bubble-me,
+.bubble-deployment_card.bubble-me {
   background-color: transparent !important;
 }
 
+.bubble-deployment_card {
+  background-color: transparent !important;
+  border: none !important;
+  padding: 0 !important;
+  box-shadow: none !important;
+}
+
+.bubble-deployment-card,
 .bubble-project-card {
   max-width: 100%;
 }

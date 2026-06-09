@@ -3,6 +3,7 @@
     scroll-y 
     class="message-list-scroll"
     :scroll-into-view="scrollToId"
+    :scroll-top="scrollTop"
     scroll-with-animation
   >
     <view class="message-list-inner">
@@ -27,6 +28,10 @@
           @project-group-cancel="$emit('project-group-cancel', $event)"
           @project-group-retry="$emit('project-group-retry', $event)"
           @project-group-open="$emit('project-group-open', $event)"
+          @deployment-confirm="$emit('deployment-confirm', $event)"
+          @deployment-cancel="$emit('deployment-cancel', $event)"
+          @deployment-retry="$emit('deployment-retry', $event)"
+          @layout-change="scrollToBottom"
         />
       </template>
       <!-- Bottom Anchor to auto scroll to -->
@@ -69,10 +74,14 @@ defineEmits([
   'project-group-confirm',
   'project-group-cancel',
   'project-group-retry',
-  'project-group-open'
+  'project-group-open',
+  'deployment-confirm',
+  'deployment-cancel',
+  'deployment-retry'
 ]);
 
 const scrollToId = ref('');
+const scrollTop = ref(0);
 let scrollTimer = null;
 let disposed = false;
 
@@ -94,6 +103,7 @@ function scrollToBottom() {
     scrollToId.value = '';
     scrollTimer = setTimeout(() => {
       if (disposed) return;
+      scrollTop.value = scrollTop.value >= 999999 ? 999998 : 999999;
       scrollToId.value = 'bottom-anchor';
       scrollTimer = null;
     }, 150);
@@ -151,5 +161,15 @@ function displayTime(msg) {
 .bottom-anchor-element {
   height: 1px;
   width: 100%;
+}
+
+@media (max-width: 768px) {
+  .message-list-inner {
+    padding-bottom: 118px;
+  }
+
+  .bottom-anchor-element {
+    height: 8px;
+  }
 }
 </style>
