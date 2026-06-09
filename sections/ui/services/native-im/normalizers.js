@@ -256,9 +256,24 @@ function normalizeStreamState(content = {}) {
   );
   if (!streamKey) return {};
   const phase = ['placeholder', 'chunk', 'final', 'cleanup'].includes(state) ? state : 'chunk';
+  const targetMessageId = firstText(
+    source.targetMessageId,
+    source.target_message_id,
+    source.promptMessageId,
+    source.prompt_message_id,
+    source.inReplyTo,
+    source.in_reply_to,
+    content.targetMessageId,
+    content.target_message_id,
+    content.promptMessageId,
+    content.prompt_message_id,
+    content.inReplyTo,
+    content.in_reply_to
+  );
   return {
     streamKey,
     streamPhase: phase,
+    ...(targetMessageId ? { targetMessageId } : {}),
     streaming: phase === 'placeholder' || phase === 'chunk',
     renderMode: 'markdown',
     isMarkdown: true

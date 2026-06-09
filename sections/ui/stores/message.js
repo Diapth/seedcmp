@@ -30,6 +30,8 @@ import {
   isClowderDirectCatConversation,
   isVisibleChatMessage,
   isSelfSender,
+  applyAgentPendingFeedbackIntoList,
+  clearAgentPendingFeedbackFromList,
   mergeNativeMessageIntoList,
   mergeSyncedMessagesPreservingLocalContext,
   mergeAgentReplyEventIntoList,
@@ -145,6 +147,41 @@ function rememberPromptContext(conversationId, message, currentUser, conversatio
 function readPromptContext(conversationId, currentUser, conversation) {
   if (!conversationId || !shouldCacheClowderPrompt(conversation)) return [];
   return readClowderPromptContext(storageRuntime(), conversationId, currentUser);
+}
+
+function messageTargetId(message = {}) {
+  return firstText(message.messageId, message.id, message.clientMsgNo, message.client_msg_no);
+}
+
+function messageTargetIds(message = {}) {
+  return new Set([
+    message.messageId,
+    message.id,
+    message.clientMsgNo,
+    message.client_msg_no
+  ].map(firstText).filter(Boolean));
+}
+
+function agentFeedbackId(agent = {}, conversation = {}) {
+  const id = firstText(
+    agent.directCatId,
+    agent.direct_cat_id,
+    agent.catId,
+    agent.cat_id,
+    agent.agentId,
+    agent.agent_id,
+    agent.id,
+    agent.uid,
+    conversation.directCatId,
+    conversation.direct_cat_id,
+    conversation.catId,
+    conversation.cat_id,
+    resolveClowderDirectCatId(conversation),
+    conversation.id,
+    conversation.channelId,
+    'clowder'
+  );
+  return cleanCatId(id);
 }
 
 export const useMessageStore = defineStore('message', {
@@ -344,6 +381,12 @@ export const useMessageStore = defineStore('message', {
           sentMessage,
           { currentUser, conversation }
         );
+        if (sentMessage.status === 'success' && isClowderDirectCatConversation(routeContext)) {
+          this.startAgentPendingFeedback(conversationId, sentMessage, {
+            id: agentFeedbackId(routeContext, routeContext),
+            name: routeContext.name || 'Clowder AI'
+          });
+        }
       } catch (error) {
         if (shouldKeepLocalSendSuccess(error, conversation)) {
           local.status = 'success';
@@ -356,6 +399,32 @@ export const useMessageStore = defineStore('message', {
         }
       }
       return local;
+    },
+    startAgentPendingFeedback(conversationId, sourceMessage = {}, agent = {}, options = {}) {
+      if (!conversationId || !sourceMessage || sourceMessage.status === 'failed') return null;
+      const targetMessageId = messageTargetId(sourceMessage);
+      if (!targetMessageId) return null;
+      const conversation = findConversation(useConversationStore(), conversationId) || {};
+      const agentId = agentFeedbackId(agent, conversation);
+      const streamKey = firstText(options.streamKey, `pending:${conversationId}:${targetMessageId}:${agentId}`);
+      this.messages[conversationId] = applyAgentPendingFeedbackIntoList(this.messages[conversationId] || [], {
+        targetMessageId,
+        agentId,
+        emoji: options.emoji || '👀',
+        streamKey,
+        expiresAt: options.expiresAt || Date.now() + Number(options.timeoutMs || 60000)
+      });
+      return (this.messages[conversationId] || []).find((message) => (
+        messageTargetIds(message).has(targetMessageId)
+      )) || null;
+    },
+    clearAgentPendingFeedback(conversationId, targetMessageId, agentId = '') {
+      if (!conversationId || !targetMessageId) return null;
+      this.messages[conversationId] = clearAgentPendingFeedbackFromList(this.messages[conversationId] || [], {
+        targetMessageId,
+        agentId
+      });
+      return (this.messages[conversationId] || []).find((message) => messageTargetIds(message).has(targetMessageId)) || null;
     },
     async syncNativeMessages(conversationOrId, options = {}) {
       const convStore = useConversationStore();

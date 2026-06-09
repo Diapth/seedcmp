@@ -640,6 +640,7 @@ async function handleSendMessage({ type, content, fileName, fileSize, fileSizeBy
   }, sender);
   const localMessage = await sendPromise;
   if (type === 'text') {
+    maybeStartAgentPendingFeedback(conversation, localMessage, extra.mentions || []);
     maybeCreateProjectGroupCard(conversation, content, localMessage);
     await maybeCreateDeploymentCard(conversation, content, localMessage);
   }
@@ -670,6 +671,27 @@ async function maybeCreateDeploymentCard(conversation, text, sourceMessage) {
   if (!shouldCreateDeploymentCardMessage({ conversation, text })) return null;
   const agent = resolveAgentForConversation(conversation) || conversation;
   return messageStore.createDeploymentCardFromPrompt(conversation, text, sourceMessage, { agent });
+}
+
+function maybeStartAgentPendingFeedback(conversation, sourceMessage, mentions = []) {
+  if (!conversation || !sourceMessage || sourceMessage.status === 'failed') return;
+  if (conversation.type !== 'group' || !mentions.length) return;
+  const targetId = sourceMessage.messageId || sourceMessage.id || sourceMessage.clientMsgNo;
+  if (!targetId) return;
+  const members = convStore.groupMembers(conversation.id);
+  const mentionedAgents = mentions
+    .map((mention) => members.find((member) => member.id === mention.userId || member.uid === mention.userId))
+    .map((member) => resolveAgentForMember(member) || (member?.isAgent ? member : null))
+    .filter(Boolean);
+  const uniqueAgents = mentionedAgents.filter((agent, index, list) => {
+    const id = agent.id || agent.uid || agent.agentId || agent.agent_id || agent.name;
+    return id && list.findIndex((item) => (item.id || item.uid || item.agentId || item.agent_id || item.name) === id) === index;
+  });
+  uniqueAgents.forEach((agent) => {
+    messageStore.startAgentPendingFeedback(conversation.id, sourceMessage, agent, {
+      streamKey: `pending:${conversation.id}:${targetId}`
+    });
+  });
 }
 
 function projectGroupCardMessageId(payload = {}) {

@@ -2185,6 +2185,102 @@ test('agent placeholder ack adds reaction to user prompt instead of visible thin
   assert.deepEqual(acknowledged[0].reactions, [{ emoji: '👀', userIds: ['clowder:opus'], count: 1 }]);
 });
 
+test('local agent pending feedback is scoped and cleared by first reply chunk', () => {
+  assert.equal(typeof messageState.applyAgentPendingFeedbackIntoList, 'function');
+  assert.equal(typeof messageState.clearAgentPendingFeedbackFromList, 'function');
+  const userPrompt = {
+    id: 'prompt-pending-1',
+    clientMsgNo: 'prompt-pending-client-1',
+    senderId: 'u1',
+    senderName: '我',
+    content: '请开始分析',
+    type: 'text',
+    status: 'success',
+    time: 1000,
+    reactions: [
+      { emoji: '👍', userIds: ['reviewer'], count: 1 }
+    ]
+  };
+
+  const pending = messageState.applyAgentPendingFeedbackIntoList([userPrompt], {
+    targetMessageId: 'prompt-pending-client-1',
+    agentId: 'clowder:opus',
+    emoji: '👀',
+    streamKey: 'pending:prompt-pending-client-1'
+  });
+
+  assert.equal(pending.length, 1);
+  assert.deepEqual(pending[0].reactions, [
+    { emoji: '👍', userIds: ['reviewer'], count: 1 },
+    {
+      emoji: '👀',
+      userIds: ['clowder:opus'],
+      count: 1,
+      kind: 'agent_pending',
+      streamKey: 'pending:prompt-pending-client-1',
+      localOnly: true
+    }
+  ]);
+
+  const answered = messageState.mergeAgentReplyEventIntoList(pending, {
+    streamKey: 'stream-pending-1',
+    phase: 'chunk',
+    targetMessageId: 'prompt-pending-client-1',
+    delta: '收到，开始处理。',
+    senderId: 'clowder:opus',
+    senderName: 'Opus'
+  });
+
+  assert.equal(answered.length, 2);
+  assert.deepEqual(answered[0].reactions, [{ emoji: '👍', userIds: ['reviewer'], count: 1 }]);
+  assert.equal(answered[1].id, 'stream-pending-1');
+  assert.equal(answered[1].content, '收到，开始处理。');
+});
+
+test('native clowder reply chunk clears local pending feedback by target message id', () => {
+  const userPrompt = {
+    id: 'prompt-native-pending-1',
+    messageId: 'prompt-native-pending-1',
+    clientMsgNo: 'prompt-native-client-1',
+    senderId: 'u1',
+    senderName: '我',
+    content: '请开始分析',
+    type: 'text',
+    status: 'success',
+    time: 1000,
+    reactions: []
+  };
+  const pending = messageState.applyAgentPendingFeedbackIntoList([userPrompt], {
+    targetMessageId: 'prompt-native-pending-1',
+    agentId: 'opus',
+    streamKey: 'pending:prompt-native-pending-1'
+  });
+  const chunk = normalizeMessage({
+    message_id: 'stream-native-pending-1',
+    from_uid: 'clowder_cat:opus',
+    payload: JSON.stringify({
+      type: 1000,
+      event: 'clowder_stream',
+      stream_key: 'stream-native-pending-1',
+      phase: 'chunk',
+      target_message_id: 'prompt-native-pending-1',
+      delta: '收到，开始处理。',
+      markdown: true
+    }),
+    timestamp: 2
+  });
+
+  const merged = messageState.mergeNativeMessageIntoList(pending, chunk, {
+    currentUser: { id: 'u1' },
+    conversation: { id: 'clowder_cat:opus', type: 'robot', source: 'clowder' }
+  });
+
+  assert.equal(chunk.targetMessageId, 'prompt-native-pending-1');
+  assert.deepEqual(merged[0].reactions, []);
+  assert.equal(merged[1].id, 'stream-native-pending-1');
+  assert.equal(merged[1].content, '收到，开始处理。');
+});
+
 test('native clowder placeholder without target reacts to latest self prompt and stays hidden', () => {
   const userPrompt = {
     id: 'prompt-real-ack-1',

@@ -270,7 +270,7 @@ export function mergeAgentReplyEventIntoList(messages = [], event = {}) {
   const normalized = normalizeAgentReplyEvent(event);
   if (!normalized.streamKey) return [...messages];
 
-  const next = [...messages];
+  let next = [...messages];
   if (normalized.phase === 'placeholder') {
     if (normalized.targetMessageId) {
       return applyReactionEventIntoList(next, {
@@ -280,6 +280,12 @@ export function mergeAgentReplyEventIntoList(messages = [], event = {}) {
       });
     }
     return next;
+  }
+  if (normalized.targetMessageId) {
+    next = clearAgentPendingFeedbackFromList(next, {
+      targetMessageId: normalized.targetMessageId,
+      agentId: normalized.senderId
+    });
   }
 
   const index = next.findIndex((message) => {
@@ -588,19 +594,22 @@ function normalizeReactionEvent(event = {}) {
   return { targetMessageId, emoji, userId };
 }
 
+function messageIdentityKeys(message = {}) {
+  return new Set([
+    message.id,
+    message.messageId,
+    message.messageID,
+    message.message_id,
+    message.clientMsgNo,
+    message.client_msg_no
+  ].map(clean).filter(Boolean));
+}
+
 export function applyReactionEventIntoList(messages = [], event = {}) {
   const normalized = normalizeReactionEvent(event);
   if (!normalized.targetMessageId || !normalized.emoji || !normalized.userId) return [...messages];
   return messages.map((message) => {
-    const keys = new Set([
-      message.id,
-      message.messageId,
-      message.messageID,
-      message.message_id,
-      message.clientMsgNo,
-      message.client_msg_no
-    ].map(clean).filter(Boolean));
-    if (!keys.has(normalized.targetMessageId)) return message;
+    if (!messageIdentityKeys(message).has(normalized.targetMessageId)) return message;
 
     const reactions = Array.isArray(message.reactions)
       ? message.reactions.map((reaction) => ({
@@ -618,6 +627,97 @@ export function applyReactionEventIntoList(messages = [], event = {}) {
       reactions.push({ emoji: normalized.emoji, userIds: [normalized.userId], count: 1 });
     }
     return { ...message, reactions };
+  });
+}
+
+function normalizeAgentPendingFeedback(event = {}) {
+  const targetMessageId = firstNonEmpty(
+    event.targetMessageId,
+    event.target_message_id,
+    event.messageId,
+    event.message_id,
+    event.clientMsgNo,
+    event.client_msg_no
+  );
+  const agentId = firstNonEmpty(event.agentId, event.agent_id, event.senderId, event.sender_id, event.userId, event.user_id, 'clowder');
+  const streamKey = firstNonEmpty(event.streamKey, event.stream_key, targetMessageId ? `pending:${targetMessageId}` : '');
+  const emoji = firstNonEmpty(event.emoji, event.reaction, '👀');
+  const expiresAt = safeNumber(event.expiresAt ?? event.expires_at, 0);
+  return {
+    targetMessageId,
+    agentId,
+    streamKey,
+    emoji,
+    ...(expiresAt ? { expiresAt } : {})
+  };
+}
+
+function comparableAgentId(value = '') {
+  const id = clean(value);
+  return getClowderCatIdFromContactId(id) || id;
+}
+
+export function applyAgentPendingFeedbackIntoList(messages = [], event = {}) {
+  const pending = normalizeAgentPendingFeedback(event);
+  if (!pending.targetMessageId || !pending.agentId || !pending.emoji) return [...messages];
+  return messages.map((message) => {
+    if (!messageIdentityKeys(message).has(pending.targetMessageId)) return message;
+    const reactions = Array.isArray(message.reactions)
+      ? message.reactions.map((reaction) => ({
+          ...reaction,
+          userIds: Array.isArray(reaction.userIds) ? [...reaction.userIds] : []
+        }))
+      : [];
+    const existing = reactions.find((reaction) => (
+      reaction.kind === 'agent_pending'
+      && reaction.localOnly === true
+      && reaction.streamKey === pending.streamKey
+    ));
+    if (existing) {
+      if (!existing.userIds.some((uid) => comparableAgentId(uid) === comparableAgentId(pending.agentId))) {
+        existing.userIds.push(pending.agentId);
+      }
+      existing.count = existing.userIds.length;
+      existing.emoji = pending.emoji;
+      if (pending.expiresAt) existing.expiresAt = pending.expiresAt;
+    } else {
+      reactions.push({
+        emoji: pending.emoji,
+        userIds: [pending.agentId],
+        count: 1,
+        kind: 'agent_pending',
+        streamKey: pending.streamKey,
+        localOnly: true,
+        ...(pending.expiresAt ? { expiresAt: pending.expiresAt } : {})
+      });
+    }
+    return { ...message, reactions };
+  });
+}
+
+export function clearAgentPendingFeedbackFromList(messages = [], event = {}) {
+  const pending = normalizeAgentPendingFeedback(event);
+  if (!pending.targetMessageId) return [...messages];
+  return messages.map((message) => {
+    if (!messageIdentityKeys(message).has(pending.targetMessageId)) return message;
+    const reactions = Array.isArray(message.reactions) ? message.reactions : [];
+    const nextReactions = reactions.flatMap((reaction) => {
+      const isPending = reaction?.kind === 'agent_pending' || reaction?.localOnly === true;
+      if (!isPending) return [reaction];
+      const userIds = Array.isArray(reaction.userIds) ? [...reaction.userIds] : [];
+      const shouldClear = !pending.agentId || userIds.some((uid) => comparableAgentId(uid) === comparableAgentId(pending.agentId));
+      if (!shouldClear) return [reaction];
+      const remainingUserIds = pending.agentId
+        ? userIds.filter((uid) => comparableAgentId(uid) !== comparableAgentId(pending.agentId))
+        : [];
+      if (!remainingUserIds.length) return [];
+      return [{
+        ...reaction,
+        userIds: remainingUserIds,
+        count: remainingUserIds.length
+      }];
+    });
+    return { ...message, reactions: nextReactions };
   });
 }
 
@@ -715,6 +815,12 @@ export function mergeNativeMessageIntoList(messages = [], incoming = {}, options
       }
       return applyReactionToLatestSelfPrompt(messages, enrichedIncoming, options);
     }
+    const baseMessages = enrichedIncoming.targetMessageId
+      ? clearAgentPendingFeedbackFromList(messages, {
+          targetMessageId: enrichedIncoming.targetMessageId,
+          agentId: firstNonEmpty(enrichedIncoming.senderId, 'clowder')
+        })
+      : messages;
     const isFinal = phase === 'final';
     const streamMessage = {
       ...enrichedIncoming,
@@ -729,7 +835,7 @@ export function mergeNativeMessageIntoList(messages = [], incoming = {}, options
       source: enrichedIncoming.source || 'clowder'
     };
     const key = messageIdentityKey(streamMessage);
-    const next = [...messages];
+    const next = [...baseMessages];
     const streamIndex = next.findIndex((message) => messageIdentityKey(message) === key);
     if (streamIndex >= 0) {
       const incomingContent = streamMessage.content || '';
