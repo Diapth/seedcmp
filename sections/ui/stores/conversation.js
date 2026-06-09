@@ -388,12 +388,56 @@ export const useConversationStore = defineStore('conversation', {
       this.isHidden = this.isHidden.filter((x) => x !== id);
       if (this.activeId === id) this.activeId = '';
     },
-    setAnnouncement(convId, text) {
+    setAnnouncement(convId, text, options = {}) {
       this.announcements[convId] = {
         text,
-        publisherId: 'me',
-        publishTime: Date.now()
+        publisherId: options.publisherId || 'me',
+        publishTime: options.publishTime || Date.now()
       };
+      const conversation = this.conversations.find((item) => item.id === convId || item.channelId === convId);
+      if (conversation) conversation.announcement = text;
+    },
+    async updateGroupAnnouncement(conversationOrId, text, options = {}) {
+      const conversation = typeof conversationOrId === 'string'
+        ? this.conversations.find((item) => item.id === conversationOrId || item.channelId === conversationOrId)
+        : conversationOrId;
+      if (!conversation) return null;
+      const identity = this.getConversationIdentity(conversation);
+      const groupId = identity.channelId || conversation.id;
+      const previous = {
+        announcement: conversation.announcement || '',
+        local: this.announcements[conversation.id]?.text || ''
+      };
+      const nextText = String(text || '');
+      this.setAnnouncement(conversation.id, nextText, {
+        publisherId: options.publisherId,
+        publishTime: options.publishTime
+      });
+      if (groupId !== conversation.id) {
+        this.setAnnouncement(groupId, nextText, {
+          publisherId: options.publisherId,
+          publishTime: options.publishTime
+        });
+      }
+      if (options.persist === false || !groupId) return conversation;
+      try {
+        await nativeImService.updateGroupProfile(groupId, { notice: nextText });
+        return conversation;
+      } catch (error) {
+        this.setAnnouncement(conversation.id, previous.local || previous.announcement, {
+          publisherId: options.publisherId,
+          publishTime: Date.now()
+        });
+        if (groupId !== conversation.id) {
+          this.setAnnouncement(groupId, previous.local || previous.announcement, {
+            publisherId: options.publisherId,
+            publishTime: Date.now()
+          });
+        }
+        this.syncError = errorText(error);
+        if (!options.silent) throw error;
+        return conversation;
+      }
     },
     updateMemberRole(convId, memberId, role) {
       const list = this.members[convId];

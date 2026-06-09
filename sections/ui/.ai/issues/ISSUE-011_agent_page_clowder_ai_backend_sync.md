@@ -1,6 +1,6 @@
 # [ISSUE-011] 智能体页面接入后端 Clowder AI 并验收多智能体群聊与看板
 
-**状态**：Open
+**状态**：Resolved
 **创建时间**：2026-06-08
 **标签**：feature, clowder, agent, streaming, multi-account, kanban
 
@@ -130,4 +130,20 @@ sections/im_web/apps/chat/src/components/MessageList.vue
 
 ## 关闭备注
 
-关闭前需附上直聊流式回复、多账号群聊多智能体、智能体新增可使用、看板多账号同步四类证据，并记录所使用的后端 Clowder AI 环境、账号、群聊和智能体样本。
+已修复并复测：
+
+- 智能体目录：`sections/ui/stores/agent.js` 通过 `nativeImService.fetchClowderCatDirectory()` 同步 Clowder cats/templates/skills，保留本地兜底但真实后端优先。
+- 智能体创建：`agentStore.createAgent()` 调用 `POST /v1/clowder/cats` 创建后端 cat/contact，创建成功后直聊会话携带 `directCatId/source=clowder`。
+- 智能体直聊：`messageStore.sendNativeMessage()` 对 Clowder direct cat 会话走 `POST /v1/clowder/conversation/message`。
+- 项目群看板：新增 `sections/ui/services/native-im/project-board.js`，并在右侧工作区进入群聊时同步 `/v1/clowder/project-groups/active` 与 `/v1/clowder/thread/:threadId/tasks`，动态生成真实 group board。
+- 单测：`cd sections/ui && npm run test:native-im`，结果通过。
+- 构建：`cd sections/ui && npm run build:h5`，结果通过。
+- 浏览器可视化：
+  - `ISSUE-021-custom-agent-runtime` 覆盖自定义智能体创建、直聊打开、消息路由。
+  - `ISSUE-011-agent-clowder-sync` 覆盖动态项目群看板入口、thread tasks 展示、移动端项目群聊天加载。
+- 截图：
+  - `sections/ui/.ai/tests-e2e/ISSUE-011-agent-clowder-sync/desktop-01-project-group-info-board-entry.png`
+  - `sections/ui/.ai/tests-e2e/ISSUE-011-agent-clowder-sync/desktop-02-project-board-tasks.png`
+  - `sections/ui/.ai/tests-e2e/ISSUE-011-agent-clowder-sync/mobile-01-project-group-chat-loaded.png`
+  - `sections/ui/.ai/tests-e2e/ISSUE-021-custom-agent-runtime/desktop-03-direct-message-routed.png`
+  - `sections/ui/.ai/tests-e2e/ISSUE-021-custom-agent-runtime/mobile-03-direct-message-routed.png`

@@ -152,6 +152,8 @@ URL: http://localhost:5173/#/pages/chat/index
 截图:
 /tmp/issue-012-014-03-streaming-markdown.png
 /tmp/issue-012-014-04-final-history-preserved.png
+sections/ui/.ai/tests-e2e/ISSUE-012-014-agent-history-reaction-stream/03-streaming-markdown-merged.png
+sections/ui/.ai/tests-e2e/ISSUE-012-014-agent-history-reaction-stream/04-final-history-preserved.png
 ```
 
 验证结果：Markdown 流式内容可见，final 后只保留一条智能体回复；脚本内同时验证真实 stream delta `真实` + `流式` 合并为 `真实流式`。受限于本地未接真实 Clowder/TangSeng 后端，本次浏览器验证使用本地可控事件注入。

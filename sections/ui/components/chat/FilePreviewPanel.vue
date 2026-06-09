@@ -669,6 +669,7 @@ const normalizedFile = computed(() => {
 
   return {
     id: source.id || '',
+    conversationId: source.conversationId || source.channelId || source.channel_id || '',
     name,
     size: source.size || source.fileSize || '未知大小',
     type: detectedType === 'file' ? getTypeFromName(name) : detectedType,
@@ -2456,6 +2457,7 @@ function quoteSelectedPreviewText() {
 
   emit('quote-selection', {
     id: `file-selection-${normalizedFile.value.id || normalizedFile.value.name || Date.now()}`,
+    conversationId: normalizedFile.value.conversationId,
     senderName: normalizedFile.value.name || '文件片段',
     contentPreview: summarizeSelectedPreviewText(selectedText),
     fileName: normalizedFile.value.name || '',

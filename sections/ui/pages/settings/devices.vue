@@ -12,6 +12,13 @@
       
       <!-- List Scroll -->
       <scroll-view scroll-y class="devices-scroll flex-1">
+        <view v-if="settingsStore.deviceSyncState === 'syncing'" class="sync-state">
+          <text class="sync-state-text">正在同步设备...</text>
+        </view>
+        <view v-else-if="settingsStore.deviceSyncError" class="sync-state warning">
+          <text class="sync-state-text">{{ settingsStore.deviceSyncError }}</text>
+        </view>
+
         <view class="list-container flex-column" v-if="settingsStore.devices.length > 0">
           <view 
             v-for="item in settingsStore.devices" 
@@ -34,10 +41,11 @@
             
             <button 
               class="btn-logout-device" 
-              v-if="!item.name.includes('当前设备')" 
+              v-if="!item.isCurrent"
+              :disabled="settingsStore.isDeviceLoggingOut(item.id)"
               @click="handleLogoutDevice(item)"
             >
-              下线
+              {{ settingsStore.isDeviceLoggingOut(item.id) ? '下线中' : '下线' }}
             </button>
             <text class="current-tag" v-else>当前活跃</text>
           </view>
@@ -71,6 +79,7 @@ const { confirm } = useConfirm();
 
 onMounted(() => {
   navStore.setActiveModule('settings');
+  settingsStore.syncDevices({ silent: true });
 });
 
 function goBack() {
@@ -84,14 +93,16 @@ function getDeviceIcon(type) {
 }
 
 function handleLogoutDevice(device) {
-  // PR-15: 替换为 useConfirm
   confirm(`确定要强制下线设备 "${device.name}" 吗？该设备将需要重新登录。`, {
     title: '下线设备',
     destructive: true
-  }).then((ok) => {
-    if (ok) {
-      settingsStore.removeDevice(device.id);
+  }).then(async (ok) => {
+    if (!ok) return;
+    try {
+      await settingsStore.logoutDevice(device);
       uni.showToast({ title: '设备已强制下线', icon: 'success' });
+    } catch (error) {
+      uni.showToast({ title: error?.msg || error?.message || '下线失败', icon: 'none' });
     }
   });
 }
@@ -138,6 +149,23 @@ function handleLogoutDevice(device) {
   gap: 12px;
   display: flex;
   flex-direction: column;
+}
+
+.sync-state {
+  margin: 16px 16px 0;
+  padding: 10px 12px;
+  border-radius: 8px;
+  background-color: var(--color-bg-surface);
+  border: 1px solid var(--color-border);
+}
+
+.sync-state.warning {
+  background-color: rgba(245, 158, 11, 0.08);
+}
+
+.sync-state-text {
+  font-size: 12px;
+  color: var(--color-text-secondary);
 }
 
 .device-item {
@@ -202,6 +230,9 @@ function handleLogoutDevice(device) {
   align-items: center;
   justify-content: center;
   cursor: pointer;
+}
+.btn-logout-device[disabled] {
+  opacity: 0.55;
 }
 .btn-logout-device::after { border: none; }
 

@@ -1,6 +1,6 @@
 # [ISSUE-022] 智能体返回 HTML 文件后点击预览未打开可识别预览
 
-**状态**：Open
+**状态**：Resolved
 **创建时间**：2026-06-09
 **标签**：bug / agent / file-preview / html
 
@@ -101,6 +101,22 @@ watch(() => props.file, (newFile) => {
 
 ---
 
+## 修复记录
+
+1. `sections/ui/services/native-im/message-state.js`
+   - `normalizeAgentFile()` 对 `html/htm/md/txt/json/js/css/vue/py/...` 等文本类智能体产物，将 `file.content` 作为内联 `previewContent` 兜底保留。
+   - 继续保持文件卡片 `content` 为文件名，避免消息气泡把 HTML 正文误当作文件名显示。
+2. `sections/ui/pages/chat/index.vue`
+   - 移动端文件预览跳转参数的 `previewContent` 增加 `file.content` 兜底。
+3. `sections/ui/pages/chat/detail.vue`
+   - 同步移动端详情页文件预览参数兜底。
+4. `sections/ui/pages/group/info.vue`
+   - 群信息共享文件预览跳转参数同步保留内联正文。
+5. `sections/ui/tests/native-im.test.mjs`
+   - 增加智能体 HTML 文件 final 事件回归，断言 `previewContent` 保留 HTML 正文且 `fileType=html`。
+
+---
+
 ## 测试结果
 
 ```bash
@@ -116,8 +132,32 @@ cd /home/leng/.codex/skills/playwright-skill \
 # FAIL: html code/file from agent can be previewed
 ```
 
+修复后验证：
+
+```bash
+cd sections/ui && node --test tests/native-im.test.mjs
+# exit 0
+```
+
+```bash
+cd /home/leng/.codex/skills/playwright-skill \
+  && TARGET_URL='http://127.0.0.1:5173' \
+     OUT_DIR='/tmp/seedcmp-new-ui-issuefix/sections/ui/.ai/tests-e2e/ISSUE-022-agent-html-preview' \
+     node run.js /tmp/playwright-issue-022-visual.js
+# exit 0
+# PASS desktop html source preview opens from generated agent file
+# PASS desktop html render preview opens from inline srcdoc
+# PASS mobile html source preview keeps inline content through route params
+```
+
+截图证据：
+
+1. `sections/ui/.ai/tests-e2e/ISSUE-022-agent-html-preview/01-desktop-html-source-preview.png`
+2. `sections/ui/.ai/tests-e2e/ISSUE-022-agent-html-preview/02-desktop-html-render-preview.png`
+3. `sections/ui/.ai/tests-e2e/ISSUE-022-agent-html-preview/03-mobile-html-source-preview.png`
+
 ---
 
 ## 关闭备注
 
-待修复后复测：智能体返回 HTML 文件后，点击 `预览` 能打开右侧预览面板，并展示源码或安全渲染结果。
+已复测：智能体返回 HTML 文件后，桌面端点击 `预览` 可打开右侧源码视图并切换安全渲染预览；移动端跳转文件预览页后仍保留内联 HTML 正文。

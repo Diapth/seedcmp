@@ -7,8 +7,10 @@ import {
 } from '../services/native-im/service.js';
 import {
   applyDraftToConversationList,
+  buildGroupScopedRoute,
   mergeRemoteDrafts,
   normalizeNativeGroup,
+  resolveGroupPageId,
   shouldPersistConversationDraft,
   upsertGroupConversation
 } from '../services/native-im/conversation-state.js';
@@ -19,12 +21,20 @@ import {
 } from '../services/native-im/normalizers.js';
 import * as messageState from '../services/native-im/message-state.js';
 import {
+  createReplyTarget,
+  replyTargetForConversation,
+  shouldClearReplyTargetOnConversationChange
+} from '../services/native-im/reply-state.js';
+import {
   formatConversationPreview
 } from '../utils/formatConversation.js';
 import {
   formatChatTime,
   shouldShowMessageTime
 } from '../utils/formatMessage.js';
+import {
+  normalizeClowderProjectBoard
+} from '../services/native-im/project-board.js';
 
 function makeRequestStub(responses = {}) {
   const calls = [];
@@ -109,6 +119,173 @@ test('native service exposes group creation and member sync APIs', async () => {
   assert.equal(members[0].id, 'u1');
   assert.equal(members[0].nickname, '张伟');
   assert.equal(members[0].role, 'admin');
+});
+
+test('native service updates group notice through real group profile API', async () => {
+  const request = makeRequestStub();
+  const service = createNativeImService({
+    baseUrl: '/v1/',
+    request,
+    getToken: () => 'token'
+  });
+
+  await service.updateGroupProfile('g-notice', { notice: '置顶内容验收 20260609' });
+
+  assert.equal(request.calls[0].method, 'PUT');
+  assert.equal(request.calls[0].url, '/v1/groups/g-notice');
+  assert.deepEqual(request.calls[0].data, { notice: '置顶内容验收 20260609' });
+});
+
+test('native service fetches and deletes real user devices', async () => {
+  const request = makeRequestStub({
+    'GET user/devices': {
+      devices: [
+        {
+          device_id: 'web-current',
+          device_name: 'Chrome Browser',
+          device_model: 'Linux',
+          device_flag: 1,
+          last_login: 1780490300,
+          login_addr: '北京'
+        },
+        {
+          id: 'dev-web',
+          device_name: 'MacBook Pro 16"',
+          device_model: 'Safari',
+          device_flag: 2,
+          last_login: 1780480000000,
+          login_addr: '上海'
+        }
+      ]
+    },
+    'DELETE user/devices/dev-web': {}
+  });
+  const service = createNativeImService({
+    baseUrl: '/v1/',
+    request,
+    getToken: () => 'token',
+    deviceFactory: () => ({ device_id: 'web-current' })
+  });
+
+  const devices = await service.fetchDevices();
+  await service.deleteDevice('dev-web');
+
+  assert.equal(request.calls[0].method, 'GET');
+  assert.equal(request.calls[0].url, '/v1/user/devices');
+  assert.equal(request.calls[1].method, 'DELETE');
+  assert.equal(request.calls[1].url, '/v1/user/devices/dev-web');
+  assert.deepEqual(devices.map((device) => ({
+    id: device.id,
+    name: device.name,
+    type: device.type,
+    lastActive: device.lastActive,
+    location: device.location,
+    isCurrent: device.isCurrent
+  })), [
+    {
+      id: 'web-current',
+      name: 'Chrome Browser',
+      type: 'web',
+      lastActive: '2026-06-03 20:38',
+      location: '北京',
+      isCurrent: true
+    },
+    {
+      id: 'dev-web',
+      name: 'MacBook Pro 16"',
+      type: 'desktop',
+      lastActive: '2026-06-03 17:46',
+      location: '上海',
+      isCurrent: false
+    }
+  ]);
+});
+
+test('native service sends register code and creates a real account session', async () => {
+  const request = makeRequestStub({
+    'POST user/sms/registercode': {},
+    'POST user/register': {
+      uid: 'u-register-20260609',
+      name: '注册验收用户',
+      token: 'register-token'
+    }
+  });
+  const service = createNativeImService({
+    baseUrl: '/v1/',
+    request,
+    getToken: () => '',
+    deviceFactory: () => ({
+      device_id: 'web-register',
+      device_name: 'Chrome',
+      device_model: 'Linux'
+    })
+  });
+
+  await service.sendRegisterCode({ phone: '19608162821' });
+  const session = await service.registerAccount({
+    phone: '19608162821',
+    code: '123456',
+    name: '注册验收用户',
+    password: '123456'
+  });
+
+  assert.equal(request.calls[0].method, 'POST');
+  assert.equal(request.calls[0].url, '/v1/user/sms/registercode');
+  assert.deepEqual(request.calls[0].data, { zone: '0086', phone: '19608162821' });
+  assert.equal(request.calls[1].method, 'POST');
+  assert.equal(request.calls[1].url, '/v1/user/register');
+  assert.deepEqual(request.calls[1].data, {
+    zone: '0086',
+    phone: '19608162821',
+    name: '注册验收用户',
+    code: '123456',
+    password: '123456',
+    flag: 1,
+    device: {
+      device_id: 'web-register',
+      device_name: 'Chrome',
+      device_model: 'Linux'
+    }
+  });
+  assert.equal(session.token, 'register-token');
+  assert.equal(session.user.id, 'u-register-20260609');
+  assert.equal(session.user.nickname, '注册验收用户');
+});
+
+test('native service updates the current user profile through real profile API', async () => {
+  const request = makeRequestStub({
+    'PUT user/current': {
+      uid: 'u-profile',
+      name: '资料验收昵称',
+      phone: '13733632709',
+      short_no: 'profile_20260609',
+      sex: 1,
+      token: 'profile-token'
+    }
+  });
+  const service = createNativeImService({
+    baseUrl: '/v1/',
+    request,
+    getToken: () => 'profile-token'
+  });
+
+  const session = await service.updateCurrentUserProfile({
+    name: '资料验收昵称',
+    shortNo: 'profile_20260609',
+    sex: 1,
+    ignored: 'nope'
+  });
+
+  assert.equal(request.calls[0].method, 'PUT');
+  assert.equal(request.calls[0].url, '/v1/user/current');
+  assert.deepEqual(request.calls[0].data, {
+    name: '资料验收昵称',
+    short_no: 'profile_20260609',
+    sex: 1
+  });
+  assert.equal(session.user.id, 'u-profile');
+  assert.equal(session.user.nickname, '资料验收昵称');
+  assert.equal(session.user.shortNo, 'profile_20260609');
 });
 
 test('native service fetches clowder cat directory as agent cards', async () => {
@@ -199,6 +376,109 @@ test('native service scans clowder templates as official agent cards', async () 
   assert.equal(directory.agents[0].source, 'clowder');
   assert.equal(directory.agents[0].raw.source, 'role-template');
   assert.deepEqual(directory.agents[0].capabilityTags, ['多智能体编排', '任务拆解']);
+});
+
+test('native service fetches active project group, thread tasks, and creates coordination', async () => {
+  const request = makeRequestStub({
+    'GET clowder/project-groups/active?projectGroupNo=g-project': {
+      binding: {
+        id: 'binding-1',
+        projectGroupNo: 'g-project',
+        projectName: 'UI项目群',
+        projectThreadId: 'thread-project-1',
+        catMemberIds: ['coordinator', 'codex']
+      }
+    },
+    'GET clowder/thread/thread-project-1/tasks': {
+      tasks: [
+        {
+          id: 'task-1',
+          title: '修复注册链路',
+          goal: '真实账号注册后进入聊天',
+          status: 'doing',
+          assigneeCatId: 'codex',
+          progress: 45,
+          artifacts: [{ id: 'doc-1', name: '注册验收.md', type: 'md' }],
+          logs: [{ time: '10:00', title: '开始处理', detail: '已定位 register.vue' }]
+        }
+      ]
+    },
+    'POST clowder/coordinator/coordination': {
+      coordinationId: 'coord-1',
+      status: 'created'
+    }
+  });
+  const service = createNativeImService({
+    baseUrl: '/v1/',
+    request,
+    getToken: () => 'token'
+  });
+
+  const binding = await service.fetchActiveProjectGroup({ projectGroupNo: 'g-project' });
+  const tasks = await service.fetchThreadTasks('thread-project-1');
+  const coordination = await service.createCoordination({
+    threadId: 'thread-project-1',
+    goal: '验收项目群看板'
+  });
+
+  assert.equal(request.calls[0].method, 'GET');
+  assert.equal(request.calls[0].url, '/v1/clowder/project-groups/active?projectGroupNo=g-project');
+  assert.equal(request.calls[1].method, 'GET');
+  assert.equal(request.calls[1].url, '/v1/clowder/thread/thread-project-1/tasks');
+  assert.equal(request.calls[2].method, 'POST');
+  assert.equal(request.calls[2].url, '/v1/clowder/coordinator/coordination');
+  assert.equal(binding.id, 'binding-1');
+  assert.equal(tasks[0].id, 'task-1');
+  assert.equal(coordination.coordinationId, 'coord-1');
+});
+
+test('clowder project binding and thread tasks normalize into a group board', () => {
+  const board = normalizeClowderProjectBoard({
+    binding: {
+      id: 'binding-1',
+      projectGroupNo: 'g-project',
+      projectName: 'UI项目群',
+      projectThreadId: 'thread-project-1',
+      userMemberIds: ['u1', 'u2'],
+      catMemberIds: ['coordinator', 'codex']
+    },
+    tasks: [
+      {
+        id: 'task-1',
+        title: '项目群可见性',
+        goal: '两个账号都能看到项目群',
+        status: 'in_progress',
+        assigneeCatId: 'coordinator',
+        progress: 60,
+        artifacts: [{ id: 'doc-1', name: '项目群验收.md', type: 'md', summary: '成员与消息同步' }],
+        logs: [{ time: '10:20', title: '同步成员', detail: '补齐 userMemberIds' }]
+      },
+      {
+        id: 'task-2',
+        name: '看板联动',
+        description: 'thread tasks 显示在右侧看板',
+        state: 'completed',
+        catId: 'codex',
+        outputs: [{ id: 'doc-2', filename: '看板截图.png', kind: 'png' }]
+      }
+    ],
+    agents: [
+      { id: 'coordinator', name: '协调者', alias: '@coordinator' },
+      { id: 'codex', name: 'Codex', alias: '@codex' }
+    ]
+  });
+
+  assert.equal(board.id, 'clowder-board-binding-1');
+  assert.equal(board.groupId, 'g-project');
+  assert.equal(board.groupName, 'UI项目群');
+  assert.equal(board.threadId, 'thread-project-1');
+  assert.equal(board.memberCount, 4);
+  assert.equal(board.tasks.length, 2);
+  assert.equal(board.tasks[0].agentId, 'coordinator');
+  assert.equal(board.tasks[0].status, 'doing');
+  assert.equal(board.tasks[0].documents[0].name, '项目群验收.md');
+  assert.equal(board.tasks[1].status, 'done');
+  assert.equal(board.tasks[1].documents[0].name, '看板截图.png');
 });
 
 test('native service falls back to direct clowder api when tangseng cat proxy fails', async () => {
@@ -316,6 +596,64 @@ test('native service sends direct clowder cat messages through conversation brid
   assert.equal(sent.status, 'success');
 });
 
+test('native service creates custom clowder cats as routable direct agents', async () => {
+  const request = makeRequestStub({
+    'POST clowder/cats': {
+      agent: {
+        catId: 'custom-reviewer',
+        displayName: 'DeepSeek 审查猫',
+        alias: '@deep-review',
+        defaultModel: 'deepseek-chat',
+        platform: 'claude-code',
+        capabilityTags: ['代码审查'],
+        available: true,
+        connected: true
+      },
+      contact: {
+        connected: true,
+        source: 'runtime-created'
+      }
+    }
+  });
+  const service = createNativeImService({
+    baseUrl: '/v1/',
+    request,
+    getToken: () => 'token'
+  });
+
+  const agent = await service.createClowderCat({
+    name: 'DeepSeek 审查猫',
+    alias: '@deep-review',
+    roleTemplateId: 'reviewer',
+    platform: 'claude-code',
+    accessMode: 'api-key',
+    accountRef: 'deepseek-env',
+    defaultModel: 'deepseek-chat',
+    personality: '严谨审查',
+    capabilities: ['代码审查'],
+    apiKey: 'sk-should-not-stay-in-browser'
+  });
+
+  assert.equal(request.calls[0].method, 'POST');
+  assert.equal(request.calls[0].url, '/v1/clowder/cats');
+  assert.deepEqual(request.calls[0].data, {
+    name: 'DeepSeek 审查猫',
+    alias: '@deep-review',
+    roleTemplateId: 'reviewer',
+    clientId: 'anthropic',
+    authType: 'api_key',
+    accountRef: 'deepseek-env',
+    defaultModel: 'deepseek-chat',
+    personality: '严谨审查',
+    capabilities: ['代码审查']
+  });
+  assert.equal(agent.id, 'custom-reviewer');
+  assert.equal(agent.directCatId, 'custom-reviewer');
+  assert.equal(agent.source, 'clowder');
+  assert.equal(agent.connected, true);
+  assert.equal(agent.apiKey, '');
+});
+
 test('native service uploads files before returning a public media url', async () => {
   const uploaded = [];
   const request = makeRequestStub({
@@ -429,6 +767,15 @@ test('conversation helpers normalize groups and upsert channelType 2 conversatio
   assert.equal(conversations[0].memberCount, 5);
 });
 
+test('group member page helpers keep routing scoped to the current group', () => {
+  assert.equal(resolveGroupPageId({ id: 'real-group-160100' }, { activeGroupId: '2', activeConversationId: 'agent-review' }), 'real-group-160100');
+  assert.equal(resolveGroupPageId({}, { activeGroupId: 'project-alpha', activeConversationId: '2' }), 'project-alpha');
+  assert.equal(resolveGroupPageId({}, { activeConversationId: 'fallback-group' }), 'fallback-group');
+
+  assert.equal(buildGroupScopedRoute('/pages/group/members', 'real-group-160100'), '/pages/group/members?id=real-group-160100');
+  assert.equal(buildGroupScopedRoute('/pages/chat/detail', 'group with spaces', { at: 'u 1' }), '/pages/chat/detail?id=group%20with%20spaces&at=u%201');
+});
+
 test('conversation normalizer uses last message timestamp instead of sync time fallback', () => {
   const conversation = normalizeConversation({
     channel_id: 'g-last',
@@ -445,6 +792,24 @@ test('conversation normalizer uses last message timestamp instead of sync time f
 
   assert.equal(conversation.lastMessage, '最后一条群消息');
   assert.equal(conversation.lastTime, 1780490300000);
+});
+
+test('conversation normalizer gives message-bearing conversations a visible fallback time', () => {
+  const before = Date.now();
+  const conversation = normalizeConversation({
+    channel_id: 'g-no-last-time',
+    channel_type: 2,
+    last_message: {
+      payload: JSON.stringify({ type: 1, content: '后端只有摘要没有时间' })
+    }
+  }, {
+    name: '缺时间群'
+  });
+  const after = Date.now();
+
+  assert.equal(conversation.lastMessage, '后端只有摘要没有时间');
+  assert.ok(conversation.lastTime >= before);
+  assert.ok(conversation.lastTime <= after);
 });
 
 test('group upsert uses group last message time and does not invent current time', () => {
@@ -464,6 +829,98 @@ test('group upsert uses group last message time and does not invent current time
   assert.equal(withLastMessage[0].lastMessage, '群里真实最后消息');
   assert.equal(withLastMessage[0].lastTime, 1780490300000);
   assert.equal(withoutAnyMessageTime[0].lastTime, 0);
+});
+
+test('group upsert gives groups with a real last message a visible fallback time', () => {
+  const before = Date.now();
+  const conversations = upsertGroupConversation([], {
+    group_no: 'g-no-last-time',
+    name: '缺时间群',
+    last_message: {
+      payload: JSON.stringify({ type: 1, content: '群里有摘要但无时间' })
+    }
+  });
+  const after = Date.now();
+
+  assert.equal(conversations[0].lastMessage, '群里有摘要但无时间');
+  assert.ok(conversations[0].lastTime >= before);
+  assert.ok(conversations[0].lastTime <= after);
+});
+
+test('native group mention messages preserve highlight metadata from synced payloads', () => {
+  const message = normalizeMessage({
+    message_id: 'mention-msg-1',
+    from_uid: '13733632709',
+    from_name: '发送者',
+    payload: JSON.stringify({
+      type: 1,
+      content: '@leng_test_updated AT验收 20260609',
+      mention: {
+        uids: ['18337488675'],
+        names: {
+          18337488675: 'leng_test_updated'
+        }
+      }
+    })
+  });
+
+  assert.deepEqual(message.mentions, [{
+    userId: '18337488675',
+    uid: '18337488675',
+    name: 'leng_test_updated',
+    offset: 0
+  }]);
+});
+
+test('conversation summary marks group messages that mention the current user', () => {
+  const message = normalizeMessage({
+    message_id: 'mention-msg-2',
+    from_uid: '13733632709',
+    from_name: '发送者',
+    payload: JSON.stringify({
+      type: 1,
+      content: '@leng_test_updated AT验收 20260609',
+      mention: {
+        uids: ['18337488675'],
+        names: {
+          18337488675: 'leng_test_updated'
+        }
+      }
+    })
+  });
+  const currentUser = { id: '18337488675', uid: '18337488675', nickname: 'leng_test_updated' };
+
+  assert.equal(
+    messageState.conversationSummaryForMessage(message, currentUser, { id: 'g-mention', type: 'group' }),
+    '[有人@我] 发送者: @leng_test_updated AT验收 20260609'
+  );
+  assert.equal(
+    messageState.conversationSummaryForMessage(message, { id: 'not-mentioned' }, { id: 'g-mention', type: 'group' }),
+    '发送者: @leng_test_updated AT验收 20260609'
+  );
+  assert.equal(
+    messageState.conversationSummaryForMessage({ ...message, senderId: '18337488675' }, currentUser, { id: 'g-mention', type: 'group' }),
+    '我: @leng_test_updated AT验收 20260609'
+  );
+});
+
+test('reply targets are scoped to the conversation that created them', () => {
+  const messageReply = createReplyTarget({
+    id: 'msg-a',
+    senderName: '张伟',
+    contentPreview: '引用内容'
+  }, 'group-a');
+  const fileReply = createReplyTarget({
+    id: 'file-selection-1',
+    fileName: '需求.md',
+    contentPreview: '选中的文件片段'
+  }, 'group-a');
+
+  assert.equal(messageReply.conversationId, 'group-a');
+  assert.equal(fileReply.conversationId, 'group-a');
+  assert.equal(replyTargetForConversation(messageReply, 'group-a'), messageReply);
+  assert.equal(replyTargetForConversation(messageReply, 'group-b'), null);
+  assert.equal(shouldClearReplyTargetOnConversationChange(fileReply, 'group-b'), true);
 });
 
 test('time helpers accept second and millisecond timestamps with five minute message dividers', () => {
@@ -516,6 +973,47 @@ test('clowder stream events merge placeholder chunks final markdown and generate
   assert.equal(list[1].type, 'file');
   assert.equal(list[1].fileName, '验收报告.md');
   assert.equal(list[1].generatedByAgent, true);
+});
+
+test('clowder generated html files preserve inline preview content', () => {
+  const list = messageState.mergeAgentReplyEventIntoList([], {
+    streamKey: 'stream-html-1',
+    phase: 'final',
+    senderId: 'clowder',
+    senderName: 'Clowder 协同猫',
+    content: 'HTML 文件已生成',
+    files: [{
+      id: 'html-preview',
+      name: 'agent-preview-20260609.html',
+      content: '<!doctype html><html><body><h1>Agent HTML Preview</h1></body></html>'
+    }]
+  });
+
+  assert.equal(list.length, 2);
+  assert.equal(list[1].type, 'file');
+  assert.equal(list[1].fileType, 'html');
+  assert.match(list[1].previewContent, /Agent HTML Preview/);
+});
+
+test('native file message payloads normalize sender and receiver file cards', () => {
+  const message = normalizeMessage({
+    message_id: 'file-msg-1',
+    from_uid: '13733632709',
+    from_name: '发送者',
+    payload: JSON.stringify({
+      type: 8,
+      content: '[文件] upload-20260609.md',
+      file_name: 'upload-20260609.md',
+      remote_url: '/files/upload-20260609.md',
+      size: 2048
+    })
+  });
+
+  assert.equal(message.type, 'file');
+  assert.equal(message.fileName, 'upload-20260609.md');
+  assert.equal(message.name, 'upload-20260609.md');
+  assert.equal(message.url, '/files/upload-20260609.md');
+  assert.equal(message.content, '[文件] upload-20260609.md');
 });
 
 test('clowder helper creates markdown placeholder chunks and final event', () => {

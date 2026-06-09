@@ -1,6 +1,6 @@
 # [ISSUE-017] 群成员页未打开当前群且成员管理仍硬编码 group 2
 
-**状态**：Open
+**状态**：Resolved
 **创建时间**：2026-06-09
 **标签**：bug / group-chat / members / h5
 
@@ -93,7 +93,55 @@ convStore.addMember('2', { /* contact */ });
 
 ---
 
+## 修复记录
+
+### 2026-06-09
+
+1. 新增 `resolveGroupPageId()` / `buildGroupScopedRoute()`，统一从 `id/groupId/group_id` 和当前 active state 解析群页 group id。
+2. `RightWorkspace.vue`、`pages/group/info.vue` 跳转群成员和群二维码时携带当前 `conversation.id`，不再打开裸路由。
+3. `pages/group/members.vue` 与 `pages/group/qrcode.vue` 改为基于当前 group id 渲染、同步成员、添加/移除成员、@ 成员和回退路由。
+4. 增加 `native-im` 回归测试，覆盖非 `2` 群的路由解析和 query 编码。
+
+---
+
 ## 测试结果
+
+### 修复后
+
+```bash
+cd /tmp/seedcmp-new-ui-issuefix/sections/ui
+npm run test:native-im
+
+# exit 0
+# pass 1, fail 0
+```
+
+```bash
+cd /home/leng/.codex/skills/playwright-skill \
+  && TARGET_URL='http://127.0.0.1:5173' \
+     OUT_DIR='/tmp/seedcmp-new-ui-issuefix/sections/ui/.ai/tests-e2e/ISSUE-017-group-members-current-group' \
+     node run.js /tmp/playwright-issue-017-visual.js
+
+# exit 0
+# PASS: desktop current group is visible before navigation
+# PASS: desktop member management action is visible
+# PASS: desktop members page count belongs to agent-review
+# PASS: desktop members page shows agent-review member PM
+# PASS: desktop members page shows agent-review member Claude Code
+# PASS: desktop route scoped to agent-review
+# PASS: mobile members page count belongs to agent-review
+# PASS: mobile members page shows agent-review member Codex
+# PASS: mobile members page shows agent-review member Clowder
+# PASS: mobile members page has no horizontal overflow
+```
+
+截图：
+
+1. `sections/ui/.ai/tests-e2e/ISSUE-017-group-members-current-group/01-desktop-current-group-info.png`
+2. `sections/ui/.ai/tests-e2e/ISSUE-017-group-members-current-group/02-desktop-members-page-agent-review.png`
+3. `sections/ui/.ai/tests-e2e/ISSUE-017-group-members-current-group/03-mobile-members-page-agent-review.png`
+
+### 修复前
 
 ```bash
 cd /home/leng/.codex/skills/playwright-skill \
@@ -115,4 +163,4 @@ cd /home/leng/.codex/skills/playwright-skill \
 
 ## 关闭备注
 
-待修复后复测：从真实群的右侧信息进入成员页，页面应显示当前群成员，并可在当前群执行成员管理动作。
+已复测：从当前非 `2` 群的右侧信息进入成员页，路由携带当前群 id，成员页显示当前群成员；移动端直接打开当前群成员页无横向溢出。真实后端群的成员同步仍依赖 `/groups/:groupNo/membersync` 可用性，但前端不再把成员管理写死到 mock group `2`。

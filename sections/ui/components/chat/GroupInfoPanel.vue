@@ -89,7 +89,9 @@ import { useConversationStore } from '@/stores/conversation';
 import { useGroupStore } from '@/stores/group';
 import { useMessageStore } from '@/stores/message';
 import { useAgentStore } from '@/stores/agent';
+import { useAppStore } from '@/stores/app';
 import { useConfirm } from '@/composables/useConfirm';
+import { resolveSelfId } from '@/services/native-im/message-state';
 import AppAvatar from '../common/AppAvatar.vue';
 import AppIcon from '../common/AppIcon.vue';
 import GroupAnnouncement from './GroupAnnouncement.vue';
@@ -98,18 +100,25 @@ const props = defineProps({
   group: { type: Object, required: true }
 });
 
-const emit = defineEmits(['open-members', 'open-qrcode', 'open-board', 'preview-file', 'select-member', 'member-contextmenu']);
+const emit = defineEmits(['open-members', 'open-qrcode', 'open-board', 'open-files', 'preview-file', 'select-member', 'member-contextmenu']);
 
 const convStore = useConversationStore();
 const groupStore = useGroupStore();
 const messageStore = useMessageStore();
 const agentStore = useAgentStore();
+const appStore = useAppStore();
 const { confirm } = useConfirm();
 
 const members = computed(() => convStore.groupMembers(props.group.id));
 const memberCount = computed(() => members.value.length || props.group.memberCount || 0);
 const previewMembers = computed(() => members.value.slice(0, 4));
-const isCreator = computed(() => convStore.isGroupCreator(props.group.id, 'me'));
+const currentUserId = computed(() => resolveSelfId(appStore.currentUser || readStoredCurrentUser()));
+const isCreator = computed(() => {
+  const selfId = currentUserId.value || 'me';
+  return convStore.isGroupCreator(props.group.id, selfId)
+    || convStore.isGroupCreator(props.group.channelId, selfId)
+    || props.group.creatorId === selfId;
+});
 const agentBoard = computed(() => {
   return agentStore.boards.find((board) => board.groupId === props.group.id) || null;
 });
@@ -140,17 +149,29 @@ function roleLabel(role) {
   return '';
 }
 
-function handleAnnouncementUpdate(text) {
-  convStore.setAnnouncement(props.group.id, text);
-  uni.showToast({ title: '已更新群公告', icon: 'success' });
+function readStoredCurrentUser() {
+  if (typeof uni === 'undefined' || typeof uni.getStorageSync !== 'function') return {};
+  try {
+    const raw = uni.getStorageSync('app_user');
+    return raw ? JSON.parse(raw) : {};
+  } catch {
+    return {};
+  }
+}
+
+async function handleAnnouncementUpdate(text) {
+  try {
+    await convStore.updateGroupAnnouncement(props.group, text, {
+      publisherId: currentUserId.value || 'me'
+    });
+    uni.showToast({ title: '已更新群公告', icon: 'success' });
+  } catch (error) {
+    uni.showToast({ title: error?.msg || error?.message || '群公告更新失败', icon: 'none' });
+  }
 }
 
 function handleSharedFilesClick() {
-  if (sharedFiles.value.length > 0) {
-    emit('preview-file', sharedFiles.value[0]);
-    return;
-  }
-  uni.showToast({ title: '暂无共享文件', icon: 'none' });
+  emit('open-files');
 }
 
 function handleExit() {

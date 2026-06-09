@@ -937,14 +937,14 @@ function leaveConfigPage(fallbackUrl = '/pages/agents/index') {
   uni.redirectTo({ url: fallbackUrl });
 }
 
-function handleCreate() {
+async function handleCreate() {
   if (!canSubmit.value) {
     uni.showToast({ title: '请完成所有检查项', icon: 'none' });
     return;
   }
   submitting.value = true;
 
-  setTimeout(() => {
+  try {
     const payload = buildAgentPayload();
     if (isEditing.value) {
       agentStore.updateAgent(editingAgentId.value, payload);
@@ -957,19 +957,23 @@ function handleCreate() {
       return;
     }
 
-    const createdId = agentStore.createAgent(payload);
+    const createdId = await agentStore.createAgent(payload);
     const createdAgent = agentStore.agents.find(agent => agent.id === createdId);
+    const conversation = createdAgent ? convStore.upsertAgentConversation(createdAgent) : null;
+    const conversationId = conversation?.id || createdId;
     if (createdAgent) {
-      convStore.upsertAgentConversation(createdAgent);
-      convStore.setActiveId(createdId);
-      uni.setStorageSync('active_conversation_id', createdId);
+      convStore.setActiveId(conversationId);
+      uni.setStorageSync('active_conversation_id', conversationId);
     }
     submitting.value = false;
     uni.showToast({ title: '智能体已部署', icon: 'success' });
     setTimeout(() => {
-      uni.redirectTo({ url: `/pages/chat/detail?id=${encodeURIComponent(createdId)}` });
+      uni.redirectTo({ url: `/pages/chat/detail?id=${encodeURIComponent(conversationId)}` });
     }, 700);
-  }, 600);
+  } catch (error) {
+    submitting.value = false;
+    uni.showToast({ title: error?.msg || error?.message || '智能体部署失败', icon: 'none' });
+  }
 }
 </script>
 

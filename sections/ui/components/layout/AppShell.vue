@@ -36,6 +36,17 @@
       </view>
       
     </view>
+    <AppDialog
+      v-model:visible="confirmState.visible"
+      :title="confirmState.title"
+      :content="confirmState.content"
+      :confirm-text="confirmState.confirmText"
+      :cancel-text="confirmState.cancelText"
+      :destructive="confirmState.destructive"
+      :variant="confirmState.variant"
+      @confirm="handleConfirm"
+      @cancel="handleCancel"
+    />
   </view>
 </template>
 
@@ -45,8 +56,10 @@ import { useAppStore } from '@/stores/app';
 import { useResponsiveLayout } from '@/composables/useResponsiveLayout';
 import { useSafeArea } from '@/composables/useSafeArea';
 import { useVisualState } from '@/composables/useVisualState';
+import { useConfirm } from '@/composables/useConfirm';
 import DesktopSidebar from './DesktopSidebar.vue';
 import MobileTabBar from './MobileTabBar.vue';
+import AppDialog from '../common/AppDialog.vue';
 import AppIcon from '../common/AppIcon.vue';
 
 defineProps({
@@ -64,6 +77,11 @@ const appStore = useAppStore();
 const { isDesktop } = useResponsiveLayout();
 const { safeAreaInsets } = useSafeArea();
 const { isOnline } = useVisualState();
+const {
+  state: confirmState,
+  handleConfirm,
+  handleCancel
+} = useConfirm();
 
 // Android/iOS statusBarHeight fallback
 const statusBarHeight = computed(() => {

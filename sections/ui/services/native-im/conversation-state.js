@@ -54,6 +54,31 @@ export function conversationDraftKey(channelId, channelType = 1) {
   return `${clean(channelId)}-${Number(channelType || 1)}`;
 }
 
+export function resolveGroupPageId(routeOptions = {}, state = {}) {
+  return clean(
+    routeOptions.id
+    || routeOptions.groupId
+    || routeOptions.group_id
+    || state.activeGroupId
+    || state.activeConversationId
+    || state.activeId
+    || state.fallbackGroupId
+    || '2'
+  );
+}
+
+export function buildGroupScopedRoute(basePath, groupId, extraParams = {}) {
+  const pairs = [['id', clean(groupId)]];
+  Object.entries(extraParams).forEach(([key, value]) => {
+    const text = clean(value);
+    if (text) pairs.push([key, text]);
+  });
+  const query = pairs
+    .map(([key, value]) => `${encodeURIComponent(key)}=${encodeURIComponent(value)}`)
+    .join('&');
+  return `${basePath}?${query}`;
+}
+
 export function shouldPersistConversationDraft(conversation = {}, identity = {}) {
   const channelId = clean(identity.channelId || conversation.channelId || conversation.channel_id || conversation.id);
   const name = clean(conversation.name || conversation.title || conversation.displayName).toLowerCase();
@@ -104,8 +129,9 @@ export function mergeRemoteDrafts(conversations = [], remoteDrafts = [], options
 export function normalizeNativeGroup(input = {}) {
   const id = clean(input.group_no || input.groupNo || input.id || input.channel_id || input.channelId);
   const name = clean(input.name || input.group_name || input.groupName || id || '群聊');
-  const lastTime = toTimestampMs(groupLastMessageTime(input), 0);
   const digest = messageDigestFromInput(input);
+  const lastMessage = digest && digest !== '收到一条新消息' ? digest : '';
+  const lastTime = toTimestampMs(groupLastMessageTime(input), lastMessage ? Date.now() : 0);
   return {
     id,
     groupNo: id,
@@ -117,7 +143,7 @@ export function normalizeNativeGroup(input = {}) {
     announcement: clean(input.notice || input.announcement),
     creatorId: clean(input.creator || input.owner || input.creator_id || input.creatorId),
     createTime: toTimestampMs(input.created_at ?? input.createdAt ?? input.createTime, 0),
-    lastMessage: digest && digest !== '收到一条新消息' ? digest : '',
+    lastMessage,
     lastTime,
     raw: input
   };

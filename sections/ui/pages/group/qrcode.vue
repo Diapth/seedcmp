@@ -54,6 +54,7 @@
 import { computed, onMounted, ref } from 'vue';
 import { useNavigationStore } from '@/stores/navigation';
 import { useConversationStore } from '@/stores/conversation';
+import { buildGroupScopedRoute, resolveGroupPageId } from '@/services/native-im/conversation-state';
 import AppSubpageShell from '@/components/layout/AppSubpageShell.vue';
 import AppIcon from '@/components/common/AppIcon.vue';
 import AppAvatar from '@/components/common/AppAvatar.vue';
@@ -62,6 +63,11 @@ const navStore = useNavigationStore();
 const convStore = useConversationStore();
 const activeState = ref('active');
 const qrSeed = ref(1);
+const routeOptions = ref({});
+
+const groupId = computed(() => resolveGroupPageId(routeOptions.value, {
+  activeConversationId: convStore.activeId
+}));
 
 const qrStates = [
   { id: 'active', label: '可加入' },
@@ -70,8 +76,8 @@ const qrStates = [
 ];
 
 const groupInfo = computed(() => {
-  return convStore.conversations.find(item => item.id === '2') || {
-    id: '2',
+  return convStore.conversations.find(item => item.id === groupId.value) || {
+    id: groupId.value,
     name: 'AgentHub 产品研发群',
     avatar: ''
   };
@@ -100,6 +106,10 @@ const stateCopy = computed(() => {
 });
 
 onMounted(() => {
+  const pages = getCurrentPages();
+  const currentPage = pages[pages.length - 1];
+  routeOptions.value = currentPage?.$page?.options || {};
+  if (groupId.value) convStore.setActiveId(groupId.value);
   navStore.setActiveModule('contacts');
 });
 
@@ -138,7 +148,7 @@ function copyLink() {
 
 function goBack() {
   uni.navigateBack({
-    fail: () => uni.redirectTo({ url: '/pages/group/members' })
+    fail: () => uni.redirectTo({ url: buildGroupScopedRoute('/pages/group/members', groupId.value) })
   });
 }
 </script>

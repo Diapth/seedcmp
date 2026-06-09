@@ -1,6 +1,6 @@
 # [ISSUE-026] 会话时间缺失与引用状态未按会话隔离
 
-**状态**：Open
+**状态**：Resolved
 **创建时间**：2026-06-09
 **标签**：bug / chat / conversation-list / reply / file-quote
 
@@ -157,7 +157,64 @@ function handleSelectConversation(id) {
 
 ---
 
+## 修复记录
+
+### 2026-06-09
+
+1. `normalizeConversation()` 与 `normalizeNativeGroup()` 在已解析出真实最后消息摘要、但后端没有提供最后消息时间时，使用当前时间作为可见兜底；没有最后消息的空群仍保持 `lastTime=0`。
+2. 新增 `services/native-im/reply-state.js`，统一创建带 `conversationId` 的引用目标，并在渲染输入框前按当前会话过滤。
+3. `pages/chat/index.vue` 与 `pages/chat/detail.vue` 普通消息引用、文件选中文本引用都写入来源会话；切换会话时清理不属于新会话的引用目标。
+4. `FilePreviewPanel.vue` 保留文件来源会话，`quote-selection` payload 携带 `conversationId`；聊天页打开文件预览前会把当前会话 id 附到文件对象。
+5. `native-im.test.mjs` 增加缺失时间兜底、空群不造时间、普通/文件引用按会话隔离的回归。
+
+---
+
 ## 测试结果
+
+### 修复后
+
+```bash
+cd /tmp/seedcmp-new-ui-issuefix/sections/ui
+npm run test:native-im
+
+# exit 0
+# pass 1, fail 0
+```
+
+```bash
+cd /tmp/seedcmp-new-ui-issuefix/sections/ui
+npm run build:h5
+
+# exit 0
+# DONE Build complete.
+```
+
+```bash
+cd /home/leng/.codex/skills/playwright-skill \
+  && TARGET_URL='http://127.0.0.1:5173' \
+     OUT_DIR='/tmp/seedcmp-new-ui-issuefix/sections/ui/.ai/tests-e2e/ISSUE-026-reply-time-isolation' \
+     node run.js /tmp/playwright-issue-026-visual.js
+
+# exit 0
+# PASS: desktop conversation fallback time visible
+# PASS: desktop normal reply cleared after switching conversation
+# PASS: desktop file reply cleared after switching conversation
+# PASS: mobile reply cleared after switching conversation
+```
+
+截图：
+
+1. `sections/ui/.ai/tests-e2e/ISSUE-026-reply-time-isolation/01-desktop-conversation-time-visible.png`
+2. `sections/ui/.ai/tests-e2e/ISSUE-026-reply-time-isolation/02-desktop-normal-reply-before-switch.png`
+3. `sections/ui/.ai/tests-e2e/ISSUE-026-reply-time-isolation/03-desktop-normal-reply-after-switch.png`
+4. `sections/ui/.ai/tests-e2e/ISSUE-026-reply-time-isolation/04-desktop-file-selection-menu.png`
+5. `sections/ui/.ai/tests-e2e/ISSUE-026-reply-time-isolation/05-desktop-file-reply-before-switch.png`
+6. `sections/ui/.ai/tests-e2e/ISSUE-026-reply-time-isolation/06-desktop-file-reply-after-switch.png`
+7. `sections/ui/.ai/tests-e2e/ISSUE-026-reply-time-isolation/07-mobile-conversation-time-visible.png`
+8. `sections/ui/.ai/tests-e2e/ISSUE-026-reply-time-isolation/08-mobile-reply-before-switch.png`
+9. `sections/ui/.ai/tests-e2e/ISSUE-026-reply-time-isolation/09-mobile-reply-after-switch.png`
+
+### 修复前
 
 ```bash
 cd /home/leng/.codex/skills/playwright-skill \
@@ -178,4 +235,4 @@ cd /home/leng/.codex/skills/playwright-skill \
 
 ## 关闭备注
 
-待修复后复测：会话列表中有最后消息的群聊应始终显示最后时间并按时间排序；普通消息引用和文件引用切换会话后不再泄漏；文件预览可选中文本并成功加入当前会话引用。
+已复测：会话列表中有最后消息但缺少后端时间的群聊会显示兜底时间；普通消息引用和文件选中文本引用在切换会话后均被清理；文件预览能基于内联 `previewContent` 显示正文并将选中文本加入当前会话引用。桌面与移动端均已在 5173 完成截图验证。

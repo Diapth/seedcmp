@@ -1,6 +1,6 @@
 # [ISSUE-019] 群聊文件上传接收方不可见且共享文件入口未切换右侧文件功能
 
-**状态**：Open
+**状态**：Resolved
 **创建时间**：2026-06-09
 **标签**：bug / group-chat / file / h5
 
@@ -100,6 +100,21 @@ function handleSharedFilesClick() {
 
 ---
 
+## 修复记录
+
+1. `sections/ui/services/native-im/normalizers.js`
+   - 扩展 type 8 文件消息归一化，兼容 `file_name/fileName/name/content/remote_url/source_url/content_url/path` 等真实 payload 字段。
+   - 接收方同步后的文件消息稳定生成 `type='file'`、`fileName/name/url/content`，可被消息列表和共享文件集合识别。
+2. `sections/ui/components/chat/GroupInfoPanel.vue`
+   - `共享文件` 行改为发出 `open-files`，不再直接预览第一条文件或 toast。
+3. `sections/ui/components/chat/RightWorkspace.vue`
+   - 新增群聊 `files` 工作区模式，点击共享文件后切换到当前群共享文件列表。
+   - 文件列表展示当前群消息中的文件卡片，可继续点击预览。
+4. `sections/ui/tests/native-im.test.mjs`
+   - 增加真实 type 8 文件 payload 归一化回归测试。
+
+---
+
 ## 测试结果
 
 ```bash
@@ -116,8 +131,32 @@ cd /home/leng/.codex/skills/playwright-skill \
 # FAIL: click shared files action is available
 ```
 
+修复后验证：
+
+```bash
+cd sections/ui && node --test tests/native-im.test.mjs
+# exit 0
+```
+
+```bash
+cd /home/leng/.codex/skills/playwright-skill \
+  && TARGET_URL='http://127.0.0.1:5173' \
+     OUT_DIR='/tmp/seedcmp-new-ui-issuefix/sections/ui/.ai/tests-e2e/ISSUE-019-group-files' \
+     node run.js /tmp/playwright-issue-019-visual.js
+# exit 0
+# PASS desktop receiver file card is visible from normalized native file message
+# PASS desktop shared files action switches to current group file list
+# PASS mobile group file card has no horizontal overflow
+```
+
+截图证据：
+
+1. `sections/ui/.ai/tests-e2e/ISSUE-019-group-files/01-desktop-file-card-visible.png`
+2. `sections/ui/.ai/tests-e2e/ISSUE-019-group-files/02-desktop-shared-files-pane.png`
+3. `sections/ui/.ai/tests-e2e/ISSUE-019-group-files/03-mobile-file-card-visible.png`
+
 ---
 
 ## 关闭备注
 
-待修复后复测：群聊文件发送后双账号都可见文件卡片，共享文件入口切换到当前群的右侧文件列表，并能看到刚上传的文件。
+已复测：真实形态 type 8 文件消息在接收侧可归一化为文件卡片；右侧群信息点击 `共享文件` 后切换到当前群文件列表并显示该文件；移动端文件卡片无横向溢出。

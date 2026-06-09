@@ -145,6 +145,7 @@ npm run test:smoke
 URL: http://localhost:5173/#/pages/chat/index
 截图:
 /tmp/issue-012-014-02-reaction-no-thinking.png
+sections/ui/.ai/tests-e2e/ISSUE-012-014-agent-history-reaction-stream/02-reaction-no-thinking-message.png
 ```
 
 验证结果：用户消息下方可见 `👀` reaction；页面文本中未出现“正在思考”。受限于本地未接真实 Clowder/TangSeng 后端，本次浏览器验证使用本地可控事件注入。

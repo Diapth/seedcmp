@@ -1,6 +1,6 @@
 # [ISSUE-016] 群聊 @ 消息未高亮且会话列表缺少 [有人@我] 提示
 
-**状态**：Open
+**状态**：Resolved
 **创建时间**：2026-06-09
 **标签**：bug / group-chat / mention / h5
 
@@ -98,6 +98,21 @@ mentions.push({ userId: m.id, name, offset: atIdx });
 
 ---
 
+## 修复记录
+
+1. `sections/ui/services/native-im/normalizers.js`
+   - 将同步消息中的 `mention.uids` / `mention.names` / `mention.members` 归一化为 `{ userId, uid, name, offset }`。
+   - 保留 `mentionAll` 与 `mentionUids`，并通过正文中的 `@name` / `@uid` 推断 offset，兼容真实后端只给 uid 的 payload。
+2. `sections/ui/services/native-im/message-state.js`
+   - 参考老前端 `sections/im_web/apps/chat/src/views/ConversationList.vue#getMentionReminder()` 与后端 `sections/im/TangSengDaoDaoServer/modules/message/api_reminders.go` 的 `[有人@我]` 语义，为命中当前用户的群消息摘要加提醒前缀。
+   - 保留会话摘要中的下划线，避免 `@leng_test_updated` 被预览清洗为 `@lengtestupdated`。
+3. `sections/ui/components/chat/MessageBubble.vue`
+   - 高亮渲染兼容对象 mention 与历史字符串 mention，避免同步消息缺少完整对象时无法高亮。
+4. `sections/ui/tests/native-im.test.mjs`
+   - 增加同步 mention 元数据归一化和当前用户被 @ 的群会话摘要回归测试。
+
+---
+
 ## 测试结果
 
 ```bash
@@ -113,8 +128,33 @@ cd /home/leng/.codex/skills/playwright-skill \
 # FAIL: conversation list shows [有人@我] mention reminder
 ```
 
+修复后验证：
+
+```bash
+cd sections/ui && node --test tests/native-im.test.mjs
+# exit 0
+```
+
+```bash
+cd /home/leng/.codex/skills/playwright-skill \
+  && TARGET_URL='http://127.0.0.1:5173' \
+     OUT_DIR='/tmp/seedcmp-new-ui-issuefix/sections/ui/.ai/tests-e2e/ISSUE-016-group-mentions' \
+     node run.js /tmp/playwright-issue-016-visual.js
+# exit 0
+# PASS desktop message bubble highlights synced @ mention
+# PASS desktop conversation row shows [有人@我]
+# PASS mobile message bubble highlights synced @ mention
+# PASS mobile group mention detail has no horizontal overflow
+```
+
+截图证据：
+
+1. `sections/ui/.ai/tests-e2e/ISSUE-016-group-mentions/01-desktop-list-reminder-and-bubble-highlight.png`
+2. `sections/ui/.ai/tests-e2e/ISSUE-016-group-mentions/02-mobile-list-reminder.png`
+3. `sections/ui/.ai/tests-e2e/ISSUE-016-group-mentions/03-mobile-bubble-highlight.png`
+
 ---
 
 ## 关闭备注
 
-待修复后复测：`18337488675` 被 `13733632709` 在同一群聊 @ 时，消息气泡高亮 @ 片段，且会话列表显示 `[有人@我]` 提示。
+已复测：`18337488675` 被 `13733632709` 在群聊 @ 时，消息气泡高亮 `@leng_test_updated`，会话列表显示 `[有人@我]` 提示；桌面和移动端均通过视觉回归。

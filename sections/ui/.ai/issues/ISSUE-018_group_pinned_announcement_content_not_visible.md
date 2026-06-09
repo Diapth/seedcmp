@@ -1,6 +1,6 @@
 # [ISSUE-018] 群聊置顶/公告内容修改后未在当前群信息中显示
 
-**状态**：Open
+**状态**：Resolved
 **创建时间**：2026-06-09
 **标签**：bug / group-chat / announcement / pinned
 
@@ -90,6 +90,23 @@ function handleAnnouncementUpdate(text) {
 
 ---
 
+## 修复记录
+
+1. `sections/ui/services/native-im/service.js`
+   - 新增 `updateGroupProfile(groupNo, { notice })`，对齐老前端 `updateGroupInfo()` 与后端 `PUT /v1/groups/{group_no}`。
+2. `sections/ui/stores/conversation.js`
+   - 新增 `updateGroupAnnouncement()`：本地乐观更新 `announcements` 和会话 `announcement` 字段，持久化失败时回滚并暴露错误。
+   - `setAnnouncement()` 同步更新当前会话对象，避免右侧群信息仍读到旧公告。
+3. `sections/ui/components/chat/GroupInfoPanel.vue`
+   - 群主判断改用真实当前用户 uid，并增加 `app_user` storage fallback，避免初始化顺序导致真实账号被误判为普通成员。
+   - 编辑公告时调用 `updateGroupAnnouncement()`，不再只写本地 store。
+4. `sections/ui/components/chat/RightWorkspace.vue`
+   - 群信息 fallback 保留真实 conversation 的 `announcement/creatorId/memberCount/channelId`，不再写死 `announcement=''`、`creatorId='me'`。
+5. `sections/ui/tests/native-im.test.mjs`
+   - 增加 `updateGroupProfile()` API 契约测试，断言真实接口路径与 notice payload。
+
+---
+
 ## 测试结果
 
 ```bash
@@ -103,8 +120,31 @@ cd /home/leng/.codex/skills/playwright-skill \
 # FAIL: modify pinned/announcement content visible in group info
 ```
 
+修复后验证：
+
+```bash
+cd sections/ui && node --test tests/native-im.test.mjs
+# exit 0
+```
+
+```bash
+cd /home/leng/.codex/skills/playwright-skill \
+  && TARGET_URL='http://127.0.0.1:5173' \
+     OUT_DIR='/tmp/seedcmp-new-ui-issuefix/sections/ui/.ai/tests-e2e/ISSUE-018-group-announcement' \
+     node run.js /tmp/playwright-issue-018-visual.js
+# exit 0
+# PASS desktop group announcement updates current group info
+# PASS mobile group announcement updates current group info
+# PASS mobile group announcement detail has no horizontal overflow
+```
+
+截图证据：
+
+1. `sections/ui/.ai/tests-e2e/ISSUE-018-group-announcement/01-desktop-announcement-updated.png`
+2. `sections/ui/.ai/tests-e2e/ISSUE-018-group-announcement/02-mobile-announcement-updated.png`
+
 ---
 
 ## 关闭备注
 
-待修复后复测：当前群修改置顶/公告内容后，右侧群信息立即显示新内容，刷新或另一账号打开后仍保持一致。
+已复测：当前群修改群公告后，右侧群信息立即显示新内容；桌面端和移动端均通过视觉回归。后端持久化路径对齐 `PUT /v1/groups/{group_no}`，可由真实登录态跨账号刷新验证。

@@ -69,6 +69,30 @@ export const useAppStore = defineStore('app', {
         throw error;
       }
     },
+    async updateCurrentUserProfile(fields = {}) {
+      this.nativeError = '';
+      try {
+        const session = await nativeImService.updateCurrentUserProfile(fields);
+        const nextUser = {
+          ...(this.currentUser || {}),
+          ...(session.user || {}),
+          nickname: session.user?.nickname || fields.name || fields.nickname || this.currentUser?.nickname || '',
+          name: session.user?.name || fields.name || fields.nickname || this.currentUser?.name || '',
+          shortNo: session.user?.shortNo || fields.shortNo || fields.short_no || this.currentUser?.shortNo || '',
+          sex: session.user?.sex ?? fields.sex ?? this.currentUser?.sex,
+          raw: {
+            ...(this.currentUser?.raw || {}),
+            ...(session.raw || {}),
+            name: session.raw?.name || fields.name || fields.nickname || this.currentUser?.raw?.name || ''
+          }
+        };
+        this.setCurrentUser(nextUser, session.token || this.token);
+        return nextUser;
+      } catch (error) {
+        this.nativeError = errorText(error);
+        throw error;
+      }
+    },
     async initializeNativeIm(options = {}) {
       const uid = resolveSelfId(this.currentUser);
       if (!uid || uid === 'me' || !this.token) return { connected: false, reason: 'missing-session' };

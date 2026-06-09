@@ -1036,9 +1036,11 @@ func (c *Clowder) ensureProjectGroup(ctx *wkhttp.Context) {
 		if req.ProjectThreadID != "" {
 			binding.ProjectThreadID = strings.TrimSpace(req.ProjectThreadID)
 		}
+		binding.UserMemberIDs = projectGroupRequiredMemberUIDsForBinding(userID, pmMemberID, binding.UserMemberIDs, req.UserMemberIDs)
+		binding.CatMemberIDs = cleanStringList(append(binding.CatMemberIDs, req.CatMemberIDs...))
 		c.projectGroupBindings[key] = binding
 		_ = c.ensureVirtualClowderUser(pmMemberID, pmDisplayName)
-		_ = c.ensureProjectGroupMembers(binding.ProjectGroupNo, userID, pmMemberID)
+		_ = c.ensureProjectGroupMembers(binding.ProjectGroupNo, userID, pmMemberID, binding.UserMemberIDs)
 		_ = c.sendProjectGroupHandoff(userID, req, binding, true)
 		ctx.JSON(http.StatusOK, projectGroupEnsureResponse{
 			Binding: binding,
@@ -1053,7 +1055,8 @@ func (c *Clowder) ensureProjectGroup(ctx *wkhttp.Context) {
 		return
 	}
 
-	groupNo, reused, err := c.findOrCreateProjectGroup(projectName, userID, pmMemberID)
+	requiredMemberIDs := projectGroupRequiredMemberUIDs(userID, pmMemberID, req.UserMemberIDs)
+	groupNo, reused, err := c.findOrCreateProjectGroup(projectName, userID, pmMemberID, requiredMemberIDs)
 	if err != nil {
 		ctx.JSON(http.StatusBadGateway, map[string]string{"error": "project_group_create_failed", "message": err.Error()})
 		return
@@ -1071,7 +1074,7 @@ func (c *Clowder) ensureProjectGroup(ctx *wkhttp.Context) {
 		ProjectGroupNo:      groupNo,
 		ProjectThreadID:     strings.TrimSpace(req.ProjectThreadID),
 		PMMemberID:          pmMemberID,
-		UserMemberIDs:       projectGroupRequiredMemberUIDs(userID, pmMemberID, req.UserMemberIDs),
+		UserMemberIDs:       requiredMemberIDs,
 		CatMemberIDs:        cleanStringList(req.CatMemberIDs),
 		CreatedBy:           "pm",
 		CreatedAt:           now,
@@ -1328,6 +1331,10 @@ func projectGroupRequiredMemberUIDs(userID string, pmMemberID string, extraUserI
 	return cleanStringList(append([]string{userID, pmMemberID}, extraUserIDs...))
 }
 
+func projectGroupRequiredMemberUIDsForBinding(userID string, pmMemberID string, existingUserIDs []string, requestUserIDs []string) []string {
+	return projectGroupRequiredMemberUIDs(userID, pmMemberID, append(existingUserIDs, requestUserIDs...))
+}
+
 func projectGroupResponse(groupNo string, groupName string, owner string) map[string]interface{} {
 	return map[string]interface{}{
 		"group_no": groupNo,
@@ -1420,16 +1427,16 @@ func (c *Clowder) updateProjectGroupBindingThread(bindingID string, userID strin
 	return ProjectGroupBinding{}, false
 }
 
-func (c *Clowder) findOrCreateProjectGroup(projectName string, userID string, pmMemberID string) (string, bool, error) {
+func (c *Clowder) findOrCreateProjectGroup(projectName string, userID string, pmMemberID string, memberUIDs []string) (string, bool, error) {
 	if existing, ok, err := c.findExistingProjectGroup(projectName, userID); err != nil {
 		return "", false, err
 	} else if ok {
-		if err := c.ensureProjectGroupMembers(existing, userID, pmMemberID); err != nil {
+		if err := c.ensureProjectGroupMembers(existing, userID, pmMemberID, memberUIDs); err != nil {
 			return "", true, err
 		}
 		return existing, true, nil
 	}
-	groupNo, err := c.createProjectGroup(projectName, userID, pmMemberID)
+	groupNo, err := c.createProjectGroup(projectName, userID, pmMemberID, memberUIDs)
 	return groupNo, false, err
 }
 
@@ -1457,13 +1464,13 @@ func (c *Clowder) findExistingProjectGroup(projectName string, userID string) (s
 	return strings.TrimSpace(rows[0].GroupNo), true, nil
 }
 
-func (c *Clowder) createProjectGroup(projectName string, userID string, pmMemberID string) (string, error) {
+func (c *Clowder) createProjectGroup(projectName string, userID string, pmMemberID string, memberUIDs []string) (string, error) {
 	if c.ctx == nil {
 		return "", fmt.Errorf("im context unavailable")
 	}
 	groupNo := util.GenerUUID()
 	version := c.ctx.GenSeq(common.GroupSeqKey)
-	memberUIDs := projectGroupRequiredMemberUIDs(userID, pmMemberID, nil)
+	memberUIDs = projectGroupRequiredMemberUIDs(userID, pmMemberID, memberUIDs)
 
 	tx, err := c.ctx.DB().Begin()
 	if err != nil {
@@ -1533,8 +1540,8 @@ func (c *Clowder) createProjectGroup(projectName string, userID string, pmMember
 	return groupNo, nil
 }
 
-func (c *Clowder) ensureProjectGroupMembers(groupNo string, userID string, pmMemberID string) error {
-	memberUIDs := projectGroupRequiredMemberUIDs(userID, pmMemberID, nil)
+func (c *Clowder) ensureProjectGroupMembers(groupNo string, userID string, pmMemberID string, memberUIDs []string) error {
+	memberUIDs = projectGroupRequiredMemberUIDs(userID, pmMemberID, memberUIDs)
 	existing := make([]string, 0, len(memberUIDs))
 	_, err := c.ctx.DB().
 		Select("uid").

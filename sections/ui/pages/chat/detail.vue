@@ -69,7 +69,7 @@
         <!-- Bottom Input area -->
         <MessageInput
           :draft="activeConversation?.draft"
-          :reply-target="replyTarget"
+          :reply-target="activeReplyTarget"
           :mention-members="mentionCandidates"
           :is-desktop="isDesktop"
           @send="handleSendMessage"
@@ -291,6 +291,11 @@ import {
   resolveSelfName,
   shouldStartLocalClowderStream
 } from '@/services/native-im/message-state';
+import {
+  createReplyTarget,
+  replyTargetForConversation,
+  shouldClearReplyTargetOnConversationChange
+} from '@/services/native-im/reply-state';
 
 const { isDesktop } = useResponsiveLayout();
 const convStore = useConversationStore();
@@ -381,6 +386,8 @@ const messagesList = computed(() => {
   if (!convStore.activeId) return [];
   return (messageStore.messages[convStore.activeId] || []).filter(isVisibleChatMessage);
 });
+
+const activeReplyTarget = computed(() => replyTargetForConversation(replyTarget.value, convStore.activeId));
 
 const activeConversationSubtitle = computed(() => {
   const conv = activeConversation.value;
@@ -573,6 +580,9 @@ function navigateToConversationProfile(conversation) {
 }
 
 function handleSelectConversation(id) {
+  if (shouldClearReplyTargetOnConversationChange(replyTarget.value, id)) {
+    replyTarget.value = null;
+  }
   convStore.setActiveId(id);
   convStore.markConversationRead(id, { silent: true });
   syncActiveMessages({ silent: true });
@@ -680,11 +690,11 @@ function handleMenuAction({ action, msg, emoji }) {
     if (!isSelfSender(msg.senderId, appStore.currentUser || {})) return;
     messageStore.revokeMessage(convStore.activeId, msg.id);
   } else if (action === 'reply') {
-    replyTarget.value = {
+    replyTarget.value = createReplyTarget({
       id: msg.id,
       senderName: msg.senderName,
       contentPreview: (msg.content || '').slice(0, 60)
-    };
+    }, convStore.activeId);
   } else if (action === 'react') {
     emojiPickerMode.value = 'reaction';
     emojiPickerVisible.value = true;
@@ -693,11 +703,11 @@ function handleMenuAction({ action, msg, emoji }) {
 }
 
 function handleFilePreviewQuote(payload) {
-  replyTarget.value = {
+  replyTarget.value = createReplyTarget({
     id: payload?.id || `file-selection-${Date.now()}`,
     senderName: payload?.senderName || payload?.fileName || '文件片段',
     contentPreview: payload?.contentPreview || ''
-  };
+  }, payload?.conversationId || convStore.activeId);
 }
 
 function handleEmojiSelect(emoji) {
@@ -711,11 +721,12 @@ function handleEmojiSelect(emoji) {
 }
 
 function openFilePreview(file) {
+  const scopedFile = { ...file, conversationId: file?.conversationId || convStore.activeId };
   if (!isDesktop.value) {
-    uni.navigateTo({ url: `/pages/files/preview?file=${encodePreviewFile(file)}` });
+    uni.navigateTo({ url: `/pages/files/preview?file=${encodePreviewFile(scopedFile)}` });
     return;
   }
-  selectedPreviewFile.value = file;
+  selectedPreviewFile.value = scopedFile;
   previewVisible.value = true;
   profilePaneVisible.value = false;
   agentProfileDialogVisible.value = false;
@@ -752,6 +763,7 @@ function isArchiveFile(name) {
 function encodePreviewFile(file) {
   const payload = {
     id: file?.id || '',
+    conversationId: file?.conversationId || '',
     name: file?.name || file?.fileName || file?.content || '',
     fileName: file?.fileName || file?.name || file?.content || '',
     content: file?.content || '',
@@ -762,7 +774,7 @@ function encodePreviewFile(file) {
     url: file?.url || '',
     sourceUrl: file?.sourceUrl || '',
     contentUrl: file?.contentUrl || '',
-    previewContent: file?.previewContent || file?.contentText || file?.markdown || file?.text || '',
+    previewContent: file?.previewContent || file?.contentText || file?.markdown || file?.text || file?.content || '',
     contentText: file?.contentText || '',
     markdown: file?.markdown || '',
     text: file?.text || ''

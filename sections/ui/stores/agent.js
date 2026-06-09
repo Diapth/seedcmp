@@ -1,5 +1,6 @@
 import { defineStore } from 'pinia';
 import { nativeImService } from '@/services/native-im/service';
+import { normalizeClowderProjectBoard } from '@/services/native-im/project-board';
 
 const STATIC_AGENT_IDS = new Set([
   'pm-agent',
@@ -478,6 +479,46 @@ export const useAgentStore = defineStore('agent', {
       }));
       return skills;
     },
+    applyProjectBoard(board) {
+      if (!board?.groupId) return null;
+      const idx = this.boards.findIndex((item) => item.id === board.id || item.groupId === board.groupId);
+      if (idx >= 0) this.boards[idx] = { ...this.boards[idx], ...board };
+      else this.boards.unshift(board);
+      return board;
+    },
+    async syncProjectBoardForGroup(groupId, options = {}) {
+      const id = String(groupId || '').trim();
+      if (!id) return null;
+      try {
+        const binding = await nativeImService.fetchActiveProjectGroup({
+          projectGroupNo: id,
+          projectGroupId: id
+        });
+        if (!binding?.projectGroupNo && !binding?.project_group_no && !binding?.projectGroupId && !binding?.project_group_id) {
+          return null;
+        }
+        const threadId = binding.projectThreadId || binding.project_thread_id || binding.threadId || binding.thread_id;
+        let tasks = [];
+        if (threadId) {
+          try {
+            tasks = await nativeImService.fetchThreadTasks(threadId);
+          } catch (error) {
+            tasks = [];
+            this.nativeError = agentErrorText(error);
+          }
+        }
+        const board = normalizeClowderProjectBoard({
+          binding,
+          tasks,
+          agents: this.agents
+        });
+        return this.applyProjectBoard(board);
+      } catch (error) {
+        if (!options.silent) this.nativeError = agentErrorText(error);
+        if (!options.silent) throw error;
+        return null;
+      }
+    },
     async fetchNativeAgents(options = {}) {
       if (!options.silent) this.syncState = 'syncing';
       if (options.clearStatic !== false) this.clearStaticCatalog();
@@ -499,18 +540,47 @@ export const useAgentStore = defineStore('agent', {
         return { agents: [] };
       }
     },
-    createAgent(agent) {
-      const id = 'agent-' + Date.now().toString();
-      this.agents.push({
-        ...agent,
-        id,
-        isAgent: true,
-        source: 'user',
-        connected: true,
-        status: 'active',
-        creator: 'User'
-      });
-      return id;
+    async createAgent(agent) {
+      try {
+        const created = await nativeImService.createClowderCat({
+          ...agent,
+          roleTemplateId: agent.roleTemplate || agent.templateId,
+          defaultModel: agent.model || agent.customModel,
+          personality: agent.systemPrompt || agent.desc,
+          capabilities: agent.capabilityTags || agent.capabilities || []
+        });
+        const next = {
+          ...agent,
+          ...created,
+          id: created.id,
+          alias: created.alias || agent.alias,
+          desc: created.desc || agent.desc,
+          isAgent: true,
+          source: 'clowder',
+          connected: created.connected !== false,
+          status: created.status || 'active',
+          creator: 'User',
+          apiKey: ''
+        };
+        const existingIndex = this.agents.findIndex((item) => item.id === next.id);
+        if (existingIndex >= 0) this.agents[existingIndex] = next;
+        else this.agents.push(next);
+        return next.id;
+      } catch (error) {
+        this.nativeError = agentErrorText(error);
+        const id = 'agent-' + Date.now().toString();
+        this.agents.push({
+          ...agent,
+          id,
+          isAgent: true,
+          source: 'user',
+          connected: false,
+          status: 'inactive',
+          creator: 'User',
+          runtimeError: this.nativeError
+        });
+        throw error;
+      }
     },
     updateAgent(id, patch) {
       const idx = this.agents.findIndex(agent => agent.id === id);

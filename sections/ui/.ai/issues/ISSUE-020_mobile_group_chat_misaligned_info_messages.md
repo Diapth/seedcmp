@@ -1,6 +1,6 @@
 # [ISSUE-020] 移动端群聊消息区存在横向错位元素
 
-**状态**：Open
+**状态**：Resolved
 **创建时间**：2026-06-09
 **标签**：bug / mobile / layout / group-chat
 
@@ -82,6 +82,18 @@
 
 ---
 
+## 修复记录
+
+1. `sections/ui/components/chat/FileCard.vue`
+   - 长文件名 `uni-text` 增加稳定收缩约束：`display:block;width:100%;min-width:0;overflow:hidden;text-overflow:ellipsis`。
+   - 对内部 `span` 增加同样的最大宽度和省略规则，避免 H5 渲染时内部 span 以原始长文本宽度越过移动端视口。
+2. `/tmp/playwright-issue-020-probe.js`
+   - 定位到实际 offender 为长文件名内部 `span`，坐标 `x=125,width=439,right=564`。
+3. `/tmp/playwright-issue-020-visual.js`
+   - 增加移动端可见 DOM 越界扫描，覆盖系统消息、长文本消息、长文件名文件卡片和群信息页。
+
+---
+
 ## 测试结果
 
 ```bash
@@ -98,8 +110,26 @@ cd /home/leng/.codex/skills/playwright-skill \
 # PASS: mobile group info page has no horizontal overflow
 ```
 
+修复后验证：
+
+```bash
+cd /home/leng/.codex/skills/playwright-skill \
+  && TARGET_URL='http://127.0.0.1:5173' \
+     OUT_DIR='/tmp/seedcmp-new-ui-issuefix/sections/ui/.ai/tests-e2e/ISSUE-020-mobile-layout' \
+     node run.js /tmp/playwright-issue-020-visual.js
+# exit 0
+# PASS mobile group detail has no visible horizontal misaligned elements
+# PASS mobile group info has no visible horizontal misaligned elements
+```
+
+截图证据：
+
+1. `sections/ui/.ai/tests-e2e/ISSUE-020-mobile-layout/01-desktop-layout-reference.png`
+2. `sections/ui/.ai/tests-e2e/ISSUE-020-mobile-layout/02-mobile-group-detail-no-overflow.png`
+3. `sections/ui/.ai/tests-e2e/ISSUE-020-mobile-layout/03-mobile-group-info-no-overflow.png`
+
 ---
 
 ## 关闭备注
 
-待修复后复测：移动端群聊详情页在常见手机视口下无信息消息错位、无可见横向越界元素，群信息页仍保持正常。
+已复测：移动端 390 x 844 群聊详情页无可见横向错位元素；系统消息、长文本消息、长文件名文件卡片和群信息页均通过视觉回归。

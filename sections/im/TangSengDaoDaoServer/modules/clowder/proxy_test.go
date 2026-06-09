@@ -582,6 +582,26 @@ func TestProjectGroupRequiredMembersAlwaysIncludeUserAndPM(t *testing.T) {
 	assert.Equal(t, []string{"user-1", defaultPMMemberID, "helper-1"}, members)
 }
 
+func TestProjectGroupRequiredMembersMergeExistingBindingAndRequestMembers(t *testing.T) {
+	members := projectGroupRequiredMemberUIDsForBinding(
+		"user-1",
+		defaultPMMemberID,
+		[]string{"helper-old", "user-1"},
+		[]string{"helper-new", "helper-old"},
+	)
+
+	assert.Equal(t, []string{"user-1", defaultPMMemberID, "helper-old", "helper-new"}, members)
+}
+
+func TestFindOrCreateProjectGroupAcceptsExtraHumanMembers(t *testing.T) {
+	c := New(nil)
+
+	_, _, err := c.findOrCreateProjectGroup("项目群", "user-1", defaultPMMemberID, []string{"helper-1"})
+
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "im context unavailable")
+}
+
 func TestNormalizeProjectGroupNameTrimsQuotesAndLength(t *testing.T) {
 	assert.Equal(t, "PM项目群验收", normalizeProjectGroupName("「PM项目群验收」"))
 	assert.Equal(t, "项目群聊", normalizeProjectGroupName(" "))

@@ -39,6 +39,7 @@ import { useConversationStore } from '@/stores/conversation';
 import { useGroupStore } from '@/stores/group';
 import { useContactStore } from '@/stores/contact';
 import { useNavigationStore } from '@/stores/navigation';
+import { buildGroupScopedRoute } from '@/services/native-im/conversation-state';
 import AppShell from '@/components/layout/AppShell.vue';
 import MobilePageHeader from '@/components/layout/MobilePageHeader.vue';
 import GroupInfoPanel from '@/components/chat/GroupInfoPanel.vue';
@@ -105,11 +106,11 @@ function goBack() {
 }
 
 function openMembers() {
-  uni.navigateTo({ url: `/pages/group/members?id=${encodeURIComponent(groupId.value)}` });
+  uni.navigateTo({ url: buildGroupScopedRoute('/pages/group/members', groupId.value) });
 }
 
 function openQrcode() {
-  uni.navigateTo({ url: `/pages/group/qrcode?id=${encodeURIComponent(groupId.value)}` });
+  uni.navigateTo({ url: buildGroupScopedRoute('/pages/group/qrcode', groupId.value) });
 }
 
 function openBoard() {
@@ -185,7 +186,7 @@ function encodePreviewFile(file) {
     url: file?.url || '',
     sourceUrl: file?.sourceUrl || '',
     contentUrl: file?.contentUrl || '',
-    previewContent: file?.previewContent || file?.contentText || file?.markdown || file?.text || '',
+    previewContent: file?.previewContent || file?.contentText || file?.markdown || file?.text || file?.content || '',
     contentText: file?.contentText || '',
     markdown: file?.markdown || '',
     text: file?.text || ''

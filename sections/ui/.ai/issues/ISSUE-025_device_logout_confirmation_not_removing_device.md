@@ -1,6 +1,6 @@
 # [ISSUE-025] 设备与登录管理中下线设备未移除设备
 
-**状态**：Open
+**状态**：Resolved
 **创建时间**：2026-06-09
 **标签**：bug / settings / device-management / h5
 
@@ -105,8 +105,53 @@ cd /home/leng/.codex/skills/playwright-skill \
 # FAIL: device logout removes device locally
 ```
 
+### 2026-06-09 修复验证
+
+代码关联：
+
+- `sections/ui/services/native-im/service.js`
+  - 新增 `fetchDevices` -> `GET /v1/user/devices`
+  - 新增 `deleteDevice` -> `DELETE /v1/user/devices/:device_id`
+  - 设备字段按后端 `device_id/device_name/device_model/last_login/self` 归一化。
+- `sections/ui/stores/settings.js`
+  - `syncDevices` 接入真实设备列表。
+  - `logoutDevice` 调用真实下线 API，成功后移除列表项。
+  - mock fallback 也记录已移除设备，避免刷新后恢复。
+- `sections/ui/pages/settings/devices.vue`
+  - 当前设备用 `isCurrent` 禁止下线。
+  - 非当前设备显示下线中状态，失败显示错误。
+- `sections/ui/components/layout/AppShell.vue`
+  - 新增全局 `useConfirm` -> `AppDialog` 出口，修复确认框状态无人渲染导致确认流程不稳定的问题。
+
+命令：
+
+```bash
+cd /tmp/seedcmp-new-ui-issuefix
+node sections/ui/tests/native-im.test.mjs
+# pass 53 / fail 0
+
+cd /tmp/seedcmp-new-ui-issuefix/sections/ui
+npm run build:h5
+# DONE Build complete.
+
+cd /home/leng/.codex/skills/playwright-skill \
+  && TARGET_URL='http://127.0.0.1:5173' \
+     OUT_DIR='/tmp/seedcmp-new-ui-issuefix/sections/ui/.ai/tests-e2e/ISSUE-025-device-logout' \
+     node run.js /tmp/playwright-issue-025-visual.js
+# PASS ISSUE-025 visual smoke
+```
+
+截图：
+
+- `sections/ui/.ai/tests-e2e/ISSUE-025-device-logout/desktop-01-devices.png`
+- `sections/ui/.ai/tests-e2e/ISSUE-025-device-logout/desktop-02-confirm.png`
+- `sections/ui/.ai/tests-e2e/ISSUE-025-device-logout/desktop-03-removed.png`
+- `sections/ui/.ai/tests-e2e/ISSUE-025-device-logout/mobile-01-devices.png`
+- `sections/ui/.ai/tests-e2e/ISSUE-025-device-logout/mobile-02-confirm.png`
+- `sections/ui/.ai/tests-e2e/ISSUE-025-device-logout/mobile-03-removed.png`
+
 ---
 
 ## 关闭备注
 
-待修复后复测：非当前设备下线后立即从列表移除，刷新后保持下线状态，并且后端会话实际失效。
+已修复并复测：非当前设备下线时弹出确认框，确认后调用 `DELETE /v1/user/devices/:device_id`，列表立即移除目标设备；当前设备不可下线。

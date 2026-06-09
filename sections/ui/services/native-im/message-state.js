@@ -33,7 +33,7 @@ export function toConversationPreview(value, maxLength = 80) {
     .replace(/(^|\s)#{1,6}\s*/g, '$1')
     .replace(/(^|\s)>\s*/g, '$1')
     .replace(/(^|\s)([-*+]|\d+\.)\s+/g, '$1')
-    .replace(/[*_~]{1,3}/g, '')
+    .replace(/[*~]{1,3}/g, '')
     .replace(/[|]/g, ' ')
     .replace(/\s+/g, ' ')
     .trim();
@@ -90,6 +90,19 @@ function normalizeStreamPhase(event = {}) {
 function normalizeAgentFile(file = {}, streamKey = '', index = 0) {
   const name = firstNonEmpty(file.fileName, file.name, file.title, `智能体文件-${index + 1}`);
   const url = firstNonEmpty(file.url, file.sourceUrl, file.contentUrl, file.path);
+  const extension = clean(file.fileType || file.ext || name.split('.').pop()).toLowerCase();
+  const inlineTextTypes = new Set([
+    'md', 'markdown', 'html', 'htm', 'txt', 'text', 'json',
+    'js', 'ts', 'jsx', 'tsx', 'css', 'less', 'scss', 'vue',
+    'py', 'java', 'cpp', 'c', 'go', 'sql', 'sh', 'xml', 'yaml', 'yml'
+  ]);
+  const inlineContent = firstNonEmpty(
+    file.previewContent,
+    file.contentText,
+    file.markdown,
+    file.text,
+    inlineTextTypes.has(extension) ? file.content : ''
+  );
   return {
     id: firstNonEmpty(file.id, file.fileId, `${streamKey}-file-${index}`),
     type: 'file',
@@ -98,12 +111,12 @@ function normalizeAgentFile(file = {}, streamKey = '', index = 0) {
     fileName: name,
     fileSize: file.fileSize || file.size || '',
     fileSizeBytes: safeNumber(file.fileSizeBytes ?? file.bytes, 0),
-    fileType: firstNonEmpty(file.fileType, file.ext, name.split('.').pop()),
+    fileType: firstNonEmpty(file.fileType, file.ext, extension),
     mimeType: firstNonEmpty(file.mimeType, file.type),
     url,
     sourceUrl: firstNonEmpty(file.sourceUrl, url),
     contentUrl: firstNonEmpty(file.contentUrl, url),
-    previewContent: firstNonEmpty(file.previewContent, file.contentText, file.markdown, file.text),
+    previewContent: inlineContent,
     generatedByAgent: true,
     source: 'clowder',
     raw: file
@@ -366,6 +379,26 @@ export function isSelfSender(senderId, currentUser = {}) {
   return collectSelfIds(currentUser).has(id);
 }
 
+function messageMentionsCurrentUser(message = {}, currentUser = {}) {
+  if (message.mentionAll) return true;
+  const selfIds = collectSelfIds(currentUser);
+  if (!selfIds.size) return false;
+  const mentions = Array.isArray(message.mentions) ? message.mentions : [];
+  const mentionUids = Array.isArray(message.mentionUids) ? message.mentionUids : [];
+  return [...mentions, ...mentionUids].some((mention) => {
+    if (mention && typeof mention === 'object') {
+      return [
+        mention.userId,
+        mention.user_id,
+        mention.uid,
+        mention.id
+      ].map(clean).some((id) => id && selfIds.has(id));
+    }
+    const id = clean(mention);
+    return id && selfIds.has(id);
+  });
+}
+
 export function resolveSelfId(currentUser = {}) {
   currentUser = currentUser || {};
   return firstNonEmpty(
@@ -495,7 +528,8 @@ export function conversationSummaryForMessage(message = {}, currentUser = {}, co
   }
   if (conversation?.type === 'group') {
     const senderName = firstNonEmpty(message.senderName, message.sender_id, message.senderId);
-    return senderName ? `${senderName}: ${digest}` : digest;
+    const reminder = messageMentionsCurrentUser(message, currentUser) ? '[有人@我] ' : '';
+    return `${reminder}${senderName ? `${senderName}: ${digest}` : digest}`;
   }
   return digest;
 }

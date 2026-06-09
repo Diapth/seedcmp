@@ -46,3 +46,18 @@ npm run test:smoke
 ```
 
 Playwright 四视口验收通过：375x844、768x1024、1024x768、1440x900，且无未过滤 JS 运行时错误。
+
+补充复测：
+
+```bash
+TARGET_URL='http://127.0.0.1:5173' OUT_ROOT='/tmp/seedcmp-new-ui-issuefix/sections/ui/.ai/tests-e2e' node run.js /tmp/playwright-issue-010-014-visual-current.js
+```
+
+截图：
+
+```text
+sections/ui/.ai/tests-e2e/ISSUE-010-anonymous-current-user-null/mobile-375-375x844.png
+sections/ui/.ai/tests-e2e/ISSUE-010-anonymous-current-user-null/tablet-768-768x1024.png
+sections/ui/.ai/tests-e2e/ISSUE-010-anonymous-current-user-null/landscape-1024-1024x768.png
+sections/ui/.ai/tests-e2e/ISSUE-010-anonymous-current-user-null/desktop-1440-1440x900.png
+```

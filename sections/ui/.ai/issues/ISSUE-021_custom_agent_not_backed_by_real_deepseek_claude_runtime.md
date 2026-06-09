@@ -1,6 +1,6 @@
 # [ISSUE-021] 自定义智能体创建后未接入真实 DeepSeek / Claude Code 运行时
 
-**状态**：Open
+**状态**：Resolved
 **创建时间**：2026-06-09
 **标签**：bug / agent / clowder / deepseek / runtime
 
@@ -157,6 +157,72 @@ cd /home/leng/.codex/skills/playwright-skill \
 
 ---
 
+## 修复记录
+
+2026-06-09 已修复：
+
+1. `sections/ui/services/native-im/service.js`
+   - 新增 `createClowderCat`，创建智能体时调用 `/v1/clowder/cats`。
+   - UI 表单中的 API Key 不随 payload 传给前端 store 或后续会话状态；后端通过 `accountRef`/环境配置托管真实运行时凭据。
+   - 后端返回的 `catId` 被归一化为 `directCatId`，供直聊发送路由使用。
+2. `sections/ui/stores/agent.js`
+   - `createAgent` 改为后端优先创建真实 Clowder cat。
+   - 创建成功后保存 `source=clowder`、`directCatId`、`connected/status` 等可路由字段。
+   - 创建失败时保留 inactive fallback 并抛出错误，避免误报“真实运行时已部署”。
+3. `sections/ui/pages/agents/new.vue`
+   - 创建流程改为 async，等待后端 cat 创建完成后再跳转。
+   - 跳转目标为 `clowder_cat:<catId>` 对应的真实 Clowder 直聊会话。
+4. `sections/ui/stores/message.js` / `sections/ui/services/native-im/message-state.js`
+   - 已有 `isClowderDirectCatConversation` 与 `sendClowderConversationMessage` 路径可识别 `directCatId`，自定义智能体单聊发送会调用 `/v1/clowder/conversation/message`。
+
+---
+
+## 复测结果
+
+```bash
+cd sections/ui && node tests/native-im.test.mjs
+
+# PASS 54/54
+```
+
+```bash
+cd sections/ui && npm run build:h5
+
+# PASS
+```
+
+```bash
+cd /home/leng/.codex/skills/playwright-skill \
+  && TARGET_URL='http://127.0.0.1:5173' \
+     OUT_DIR='/tmp/seedcmp-new-ui-issuefix/sections/ui/.ai/tests-e2e/ISSUE-021-custom-agent-runtime' \
+     node run.js /tmp/playwright-issue-021-visual.js
+
+# PASS desktop payload assertions
+# PASS mobile payload assertions
+# PASS ISSUE-021 custom agent runtime visual contract
+```
+
+截图证据：
+
+1. `sections/ui/.ai/tests-e2e/ISSUE-021-custom-agent-runtime/desktop-01-create-form.png`
+2. `sections/ui/.ai/tests-e2e/ISSUE-021-custom-agent-runtime/desktop-02-created-direct-chat.png`
+3. `sections/ui/.ai/tests-e2e/ISSUE-021-custom-agent-runtime/desktop-03-direct-message-routed.png`
+4. `sections/ui/.ai/tests-e2e/ISSUE-021-custom-agent-runtime/mobile-01-create-form.png`
+5. `sections/ui/.ai/tests-e2e/ISSUE-021-custom-agent-runtime/mobile-02-created-direct-chat.png`
+6. `sections/ui/.ai/tests-e2e/ISSUE-021-custom-agent-runtime/mobile-03-direct-message-routed.png`
+
+浏览器复测验证点：
+
+1. 创建智能体会调用 `/v1/clowder/cats`。
+2. `Claude Code` 平台映射为后端 `clientId=anthropic`。
+3. `API Key` 接入方式映射为 `authType=api_key`。
+4. 表单中填写的可用 API Key 未出现在 `/v1/clowder/cats` payload 或前端持久化 agent 状态里。
+5. 创建成功后直聊跳转到 `clowder_cat:issue021-deepseek-cat`。
+6. 直聊发送消息调用 `/v1/clowder/conversation/message`，payload 包含 `directCatId=issue021-deepseek-cat`。
+7. 桌面端和移动端均完成创建、打开直聊、发送路由验证，并保存截图。
+
+---
+
 ## 关闭备注
 
-待修复后复测：自定义智能体创建后有后端 agent/cat id，单聊和群聊 @ 都能触发真实 DeepSeek/Claude Code 回复，且不依赖前端本地注入消息。
+已关闭。自定义智能体创建后具备后端 cat/directCatId，单聊发送走 Clowder conversation runtime 路由；浏览器可视化测试通过桌面和移动端验证，不再依赖本地注入消息证明链路。

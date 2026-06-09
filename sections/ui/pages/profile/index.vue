@@ -75,6 +75,51 @@
           </view>
         </view>
       </scroll-view>
+
+      <AppDialog
+        v-model:visible="editVisible"
+        title="编辑资料"
+        variant="bottom-sheet"
+        width="md"
+        confirm-text="保存"
+        cancel-text="取消"
+        :loading="savingProfile"
+        :confirm-disabled="!editForm.nickname.trim()"
+        @confirm="saveProfile"
+      >
+        <view class="profile-edit-form flex-column">
+          <view class="edit-field flex-column">
+            <text class="edit-label">昵称</text>
+            <input
+              v-model="editForm.nickname"
+              class="edit-input"
+              maxlength="32"
+              placeholder="请输入昵称"
+              placeholder-style="color: var(--color-text-muted)"
+            />
+          </view>
+          <view class="edit-field flex-column">
+            <text class="edit-label">短号</text>
+            <input
+              v-model="editForm.shortNo"
+              class="edit-input"
+              maxlength="32"
+              placeholder="可选"
+              placeholder-style="color: var(--color-text-muted)"
+            />
+          </view>
+          <view class="edit-field flex-column">
+            <text class="edit-label">性别</text>
+            <picker :range="sexOptions" range-key="label" :value="editForm.sexIndex" @change="changeSex">
+              <view class="edit-picker flex-row align-center justify-between">
+                <text>{{ sexOptions[editForm.sexIndex]?.label || '未设置' }}</text>
+                <AppIcon name="chevron-right" :size="14" color="var(--color-text-muted)" />
+              </view>
+            </picker>
+          </view>
+          <text v-if="editError" class="edit-error">{{ editError }}</text>
+        </view>
+      </AppDialog>
     </view>
   </AppSubpageShell>
 </template>
@@ -88,6 +133,7 @@ import { useContactStore } from '@/stores/contact';
 import AppSubpageShell from '@/components/layout/AppSubpageShell.vue';
 import AppAvatar from '@/components/common/AppAvatar.vue';
 import AppIcon from '@/components/common/AppIcon.vue';
+import AppDialog from '@/components/common/AppDialog.vue';
 import ContactCard from '@/components/contacts/ContactCard.vue';
 
 const appStore = useAppStore();
@@ -95,6 +141,19 @@ const navStore = useNavigationStore();
 const contactStore = useContactStore();
 const qrSeed = ref(0);
 const routeOptions = ref({});
+const editVisible = ref(false);
+const savingProfile = ref(false);
+const editError = ref('');
+const sexOptions = [
+  { label: '未设置', value: 0 },
+  { label: '男', value: 1 },
+  { label: '女', value: 2 }
+];
+const editForm = ref({
+  nickname: '',
+  shortNo: '',
+  sexIndex: 0
+});
 
 const user = computed(() => {
   return appStore.currentUser || {
@@ -164,7 +223,39 @@ function refreshQr() {
 }
 
 function editProfile() {
-  uni.showToast({ title: '资料编辑面板已打开', icon: 'none' });
+  editForm.value = {
+    nickname: user.value.nickname || user.value.name || '',
+    shortNo: user.value.shortNo || user.value.short_no || '',
+    sexIndex: Math.max(0, sexOptions.findIndex((item) => Number(item.value) === Number(user.value.sex || 0)))
+  };
+  editError.value = '';
+  editVisible.value = true;
+}
+
+function changeSex(e) {
+  editForm.value.sexIndex = Number(e.detail.value || 0);
+}
+
+async function saveProfile() {
+  if (!editForm.value.nickname.trim()) {
+    editError.value = '昵称不能为空';
+    return;
+  }
+  savingProfile.value = true;
+  editError.value = '';
+  try {
+    await appStore.updateCurrentUserProfile({
+      name: editForm.value.nickname.trim(),
+      shortNo: editForm.value.shortNo.trim(),
+      sex: sexOptions[editForm.value.sexIndex]?.value || 0
+    });
+    editVisible.value = false;
+    uni.showToast({ title: '资料已更新', icon: 'success' });
+  } catch (error) {
+    editError.value = error?.msg || error?.message || '资料保存失败';
+  } finally {
+    savingProfile.value = false;
+  }
 }
 
 function navigate(url) {
@@ -428,6 +519,47 @@ function goBack() {
   cursor: pointer;
   color: var(--color-text-primary);
   font-size: 14px;
+}
+
+.profile-edit-form {
+  gap: 14px;
+}
+
+.edit-field {
+  gap: 6px;
+}
+
+.edit-label {
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--color-text-secondary);
+}
+
+.edit-input,
+.edit-picker {
+  width: 100%;
+  min-height: 44px;
+  border: 1px solid var(--color-border);
+  border-radius: 10px;
+  background-color: var(--color-bg-base);
+  color: var(--color-text-primary);
+  font-size: 14px;
+  padding: 0 12px;
+  box-sizing: border-box;
+}
+
+.edit-input {
+  line-height: 44px;
+}
+
+.edit-picker {
+  display: flex;
+}
+
+.edit-error {
+  font-size: 12px;
+  line-height: 1.45;
+  color: var(--color-error);
 }
 
 @media (max-width: 768px) {

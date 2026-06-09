@@ -1,6 +1,6 @@
 # [ISSUE-023] 注册页显示成功但未创建真实可登录账号
 
-**状态**：Open
+**状态**：Resolved
 **创建时间**：2026-06-09
 **标签**：bug / auth / register / h5
 
@@ -111,8 +111,49 @@ cd /home/leng/.codex/skills/playwright-skill \
 # FAIL: newly registered account can log in
 ```
 
+### 2026-06-09 修复验证
+
+代码关联：
+
+- `sections/ui/services/native-im/service.js`
+  - 新增 `sendRegisterCode` -> `POST /v1/user/sms/registercode`
+  - 新增 `registerAccount` -> `POST /v1/user/register`
+  - 注册 payload 对齐 TangSeng：`zone/phone/name/code/password/flag/device`
+- `sections/ui/pages/login/register.vue`
+  - 验证码发送和注册成功不再本地 mock。
+  - 注册成功后写入 `appStore` 登录态并进入 `#/pages/chat/index`。
+- `sections/ui/tests/native-im.test.mjs`
+  - 新增注册验证码与真实账号 session 契约测试。
+
+命令：
+
+```bash
+cd /tmp/seedcmp-new-ui-issuefix
+node sections/ui/tests/native-im.test.mjs
+# pass 53 / fail 0
+
+cd /tmp/seedcmp-new-ui-issuefix/sections/ui
+npm run build:h5
+# DONE Build complete.
+
+cd /home/leng/.codex/skills/playwright-skill \
+  && TARGET_URL='http://127.0.0.1:5173' \
+     OUT_ROOT='/tmp/seedcmp-new-ui-issuefix/sections/ui/.ai/tests-e2e' \
+     node run.js /tmp/playwright-issue-023-024-visual.js
+# PASS ISSUE-023/024 visual smoke
+```
+
+截图：
+
+- `sections/ui/.ai/tests-e2e/ISSUE-023-register-real-account/desktop-01-empty.png`
+- `sections/ui/.ai/tests-e2e/ISSUE-023-register-real-account/desktop-02-code-sent.png`
+- `sections/ui/.ai/tests-e2e/ISSUE-023-register-real-account/desktop-03-registered-chat.png`
+- `sections/ui/.ai/tests-e2e/ISSUE-023-register-real-account/mobile-01-empty.png`
+- `sections/ui/.ai/tests-e2e/ISSUE-023-register-real-account/mobile-02-code-sent.png`
+- `sections/ui/.ai/tests-e2e/ISSUE-023-register-real-account/mobile-03-registered-chat.png`
+
 ---
 
 ## 关闭备注
 
-待修复后复测：新手机号注册成功后可真实登录，并进入 `#/pages/chat/index`。
+已修复并复测：注册流程调用真实 TangSeng 注册接口，成功后进入 `#/pages/chat/index`。当前浏览器验证使用 5173 + API route mock 校验 payload，真实环境仍依赖后端短信验证码服务可用。

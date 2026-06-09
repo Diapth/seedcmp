@@ -178,6 +178,9 @@ function previewFile() {
 }
 
 .file-name {
+  display: block;
+  width: 100%;
+  min-width: 0;
   max-width: 100%;
   font-size: 13.5px;
   font-weight: 600;
@@ -185,9 +188,20 @@ function previewFile() {
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
+  word-break: break-all;
+  overflow-wrap: anywhere;
   line-height: 1.4;
   margin-bottom: 2px;
   transition: color 0.2s ease;
+}
+
+.file-name :deep(span) {
+  display: block;
+  max-width: 100%;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .file-card:hover .file-name {

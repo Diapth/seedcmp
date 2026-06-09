@@ -1,6 +1,6 @@
 # [ISSUE-024] 个人资料编辑入口只显示提示，无法修改资料
 
-**状态**：Open
+**状态**：Resolved
 **创建时间**：2026-06-09
 **标签**：bug / profile / settings / h5
 
@@ -88,8 +88,50 @@ cd /home/leng/.codex/skills/playwright-skill \
 # FAIL: profile edit supports actual modification form
 ```
 
+### 2026-06-09 修复验证
+
+代码关联：
+
+- `sections/ui/services/native-im/service.js`
+  - 新增 `updateCurrentUserProfile` -> `PUT /v1/user/current`
+  - payload 只发送后端支持字段：`name/sex/short_no`
+- `sections/ui/stores/app.js`
+  - 新增 `updateCurrentUserProfile` action，保存成功后同步 `currentUser`、token 和 storage。
+- `sections/ui/pages/profile/index.vue`
+  - `编辑资料` 打开真实编辑面板，支持昵称、短号、性别。
+  - 保存失败显示错误；保存成功后页面昵称立即更新。
+- `sections/ui/tests/native-im.test.mjs`
+  - 新增个人资料更新接口契约测试。
+
+命令：
+
+```bash
+cd /tmp/seedcmp-new-ui-issuefix
+node sections/ui/tests/native-im.test.mjs
+# pass 53 / fail 0
+
+cd /tmp/seedcmp-new-ui-issuefix/sections/ui
+npm run build:h5
+# DONE Build complete.
+
+cd /home/leng/.codex/skills/playwright-skill \
+  && TARGET_URL='http://127.0.0.1:5173' \
+     OUT_ROOT='/tmp/seedcmp-new-ui-issuefix/sections/ui/.ai/tests-e2e' \
+     node run.js /tmp/playwright-issue-023-024-visual.js
+# PASS ISSUE-023/024 visual smoke
+```
+
+截图：
+
+- `sections/ui/.ai/tests-e2e/ISSUE-024-profile-edit-form/desktop-01-profile.png`
+- `sections/ui/.ai/tests-e2e/ISSUE-024-profile-edit-form/desktop-02-edit-form.png`
+- `sections/ui/.ai/tests-e2e/ISSUE-024-profile-edit-form/desktop-03-saved.png`
+- `sections/ui/.ai/tests-e2e/ISSUE-024-profile-edit-form/mobile-01-profile.png`
+- `sections/ui/.ai/tests-e2e/ISSUE-024-profile-edit-form/mobile-02-edit-form.png`
+- `sections/ui/.ai/tests-e2e/ISSUE-024-profile-edit-form/mobile-03-saved.png`
+
 ---
 
 ## 关闭备注
 
-待修复后复测：个人资料页点击 `编辑资料` 后可修改并保存资料，设置页同步显示修改后的用户信息。
+已修复并复测：个人资料页点击 `编辑资料` 后出现真实编辑表单，保存时调用 `PUT /v1/user/current`，成功后同步当前用户展示。

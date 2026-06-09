@@ -110,12 +110,42 @@
             </view>
           </view>
         </view>
+        <view v-else-if="groupWorkspaceMode === 'files'" class="group-files-pane flex-column">
+          <view class="board-topbar flex-row align-center justify-between">
+            <button class="board-back flex-row align-center" @click="showGroupInfo">
+              <AppIcon name="back" :size="16" color="var(--color-text-primary)" />
+              <text>群聊信息</text>
+            </button>
+            <view class="board-status flex-row align-center">
+              <AppIcon name="files" :size="15" color="var(--color-primary)" />
+              <text>{{ sharedFiles.length }} 个文件</text>
+            </view>
+          </view>
+
+          <view class="workspace-section group-files-section flex-column">
+            <text class="section-title">共享文件</text>
+            <view v-if="sharedFiles.length > 0" class="shared-files-list">
+              <view
+                v-for="file in sharedFiles"
+                :key="file.id || file.fileName || file.name"
+                class="shared-file-item flex-row align-center"
+                @click="$emit('preview-file', file)"
+              >
+                <AppIcon name="files" :size="18" color="var(--color-primary)" />
+                <text class="shared-file-name flex-1">{{ file.fileName || file.name || file.content }}</text>
+                <text class="shared-file-size">{{ file.fileSize || file.size || '' }}</text>
+              </view>
+            </view>
+            <text v-else class="empty-files-text">暂无共享文件</text>
+          </view>
+        </view>
         <GroupInfoPanel
           v-else
           :group="groupData"
           @open-members="openGroupMembers"
           @open-qrcode="openGroupQrcode"
           @open-board="openGroupBoard"
+          @open-files="openGroupFiles"
           @preview-file="$emit('preview-file', $event)"
           @select-member="$emit('select-member', $event)"
           @member-contextmenu="$emit('member-contextmenu', $event)"
@@ -174,6 +204,7 @@ import { useMessageStore } from '@/stores/message';
 import { useGroupStore } from '@/stores/group';
 import { useAgentStore } from '@/stores/agent';
 import { useConversationStore } from '@/stores/conversation';
+import { buildGroupScopedRoute } from '@/services/native-im/conversation-state';
 import AppAvatar from '../common/AppAvatar.vue';
 import AppIcon from '../common/AppIcon.vue';
 import ClowderPanel from './ClowderPanel.vue';
@@ -197,6 +228,7 @@ const groupWorkspaceMode = ref('info');
 const headerTitle = computed(() => {
   if (props.conversation.id === 'clowder') return 'Clowder AI 详情';
   if (props.conversation.type === 'group' && groupWorkspaceMode.value === 'board') return '智能体看板';
+  if (props.conversation.type === 'group' && groupWorkspaceMode.value === 'files') return '共享文件';
   if (props.conversation.type === 'group') return '群聊信息';
   return '会话详情';
 });
@@ -212,11 +244,12 @@ const groupData = computed(() => {
   if (props.conversation.type !== 'group') return null;
   return groupStore.groups.find((g) => g.id === props.conversation.id) || {
     id: props.conversation.id,
+    channelId: props.conversation.channelId || props.conversation.id,
     name: props.conversation.name,
     avatar: props.conversation.avatar,
-    memberCount: 0,
-    announcement: '',
-    creatorId: 'me',
+    memberCount: props.conversation.memberCount || 0,
+    announcement: props.conversation.announcement || '',
+    creatorId: props.conversation.creatorId || props.conversation.creator || props.conversation.owner || '',
     createTime: 0
   };
 });
@@ -250,7 +283,8 @@ const inlineCompletedCount = computed(() => {
 
 watch(() => props.conversation.id, () => {
   groupWorkspaceMode.value = 'info';
-});
+  syncProjectBoardForActiveGroup();
+}, { immediate: true });
 
 function togglePinned(e) {
   emit('update-conversation', { isPinned: e.detail.value });
@@ -261,11 +295,11 @@ function toggleMuted(e) {
 }
 
 function openGroupMembers() {
-  uni.navigateTo({ url: '/pages/group/members' });
+  uni.navigateTo({ url: buildGroupScopedRoute('/pages/group/members', props.conversation.id) });
 }
 
 function openGroupQrcode() {
-  uni.navigateTo({ url: '/pages/group/qrcode' });
+  uni.navigateTo({ url: buildGroupScopedRoute('/pages/group/qrcode', props.conversation.id) });
 }
 
 function openGroupBoard(board) {
@@ -274,8 +308,17 @@ function openGroupBoard(board) {
   }
 }
 
+function openGroupFiles() {
+  groupWorkspaceMode.value = 'files';
+}
+
 function showGroupInfo() {
   groupWorkspaceMode.value = 'info';
+}
+
+function syncProjectBoardForActiveGroup() {
+  if (props.conversation.type !== 'group' || !props.conversation.id) return;
+  agentStore.syncProjectBoardForGroup(props.conversation.id, { silent: true });
 }
 
 function statusText(status) {

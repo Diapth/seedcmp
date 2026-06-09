@@ -102,6 +102,108 @@ function memberDisplayName(member) {
   return firstText(member);
 }
 
+function mentionNameFromMap(source, uid) {
+  if (!source || typeof source !== 'object' || Array.isArray(source)) return '';
+  return firstText(source[uid], source[String(uid)]);
+}
+
+function mentionNameFromMembers(members, uid) {
+  if (!Array.isArray(members)) return '';
+  const member = members.find((item) => {
+    if (!item || typeof item !== 'object') return false;
+    return clean(firstNonEmpty(item.uid, item.userId, item.user_id, item.id)) === clean(uid);
+  });
+  return memberDisplayName(member);
+}
+
+function mentionDisplayName(mention = {}, uid = '', entry = {}) {
+  return firstText(
+    entry.name,
+    entry.nickname,
+    entry.displayName,
+    entry.display_name,
+    mentionNameFromMap(mention.names, uid),
+    mentionNameFromMap(mention.nicknames, uid),
+    mentionNameFromMap(mention.displayNames, uid),
+    mentionNameFromMap(mention.display_names, uid),
+    mentionNameFromMembers(mention.members, uid),
+    mentionNameFromMembers(mention.users, uid),
+    uid
+  );
+}
+
+function findMentionOffset(text = '', name = '', uid = '', start = 0) {
+  const source = String(text || '');
+  const candidates = [name, uid]
+    .map((value) => clean(value).replace(/^@/, ''))
+    .filter(Boolean);
+  for (const value of [...new Set(candidates)]) {
+    const token = `@${value}`;
+    const afterStart = source.indexOf(token, Math.max(0, start));
+    if (afterStart >= 0) return afterStart;
+    const anywhere = source.indexOf(token);
+    if (anywhere >= 0) return anywhere;
+  }
+  return -1;
+}
+
+function normalizeMentionEntry(entry, mention = {}, text = '', cursor = 0) {
+  const objectEntry = entry && typeof entry === 'object' ? entry : {};
+  const uid = firstNonEmpty(
+    objectEntry.userId,
+    objectEntry.user_id,
+    objectEntry.uid,
+    objectEntry.id,
+    typeof entry === 'object' ? '' : entry
+  );
+  const name = mentionDisplayName(mention, uid, objectEntry);
+  const explicitOffset = objectEntry.offset ?? objectEntry.index ?? objectEntry.start;
+  const inferredOffset = findMentionOffset(text, name, uid, cursor);
+  const offset = explicitOffset === undefined || explicitOffset === null || explicitOffset === ''
+    ? inferredOffset
+    : toNumber(explicitOffset, inferredOffset);
+
+  if (!uid && !name) return null;
+  return {
+    userId: String(uid || name),
+    uid: String(uid || name),
+    name: String(name || uid),
+    offset
+  };
+}
+
+function uniqueMentions(mentions = []) {
+  const seen = new Set();
+  return mentions.filter((mention) => {
+    if (!mention) return false;
+    const key = `${mention.userId}:${mention.name}:${mention.offset}`;
+    if (seen.has(key)) return false;
+    seen.add(key);
+    return true;
+  });
+}
+
+function normalizeMentions(mention = {}, text = '', ...sources) {
+  const entries = [
+    ...firstArray(mention.mentions, mention.items, mention.members, mention.users),
+    ...firstArray(...sources),
+    ...firstArray(mention.uids, mention.userIds, mention.user_ids)
+  ];
+  let cursor = 0;
+  const normalized = entries.map((entry) => {
+    const item = normalizeMentionEntry(entry, mention, text, cursor);
+    if (item && item.offset >= 0) {
+      cursor = item.offset + item.name.length + 1;
+    }
+    return item;
+  });
+  return uniqueMentions(normalized);
+}
+
+function normalizeMentionAll(value) {
+  return value === true || value === 1 || value === '1' || clean(value).toLowerCase() === 'true';
+}
+
 function memberListText(...values) {
   const members = firstArray(...values);
   if (!members.length) {
@@ -335,7 +437,16 @@ export function normalizeContent(payload) {
     envelope.content_delta
   );
   const text = contentText || deltaText;
-  const name = firstNonEmpty(content.name, content.fileName, payload?.name, payload?.file_name);
+  const name = firstNonEmpty(
+    content.name,
+    content.fileName,
+    content.file_name,
+    content.filename,
+    content.title,
+    payload?.name,
+    payload?.file_name,
+    payload?.fileName
+  );
   const streamState = normalizeStreamState(content);
   const markdownState = (content.markdown === true || content.format === 'markdown')
     ? { renderMode: 'markdown', isMarkdown: true }
@@ -348,13 +459,27 @@ export function normalizeContent(payload) {
     return { type: 'voice', content: '[语音]', url: content.url || '', duration: toNumber(content.time || content.duration, 0) };
   }
   if (type === 8) {
+    const fileName = name || String(text || '').replace(/^\[文件\]\s*/, '').trim() || '文件';
+    const url = firstNonEmpty(
+      content.url,
+      content.remoteUrl,
+      content.remote_url,
+      content.sourceUrl,
+      content.source_url,
+      content.contentUrl,
+      content.content_url,
+      content.path,
+      payload?.url,
+      payload?.remote_url,
+      payload?.path
+    );
     return {
       type: 'file',
-      content: `[文件] ${name || text || ''}`.trim(),
-      name: name || text || '文件',
-      fileName: name || text || '文件',
-      size: content.size || payload?.size || 0,
-      url: content.url || payload?.url || ''
+      content: `[文件] ${fileName}`.trim(),
+      name: fileName,
+      fileName,
+      size: content.size || content.fileSize || content.file_size || payload?.size || payload?.file_size || 0,
+      url
     };
   }
   if (streamState.streamKey) {
@@ -393,7 +518,7 @@ export function normalizeMessage(input = {}, options = {}) {
   const senderName = firstNonEmpty(input.from_name, input.senderName, input.sender_name, senderId);
   const raw = parsePayload(payload);
   const mention = raw.mention || input.mention || {};
-  const mentions = Array.isArray(mention.uids) ? mention.uids.map(String) : [];
+  const mentions = normalizeMentions(mention, normalizedContent.content, raw.mentions, input.mentions);
 
   return {
     id: String(id || `local-${Date.now()}`),
@@ -409,6 +534,8 @@ export function normalizeMessage(input = {}, options = {}) {
     reactions: input.reactions || [],
     replyRef: input.replyRef || raw.reply || null,
     mentions,
+    mentionAll: normalizeMentionAll(mention.all),
+    mentionUids: mentions.map((item) => item.userId).filter(Boolean),
     raw,
     ...normalizedContent
   };
@@ -461,7 +588,8 @@ export function normalizeConversation(input = {}, channelInfo = {}) {
   const isRobot = Number(channelInfo.robot || channelInfo.orgData?.robot || 0) === 1 || category === 'robot';
   const name = firstNonEmpty(channelInfo.remark, channelInfo.orgData?.remark, input.remark, channelInfo.name, channelInfo.title, input.name, channelId);
   const logo = firstNonEmpty(channelInfo.logo, channelInfo.avatar, input.avatar);
-  const lastTime = toTimestampMs(lastMessageTimeFromInput(input), 0);
+  const lastMessage = messageDigestFromInput(input);
+  const lastTime = toTimestampMs(lastMessageTimeFromInput(input), lastMessage ? Date.now() : 0);
 
   return {
     id: channelId,
@@ -473,7 +601,7 @@ export function normalizeConversation(input = {}, channelInfo = {}) {
     avatar: logo || '',
     unread: toNumber(input.unread, 0),
     lastSeq: toNumber(input.last_msg_seq ?? input.lastMsgSeq, 0),
-    lastMessage: messageDigestFromInput(input),
+    lastMessage,
     lastTime,
     isPinned: Number(input.top ?? input.stick ?? channelInfo.top ?? channelInfo.stick ?? 0) === 1,
     isMuted: Number(input.mute ?? channelInfo.mute ?? 0) === 1,

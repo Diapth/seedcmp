@@ -130,6 +130,17 @@ function normalizeLoginUsername(username = '') {
   return value;
 }
 
+function normalizePhone(value = '') {
+  const raw = String(value || '').trim();
+  return raw.replace(/^0086/, '').replace(/^\+?86/, '');
+}
+
+function normalizeZone(value = '') {
+  const raw = String(value || '').trim();
+  if (!raw) return '0086';
+  return raw.startsWith('00') ? raw : `00${raw.replace(/^\+/, '')}`;
+}
+
 function extractWsAddrs(resp = {}) {
   return firstArray(resp.wsaddrs, resp.ws_addrs, resp.addrs, resp.data?.wsaddrs)
     .concat([resp.wss_addr, resp.ws_addr, resp.wssAddr, resp.wsAddr, resp.addr, resp.data?.wss_addr, resp.data?.ws_addr])
@@ -229,6 +240,73 @@ function firstList(...values) {
   return [];
 }
 
+function toTimestampMs(value, fallback = 0) {
+  if (value === undefined || value === null || value === '') return fallback;
+  if (typeof value === 'number') {
+    if (!Number.isFinite(value) || value <= 0) return fallback;
+    return value > 100000000000 ? value : value * 1000;
+  }
+  const text = String(value).trim();
+  if (!text) return fallback;
+  if (/^\d+$/.test(text)) return toTimestampMs(Number(text), fallback);
+  const parsed = Date.parse(text.replace(' ', 'T'));
+  return Number.isFinite(parsed) ? parsed : fallback;
+}
+
+function padTimePart(value) {
+  return String(value).padStart(2, '0');
+}
+
+function formatDeviceTime(value) {
+  if (typeof value === 'string' && /刚刚|分钟前|小时前|天前|年|月|日/.test(value)) return value;
+  const time = toTimestampMs(value, 0);
+  if (!time) return firstNonEmpty(value, '未知');
+  const date = new Date(time);
+  return [
+    date.getFullYear(),
+    '-',
+    padTimePart(date.getMonth() + 1),
+    '-',
+    padTimePart(date.getDate()),
+    ' ',
+    padTimePart(date.getHours()),
+    ':',
+    padTimePart(date.getMinutes())
+  ].join('');
+}
+
+function normalizeDeviceType(device = {}) {
+  const flag = Number(device.device_flag ?? device.deviceFlag ?? device.flag ?? 0);
+  const source = `${device.device_name || device.deviceName || device.name || ''} ${device.device_model || device.deviceModel || device.model || ''}`.toLowerCase();
+  if (flag === 1) return 'web';
+  if (flag === 2) return 'desktop';
+  if (/web|browser|chrome|edge|firefox|safari/.test(source)) return 'web';
+  if (/pc|desktop|mac|windows|linux|book/.test(source)) return 'desktop';
+  return 'mobile';
+}
+
+function normalizeDevice(device = {}, currentDeviceId = '') {
+  const id = firstNonEmpty(device.device_id, device.deviceId, device.id);
+  const name = firstNonEmpty(device.device_name, device.deviceName, device.name, device.device_model, '未命名设备');
+  const isCurrent = Boolean(
+    device.self === 1
+    || device.isCurrent
+    || device.current
+    || (currentDeviceId && id === currentDeviceId)
+    || /当前设备|本机/.test(name)
+  );
+  return {
+    id,
+    deviceId: id,
+    name: name.replace(/（本机）|\(本机\)/g, '').trim() || '未命名设备',
+    type: normalizeDeviceType(device),
+    lastActive: formatDeviceTime(device.last_login ?? device.lastLogin ?? device.lastActive ?? device.updated_at ?? device.updatedAt),
+    location: firstNonEmpty(device.login_addr, device.loginAddr, device.location, device.ip_city, device.ipCity, '未知'),
+    isCurrent,
+    raw: device
+  };
+}
+
 function normalizeMention(value = '', fallback = '') {
   const raw = firstNonEmpty(value, fallback);
   if (!raw) return '';
@@ -291,6 +369,37 @@ function normalizeClowderAgent(agent = {}) {
     preferred: Boolean(agent.preferred),
     raw: agent
   };
+}
+
+function normalizeCreatedClowderCat(resp = {}) {
+  const agentSource = resp.agent || resp.data?.agent || resp.cat || resp.data?.cat || resp.data || resp;
+  const normalized = normalizeClowderAgent({
+    ...agentSource,
+    source: agentSource.source || resp.contact?.source || resp.data?.contact?.source || 'runtime-created',
+    connected: agentSource.connected ?? resp.contact?.connected ?? resp.data?.contact?.connected ?? true
+  });
+  return {
+    ...normalized,
+    catId: normalized.id,
+    directCatId: normalized.id,
+    creator: 'User',
+    source: 'clowder',
+    connected: normalized.connected !== false,
+    apiKey: '',
+    apiUrl: '',
+    customModel: ''
+  };
+}
+
+function clientIdForAgentPlatform(platform = '') {
+  const value = firstNonEmpty(platform).toLowerCase();
+  if (value.includes('claude') || value.includes('anthropic')) return 'anthropic';
+  return 'openai';
+}
+
+function authTypeForAccessMode(accessMode = '') {
+  const value = firstNonEmpty(accessMode).toLowerCase();
+  return value === 'oauth' ? 'oauth' : 'api_key';
 }
 
 function mergeClowderDirectoryAgents(agents = [], templates = []) {
@@ -491,6 +600,66 @@ export function createNativeImService(options = {}) {
     return normalizeSession(resp);
   }
 
+  async function sendRegisterCode({ phone, zone = '0086' } = {}) {
+    const cleanPhone = normalizePhone(phone);
+    if (!cleanPhone) throw { msg: '请输入手机号' };
+    return client.post('user/sms/registercode', {
+      zone: normalizeZone(zone),
+      phone: cleanPhone
+    });
+  }
+
+  async function registerAccount({
+    phone,
+    code,
+    name,
+    nickname,
+    password,
+    zone = '0086'
+  } = {}) {
+    const cleanPhone = normalizePhone(phone);
+    const displayName = firstNonEmpty(name, nickname);
+    if (!cleanPhone) throw { msg: '请输入手机号' };
+    if (!code) throw { msg: '请输入验证码' };
+    if (!displayName) throw { msg: '请输入昵称' };
+    if (!password) throw { msg: '请输入密码' };
+    const resp = await client.post('user/register', {
+      zone: normalizeZone(zone),
+      phone: cleanPhone,
+      name: displayName,
+      code: String(code || '').trim(),
+      password,
+      flag: 1,
+      device: deviceFactory()
+    });
+    return normalizeSession(resp);
+  }
+
+  async function updateCurrentUserProfile(fields = {}) {
+    const payload = {};
+    if (Object.prototype.hasOwnProperty.call(fields, 'name')) {
+      payload.name = String(fields.name || '').trim();
+    }
+    if (Object.prototype.hasOwnProperty.call(fields, 'nickname')) {
+      payload.name = String(fields.nickname || '').trim();
+    }
+    if (Object.prototype.hasOwnProperty.call(fields, 'sex')) {
+      payload.sex = Number(fields.sex || 0);
+    }
+    if (Object.prototype.hasOwnProperty.call(fields, 'shortNo')) {
+      payload.short_no = String(fields.shortNo || '').trim();
+    }
+    if (Object.prototype.hasOwnProperty.call(fields, 'short_no')) {
+      payload.short_no = String(fields.short_no || '').trim();
+    }
+    Object.keys(payload).forEach((key) => {
+      if (payload[key] === '' || Number.isNaN(payload[key])) delete payload[key];
+    });
+    if (!Object.keys(payload).length) return normalizeSession({});
+    const resp = await client.put('user/current', payload);
+    return normalizeSession(resp);
+  }
+
   async function syncConversations() {
     const resp = await client.post('conversation/sync', { msg_count: 1 });
     const channelInfoMap = buildChannelInfoMap(resp);
@@ -575,6 +744,23 @@ export function createNativeImService(options = {}) {
       channelType: Number(channelType),
       content: trimmedText
     };
+  }
+
+  async function createClowderCat(agent = {}) {
+    const payload = {
+      name: firstNonEmpty(agent.name, agent.nickname),
+      alias: firstNonEmpty(agent.alias),
+      roleTemplateId: firstNonEmpty(agent.roleTemplateId, agent.roleTemplate, agent.templateId, 'general'),
+      clientId: clientIdForAgentPlatform(agent.platform || agent.clientId),
+      authType: authTypeForAccessMode(agent.accessMode || agent.authType),
+      accountRef: firstNonEmpty(agent.accountRef, agent.account_ref, 'default'),
+      defaultModel: firstNonEmpty(agent.defaultModel, agent.model, agent.customModel),
+      personality: firstNonEmpty(agent.personality, agent.systemPrompt, agent.desc),
+      capabilities: firstList(agent.capabilities, agent.capabilityTags).map(String).filter(Boolean)
+    };
+    if (!payload.name) throw { msg: '请输入智能体名称' };
+    const resp = await client.post('clowder/cats', payload);
+    return normalizeCreatedClowderCat(resp);
   }
 
   async function updateConversationSettings({ channelId, channelType = CHANNEL_TYPE_PERSON, isPinned, isMuted } = {}) {
@@ -751,6 +937,30 @@ export function createNativeImService(options = {}) {
     return firstArray(resp, resp.members, resp.list, resp.data, resp.data?.members).map(normalizeNativeGroupMember);
   }
 
+  async function updateGroupProfile(groupNo, fields = {}) {
+    if (!groupNo) throw { msg: 'groupNo不能为空' };
+    const payload = {};
+    if (Object.prototype.hasOwnProperty.call(fields, 'name')) payload.name = String(fields.name || '');
+    if (Object.prototype.hasOwnProperty.call(fields, 'notice')) payload.notice = String(fields.notice || '');
+    if (!Object.keys(payload).length) return {};
+    return client.put(`groups/${encodeURIComponent(String(groupNo))}`, payload);
+  }
+
+  async function fetchDevices() {
+    const currentDevice = deviceFactory() || {};
+    const currentDeviceId = firstNonEmpty(currentDevice.device_id, currentDevice.deviceId, currentDevice.id);
+    const resp = await client.get('user/devices');
+    return firstArray(resp, resp.devices, resp.data, resp.data?.devices, resp.list, resp.items)
+      .map((device) => normalizeDevice(device, currentDeviceId))
+      .filter((device) => device.id);
+  }
+
+  async function deleteDevice(deviceId) {
+    const id = String(deviceId || '').trim();
+    if (!id) throw { msg: 'deviceId不能为空' };
+    return client.delete(`user/devices/${encodeURIComponent(id)}`);
+  }
+
   async function fetchClowderCatDirectory(params = {}) {
     let resp = null;
     if (params.preferDirect) {
@@ -804,6 +1014,28 @@ export function createNativeImService(options = {}) {
     };
   }
 
+  async function fetchActiveProjectGroup(params = {}) {
+    const query = {};
+    if (params.projectGroupNo || params.groupId) query.projectGroupNo = String(params.projectGroupNo || params.groupId);
+    if (params.projectGroupId) query.projectGroupId = String(params.projectGroupId);
+    if (params.pmDirectChannelId || params.channelId) query.pmDirectChannelId = String(params.pmDirectChannelId || params.channelId);
+    if (params.pmDirectChannelType || params.channelType) query.pmDirectChannelType = Number(params.pmDirectChannelType || params.channelType);
+    if (params.projectName) query.projectName = String(params.projectName);
+    const resp = await client.get('clowder/project-groups/active', query);
+    return resp.binding || resp.data?.binding || resp.data || resp;
+  }
+
+  async function fetchThreadTasks(threadId, params = {}) {
+    const id = String(threadId || '').trim();
+    if (!id) return [];
+    const resp = await client.get(`clowder/thread/${encodeURIComponent(id)}/tasks`, params);
+    return firstArray(resp.tasks, resp.data?.tasks, resp.items, resp.data?.items, resp.data);
+  }
+
+  async function createCoordination(payload = {}) {
+    return client.post('clowder/coordinator/coordination', payload);
+  }
+
   function disconnect() {
     try {
       getShared()?.disconnect?.();
@@ -817,11 +1049,15 @@ export function createNativeImService(options = {}) {
     CHANNEL_TYPE_GROUP,
     client,
     loginWithPassword,
+    sendRegisterCode,
+    registerAccount,
+    updateCurrentUserProfile,
     initializeSdk,
     syncConversations,
     syncMessages,
     sendTextMessage,
     sendClowderConversationMessage,
+    createClowderCat,
     sendMediaMessage,
     uploadChatFile,
     updateConversationSettings,
@@ -835,8 +1071,14 @@ export function createNativeImService(options = {}) {
     createGroup,
     syncMyGroups,
     syncGroupMembers,
+    updateGroupProfile,
+    fetchDevices,
+    deleteDevice,
     fetchClowderCatDirectory,
     fetchClowderConversationAgents,
+    fetchActiveProjectGroup,
+    fetchThreadTasks,
+    createCoordination,
     disconnect,
     get sdkReady() {
       return Boolean(sdkShared);

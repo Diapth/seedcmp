@@ -208,13 +208,16 @@ const textSegments = computed(() => {
   const text = props.data.content || '';
   const mentions = props.data.mentions || [];
   if (!mentions.length) return [{ text, mention: false }];
-  // 简单策略: 扫描 @昵称 字符串, 命中 mentions 则标记 mention=true
   const segments = [];
   let cursor = 0;
-  const sorted = [...mentions].sort((a, b) => a.offset - b.offset);
+  const sorted = [...mentions]
+    .map((mention) => normalizeMentionSegment(mention, text))
+    .filter((mention) => mention && mention.offset >= 0 && mention.name)
+    .sort((a, b) => a.offset - b.offset);
   for (const m of sorted) {
     const start = m.offset;
     const matchText = `@${m.name}`;
+    if (start < cursor) continue;
     if (start > cursor) {
       segments.push({ text: text.slice(cursor, start), mention: false });
     }
@@ -226,6 +229,20 @@ const textSegments = computed(() => {
   }
   return segments;
 });
+
+function normalizeMentionSegment(mention, text) {
+  const isObject = mention && typeof mention === 'object';
+  const rawName = isObject
+    ? (mention.name || mention.nickname || mention.displayName || mention.uid || mention.userId || mention.id)
+    : mention;
+  const name = String(rawName || '').replace(/^@/, '');
+  if (!name) return null;
+  const explicitOffset = isObject ? Number(mention.offset ?? mention.index ?? mention.start) : NaN;
+  const offset = Number.isFinite(explicitOffset) && explicitOffset >= 0
+    ? explicitOffset
+    : String(text || '').indexOf(`@${name}`);
+  return { name, offset };
+}
 
 const isMarkdownText = computed(() => {
   if (props.data.renderMode === 'markdown' || props.data.isMarkdown) return true;

@@ -101,44 +101,54 @@
 
 <script setup>
 import { ref } from 'vue';
+import { useAppStore } from '@/stores/app';
+import { nativeImService } from '@/services/native-im/service';
 import AppIcon from '@/components/common/AppIcon.vue';
 
+const appStore = useAppStore();
 const phone = ref('');
 const code = ref('');
 const nickname = ref('');
 const password = ref('');
 const codeCountdown = ref(0);
 const isLoading = ref(false);
+const codeLoading = ref(false);
 const errorMessage = ref('');
 
 function goBack() {
   uni.navigateBack();
 }
 
-function sendCode() {
+async function sendCode() {
   if (!phone.value || phone.value.length < 11) {
     errorMessage.value = '请先输入正确的手机号';
     return;
   }
   
   errorMessage.value = '';
-  codeCountdown.value = 60;
-  
-  const timer = setInterval(() => {
-    if (codeCountdown.value > 0) {
-      codeCountdown.value--;
-    } else {
-      clearInterval(timer);
-    }
-  }, 1000);
-  
-  uni.showToast({
-    title: '验证码发送成功',
-    icon: 'success'
-  });
+  codeLoading.value = true;
+  try {
+    await nativeImService.sendRegisterCode({ phone: phone.value.trim() });
+    codeCountdown.value = 60;
+    const timer = setInterval(() => {
+      if (codeCountdown.value > 0) {
+        codeCountdown.value--;
+      } else {
+        clearInterval(timer);
+      }
+    }, 1000);
+    uni.showToast({
+      title: '验证码发送成功',
+      icon: 'success'
+    });
+  } catch (error) {
+    errorMessage.value = error?.msg || error?.message || '验证码发送失败';
+  } finally {
+    codeLoading.value = false;
+  }
 }
 
-function handleRegister() {
+async function handleRegister() {
   if (!phone.value || !code.value || !nickname.value || !password.value) {
     errorMessage.value = '请填写完整的注册信息';
     return;
@@ -151,18 +161,28 @@ function handleRegister() {
   
   errorMessage.value = '';
   isLoading.value = true;
-  
-  setTimeout(() => {
-    isLoading.value = false;
+
+  try {
+    const session = await nativeImService.registerAccount({
+      phone: phone.value.trim(),
+      code: code.value.trim(),
+      name: nickname.value.trim(),
+      password: password.value
+    });
+    appStore.setCurrentUser(session.user, session.token);
+    await appStore.initializeNativeIm({ sync: true });
     uni.showToast({
       title: '注册成功',
       icon: 'success'
     });
-    
     setTimeout(() => {
-      goBack();
-    }, 1000);
-  }, 1200);
+      uni.reLaunch({ url: '/pages/chat/index' });
+    }, 350);
+  } catch (error) {
+    errorMessage.value = error?.msg || error?.message || '注册失败';
+  } finally {
+    isLoading.value = false;
+  }
 }
 </script>
 

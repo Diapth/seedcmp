@@ -1,6 +1,6 @@
 # [ISSUE-015] 真实多智能体项目群未完整同步到双账号与看板
 
-**状态**：Open
+**状态**：Resolved
 **创建时间**：2026-06-08
 **标签**：bug / investigation / multi-agent / group-chat
 
@@ -129,4 +129,15 @@ cd /home/leng/.codex/skills/playwright-skill \
 
 ## 关闭备注
 
-待修复后复测同一链路：两个账号均能进入真实项目群，项目群中可见多智能体看板/任务，`@coordinator @codex` 后可触发并展示真实 coordination/tasks，且项目群消息可在两个真人账号之间互通。
+已修复并复测：
+
+- 后端：`sections/im/TangSengDaoDaoServer/modules/clowder/api.go` 的项目群创建/复用路径会把 `req.UserMemberIDs` 合并进真实群成员维护逻辑，并补齐 `ensureProjectGroupMembers()`；Clowder coordinator/thread tasks 代理路由已暴露。
+- 前端 API：`nativeImService` 新增 `fetchActiveProjectGroup()`、`fetchThreadTasks()`、`createCoordination()`，对应 `/v1/clowder/project-groups/active`、`/v1/clowder/thread/:threadId/tasks`、`/v1/clowder/coordinator/coordination`。
+- 前端看板：`agentStore.syncProjectBoardForGroup()` 将 active binding + thread tasks 归一化为 group board；`RightWorkspace` 打开真实项目群时自动同步并展示“智能体看板”入口。
+- 单测：`cd sections/ui && npm run test:native-im`，结果通过，覆盖 project group active、thread tasks、coordination API 封装和 board 归一化。
+- 构建：`cd sections/ui && npm run build:h5`，结果通过。
+- 浏览器可视化：`TARGET_URL=http://127.0.0.1:5173 OUT_ROOT=sections/ui/.ai/tests-e2e node run.js /tmp/playwright-issue-011-015-visual.js`，结果通过。
+- 截图：
+  - `sections/ui/.ai/tests-e2e/ISSUE-015-project-group-board/desktop-01-project-group-info-board-entry.png`
+  - `sections/ui/.ai/tests-e2e/ISSUE-015-project-group-board/desktop-02-project-board-tasks.png`
+  - `sections/ui/.ai/tests-e2e/ISSUE-015-project-group-board/mobile-01-project-group-chat-loaded.png`

@@ -144,6 +144,7 @@ import { useConversationStore } from '@/stores/conversation';
 import { useGroupStore } from '@/stores/group';
 import { useAgentStore } from '@/stores/agent';
 import { useNavigationStore } from '@/stores/navigation';
+import { buildGroupScopedRoute, resolveGroupPageId } from '@/services/native-im/conversation-state';
 import { useContextMenu } from '@/composables/useContextMenu';
 import { useConfirm } from '@/composables/useConfirm';
 import AppSubpageShell from '@/components/layout/AppSubpageShell.vue';
@@ -162,12 +163,29 @@ const navStore = useNavigationStore();
 const ctxMenu = useContextMenu();
 const ctxTarget = ref(null);
 const { confirm } = useConfirm();
+const routeOptions = ref({});
 
-onMounted(() => {
+const groupId = computed(() => resolveGroupPageId(routeOptions.value, {
+  activeGroupId: groupStore.activeGroupId,
+  activeConversationId: convStore.activeId
+}));
+
+const currentConversation = computed(() => convStore.conversations.find((conversation) => conversation.id === groupId.value) || null);
+
+onMounted(async () => {
   navStore.setActiveModule('contacts');
-  if (!convStore.members['2'] || convStore.members['2'].length === 0) {
+  const pages = getCurrentPages();
+  const currentPage = pages[pages.length - 1];
+  routeOptions.value = currentPage?.$page?.options || {};
+  const id = groupId.value;
+  if (id) {
+    convStore.setActiveId(id);
+    groupStore.setActiveGroupId(id);
+    await groupStore.syncNativeGroupMembers(id, { silent: true });
+  }
+  if (!convStore.members[id] || convStore.members[id].length === 0) {
     convStore.initFromGroupMembers(
-      '2',
+      id,
       [
         { id: 'me', nickname: '我', avatar: '', role: 'owner' },
         { id: '1', nickname: '张伟', avatar: '', role: 'admin' },
@@ -177,13 +195,13 @@ onMounted(() => {
       'me'
     );
   }
-  if (!groupStore.groups.find((g) => g.id === '2')) {
+  if (!groupStore.groups.find((g) => g.id === id)) {
     groupStore.addGroup({
-      id: '2',
-      name: 'AgentHub 产品研发群',
-      avatar: '',
-      memberCount: 4,
-      announcement: '欢迎来到 AgentHub 产品研发群',
+      id,
+      name: currentConversation.value?.name || 'AgentHub 产品研发群',
+      avatar: currentConversation.value?.avatar || '',
+      memberCount: convStore.groupMembers(id).length || currentConversation.value?.memberCount || 4,
+      announcement: currentConversation.value?.announcement || '欢迎来到 AgentHub 产品研发群',
       creatorId: 'me',
       createTime: 1780300000000
     });
@@ -194,7 +212,7 @@ const searchQuery = ref('');
 const showAddDialog = ref(false);
 const selectedContacts = ref([]);
 
-const members = computed(() => convStore.groupMembers('2'));
+const members = computed(() => convStore.groupMembers(groupId.value));
 
 const filteredMembers = computed(() => {
   const query = searchQuery.value.trim().toLowerCase();
@@ -230,7 +248,7 @@ function goBack() {
 }
 
 function goQrCode() {
-  uni.navigateTo({ url: '/pages/group/qrcode' });
+  uni.navigateTo({ url: buildGroupScopedRoute('/pages/group/qrcode', groupId.value) });
 }
 
 function handleRemove(item) {
@@ -240,7 +258,7 @@ function handleRemove(item) {
     destructive: true
   }).then((ok) => {
     if (ok) {
-      convStore.removeMember('2', item.id);
+      convStore.removeMember(groupId.value, item.id);
       uni.showToast({ title: '已成功移出', icon: 'success' });
     }
   });
@@ -261,12 +279,12 @@ function handleAddConfirm() {
     if (id.startsWith('agent:')) {
       const agentId = id.slice('agent:'.length);
       const agent = agentStore.agents.find((item) => item.id === agentId);
-      if (agent) convStore.addAgentMember('2', agent);
+      if (agent) convStore.addAgentMember(groupId.value, agent);
       return;
     }
     const contact = contactStore.contacts.find((c) => c.id === id);
     if (contact) {
-      convStore.addMember('2', {
+      convStore.addMember(groupId.value, {
         id: contact.id,
         nickname: contact.nickname,
         avatar: contact.avatar,
@@ -328,12 +346,12 @@ function atMember(m) {
   // #ifdef H5
   if (ctxMenu.isDesktop.value) {
     // 桌面: 直接打开 chat 详情并预填 @nickname
-    uni.setStorageSync(`at:${'2'}`, m.id);
+    uni.setStorageSync(`at:${groupId.value}`, m.id);
   }
   // #endif
   // 桌面 + 移动统一通过 query 参数跳转
   uni.navigateTo({
-    url: `/pages/chat/detail?id=2&at=${m.id}`
+    url: buildGroupScopedRoute('/pages/chat/detail', groupId.value, { at: m.id })
   });
 }
 
