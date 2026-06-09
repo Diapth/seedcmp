@@ -52,6 +52,12 @@ import {
   normalizeSkillCatalogPreview,
   normalizeUserSkillList
 } from '../services/native-im/skill-state.js';
+import {
+  buildDeploymentCardMessage,
+  isDeploymentCardMessage,
+  shouldCreateDeploymentCard,
+  upsertDeploymentCardMessage
+} from '../services/native-im/deployment.js';
 
 function makeRequestStub(responses = {}) {
   const calls = [];
@@ -507,6 +513,183 @@ test('native service uploads skill packages through multipart upload runtime', a
     fieldName: 'file',
     headers: { token: 'token' }
   }]);
+});
+
+test('deployment helper detects deployment intent only in clowder direct chats', () => {
+  const clowderDirect = {
+    id: 'clowder_cat:codex',
+    channelId: 'clowder_cat:codex',
+    channelType: 1,
+    type: 'robot',
+    source: 'clowder',
+    directCatId: 'codex'
+  };
+  const normalDirect = {
+    id: 'u-friend',
+    channelId: 'u-friend',
+    channelType: 1,
+    type: 'single'
+  };
+
+  assert.equal(shouldCreateDeploymentCard({ conversation: clowderDirect, text: '帮我把这个项目部署到 preview 环境' }), true);
+  assert.equal(shouldCreateDeploymentCard({ conversation: clowderDirect, text: '先不部署，继续改文案' }), false);
+  assert.equal(shouldCreateDeploymentCard({ conversation: normalDirect, text: '帮我部署到线上' }), false);
+});
+
+test('native service uses conversation deployment request endpoints', async () => {
+  const request = makeRequestStub({
+    'POST clowder/conversation/deployment-request': {
+      deploymentRequest: {
+        id: 'deploy-req-1',
+        channelId: 'clowder_cat:codex',
+        channelType: 1,
+        originalText: '部署这个项目',
+        target: 'demo-app',
+        environment: 'preview',
+        missingFields: [],
+        status: 'pending_confirmation',
+        downloadUrl: 'http://localhost:3004/api/deployments/job-1/download'
+      }
+    },
+    'PATCH clowder/conversation/deployment-request/deploy-req-1': {
+      deploymentRequest: { id: 'deploy-req-1', target: 'demo-app', environment: 'preview', missingFields: [], status: 'pending_confirmation' }
+    },
+    'GET clowder/conversation/deployment-request/active?channelId=clowder_cat%3Acodex&channelType=1': {
+      deploymentRequest: { id: 'deploy-req-1', target: 'demo-app', environment: 'preview', missingFields: [], status: 'pending_confirmation' }
+    },
+    'GET clowder/conversation/deployment-request/deploy-req-1': {
+      deploymentRequest: {
+        id: 'deploy-req-1',
+        target: 'demo-app',
+        environment: 'preview',
+        missingFields: [],
+        status: 'succeeded',
+        previewUrl: 'http://localhost:3004/api/deployments/job-1/preview'
+      }
+    },
+    'POST clowder/conversation/deployment-action': {
+      ok: true,
+      deploymentRequestId: 'deploy-req-1',
+      action: 'confirm',
+      actionId: 'action-1',
+      status: 'queued',
+      deploymentRequest: { id: 'deploy-req-1', target: 'demo-app', environment: 'preview', missingFields: [], status: 'queued' }
+    },
+    'GET clowder/deployments/job-1': {
+      deployment: { id: 'job-1', status: 'succeeded', previewUrl: 'http://localhost:3004/api/deployments/job-1/preview' }
+    },
+    'GET clowder/deployments/job-1/logs': {
+      logs: [{ level: 'info', message: 'deployed' }]
+    }
+  });
+  const service = createNativeImService({
+    baseUrl: '/v1/',
+    request,
+    getToken: () => 'token'
+  });
+
+  const created = await service.createDeploymentRequest({
+    channelId: 'clowder_cat:codex',
+    channelType: 1,
+    sourceMessageId: 'msg-1',
+    originalText: '部署这个项目',
+    target: 'demo-app',
+    environment: 'preview'
+  });
+  const updated = await service.updateDeploymentRequest('deploy-req-1', { target: 'demo-app' });
+  const active = await service.fetchActiveDeploymentRequest({ channelId: 'clowder_cat:codex', channelType: 1 });
+  const detail = await service.fetchDeploymentRequest('deploy-req-1');
+  const action = await service.sendDeploymentAction({
+    deploymentRequestId: 'deploy-req-1',
+    channelId: 'clowder_cat:codex',
+    channelType: 1,
+    action: 'confirm',
+    actionId: 'action-1'
+  });
+  const deployment = await service.fetchDeployment('job-1');
+  const logs = await service.fetchDeploymentLogs('job-1');
+
+  assert.equal(created.id, 'deploy-req-1');
+  assert.equal(updated.id, 'deploy-req-1');
+  assert.equal(active.id, 'deploy-req-1');
+  assert.equal(detail.status, 'succeeded');
+  assert.equal(action.deploymentRequest.status, 'queued');
+  assert.equal(deployment.id, 'job-1');
+  assert.equal(logs[0].message, 'deployed');
+  assert.deepEqual(request.calls.map((call) => [call.method, call.url, call.data]), [
+    ['POST', '/v1/clowder/conversation/deployment-request', {
+      channelId: 'clowder_cat:codex',
+      channelType: 1,
+      sourceMessageId: 'msg-1',
+      originalText: '部署这个项目',
+      target: 'demo-app',
+      environment: 'preview'
+    }],
+    ['PATCH', '/v1/clowder/conversation/deployment-request/deploy-req-1', { target: 'demo-app' }],
+    ['GET', '/v1/clowder/conversation/deployment-request/active?channelId=clowder_cat%3Acodex&channelType=1', undefined],
+    ['GET', '/v1/clowder/conversation/deployment-request/deploy-req-1', undefined],
+    ['POST', '/v1/clowder/conversation/deployment-action', {
+      deploymentRequestId: 'deploy-req-1',
+      channelId: 'clowder_cat:codex',
+      channelType: 1,
+      action: 'confirm',
+      actionId: 'action-1'
+    }],
+    ['GET', '/v1/clowder/deployments/job-1', undefined],
+    ['GET', '/v1/clowder/deployments/job-1/logs', undefined]
+  ]);
+});
+
+test('deployment card helper upserts state and keeps preview urls', () => {
+  const request = {
+    id: 'deploy-req-1',
+    channelId: 'clowder_cat:codex',
+    channelType: 1,
+    originalText: '部署这个项目',
+    target: 'demo-app',
+    environment: 'preview',
+    missingFields: [],
+    status: 'pending_confirmation',
+    downloadUrl: 'http://localhost:3004/api/deployments/job-1/download',
+    targetCandidates: [],
+    environmentCandidates: []
+  };
+  const sourceMessage = { id: 'msg-1', clientMsgNo: 'client-msg-1', content: '部署这个项目' };
+
+  let list = upsertDeploymentCardMessage([], {
+    deploymentRequest: request,
+    sourceMessage,
+    conversation: { channelType: 1 },
+    agent: { id: 'codex', name: 'Codex' }
+  });
+  list = upsertDeploymentCardMessage(list, {
+    deploymentRequest: {
+      ...request,
+      status: 'succeeded',
+      deploymentJobId: 'job-1',
+      previewUrl: 'http://localhost:3004/api/deployments/job-1/preview'
+    },
+    sourceMessage,
+    conversation: { channelType: 1 },
+    agent: { id: 'codex', name: 'Codex' }
+  });
+
+  assert.equal(list.length, 1);
+  assert.equal(isDeploymentCardMessage(list[0]), true);
+  assert.equal(list[0].id, 'deployment-card-deploy-req-1');
+  assert.equal(list[0].type, 'deployment_card');
+  assert.equal(list[0].deploymentCard.status, 'succeeded');
+  assert.equal(list[0].deploymentCard.statusLabel, '部署完成');
+  assert.equal(list[0].deploymentCard.previewUrl, 'http://localhost:3004/api/deployments/job-1/preview');
+  assert.equal(list[0].deploymentCard.downloadUrl, 'http://localhost:3004/api/deployments/job-1/download');
+  assert.match(list[0].content, /部署完成/);
+
+  const cardMessage = buildDeploymentCardMessage(request, {
+    sourceMessage,
+    conversation: { channelType: 1 },
+    agent: { id: 'codex', name: 'Codex' }
+  });
+  assert.equal(cardMessage.metadata.deployment_card, true);
 });
 
 test('skill catalog preview does not assign every catalog skill to every agent', () => {

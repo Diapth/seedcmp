@@ -19,6 +19,9 @@ import {
   normalizeUserSkill,
   normalizeUserSkillList
 } from './skill-state.js';
+import {
+  normalizeDeploymentRequest
+} from './deployment.js';
 
 const CHANNEL_TYPE_PERSON = 1;
 const CHANNEL_TYPE_GROUP = 2;
@@ -1301,6 +1304,58 @@ export function createNativeImService(options = {}) {
     return client.post('clowder/coordinator/coordination', payload);
   }
 
+  async function createDeploymentRequest(payload = {}) {
+    const resp = await client.post('clowder/conversation/deployment-request', payload);
+    return normalizeDeploymentRequest(resp.deploymentRequest || resp.data?.deploymentRequest || resp.data || resp);
+  }
+
+  async function updateDeploymentRequest(deploymentRequestId, patch = {}) {
+    const id = String(deploymentRequestId || '').trim();
+    if (!id) throw { msg: 'deploymentRequestId不能为空' };
+    const resp = await client.patch(`clowder/conversation/deployment-request/${encodeURIComponent(id)}`, patch);
+    return normalizeDeploymentRequest(resp.deploymentRequest || resp.data?.deploymentRequest || resp.data || resp);
+  }
+
+  async function fetchActiveDeploymentRequest(params = {}) {
+    const query = {};
+    if (params.channelId) query.channelId = String(params.channelId);
+    if (params.channelType) query.channelType = Number(params.channelType);
+    const resp = await client.get('clowder/conversation/deployment-request/active', query);
+    const source = resp.deploymentRequest || resp.data?.deploymentRequest || resp.data || resp;
+    return source ? normalizeDeploymentRequest(source) : null;
+  }
+
+  async function fetchDeploymentRequest(deploymentRequestId) {
+    const id = String(deploymentRequestId || '').trim();
+    if (!id) throw { msg: 'deploymentRequestId不能为空' };
+    const resp = await client.get(`clowder/conversation/deployment-request/${encodeURIComponent(id)}`);
+    return normalizeDeploymentRequest(resp.deploymentRequest || resp.data?.deploymentRequest || resp.data || resp);
+  }
+
+  async function sendDeploymentAction(payload = {}) {
+    const resp = await client.post('clowder/conversation/deployment-action', payload);
+    return {
+      ...resp,
+      deploymentRequest: resp.deploymentRequest || resp.data?.deploymentRequest
+        ? normalizeDeploymentRequest(resp.deploymentRequest || resp.data?.deploymentRequest)
+        : null
+    };
+  }
+
+  async function fetchDeployment(deploymentId) {
+    const id = String(deploymentId || '').trim();
+    if (!id) throw { msg: 'deploymentId不能为空' };
+    const resp = await client.get(`clowder/deployments/${encodeURIComponent(id)}`);
+    return resp.deployment || resp.data?.deployment || resp.data || resp;
+  }
+
+  async function fetchDeploymentLogs(deploymentId) {
+    const id = String(deploymentId || '').trim();
+    if (!id) throw { msg: 'deploymentId不能为空' };
+    const resp = await client.get(`clowder/deployments/${encodeURIComponent(id)}/logs`);
+    return firstArray(resp.logs, resp.data?.logs, resp.items, resp.data?.items, resp.data);
+  }
+
   function disconnect() {
     try {
       getShared()?.disconnect?.();
@@ -1358,6 +1413,13 @@ export function createNativeImService(options = {}) {
     fetchActiveProjectGroup,
     fetchThreadTasks,
     createCoordination,
+    createDeploymentRequest,
+    updateDeploymentRequest,
+    fetchActiveDeploymentRequest,
+    fetchDeploymentRequest,
+    sendDeploymentAction,
+    fetchDeployment,
+    fetchDeploymentLogs,
     disconnect,
     get sdkReady() {
       return Boolean(sdkShared);
