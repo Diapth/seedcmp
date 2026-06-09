@@ -44,6 +44,10 @@ import {
   cleanupAgentFromLocalState,
   resolveAgentDeleteIdentity
 } from '../services/native-im/agent-cleanup.js';
+import {
+  buildSelectableGroupMembers,
+  splitSelectedGroupMembers
+} from '../services/native-im/group-member-candidates.js';
 
 function makeRequestStub(responses = {}) {
   const calls = [];
@@ -765,6 +769,46 @@ test('native service deletes clowder cats through contact lifecycle API', async 
   assert.deepEqual(result, { deleted: true, id: 'codex' });
 });
 
+test('native service syncs clowder group cats without sending agents as native members', async () => {
+  const request = makeRequestStub({
+    'POST clowder/group/cats/sync': {
+      groupId: 'g100',
+      catIds: ['codex'],
+      cats: [{ catId: 'codex', displayName: 'Codex', connected: true }]
+    }
+  });
+  const service = createNativeImService({
+    baseUrl: '/v1/',
+    request,
+    getToken: () => 'token'
+  });
+
+  const result = await service.syncGroupCats({
+    groupId: 'g100',
+    groupName: '研发群',
+    agents: [{ id: 'codex', name: 'Codex', alias: '@codex', avatar: 'codex.png', desc: '代码生成' }]
+  });
+
+  assert.equal(request.calls[0].method, 'POST');
+  assert.equal(request.calls[0].url, '/v1/clowder/group/cats/sync');
+  assert.deepEqual(request.calls[0].data.catIds, ['codex']);
+  assert.deepEqual(request.calls[0].data.cats, [{
+    catId: 'codex',
+    displayName: 'Codex',
+    aliases: ['@codex'],
+    mentionPatterns: ['@codex', 'Codex'],
+    avatar: 'codex.png',
+    personalitySummary: '代码生成',
+    capabilitySummary: '',
+    available: true,
+    availabilityState: 'available',
+    source: 'ui',
+    connected: true
+  }]);
+  assert.equal(request.calls[0].data.prompt.includes('研发群'), true);
+  assert.deepEqual(result.catIds, ['codex']);
+});
+
 test('agent cleanup identity resolves clowder contact and raw cat ids', () => {
   assert.deepEqual(resolveAgentDeleteIdentity({
     id: 'clowder_cat:codex',
@@ -823,6 +867,36 @@ test('agent cleanup prunes agents conversations group members and optional direc
   assert.equal(Object.prototype.hasOwnProperty.call(next.messages, 'clowder_cat:codex'), false);
   assert.deepEqual(next.messages.g1, [{ id: 'g-msg', senderId: 'codex' }]);
   assert.equal(next.activeId, '');
+});
+
+test('group creation candidates include existing agents and split native contacts from agents', () => {
+  const contacts = [
+    { id: 'u1', nickname: '张伟', avatar: 'u1.png' }
+  ];
+  const agents = [
+    { id: 'codex', name: 'Codex', alias: '@codex', avatar: 'codex.png', platform: 'codex' },
+    { id: 'claude', name: 'Claude Code', alias: '@claude', status: 'active' }
+  ];
+
+  const agentOnlyCandidates = buildSelectableGroupMembers({ contacts: [], agents });
+  assert.equal(agentOnlyCandidates.length, 2);
+  assert.deepEqual(agentOnlyCandidates.map((item) => item.id), ['agent:codex', 'agent:claude']);
+  assert.equal(agentOnlyCandidates[0].inviteType, 'agent');
+  assert.equal(agentOnlyCandidates[0].agentId, 'codex');
+  assert.equal(agentOnlyCandidates[0].nickname, 'Codex');
+  assert.equal(agentOnlyCandidates[0].alias, '@codex');
+
+  const candidates = buildSelectableGroupMembers({
+    contacts,
+    agents,
+    existingMembers: [{ id: 'agent:claude', agentId: 'claude', isAgent: true }]
+  });
+  assert.deepEqual(candidates.map((item) => item.id), ['agent:codex', 'u1']);
+
+  const split = splitSelectedGroupMembers(['u1', 'agent:codex'], candidates);
+  assert.deepEqual(split.contactIds, ['u1']);
+  assert.deepEqual(split.agentIds, ['codex']);
+  assert.deepEqual(split.agents.map((agent) => agent.id), ['codex']);
 });
 
 test('local oauth capability loader dedupes concurrent probes and force refreshes', async () => {

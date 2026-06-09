@@ -80,6 +80,14 @@ export const useGroupStore = defineStore('group', {
       const conversation = useConversationStore().upsertGroupConversation(group);
       return { group, conversation };
     },
+    async syncGroupCatsForGroup({ groupId, groupName, agents = [] } = {}) {
+      if (!groupId || agents.length === 0) return null;
+      return nativeImService.syncGroupCats({
+        groupId,
+        groupName,
+        agents
+      });
+    },
     async syncNativeGroupMembers(groupId, options = {}) {
       if (!groupId) return [];
       try {

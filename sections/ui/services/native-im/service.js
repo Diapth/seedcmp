@@ -244,6 +244,10 @@ function firstList(...values) {
   return [];
 }
 
+function uniqueStrings(values = []) {
+  return [...new Set(values.map((value) => String(value || '').trim()).filter(Boolean))];
+}
+
 function toTimestampMs(value, fallback = 0) {
   if (value === undefined || value === null || value === '') return fallback;
   if (typeof value === 'number') {
@@ -393,6 +397,52 @@ function normalizeCreatedClowderCat(resp = {}) {
     apiUrl: '',
     customModel: ''
   };
+}
+
+function normalizeGroupCatForSync(agent = {}) {
+  const raw = agent.raw || {};
+  const catId = firstNonEmpty(
+    agent.catId,
+    agent.cat_id,
+    agent.directCatId,
+    agent.direct_cat_id,
+    agent.id,
+    agent.agentId,
+    agent.uid,
+    raw.catId,
+    raw.cat_id,
+    raw.id
+  ).replace(/^clowder_cat:/, '');
+  const displayName = firstNonEmpty(agent.displayName, agent.name, agent.nickname, agent.alias, catId);
+  const aliases = uniqueStrings([
+    agent.alias,
+    ...(Array.isArray(agent.aliases) ? agent.aliases : [])
+  ]);
+  return {
+    catId,
+    displayName,
+    aliases,
+    mentionPatterns: uniqueStrings([
+      ...aliases,
+      displayName,
+      catId ? `@${catId}` : ''
+    ]),
+    avatar: firstNonEmpty(agent.avatar, agent.logo, raw.avatar),
+    personalitySummary: firstNonEmpty(agent.personalitySummary, agent.personality, agent.systemPrompt, agent.desc, agent.description),
+    capabilitySummary: firstList(agent.capabilities, agent.capabilityTags).join('、'),
+    available: agent.available !== false,
+    availabilityState: firstNonEmpty(agent.availabilityState, agent.status === 'inactive' ? 'unavailable' : 'available'),
+    source: firstNonEmpty(agent.source, raw.source, 'ui'),
+    connected: true
+  };
+}
+
+function buildGroupCatsPrompt({ groupName = '', cats = [] } = {}) {
+  const names = cats.map((cat) => cat.displayName || cat.catId).filter(Boolean).join('、');
+  return [
+    `群聊「${groupName || '未命名群聊'}」已连接智能体${names ? `：${names}` : ''}。`,
+    '智能体只在被 @ 或明确点名时参与回复，并应遵守群聊上下文。'
+  ].join('\n');
 }
 
 function clientIdForAgentPlatform(platform = '') {
@@ -778,6 +828,25 @@ export function createNativeImService(options = {}) {
     return normalizeLocalOAuthCapabilities(resp);
   }
 
+  async function syncGroupCats({ groupId, groupName = '', agents = [], catIds = [], cats = [], prompt = '', proactiveReplies = false, autoReplyMode = 'mentions_only' } = {}) {
+    const id = String(groupId || '').trim();
+    if (!id) throw { msg: 'groupId不能为空' };
+    const normalizedCats = (cats.length > 0 ? cats : agents).map((cat) => normalizeGroupCatForSync(cat));
+    const payload = {
+      groupId: id,
+      groupName: String(groupName || id).trim(),
+      catIds: uniqueStrings([
+        ...catIds,
+        ...normalizedCats.map((cat) => cat.catId)
+      ]),
+      cats: normalizedCats,
+      prompt: prompt || buildGroupCatsPrompt({ groupName: groupName || id, cats: normalizedCats }),
+      proactiveReplies: proactiveReplies === true,
+      autoReplyMode
+    };
+    return client.post('clowder/group/cats/sync', payload);
+  }
+
   async function updateConversationSettings({ channelId, channelType = CHANNEL_TYPE_PERSON, isPinned, isMuted } = {}) {
     if (!channelId) throw { msg: 'channelId不能为空' };
     const payload = {};
@@ -1080,6 +1149,7 @@ export function createNativeImService(options = {}) {
     sendClowderConversationMessage,
     createClowderCat,
     getLocalAuthCapabilities,
+    syncGroupCats,
     sendMediaMessage,
     uploadChatFile,
     updateConversationSettings,
