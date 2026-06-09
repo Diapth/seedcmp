@@ -48,6 +48,10 @@ import {
   buildSelectableGroupMembers,
   splitSelectedGroupMembers
 } from '../services/native-im/group-member-candidates.js';
+import {
+  normalizeSkillCatalogPreview,
+  normalizeUserSkillList
+} from '../services/native-im/skill-state.js';
 
 function makeRequestStub(responses = {}) {
   const calls = [];
@@ -389,6 +393,94 @@ test('native service scans clowder templates as official agent cards', async () 
   assert.equal(directory.agents[0].source, 'clowder');
   assert.equal(directory.agents[0].raw.source, 'role-template');
   assert.deepEqual(directory.agents[0].capabilityTags, ['多智能体编排', '任务拆解']);
+});
+
+test('native service fetches user skills separately from marketplace skills', async () => {
+  const request = makeRequestStub({
+    'GET clowder/skills/summary': {
+      skills: [{ id: 'user-skill-1', name: 'tdd', enabled: true, agentIds: ['codex'] }]
+    },
+    'GET clowder/skills': {
+      skills: [{ id: 'user-skill-1', name: 'tdd', enabled: true, agentIds: ['codex'] }]
+    },
+    'GET clowder/skills/marketplace': {
+      skills: [
+        { id: 'codex:tdd', name: 'tdd', sourceType: 'official', provider: 'codex', added: true },
+        { id: 'claude:review', name: 'review', sourceType: 'project', provider: 'claude', added: false }
+      ]
+    }
+  });
+  const service = createNativeImService({
+    baseUrl: '/v1/',
+    request,
+    getToken: () => 'token'
+  });
+
+  const summary = await service.fetchSkillSummary();
+  const mine = await service.fetchUserSkills();
+  const marketplace = await service.fetchSkillMarketplace();
+
+  assert.equal(summary[0].id, 'user-skill-1');
+  assert.equal(mine[0].assignedAgentCount, 1);
+  assert.equal(marketplace[0].added, true);
+  assert.equal(marketplace[1].sourceType, 'project');
+  assert.deepEqual(request.calls.map((call) => `${call.method} ${call.url}`), [
+    'GET /v1/clowder/skills/summary',
+    'GET /v1/clowder/skills',
+    'GET /v1/clowder/skills/marketplace'
+  ]);
+});
+
+test('native service mutates user skill ownership and assignments by explicit ids', async () => {
+  const request = makeRequestStub({
+    'POST clowder/skills/codex%3Atdd/add': {
+      skill: { id: 'user-skill-1', sourceId: 'codex:tdd', name: 'tdd', enabled: true, agentIds: [] }
+    },
+    'PATCH clowder/skills/user-skill-1': {
+      skill: { id: 'user-skill-1', name: 'tdd', enabled: false, agentIds: [] }
+    },
+    'PUT clowder/skills/user-skill-1/assignments': {
+      skill: { id: 'user-skill-1', name: 'tdd', enabled: false, agentIds: ['codex'] }
+    },
+    'DELETE clowder/skills/user-skill-1': { ok: true }
+  });
+  const service = createNativeImService({
+    baseUrl: '/v1/',
+    request,
+    getToken: () => 'token'
+  });
+
+  const added = await service.addMarketplaceSkill('codex:tdd');
+  const updated = await service.updateUserSkill('user-skill-1', { enabled: false });
+  const assigned = await service.updateSkillAssignments('user-skill-1', ['codex']);
+  const deleted = await service.deleteUserSkill('user-skill-1');
+
+  assert.equal(added.sourceId, 'codex:tdd');
+  assert.equal(updated.enabled, false);
+  assert.deepEqual(assigned.agentIds, ['codex']);
+  assert.equal(deleted.ok, true);
+  assert.deepEqual(request.calls.map((call) => [call.method, call.url, call.data]), [
+    ['POST', '/v1/clowder/skills/codex%3Atdd/add', { sourceId: 'codex:tdd' }],
+    ['PATCH', '/v1/clowder/skills/user-skill-1', { enabled: false }],
+    ['PUT', '/v1/clowder/skills/user-skill-1/assignments', { agentIds: ['codex'] }],
+    ['DELETE', '/v1/clowder/skills/user-skill-1', undefined]
+  ]);
+});
+
+test('skill catalog preview does not assign every catalog skill to every agent', () => {
+  const preview = normalizeSkillCatalogPreview({
+    codex: [{ name: 'tdd', category: '工程', description: '测试驱动', mounted: true }],
+    claude: [{ name: 'review', category: '质量', trigger: 'review', mounted: false }]
+  });
+  const userSkills = normalizeUserSkillList([
+    { id: 'user-skill-1', name: 'tdd', enabled: true, agentIds: ['codex'] }
+  ]);
+
+  assert.equal(preview.length, 2);
+  assert.deepEqual(preview[0].agentIds, []);
+  assert.equal(preview[0].level, '市场可添加');
+  assert.equal(preview[1].level, '未挂载');
+  assert.equal(userSkills[0].assignedAgentCount, 1);
 });
 
 test('native service fetches active project group, thread tasks, and creates coordination', async () => {

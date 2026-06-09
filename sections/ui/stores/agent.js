@@ -9,6 +9,11 @@ import {
   resolveAgentDeleteIdentity,
   isAgentMatch
 } from '@/services/native-im/agent-cleanup';
+import {
+  normalizeMarketplaceSkillList,
+  normalizeSkillCatalogPreview,
+  normalizeUserSkillList
+} from '@/services/native-im/skill-state';
 
 const STATIC_AGENT_IDS = new Set([
   'pm-agent',
@@ -20,36 +25,16 @@ const STATIC_AGENT_IDS = new Set([
   'clowder'
 ]);
 
-const SKILL_TONES = ['primary', 'cyan', 'orange', 'green', 'purple'];
-
 function agentErrorText(error) {
   return error?.msg || error?.message || '智能体目录同步失败';
-}
-
-function normalizeSkillCatalog(skillCatalog = {}, agents = []) {
-  return Object.entries(skillCatalog || {}).flatMap(([provider, entries], providerIndex) => {
-    if (!Array.isArray(entries)) return [];
-    return entries.map((entry, index) => {
-      const name = String(entry.name || entry.id || `${provider}-${index + 1}`).trim();
-      const id = `${provider}-${name}`.toLowerCase().replace(/[^a-z0-9\u4e00-\u9fa5_-]+/g, '-');
-      return {
-        id,
-        name,
-        category: entry.category || provider,
-        level: entry.mounted === false ? '未启用' : '可用',
-        desc: entry.description || entry.trigger || '后端技能已同步',
-        icon: 'bookmark',
-        tone: SKILL_TONES[(providerIndex + index) % SKILL_TONES.length],
-        agentIds: agents.map((agent) => agent.id).filter(Boolean)
-      };
-    });
-  });
 }
 
 export const useAgentStore = defineStore('agent', {
   state: () => ({
     syncState: 'idle',
     nativeError: '',
+    skillSyncState: 'idle',
+    skillError: '',
     localOAuthCapabilities: {},
     localOAuthLoading: false,
     localOAuthError: '',
@@ -64,6 +49,7 @@ export const useAgentStore = defineStore('agent', {
       { id: 'creative-spark', name: '创意火花', alias: '@spark', desc: '构思伙伴，用于头脑风暴与方案发散', avatar: '', status: 'inactive', creator: 'User', platform: 'claude-code', accessMode: 'oauth', model: 'Claude 3.5 Sonnet', accountRef: 'agenthub-default', apiKey: '', apiUrl: '', customModel: '', systemPrompt: '', roleTemplate: 'creative', templateId: 'creative', capabilityTags: ['头脑风暴', '方案发散'] },
       { id: 'clowder', name: 'Clowder 协同猫', alias: '@clowder', desc: '用于多智能体团队协作和信息聚合', avatar: '', status: 'active', creator: 'System', platform: 'codex', accessMode: 'api-key', model: 'DeepSeek V3', accountRef: 'openai-prod', apiKey: '', apiUrl: 'https://api.deepseek.com/v1', customModel: '', systemPrompt: '', roleTemplate: 'coordinator', templateId: 'reviewer', capabilityTags: ['多智能体', '信息聚合'] }
     ],
+    skillMarketplace: [],
     userSkills: [
       { id: 'skill-requirement', name: '需求澄清', category: '产品协作', level: '熟练', desc: '把模糊诉求拆成场景、约束与验收标准', icon: 'search', tone: 'primary', agentIds: ['pm-agent', 'logic-weaver'] },
       { id: 'skill-codegen', name: '代码生成', category: '工程实现', level: '熟练', desc: '根据需求快速生成页面、组件与业务逻辑', icon: 'code', tone: 'cyan', agentIds: ['codex'] },
@@ -461,6 +447,7 @@ export const useAgentStore = defineStore('agent', {
       });
       this.userSkills = [];
       this.localSkills = [];
+      this.skillMarketplace = [];
     },
     applyNativeAgents(agents = []) {
       if (!Array.isArray(agents) || agents.length === 0) return [];
@@ -474,23 +461,120 @@ export const useAgentStore = defineStore('agent', {
       return this.agents;
     },
     applyNativeSkills(skillCatalog = {}) {
-      const skills = normalizeSkillCatalog(skillCatalog, this.agents);
-      this.userSkills = skills;
-      this.localSkills = skills.map((skill) => ({
-        ...skill,
-        version: '',
-        packageName: '',
-        size: '',
-        updatedAt: '',
-        location: 'backend',
-        author: 'Clowder',
-        status: skill.level,
-        source: '后端',
-        triggers: [],
-        files: [],
-        documents: []
-      }));
-      return skills;
+      const marketplace = normalizeSkillCatalogPreview(skillCatalog);
+      this.skillMarketplace = marketplace;
+      this.localSkills = marketplace;
+      return marketplace;
+    },
+    applyUserSkills(skills = []) {
+      const normalized = normalizeUserSkillList(skills);
+      this.userSkills = normalized;
+      this.localSkills = normalized;
+      return normalized;
+    },
+    applyMarketplaceSkills(skills = []) {
+      const normalized = normalizeMarketplaceSkillList(skills);
+      this.skillMarketplace = normalized;
+      return normalized;
+    },
+    async fetchSkillSummary(options = {}) {
+      this.skillError = '';
+      try {
+        const skills = await nativeImService.fetchSkillSummary();
+        this.userSkills = normalizeUserSkillList(skills);
+        return this.userSkills;
+      } catch (error) {
+        this.skillError = agentErrorText(error);
+        if (!options.silent) throw error;
+        return [];
+      }
+    },
+    async fetchUserSkills(options = {}) {
+      if (!options.silent) this.skillSyncState = 'syncing';
+      this.skillError = '';
+      try {
+        const skills = await nativeImService.fetchUserSkills();
+        this.applyUserSkills(skills);
+        this.skillSyncState = 'success';
+        return this.userSkills;
+      } catch (error) {
+        this.skillSyncState = 'failed';
+        this.skillError = agentErrorText(error);
+        if (!options.silent) throw error;
+        return [];
+      }
+    },
+    async fetchSkillMarketplace(options = {}) {
+      this.skillError = '';
+      try {
+        const skills = await nativeImService.fetchSkillMarketplace();
+        return this.applyMarketplaceSkills(skills);
+      } catch (error) {
+        this.skillError = agentErrorText(error);
+        if (!options.silent) throw error;
+        return [];
+      }
+    },
+    async refreshSkills(options = {}) {
+      const [mine, marketplace] = await Promise.allSettled([
+        this.fetchUserSkills({ silent: true }),
+        this.fetchSkillMarketplace({ silent: true })
+      ]);
+      if (mine.status === 'rejected' || marketplace.status === 'rejected') {
+        const error = mine.reason || marketplace.reason;
+        this.skillError = agentErrorText(error);
+        if (!options.silent) throw error;
+      }
+      return {
+        userSkills: this.userSkills,
+        marketplace: this.skillMarketplace
+      };
+    },
+    async addMarketplaceSkill(sourceId) {
+      const skill = await nativeImService.addMarketplaceSkill(sourceId);
+      const next = normalizeUserSkillList([skill])[0];
+      this.userSkills = [
+        next,
+        ...this.userSkills.filter((item) => item.id !== next.id && item.sourceId !== next.sourceId)
+      ];
+      this.localSkills = this.userSkills;
+      this.skillMarketplace = this.skillMarketplace.map((item) => (
+        item.id === sourceId || item.sourceId === sourceId ? { ...item, added: true, status: '已添加', level: '已添加' } : item
+      ));
+      return next;
+    },
+    async updateUserSkill(userSkillId, patch = {}) {
+      const skill = await nativeImService.updateUserSkill(userSkillId, patch);
+      const next = normalizeUserSkillList([skill])[0];
+      this.userSkills = this.userSkills.map((item) => item.id === next.id ? next : item);
+      this.localSkills = this.userSkills;
+      return next;
+    },
+    async deleteUserSkill(userSkillId) {
+      const result = await nativeImService.deleteUserSkill(userSkillId);
+      const removed = this.userSkills.find((item) => item.id === userSkillId);
+      this.userSkills = this.userSkills.filter((item) => item.id !== userSkillId);
+      this.localSkills = this.userSkills;
+      if (removed?.sourceId) {
+        this.skillMarketplace = this.skillMarketplace.map((item) => (
+          item.id === removed.sourceId || item.sourceId === removed.sourceId ? { ...item, added: false, status: item.mounted === false ? '未挂载' : '可添加', level: item.mounted === false ? '未挂载' : '市场可添加' } : item
+        ));
+      }
+      return result;
+    },
+    async updateSkillAssignments(userSkillId, agentIds = []) {
+      const skill = await nativeImService.updateSkillAssignments(userSkillId, agentIds);
+      const next = normalizeUserSkillList([skill])[0];
+      this.userSkills = this.userSkills.map((item) => item.id === next.id ? next : item);
+      this.localSkills = this.userSkills;
+      return next;
+    },
+    async uploadSkillPackage(payload = {}) {
+      const skill = await nativeImService.uploadSkillPackage(payload);
+      const next = normalizeUserSkillList([skill])[0];
+      this.userSkills = [next, ...this.userSkills.filter((item) => item.id !== next.id)];
+      this.localSkills = this.userSkills;
+      return next;
     },
     applyProjectBoard(board) {
       if (!board?.groupId) return null;

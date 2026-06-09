@@ -14,6 +14,11 @@ import {
   defaultOAuthAccountRef,
   normalizeLocalOAuthCapabilities
 } from './oauth.js';
+import {
+  normalizeMarketplaceSkillList,
+  normalizeUserSkill,
+  normalizeUserSkillList
+} from './skill-state.js';
 
 const CHANNEL_TYPE_PERSON = 1;
 const CHANNEL_TYPE_GROUP = 2;
@@ -542,8 +547,9 @@ function defaultUploadRequest({ url, file, fieldName = 'file' }) {
 }
 
 export function createNativeImService(options = {}) {
+  const nativeBaseUrl = options.baseUrl || resolveDefaultBaseUrl();
   const client = options.client || createNativeApiClient({
-    baseUrl: options.baseUrl || resolveDefaultBaseUrl(),
+    baseUrl: nativeBaseUrl,
     getToken: options.getToken || (() => readStorage('app_token')),
     request: options.request
   });
@@ -1169,6 +1175,55 @@ export function createNativeImService(options = {}) {
     };
   }
 
+  async function fetchSkillSummary() {
+    const resp = await client.get('clowder/skills/summary');
+    return normalizeUserSkillList(firstArray(resp.skills, resp.data?.skills, resp.items, resp.data));
+  }
+
+  async function fetchUserSkills() {
+    const resp = await client.get('clowder/skills');
+    return normalizeUserSkillList(firstArray(resp.skills, resp.data?.skills, resp.items, resp.data));
+  }
+
+  async function fetchSkillMarketplace() {
+    const resp = await client.get('clowder/skills/marketplace');
+    return normalizeMarketplaceSkillList(firstArray(resp.skills, resp.data?.skills, resp.items, resp.data));
+  }
+
+  async function addMarketplaceSkill(sourceId) {
+    const id = String(sourceId || '').trim();
+    if (!id) throw { msg: 'sourceId不能为空' };
+    const resp = await client.post(`clowder/skills/${encodeURIComponent(id)}/add`, { sourceId: id });
+    return normalizeUserSkill(resp.skill || resp.data?.skill || resp.data || resp);
+  }
+
+  async function updateUserSkill(userSkillId, patch = {}) {
+    const id = String(userSkillId || '').trim();
+    if (!id) throw { msg: 'userSkillId不能为空' };
+    const resp = await client.patch(`clowder/skills/${encodeURIComponent(id)}`, patch);
+    return normalizeUserSkill(resp.skill || resp.data?.skill || resp.data || resp);
+  }
+
+  async function deleteUserSkill(userSkillId) {
+    const id = String(userSkillId || '').trim();
+    if (!id) throw { msg: 'userSkillId不能为空' };
+    return client.delete(`clowder/skills/${encodeURIComponent(id)}`);
+  }
+
+  async function updateSkillAssignments(userSkillId, agentIds = []) {
+    const id = String(userSkillId || '').trim();
+    if (!id) throw { msg: 'userSkillId不能为空' };
+    const resp = await client.put(`clowder/skills/${encodeURIComponent(id)}/assignments`, {
+      agentIds: Array.isArray(agentIds) ? agentIds.map(String).filter(Boolean) : []
+    });
+    return normalizeUserSkill(resp.skill || resp.data?.skill || resp.data || resp);
+  }
+
+  async function uploadSkillPackage(payload = {}) {
+    const resp = await client.post('clowder/skills/upload', payload);
+    return normalizeUserSkill(resp.skill || resp.data?.skill || resp.data || resp);
+  }
+
   async function fetchActiveProjectGroup(params = {}) {
     const query = {};
     if (params.projectGroupNo || params.groupId) query.projectGroupNo = String(params.projectGroupNo || params.groupId);
@@ -1237,6 +1292,14 @@ export function createNativeImService(options = {}) {
     deleteClowderCat,
     fetchClowderCatDirectory,
     fetchClowderConversationAgents,
+    fetchSkillSummary,
+    fetchUserSkills,
+    fetchSkillMarketplace,
+    addMarketplaceSkill,
+    updateUserSkill,
+    deleteUserSkill,
+    updateSkillAssignments,
+    uploadSkillPackage,
     fetchActiveProjectGroup,
     fetchThreadTasks,
     createCoordination,

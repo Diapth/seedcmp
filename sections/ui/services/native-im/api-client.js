@@ -77,6 +77,9 @@ export function createNativeApiClient(options = {}) {
     put(path, data, config) {
       return call('PUT', path, data, config);
     },
+    patch(path, data, config) {
+      return call('PATCH', path, data, config);
+    },
     delete(path, data, config) {
       return call('DELETE', path, data, config);
     }
