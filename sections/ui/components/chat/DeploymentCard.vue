@@ -268,17 +268,21 @@ function openUrl(url) {
 
 .deployment-actions {
   display: flex;
+  flex-wrap: wrap;
   gap: 8px;
   padding: 0 14px 14px;
 }
 
 .deployment-btn {
   min-height: 44px;
-  flex: 1;
+  min-width: 88px;
+  flex: 1 1 88px;
   margin: 0;
+  padding: 0 12px;
   border-radius: 6px;
   font-size: 14px;
   line-height: 44px;
+  white-space: nowrap;
 }
 
 .deployment-btn::after {
@@ -304,6 +308,10 @@ function openUrl(url) {
   .deployment-actions {
     grid-template-columns: 1fr;
     flex-direction: column;
+  }
+
+  .deployment-btn {
+    width: 100%;
   }
 }
 </style>
