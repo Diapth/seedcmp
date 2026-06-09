@@ -606,6 +606,65 @@ test('project group confirmation card keeps one retryable failed state', async (
   assert.match(list[0].content, /创建失败/);
 });
 
+test('project group confirmation trigger is limited to coordinator direct chats', async () => {
+  const {
+    buildProjectGroupConfirmationInput,
+    shouldCreateProjectGroupConfirmation
+  } = await import('../services/native-im/project-group.js');
+  const coordinatorConversation = {
+    id: 'clowder_cat:coordinator',
+    channelId: 'clowder_cat:coordinator',
+    channelType: 1,
+    type: 'robot',
+    source: 'clowder',
+    directCatId: 'coordinator',
+    name: 'PM 智能体'
+  };
+  const coordinatorAgent = {
+    id: 'coordinator',
+    name: 'PM 智能体',
+    roleTemplate: 'coordinator',
+    alias: '@pm'
+  };
+  const workerAgents = [
+    coordinatorAgent,
+    { id: 'codex', name: 'Codex', alias: '@codex', status: 'active', roleTemplate: 'engineer' },
+    { id: 'claude-code', directCatId: 'claude', name: 'Claude Code', alias: '@claude', status: 'active', roleTemplate: 'reviewer' },
+    { id: 'spark', name: '创意火花', status: 'inactive', roleTemplate: 'creative' }
+  ];
+
+  assert.equal(shouldCreateProjectGroupConfirmation({
+    conversation: coordinatorConversation,
+    agent: coordinatorAgent,
+    text: '为项目名叫 ISSUE-029项目群，拉 Codex 和 Claude 分工执行'
+  }), true);
+  assert.equal(shouldCreateProjectGroupConfirmation({
+    conversation: { id: 'g1', type: 'group', channelType: 2, name: '项目群' },
+    agent: coordinatorAgent,
+    text: '创建项目群'
+  }), false);
+  assert.equal(shouldCreateProjectGroupConfirmation({
+    conversation: { id: 'clowder_cat:codex', type: 'robot', source: 'clowder', directCatId: 'codex', name: 'Codex' },
+    agent: workerAgents[1],
+    text: '创建项目群'
+  }), false);
+
+  const cardInput = buildProjectGroupConfirmationInput({
+    conversation: coordinatorConversation,
+    agent: coordinatorAgent,
+    sourceMessage: { id: 'prompt-029', content: '项目名叫 ISSUE-029项目群，拉 Codex 和 Claude 分工执行' },
+    text: '项目名叫 ISSUE-029项目群，拉 Codex 和 Claude 分工执行',
+    currentUser: { id: 'u-owner' },
+    availableAgents: workerAgents
+  });
+
+  assert.equal(cardInput.projectName, 'ISSUE-029项目群');
+  assert.equal(cardInput.pmDirectChannelId, 'clowder_cat:coordinator');
+  assert.equal(cardInput.pmDirectChannelType, 1);
+  assert.deepEqual(cardInput.userMemberIds, ['u-owner']);
+  assert.deepEqual(cardInput.targetCatIds, ['codex', 'claude']);
+});
+
 test('clowder project binding and thread tasks normalize into a group board', () => {
   const board = normalizeClowderProjectBoard({
     binding: {

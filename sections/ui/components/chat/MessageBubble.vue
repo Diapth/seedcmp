@@ -68,9 +68,23 @@
           @contextmenu.prevent.stop="handleContextMenu"
           @longpress="handleLongPress"
         >
+          <view
+            v-if="data.type === 'project_group_confirmation'"
+            class="bubble-project-card"
+          >
+            <CoordinatorProjectGroupCard
+              :card="data.projectGroupCard || {}"
+              :message="data"
+              @confirm="$emit('project-group-confirm', $event)"
+              @cancel="$emit('project-group-cancel', $event)"
+              @retry="$emit('project-group-retry', $event)"
+              @open="$emit('project-group-open', $event)"
+            />
+          </view>
+
           <!-- Text Message -->
           <text
-            v-if="data.type === 'text' && !isMarkdownText"
+            v-else-if="data.type === 'text' && !isMarkdownText"
             class="bubble-text"
             space="emsp"
           ><text
@@ -151,6 +165,7 @@ import AppIcon from '../common/AppIcon.vue';
 import FileCard from './FileCard.vue';
 import VoiceCard from './VoiceCard.vue';
 import MessageReactions from './MessageReactions.vue';
+import CoordinatorProjectGroupCard from './CoordinatorProjectGroupCard.vue';
 import {
   isSelfSender,
   resolveSelfAvatar,
@@ -179,7 +194,11 @@ const emit = defineEmits([
   'open-lightbox',
   'jump-to',
   'open-file',
-  'preview-file'
+  'preview-file',
+  'project-group-confirm',
+  'project-group-cancel',
+  'project-group-retry',
+  'project-group-open'
 ]);
 
 const appStore = useAppStore();
@@ -465,7 +484,8 @@ function openLightbox(images, index) {
 .bubble-image-only,
 .bubble-file,
 .bubble-file-only,
-.bubble-voice-only {
+.bubble-voice-only,
+.bubble-project_group_confirmation {
   background-color: transparent !important;
   border: none !important;
   padding: 0 !important;
@@ -475,8 +495,13 @@ function openLightbox(images, index) {
 .bubble-file.bubble-me,
 .bubble-file-only.bubble-me,
 .bubble-voice-only.bubble-me,
-.bubble-image-only.bubble-me {
+.bubble-image-only.bubble-me,
+.bubble-project_group_confirmation.bubble-me {
   background-color: transparent !important;
+}
+
+.bubble-project-card {
+  max-width: 100%;
 }
 
 .voice-duration {

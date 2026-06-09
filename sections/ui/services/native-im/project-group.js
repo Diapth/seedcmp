@@ -7,6 +7,20 @@ const PROJECT_NAME_PATTERNS = [
   /群(?:名|名称)(?:叫|为|是)?\s*[「『“"]?([^」』”"\n，。,.!?！？；;]{2,40})/i
 ];
 
+const CLOWDER_CAT_CONTACT_PREFIX = 'clowder_cat:';
+const COORDINATOR_KEYWORDS = [
+  'coordinator',
+  'pm',
+  'projectmanager',
+  'productmanager',
+  'clowder',
+  '协调者',
+  '协同',
+  '项目经理',
+  '产品经理',
+  '项目管理'
+];
+
 function uniqueStrings(values = []) {
   return [...new Set(values.map((value) => String(value || '').trim()).filter(Boolean))];
 }
@@ -26,6 +40,85 @@ function cleanProjectName(value = '') {
     .replace(/^(?:叫|为|是|：|:)\s*/, '')
     .replace(/[」』”"']+$/g, '')
     .trim();
+}
+
+function cleanCatId(value = '') {
+  return String(value || '').trim().replace(new RegExp(`^${CLOWDER_CAT_CONTACT_PREFIX}`), '');
+}
+
+function normalizeKeyword(value = '') {
+  return cleanCatId(value)
+    .toLowerCase()
+    .replace(/^@/, '')
+    .replace(/[\s_\-:：/]+/g, '')
+    .replace(/智能体|agent|ai/g, '');
+}
+
+function keywordValues(entity = {}) {
+  const raw = entity.raw || {};
+  return [
+    entity.id,
+    entity.uid,
+    entity.catId,
+    entity.cat_id,
+    entity.directCatId,
+    entity.direct_cat_id,
+    entity.agentId,
+    entity.agent_id,
+    entity.name,
+    entity.nickname,
+    entity.displayName,
+    entity.alias,
+    entity.roleTemplate,
+    entity.roleTemplateId,
+    entity.templateId,
+    entity.template_id,
+    raw.id,
+    raw.catId,
+    raw.cat_id,
+    raw.roleTemplate,
+    raw.roleTemplateId,
+    raw.templateId
+  ];
+}
+
+function isCoordinatorEntity(entity = {}) {
+  const haystack = keywordValues(entity).map(normalizeKeyword).filter(Boolean);
+  return haystack.some((value) => COORDINATOR_KEYWORDS.some((keyword) => value.includes(keyword)));
+}
+
+function isDirectAgentConversation(conversation = {}) {
+  const channelType = Number(conversation.channelType || conversation.channel_type || (conversation.type === 'group' ? 2 : 1));
+  if (channelType === 2 || conversation.type === 'group') return false;
+  return conversation.type === 'robot'
+    || conversation.source === 'clowder'
+    || Boolean(conversation.directCatId || conversation.direct_cat_id)
+    || String(conversation.id || conversation.channelId || '').startsWith(CLOWDER_CAT_CONTACT_PREFIX);
+}
+
+function agentCatId(agent = {}) {
+  return cleanCatId(firstText(agent.directCatId, agent.direct_cat_id, agent.catId, agent.cat_id, agent.id, agent.uid));
+}
+
+function isAvailableWorkerAgent(agent = {}) {
+  if (!agentCatId(agent)) return false;
+  if (isCoordinatorEntity(agent)) return false;
+  if (agent.available === false || agent.connected === false) return false;
+  return !['inactive', 'disabled', 'unavailable'].includes(String(agent.status || '').toLowerCase());
+}
+
+function mentionedWorkerIds(text = '', agents = []) {
+  const normalizedText = normalizeKeyword(text);
+  return uniqueStrings(agents.filter(isAvailableWorkerAgent).filter((agent) => {
+    const candidates = keywordValues(agent)
+      .map(normalizeKeyword)
+      .filter((value) => value && value.length >= 2);
+    return candidates.some((value) => normalizedText.includes(value) || value.includes(normalizedText));
+  }).map(agentCatId));
+}
+
+function defaultWorkerIds(agents = []) {
+  return uniqueStrings(agents.filter(isAvailableWorkerAgent).map(agentCatId)).slice(0, 3);
 }
 
 export function isProjectStartRequest(text = '') {
@@ -54,6 +147,44 @@ export function resolveProjectGroupName(text = '', fallback = '') {
 export function buildProjectGroupCardId(sourceMessage = {}) {
   const id = sourceMessage.id || sourceMessage.messageId || sourceMessage.clientMsgNo || sourceMessage.client_msg_no || '';
   return `project-group-card:${String(id || Date.now()).trim()}`;
+}
+
+export function shouldCreateProjectGroupConfirmation({ conversation = {}, agent = {}, text = '' } = {}) {
+  return isProjectStartRequest(text)
+    && isDirectAgentConversation(conversation)
+    && (isCoordinatorEntity(agent) || isCoordinatorEntity(conversation));
+}
+
+export function buildProjectGroupConfirmationInput({
+  conversation = {},
+  agent = {},
+  sourceMessage = {},
+  text = '',
+  currentUser = {},
+  availableAgents = []
+} = {}) {
+  const pmDirectChannelId = firstText(conversation.channelId, conversation.id);
+  const coordinatorId = agentCatId(agent) || agentCatId(conversation) || 'coordinator';
+  const targetCatIds = mentionedWorkerIds(text || sourceMessage.content, availableAgents);
+  const workerCatIds = targetCatIds.length ? targetCatIds : defaultWorkerIds(availableAgents);
+  const userId = firstText(currentUser.id, currentUser.uid, currentUser.userId, currentUser.raw?.uid, currentUser.raw?.id);
+  return {
+    sourceMessage,
+    sourceText: firstText(text, sourceMessage.content),
+    projectName: resolveProjectGroupName(text || sourceMessage.content, conversation.name || agent.name || 'Clowder'),
+    pmDirectChannelId,
+    pmDirectChannelType: Number(conversation.channelType || conversation.channel_type || 1),
+    pmMemberId: coordinatorId ? `${CLOWDER_CAT_CONTACT_PREFIX}${coordinatorId}` : CLOWDER_CAT_CONTACT_PREFIX + 'coordinator',
+    userMemberIds: userId ? [userId] : [],
+    catMemberIds: uniqueStrings([coordinatorId, ...workerCatIds]),
+    targetCatIds: workerCatIds,
+    workerCatIds,
+    coordinator: {
+      id: coordinatorId,
+      name: firstText(agent.name, agent.nickname, conversation.name, 'PM / 协调者'),
+      avatar: firstText(agent.avatar, conversation.avatar)
+    }
+  };
 }
 
 function cardErrorText(error = '') {

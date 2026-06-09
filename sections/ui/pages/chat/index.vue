@@ -86,6 +86,10 @@
             @message-open-lightbox="handleOpenLightbox"
             @message-open-file="openFileExternally"
             @message-preview-file="openFilePreview"
+            @project-group-confirm="handleProjectGroupConfirm"
+            @project-group-cancel="handleProjectGroupCancel"
+            @project-group-retry="handleProjectGroupConfirm"
+            @project-group-open="handleProjectGroupOpen"
           />
         </view>
 
@@ -317,6 +321,10 @@ import {
   replyTargetForConversation,
   shouldClearReplyTargetOnConversationChange
 } from '@/services/native-im/reply-state';
+import {
+  buildProjectGroupConfirmationInput,
+  shouldCreateProjectGroupConfirmation
+} from '@/services/native-im/project-group';
 
 const { isDesktop } = useResponsiveLayout();
 const appStore = useAppStore();
@@ -625,12 +633,55 @@ async function handleSendMessage({ type, content, fileName, fileSize, fileSizeBy
     mentions: extra.mentions || []
   }, sender);
   const localMessage = await sendPromise;
+  if (type === 'text') {
+    maybeCreateProjectGroupCard(conversation, content, localMessage);
+  }
   if (type === 'text' && shouldStartLocalClowderStream(conversation)) {
     messageStore.startClowderMarkdownStream(conversation.id, content, {
       targetMessageId: localMessage?.id || localMessage?.messageId || localMessage?.clientMsgNo
     });
   }
   replyTarget.value = null;
+}
+
+function maybeCreateProjectGroupCard(conversation, text, sourceMessage) {
+  if (!conversation || !text || sourceMessage?.status === 'failed') return null;
+  const agent = resolveAgentForConversation(conversation) || conversation;
+  if (!shouldCreateProjectGroupConfirmation({ conversation, agent, text })) return null;
+  return messageStore.createProjectGroupConfirmation(conversation.id, buildProjectGroupConfirmationInput({
+    conversation,
+    agent,
+    sourceMessage,
+    text,
+    currentUser: appStore.currentUser || {},
+    availableAgents: agentStore.agents
+  }));
+}
+
+function projectGroupCardMessageId(payload = {}) {
+  return payload.message?.id || payload.card?.cardId || payload.message?.projectGroupCard?.cardId || '';
+}
+
+function handleProjectGroupCancel(payload = {}) {
+  const cardId = projectGroupCardMessageId(payload);
+  if (!cardId) return;
+  messageStore.updateProjectGroupConfirmation(convStore.activeId, cardId, { status: 'cancelled' });
+}
+
+function handleProjectGroupConfirm(payload = {}) {
+  const cardId = projectGroupCardMessageId(payload);
+  if (!cardId) return;
+  messageStore.updateProjectGroupConfirmation(convStore.activeId, cardId, { status: 'creating' });
+}
+
+function handleProjectGroupOpen(payload = {}) {
+  const groupId = payload.card?.projectGroupNo || payload.card?.groupNo || payload.message?.projectGroupCard?.projectGroupNo;
+  if (!groupId) {
+    uni.showToast({ title: '项目群尚未创建', icon: 'none' });
+    return;
+  }
+  convStore.setActiveId(groupId);
+  syncActiveMessages({ silent: true });
 }
 
 function handleDraftChange(draftVal) {

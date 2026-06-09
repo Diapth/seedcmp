@@ -23,6 +23,10 @@
           @jump-to="$emit('message-jump-to', $event)"
           @open-file="$emit('message-open-file', $event)"
           @preview-file="$emit('message-preview-file', $event)"
+          @project-group-confirm="$emit('project-group-confirm', $event)"
+          @project-group-cancel="$emit('project-group-cancel', $event)"
+          @project-group-retry="$emit('project-group-retry', $event)"
+          @project-group-open="$emit('project-group-open', $event)"
         />
       </template>
       <!-- Bottom Anchor to auto scroll to -->
@@ -61,7 +65,11 @@ defineEmits([
   'message-open-lightbox',
   'message-jump-to',
   'message-open-file',
-  'message-preview-file'
+  'message-preview-file',
+  'project-group-confirm',
+  'project-group-cancel',
+  'project-group-retry',
+  'project-group-open'
 ]);
 
 const scrollToId = ref('');
