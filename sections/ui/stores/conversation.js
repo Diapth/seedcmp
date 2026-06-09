@@ -15,6 +15,10 @@ import {
   createAgentMember,
   shouldPreserveClowderAgentDisplayName
 } from '@/services/native-im/agent-state';
+import {
+  cleanupAgentFromLocalState,
+  resolveAgentDeleteIdentity
+} from '@/services/native-im/agent-cleanup';
 
 function channelTypeFromConversation(conversation = {}) {
   if (conversation.channelType) return Number(conversation.channelType);
@@ -388,6 +392,22 @@ export const useConversationStore = defineStore('conversation', {
       this.conversations = this.conversations.filter((c) => c.id !== id);
       this.isHidden = this.isHidden.filter((x) => x !== id);
       if (this.activeId === id) this.activeId = '';
+    },
+    cleanupAgentReferences(agent, options = {}) {
+      const next = cleanupAgentFromLocalState({
+        conversations: this.conversations,
+        members: this.members,
+        activeId: this.activeId,
+        messages: {}
+      }, agent, options);
+      this.conversations = next.conversations;
+      this.members = next.members;
+      this.activeId = next.activeId;
+      this.isHidden = this.isHidden.filter((id) => !next.removedConversationIds.includes(id));
+      return {
+        ...next,
+        identity: resolveAgentDeleteIdentity(agent)
+      };
     },
     setAnnouncement(convId, text, options = {}) {
       this.announcements[convId] = {

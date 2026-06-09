@@ -337,6 +337,26 @@
               </view>
             </view>
 
+            <!-- 4. Danger Zone -->
+            <view v-if="isEditing" class="danger-card glass-panel flex-column gap-3">
+              <view class="danger-head flex-row align-center gap-2">
+                <view class="danger-icon">
+                  <AppIcon name="trash" :size="16" color="var(--color-error)" />
+                </view>
+                <view class="flex-column flex-1">
+                  <text class="danger-title">危险操作</text>
+                  <text class="danger-desc">删除智能体会移除联系人、群成员和 @ 候选。历史消息默认保留。</text>
+                </view>
+              </view>
+              <button
+                class="btn-danger"
+                :disabled="!canDeleteEditingAgent"
+                @click="openDeleteAgentDialog"
+              >
+                {{ canDeleteEditingAgent ? '删除智能体' : '系统智能体不能删除' }}
+              </button>
+            </view>
+
             <!-- Mobile action bar (only on mobile) -->
             <view class="mobile-action-bar" v-if="!isDesktop">
               <button class="btn-clear" @click="handleClear">{{ resetActionText }}</button>
@@ -420,6 +440,61 @@
           </view>
         </view>
       </scroll-view>
+
+      <AppDialog
+        v-if="deleteDialogVisible"
+        :visible="deleteDialogVisible"
+        title="删除智能体"
+        :show-footer="false"
+        width="md"
+        :mask-closable="!deletingAgent"
+        @update:visible="deleteDialogVisible = $event"
+      >
+        <view class="delete-dialog flex-column gap-3">
+          <view class="delete-warning flex-column gap-1">
+            <text class="delete-warning-title">此操作会删除 {{ editingAgent?.name || '该智能体' }}</text>
+            <text class="delete-warning-text">远端删除成功后，智能体将从列表、建群候选、群成员与 @ 候选中移除。</text>
+            <text class="delete-warning-text">群聊历史发言会保留，避免破坏多人上下文。</text>
+          </view>
+
+          <view class="input-group flex-column gap-1">
+            <text class="input-label">输入名称、别名或 catId 以确认</text>
+            <input
+              v-model="deleteConfirmText"
+              type="text"
+              :placeholder="deleteConfirmPlaceholder"
+              class="form-input"
+              placeholder-style="color: var(--color-text-muted)"
+            />
+          </view>
+
+          <view
+            class="delete-option flex-row align-center gap-2"
+            :class="{ active: deleteDirectMessages }"
+            @click="deleteDirectMessages = !deleteDirectMessages"
+          >
+            <view class="delete-checkbox" :class="{ checked: deleteDirectMessages }">
+              <AppIcon v-if="deleteDirectMessages" name="check" :size="12" color="#ffffff" />
+            </view>
+            <view class="flex-column flex-1">
+              <text class="delete-option-title">同时删除直聊会话和聊天记录</text>
+              <text class="delete-option-desc">仅清理与该智能体的一对一直聊，不删除群聊中的历史发言。</text>
+            </view>
+          </view>
+
+          <view v-if="deleteError" class="delete-error">{{ deleteError }}</view>
+
+          <view class="delete-actions flex-row gap-2">
+            <button class="btn-clear flex-1" :disabled="deletingAgent" @click="closeDeleteAgentDialog">取消</button>
+            <button
+              class="btn-danger confirm flex-1"
+              :disabled="!deleteConfirmMatched || deletingAgent"
+              :loading="deletingAgent"
+              @click="handleDeleteAgent"
+            >确认删除</button>
+          </view>
+        </view>
+      </AppDialog>
 
       <!-- Help dialog -->
       <AppDialog
@@ -588,6 +663,11 @@ const form = ref(createDefaultForm());
 
 const tagDraft = ref('');
 const submitting = ref(false);
+const deletingAgent = ref(false);
+const deleteDialogVisible = ref(false);
+const deleteConfirmText = ref('');
+const deleteDirectMessages = ref(false);
+const deleteError = ref('');
 const helpVisible = ref(false);
 const showApiKey = ref(false);
 const showTemplateManager = ref(false);
@@ -680,6 +760,12 @@ const editingAgent = computed(() => {
 });
 
 const isEditing = computed(() => !!editingAgent.value);
+const canDeleteEditingAgent = computed(() => {
+  const agent = editingAgent.value;
+  if (!agent) return false;
+  if (agent.creator === 'System' || agent.source === 'official' || agent.raw?.source === 'role-template') return false;
+  return true;
+});
 
 const pageTitle = computed(() => (isEditing.value ? '智能体配置' : '新建智能体'));
 const pageSubtitle = computed(() => (
@@ -693,6 +779,22 @@ const checkTitle = computed(() => (isEditing.value ? '保存前检查' : '部署
 const resetActionText = computed(() => (isEditing.value ? '还原' : '清空'));
 const submitText = computed(() => (isEditing.value ? '保存配置' : '创建并部署'));
 const helpTitle = computed(() => (isEditing.value ? '智能体配置帮助' : '创建智能体帮助'));
+const deleteConfirmTokens = computed(() => {
+  const agent = editingAgent.value || {};
+  return [
+    agent.name,
+    agent.alias,
+    agent.catId,
+    agent.directCatId,
+    agent.id
+  ].map((value) => String(value || '').trim()).filter(Boolean);
+});
+const deleteConfirmPlaceholder = computed(() => deleteConfirmTokens.value[0] || '输入智能体名称');
+const deleteConfirmMatched = computed(() => {
+  const input = deleteConfirmText.value.trim();
+  if (!input) return false;
+  return deleteConfirmTokens.value.some((token) => token === input);
+});
 
 const currentRole = computed(() => {
   return roleTemplates.find(r => r.value === form.value.roleTemplate) || roleTemplates[0];
@@ -950,6 +1052,19 @@ function openHelp() {
   helpVisible.value = true;
 }
 
+function openDeleteAgentDialog() {
+  if (!canDeleteEditingAgent.value) return;
+  deleteConfirmText.value = '';
+  deleteDirectMessages.value = false;
+  deleteError.value = '';
+  deleteDialogVisible.value = true;
+}
+
+function closeDeleteAgentDialog() {
+  if (deletingAgent.value) return;
+  deleteDialogVisible.value = false;
+}
+
 function handleClear() {
   const title = isEditing.value ? '还原配置' : '清空确认';
   const content = isEditing.value
@@ -1020,6 +1135,27 @@ function leaveConfigPage(fallbackUrl = '/pages/agents/index') {
     return;
   }
   uni.redirectTo({ url: fallbackUrl });
+}
+
+async function handleDeleteAgent() {
+  if (!editingAgent.value || !deleteConfirmMatched.value || deletingAgent.value) return;
+  deletingAgent.value = true;
+  deleteError.value = '';
+  try {
+    await agentStore.deleteAgent(editingAgent.value.id, {
+      deleteDirectMessages: deleteDirectMessages.value
+    });
+    deletingAgent.value = false;
+    deleteDialogVisible.value = false;
+    uni.showToast({ title: '智能体已删除', icon: 'success' });
+    setTimeout(() => {
+      uni.redirectTo({ url: '/pages/agents/index' });
+    }, 500);
+  } catch (error) {
+    deletingAgent.value = false;
+    deleteError.value = error?.msg || error?.message || '删除智能体失败';
+    uni.showToast({ title: deleteError.value, icon: 'none' });
+  }
 }
 
 async function handleCreate() {
@@ -1630,6 +1766,127 @@ async function handleCreate() {
   border: 1px dashed rgba(0, 74, 198, 0.24);
 }
 
+.danger-card {
+  padding: 18px;
+  border-color: rgba(239, 68, 68, 0.24);
+  background-color: rgba(239, 68, 68, 0.04);
+}
+.danger-head {
+  display: flex;
+  align-items: flex-start;
+}
+.danger-icon {
+  width: 30px;
+  height: 30px;
+  border-radius: 8px;
+  background-color: rgba(239, 68, 68, 0.12);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+.danger-title {
+  font-size: 15px;
+  font-weight: 800;
+  color: var(--color-error);
+}
+.danger-desc {
+  font-size: 12px;
+  line-height: 1.5;
+  color: var(--color-text-secondary);
+  margin-top: 2px;
+}
+.btn-danger {
+  min-height: 40px;
+  border-radius: 8px;
+  border: 1px solid rgba(239, 68, 68, 0.38);
+  background-color: rgba(239, 68, 68, 0.1);
+  color: var(--color-error);
+  font-size: 13px;
+  font-weight: 800;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.btn-danger.confirm {
+  color: #ffffff;
+  background-color: var(--color-error);
+  border-color: var(--color-error);
+}
+.btn-danger::after { border: none; }
+.btn-danger[disabled],
+.btn-danger:disabled {
+  color: var(--color-text-muted);
+  background-color: var(--color-bg-muted);
+  border-color: var(--color-border);
+}
+
+.delete-dialog {
+  display: flex;
+}
+.delete-warning {
+  padding: 12px;
+  border-radius: 10px;
+  border: 1px solid rgba(239, 68, 68, 0.22);
+  background-color: rgba(239, 68, 68, 0.06);
+}
+.delete-warning-title {
+  font-size: 14px;
+  font-weight: 800;
+  color: var(--color-text-primary);
+}
+.delete-warning-text {
+  font-size: 12px;
+  line-height: 1.5;
+  color: var(--color-text-secondary);
+}
+.delete-option {
+  display: flex;
+  padding: 12px;
+  border: 1px solid var(--color-border);
+  border-radius: 10px;
+  cursor: pointer;
+}
+.delete-option.active {
+  border-color: rgba(239, 68, 68, 0.36);
+  background-color: rgba(239, 68, 68, 0.05);
+}
+.delete-checkbox {
+  width: 18px;
+  height: 18px;
+  border-radius: 5px;
+  border: 1px solid var(--color-border);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+.delete-checkbox.checked {
+  border-color: var(--color-error);
+  background-color: var(--color-error);
+}
+.delete-option-title {
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--color-text-primary);
+}
+.delete-option-desc {
+  font-size: 12px;
+  line-height: 1.45;
+  color: var(--color-text-secondary);
+}
+.delete-error {
+  padding: 8px 10px;
+  border-radius: 8px;
+  background-color: rgba(239, 68, 68, 0.08);
+  color: var(--color-error);
+  font-size: 12px;
+  line-height: 1.5;
+}
+.delete-actions {
+  display: flex;
+}
+
 .block-divider { display: flex; }
 .divider-line {
   flex: 1;
@@ -1876,6 +2133,7 @@ async function handleCreate() {
   .help-btn { width: 36px; padding: 0; }
   .form-grid { grid-template-columns: 1fr; }
   .form-card { padding: 16px; }
+  .danger-card { padding: 16px; }
   .preview-card, .check-card { padding: 16px; }
   .oauth-status-main {
     align-items: flex-start;
@@ -1886,6 +2144,9 @@ async function handleCreate() {
   }
   .oauth-retry {
     margin-left: 64px;
+  }
+  .delete-actions {
+    flex-direction: column-reverse;
   }
 }
 </style>

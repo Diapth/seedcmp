@@ -40,6 +40,10 @@ import {
 import {
   normalizeClowderProjectBoard
 } from '../services/native-im/project-board.js';
+import {
+  cleanupAgentFromLocalState,
+  resolveAgentDeleteIdentity
+} from '../services/native-im/agent-cleanup.js';
 
 function makeRequestStub(responses = {}) {
   const calls = [];
@@ -742,6 +746,83 @@ test('native service creates oauth clowder cats with local cli account refs', as
     capabilities: ['代码生成']
   });
   assert.equal(Object.prototype.hasOwnProperty.call(request.calls[0].data, 'defaultModel'), false);
+});
+
+test('native service deletes clowder cats through contact lifecycle API', async () => {
+  const request = makeRequestStub({
+    'DELETE clowder/cats/codex': { deleted: true, id: 'codex' }
+  });
+  const service = createNativeImService({
+    baseUrl: '/v1/',
+    request,
+    getToken: () => 'token'
+  });
+
+  const result = await service.deleteClowderCat('codex');
+
+  assert.equal(request.calls[0].method, 'DELETE');
+  assert.equal(request.calls[0].url, '/v1/clowder/cats/codex');
+  assert.deepEqual(result, { deleted: true, id: 'codex' });
+});
+
+test('agent cleanup identity resolves clowder contact and raw cat ids', () => {
+  assert.deepEqual(resolveAgentDeleteIdentity({
+    id: 'clowder_cat:codex',
+    raw: { cat_id: 'codex-raw' }
+  }), {
+    catId: 'codex',
+    directConversationIds: ['clowder_cat:codex', 'codex']
+  });
+
+  assert.deepEqual(resolveAgentDeleteIdentity({
+    id: 'local-agent',
+    directCatId: 'claude',
+    alias: '@claude'
+  }), {
+    catId: 'claude',
+    directConversationIds: ['clowder_cat:claude', 'claude', 'local-agent']
+  });
+});
+
+test('agent cleanup prunes agents conversations group members and optional direct messages', () => {
+  const state = {
+    agents: [
+      { id: 'codex', directCatId: 'codex', name: 'Codex' },
+      { id: 'claude', directCatId: 'claude', name: 'Claude' }
+    ],
+    conversations: [
+      { id: 'clowder_cat:codex', directCatId: 'codex', type: 'robot' },
+      { id: 'g1', type: 'group' },
+      { id: 'clowder_cat:claude', directCatId: 'claude', type: 'robot' }
+    ],
+    members: {
+      g1: [
+        { id: 'me', nickname: '我' },
+        { id: 'codex', agentId: 'codex', isAgent: true },
+        { id: 'agent:claude', agentId: 'claude', isAgent: true }
+      ]
+    },
+    messages: {
+      'clowder_cat:codex': [{ id: 'm1' }],
+      g1: [{ id: 'g-msg', senderId: 'codex' }],
+      'clowder_cat:claude': [{ id: 'm2' }]
+    },
+    activeId: 'clowder_cat:codex'
+  };
+
+  const next = cleanupAgentFromLocalState(state, {
+    id: 'codex',
+    directCatId: 'codex'
+  }, {
+    deleteDirectMessages: true
+  });
+
+  assert.deepEqual(next.agents.map((agent) => agent.id), ['claude']);
+  assert.deepEqual(next.conversations.map((conv) => conv.id), ['g1', 'clowder_cat:claude']);
+  assert.deepEqual(next.members.g1.map((member) => member.id), ['me', 'agent:claude']);
+  assert.equal(Object.prototype.hasOwnProperty.call(next.messages, 'clowder_cat:codex'), false);
+  assert.deepEqual(next.messages.g1, [{ id: 'g-msg', senderId: 'codex' }]);
+  assert.equal(next.activeId, '');
 });
 
 test('local oauth capability loader dedupes concurrent probes and force refreshes', async () => {

@@ -976,6 +976,12 @@ export function createNativeImService(options = {}) {
     return client.delete(`user/devices/${encodeURIComponent(id)}`);
   }
 
+  async function deleteClowderCat(catId) {
+    const id = String(catId || '').trim();
+    if (!id) throw { msg: 'catId不能为空' };
+    return client.delete(`clowder/cats/${encodeURIComponent(id)}`);
+  }
+
   async function fetchClowderCatDirectory(params = {}) {
     let resp = null;
     if (params.preferDirect) {
@@ -1090,6 +1096,7 @@ export function createNativeImService(options = {}) {
     updateGroupProfile,
     fetchDevices,
     deleteDevice,
+    deleteClowderCat,
     fetchClowderCatDirectory,
     fetchClowderConversationAgents,
     fetchActiveProjectGroup,

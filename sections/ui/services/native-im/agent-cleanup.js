@@ -1,0 +1,106 @@
+import {
+  buildClowderCatContactId,
+  getClowderCatIdFromContactId
+} from './agent-state.js';
+
+function clean(value) {
+  if (value === undefined || value === null) return '';
+  return String(value).trim();
+}
+
+function firstNonEmpty(...values) {
+  for (const value of values) {
+    const text = clean(value);
+    if (text) return text;
+  }
+  return '';
+}
+
+function unique(values = []) {
+  return [...new Set(values.map(clean).filter(Boolean))];
+}
+
+export function resolveAgentDeleteIdentity(agent = {}) {
+  const rawId = firstNonEmpty(
+    agent.catId,
+    agent.cat_id,
+    agent.directCatId,
+    agent.direct_cat_id,
+    getClowderCatIdFromContactId(agent.id),
+    getClowderCatIdFromContactId(agent.agentId),
+    agent.raw?.catId,
+    agent.raw?.cat_id,
+    agent.raw?.id,
+    agent.id,
+    agent.agentId,
+    agent.uid
+  );
+  const catId = getClowderCatIdFromContactId(rawId) || rawId;
+  return {
+    catId,
+    directConversationIds: unique([
+      catId ? buildClowderCatContactId(catId) : '',
+      catId,
+      agent.id,
+      agent.agentId,
+      agent.uid
+    ])
+  };
+}
+
+export function isAgentMatch(candidate = {}, identity = {}) {
+  const catId = clean(identity.catId);
+  const ids = new Set([
+    catId,
+    catId ? buildClowderCatContactId(catId) : '',
+    ...identity.directConversationIds || []
+  ].map(clean).filter(Boolean));
+  const candidateIds = [
+    candidate.id,
+    candidate.uid,
+    candidate.agentId,
+    candidate.agent_id,
+    candidate.catId,
+    candidate.cat_id,
+    candidate.directCatId,
+    candidate.direct_cat_id,
+    candidate.raw?.catId,
+    candidate.raw?.cat_id,
+    getClowderCatIdFromContactId(candidate.id),
+    getClowderCatIdFromContactId(candidate.agentId)
+  ].map(clean).filter(Boolean);
+  return candidateIds.some((id) => ids.has(id));
+}
+
+export function cleanupAgentFromLocalState(state = {}, agent = {}, options = {}) {
+  const identity = resolveAgentDeleteIdentity(agent);
+  const directIds = new Set(identity.directConversationIds);
+  const agents = (state.agents || []).filter((item) => !isAgentMatch(item, identity));
+  const conversations = (state.conversations || []).filter((conversation) => {
+    if (directIds.has(clean(conversation.id)) || directIds.has(clean(conversation.channelId))) return false;
+    return !isAgentMatch(conversation, identity);
+  });
+  const members = Object.fromEntries(Object.entries(state.members || {}).map(([groupId, list]) => [
+    groupId,
+    (list || []).filter((member) => !isAgentMatch(member, identity))
+  ]));
+  const messages = { ...(state.messages || {}) };
+  if (options.deleteDirectMessages) {
+    identity.directConversationIds.forEach((id) => {
+      delete messages[id];
+    });
+  }
+  const activeId = directIds.has(clean(state.activeId)) ? '' : (state.activeId || '');
+
+  return {
+    ...state,
+    agents,
+    conversations,
+    members,
+    messages,
+    activeId,
+    removedConversationIds: [...identity.directConversationIds].filter((id) => (
+      (state.conversations || []).some((conversation) => conversation.id === id || conversation.channelId === id)
+    ))
+  };
+}

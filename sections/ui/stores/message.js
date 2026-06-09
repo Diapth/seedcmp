@@ -494,6 +494,10 @@ export const useMessageStore = defineStore('message', {
       if (!list) return;
       this.messages[conversationId] = list.filter((m) => m.id !== messageId);
     },
+    clearConversationMessages(conversationId) {
+      if (!conversationId) return;
+      delete this.messages[conversationId];
+    },
     editMessage(conversationId, messageId, newContent) {
       const list = this.messages[conversationId];
       if (!list) return;

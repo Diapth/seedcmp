@@ -5,6 +5,10 @@ import {
   createLocalOAuthCapabilityLoader,
   oauthProviderForPlatform
 } from '@/services/native-im/oauth';
+import {
+  resolveAgentDeleteIdentity,
+  isAgentMatch
+} from '@/services/native-im/agent-cleanup';
 
 const STATIC_AGENT_IDS = new Set([
   'pm-agent',
@@ -635,6 +639,40 @@ export const useAgentStore = defineStore('agent', {
           creator: 'User',
           runtimeError: this.nativeError
         });
+        throw error;
+      }
+    },
+    async deleteAgent(id, options = {}) {
+      const agent = this.agents.find((item) => item.id === id || item.catId === id || item.directCatId === id);
+      if (!agent) throw { msg: '未找到智能体' };
+      if (agent.creator === 'System' || agent.source === 'official' || agent.raw?.source === 'role-template') {
+        throw { msg: '系统智能体不能删除' };
+      }
+      const identity = resolveAgentDeleteIdentity(agent);
+      if (!identity.catId) throw { msg: '无法识别智能体 catId' };
+      try {
+        const remote = await nativeImService.deleteClowderCat(identity.catId);
+        this.agents = this.agents.filter((item) => !isAgentMatch(item, identity));
+
+        let cleanup = null;
+        const { useConversationStore } = await import('@/stores/conversation');
+        const convStore = useConversationStore();
+        cleanup = convStore.cleanupAgentReferences(agent, options);
+
+        if (options.deleteDirectMessages) {
+          const { useMessageStore } = await import('@/stores/message');
+          const messageStore = useMessageStore();
+          identity.directConversationIds.forEach((conversationId) => {
+            messageStore.clearConversationMessages(conversationId);
+          });
+        }
+        return {
+          remote,
+          identity,
+          cleanup
+        };
+      } catch (error) {
+        this.nativeError = agentErrorText(error);
         throw error;
       }
     },
