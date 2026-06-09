@@ -445,6 +445,90 @@ test('native service fetches active project group, thread tasks, and creates coo
   assert.equal(coordination.coordinationId, 'coord-1');
 });
 
+test('project group helper detects coordinator kickoff intent and resolves project names', async () => {
+  const {
+    isProjectStartRequest,
+    resolveProjectGroupName,
+    buildProjectGroupCardId
+  } = await import('../services/native-im/project-group.js');
+
+  assert.equal(isProjectStartRequest('为这个需求创建项目群，让 Codex 和 Claude 分工执行'), true);
+  assert.equal(isProjectStartRequest('拉 Codex/Claude 拆解任务并分工执行'), true);
+  assert.equal(isProjectStartRequest('今天下午天气怎么样'), false);
+  assert.equal(resolveProjectGroupName('项目名叫 ISSUE-029项目群，请 PM 拉猫猫执行', '默认项目'), 'ISSUE-029项目群');
+  assert.equal(resolveProjectGroupName('帮我创建项目群处理登录问题', '登录修复'), '登录修复 项目群');
+  assert.equal(buildProjectGroupCardId({ id: 'msg-1' }), 'project-group-card:msg-1');
+});
+
+test('native service posts ensure project group and updates binding thread', async () => {
+  const request = makeRequestStub({
+    'POST clowder/project-groups/ensure': {
+      binding: {
+        id: 'binding-029',
+        projectGroupNo: 'g-029',
+        projectName: 'ISSUE-029项目群',
+        projectThreadId: 'thread-029',
+        catMemberIds: ['coordinator', 'codex'],
+        status: 'active'
+      },
+      reused: false
+    },
+    'GET clowder/group/cats?groupId=g-029': {
+      cats: [{ catId: 'codex', displayName: 'Codex', connected: true }]
+    },
+    'POST clowder/project-groups/binding-029/thread': {
+      binding: {
+        id: 'binding-029',
+        projectThreadId: 'thread-updated'
+      }
+    }
+  });
+  const service = createNativeImService({
+    baseUrl: '/v1/',
+    request,
+    getToken: () => 'token'
+  });
+
+  const ensured = await service.ensureProjectGroup({
+    projectName: 'ISSUE-029项目群',
+    workspaceId: 'workspace-029',
+    pmDirectChannelId: 'clowder_cat:coordinator',
+    pmDirectChannelType: 1,
+    pmMemberId: 'clowder_cat:coordinator',
+    userMemberIds: ['u-owner'],
+    catMemberIds: ['coordinator', 'codex'],
+    createdBy: 'user'
+  });
+  const groupCats = await service.fetchGroupCats({ groupId: 'g-029' });
+  const updated = await service.updateProjectGroupThread('binding-029', {
+    projectThreadId: 'thread-updated'
+  });
+
+  assert.equal(request.calls[0].method, 'POST');
+  assert.equal(request.calls[0].url, '/v1/clowder/project-groups/ensure');
+  assert.deepEqual(request.calls[0].data, {
+    projectName: 'ISSUE-029项目群',
+    workspaceId: 'workspace-029',
+    pmDirectChannelId: 'clowder_cat:coordinator',
+    pmDirectChannelType: 1,
+    pmMemberId: 'clowder_cat:coordinator',
+    userMemberIds: ['u-owner'],
+    catMemberIds: ['coordinator', 'codex'],
+    createdBy: 'user'
+  });
+  assert.equal(request.calls[1].method, 'GET');
+  assert.equal(request.calls[1].url, '/v1/clowder/group/cats?groupId=g-029');
+  assert.equal(request.calls[2].method, 'POST');
+  assert.equal(request.calls[2].url, '/v1/clowder/project-groups/binding-029/thread');
+  assert.deepEqual(request.calls[2].data, { projectThreadId: 'thread-updated' });
+  assert.equal(ensured.binding.id, 'binding-029');
+  assert.equal(ensured.binding.projectGroupNo, 'g-029');
+  assert.equal(ensured.reused, false);
+  assert.equal(groupCats[0].id, 'codex');
+  assert.equal(groupCats[0].name, 'Codex');
+  assert.equal(updated.binding.projectThreadId, 'thread-updated');
+});
+
 test('clowder project binding and thread tasks normalize into a group board', () => {
   const board = normalizeClowderProjectBoard({
     binding: {

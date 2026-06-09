@@ -445,6 +445,27 @@ function buildGroupCatsPrompt({ groupName = '', cats = [] } = {}) {
   ].join('\n');
 }
 
+function normalizeFetchedGroupCat(cat = {}) {
+  const raw = cat.raw || {};
+  const id = firstNonEmpty(cat.catId, cat.cat_id, cat.id, cat.uid, raw.catId, raw.cat_id, raw.id).replace(/^clowder_cat:/, '');
+  const name = firstNonEmpty(cat.displayName, cat.display_name, cat.name, cat.nickname, cat.alias, id);
+  return {
+    id,
+    uid: id,
+    catId: id,
+    agentId: id,
+    name,
+    nickname: name,
+    alias: firstNonEmpty(cat.alias, firstList(cat.aliases, cat.mentionPatterns, cat.mention_patterns)[0], id ? `@${id}` : ''),
+    avatar: firstNonEmpty(cat.avatar, cat.logo, raw.avatar),
+    desc: firstNonEmpty(cat.capabilitySummary, cat.capability_summary, cat.personalitySummary, cat.personality_summary, cat.description, cat.desc),
+    isAgent: true,
+    source: firstNonEmpty(cat.source, raw.source, 'clowder'),
+    connected: cat.connected !== false,
+    raw: cat
+  };
+}
+
 function clientIdForAgentPlatform(platform = '') {
   const value = firstNonEmpty(platform).toLowerCase();
   if (value.includes('claude') || value.includes('anthropic')) return 'anthropic';
@@ -847,6 +868,50 @@ export function createNativeImService(options = {}) {
     return client.post('clowder/group/cats/sync', payload);
   }
 
+  async function fetchGroupCats({ groupId } = {}) {
+    const id = String(groupId || '').trim();
+    if (!id) throw { msg: 'groupId不能为空' };
+    const resp = await client.get('clowder/group/cats', { groupId: id });
+    return firstArray(resp.cats, resp.data?.cats, resp.agents, resp.data?.agents).map(normalizeFetchedGroupCat);
+  }
+
+  async function ensureProjectGroup(payload = {}) {
+    const data = {};
+    Object.entries(payload).forEach(([key, value]) => {
+      if (value === undefined || value === null || value === '') return;
+      if (Array.isArray(value)) {
+        data[key] = uniqueStrings(value);
+        return;
+      }
+      data[key] = value;
+    });
+    if (!data.projectName) throw { msg: 'projectName不能为空' };
+    if (!data.pmDirectChannelId) throw { msg: 'pmDirectChannelId不能为空' };
+    const resp = await client.post('clowder/project-groups/ensure', data);
+    return {
+      ...resp,
+      binding: resp.binding || resp.data?.binding || resp.data || resp,
+      reused: Boolean(resp.reused ?? resp.data?.reused ?? resp.binding?.reused ?? false),
+      raw: resp
+    };
+  }
+
+  async function updateProjectGroupThread(bindingId, payload = {}) {
+    const id = String(bindingId || '').trim();
+    if (!id) throw { msg: 'bindingId不能为空' };
+    const data = {};
+    Object.entries(payload).forEach(([key, value]) => {
+      if (value === undefined || value === null || value === '') return;
+      data[key] = value;
+    });
+    const resp = await client.post(`clowder/project-groups/${encodeURIComponent(id)}/thread`, data);
+    return {
+      ...resp,
+      binding: resp.binding || resp.data?.binding || resp.data || resp,
+      raw: resp
+    };
+  }
+
   async function updateConversationSettings({ channelId, channelType = CHANNEL_TYPE_PERSON, isPinned, isMuted } = {}) {
     if (!channelId) throw { msg: 'channelId不能为空' };
     const payload = {};
@@ -1150,6 +1215,9 @@ export function createNativeImService(options = {}) {
     createClowderCat,
     getLocalAuthCapabilities,
     syncGroupCats,
+    fetchGroupCats,
+    ensureProjectGroup,
+    updateProjectGroupThread,
     sendMediaMessage,
     uploadChatFile,
     updateConversationSettings,
