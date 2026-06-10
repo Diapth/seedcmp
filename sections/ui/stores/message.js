@@ -30,6 +30,12 @@ import {
   upsertCoordinatorTemplateCatsMessage
 } from '@/services/native-im/coordinator-template-cats';
 import {
+  applyManualContextPinsToMessages,
+  buildManualContextPinPayload,
+  normalizeManualContextPin,
+  resolveConversationThreadId
+} from '@/services/native-im/manual-context-pins';
+import {
   conversationSummaryForMessage,
   createClowderMarkdownStreamEvents,
   createClientMsgNo,
@@ -193,10 +199,45 @@ function agentFeedbackId(agent = {}, conversation = {}) {
   return cleanCatId(id);
 }
 
+function resolveConversationForPins(convStore, conversationOrId) {
+  if (!conversationOrId) return null;
+  if (typeof conversationOrId === 'string') {
+    return findConversation(convStore, conversationOrId) || {
+      id: conversationOrId,
+      channelId: conversationOrId,
+      channelType: 1
+    };
+  }
+  return conversationOrId;
+}
+
+function conversationMessageListId(conversation = {}, fallback = '') {
+  return firstText(conversation.id, conversation.conversationId, conversation.channelId, fallback);
+}
+
+function activeManualContextPins(pins = []) {
+  return (pins || []).map(normalizeManualContextPin).filter((pin) => pin.status === 'active');
+}
+
+function messagePinIdFromPins(message = {}, pins = []) {
+  const ids = new Set([
+    message.messageId,
+    message.message_id,
+    message.id,
+    message.clientMsgNo,
+    message.client_msg_no
+  ].map(firstText).filter(Boolean));
+  const pin = activeManualContextPins(pins).find((item) => ids.has(item.messageId));
+  return pin?.id || '';
+}
+
 export const useMessageStore = defineStore('message', {
   state: () => ({
     syncState: 'idle',
     syncError: '',
+    manualContextPinsByThread: {},
+    manualContextPinSyncStateByThread: {},
+    manualContextPinErrorsByThread: {},
     messages: {
       '1': [
         { id: '101', senderId: '1', senderName: '张伟', content: '哈罗，最近项目进展怎么样？', type: 'text', time: 1780485000000, status: 'success', reactions: [], replyRef: null, mentions: [], senderAvatar: '' },
@@ -259,6 +300,99 @@ export const useMessageStore = defineStore('message', {
       }, 500);
 
       return newMsg;
+    },
+    manualContextThreadId(conversationOrId) {
+      const convStore = useConversationStore();
+      const conversation = resolveConversationForPins(convStore, conversationOrId);
+      return resolveConversationThreadId(conversation || {});
+    },
+    applyManualContextPinMarks(conversationOrId) {
+      const convStore = useConversationStore();
+      const conversation = resolveConversationForPins(convStore, conversationOrId);
+      const conversationId = conversationMessageListId(conversation, typeof conversationOrId === 'string' ? conversationOrId : '');
+      const threadId = resolveConversationThreadId(conversation || {});
+      if (!conversationId || !this.messages[conversationId]) return [];
+      const pins = threadId ? activeManualContextPins(this.manualContextPinsByThread[threadId] || []) : [];
+      this.messages[conversationId] = applyManualContextPinsToMessages(this.messages[conversationId] || [], pins);
+      return this.messages[conversationId];
+    },
+    async syncManualContextPins(conversationOrId, options = {}) {
+      const convStore = useConversationStore();
+      const conversation = resolveConversationForPins(convStore, conversationOrId);
+      const conversationId = conversationMessageListId(conversation, typeof conversationOrId === 'string' ? conversationOrId : '');
+      const threadId = resolveConversationThreadId(conversation || {});
+      if (!threadId) return [];
+      this.manualContextPinSyncStateByThread[threadId] = 'syncing';
+      this.manualContextPinErrorsByThread[threadId] = '';
+      try {
+        const pins = await nativeImService.listManualContextPins(threadId, {
+          limit: options.limit || 5,
+          includeInactive: Boolean(options.includeInactive)
+        });
+        this.manualContextPinsByThread[threadId] = activeManualContextPins(pins);
+        if (conversationId) this.applyManualContextPinMarks(conversation || conversationId);
+        this.manualContextPinSyncStateByThread[threadId] = 'success';
+        return this.manualContextPinsByThread[threadId];
+      } catch (error) {
+        this.manualContextPinSyncStateByThread[threadId] = 'failed';
+        this.manualContextPinErrorsByThread[threadId] = errorText(error);
+        if (!options.silent) throw error;
+        return this.manualContextPinsByThread[threadId] || [];
+      }
+    },
+    async pinMessageAsContext(conversationOrId, message = {}) {
+      const convStore = useConversationStore();
+      const conversation = resolveConversationForPins(convStore, conversationOrId);
+      const conversationId = conversationMessageListId(conversation, typeof conversationOrId === 'string' ? conversationOrId : '');
+      const threadId = resolveConversationThreadId(conversation || {});
+      if (!threadId) throw { msg: '当前会话未绑定Clowder thread，无法设为长期上下文' };
+      const payload = buildManualContextPinPayload(message, conversation || {});
+      if (!payload) throw { msg: '这条消息没有可保存的长期上下文内容' };
+      const pin = normalizeManualContextPin(await nativeImService.upsertManualContextPin(threadId, payload));
+      const existing = activeManualContextPins(this.manualContextPinsByThread[threadId] || [])
+        .filter((item) => item.id !== pin.id && item.messageId !== pin.messageId);
+      this.manualContextPinsByThread[threadId] = [pin, ...existing].slice(0, 5);
+      if (conversationId) this.applyManualContextPinMarks(conversation || conversationId);
+      return pin;
+    },
+    async unpinMessageAsContext(conversationOrId, messageOrPinId = {}) {
+      const convStore = useConversationStore();
+      const conversation = resolveConversationForPins(convStore, conversationOrId);
+      const conversationId = conversationMessageListId(conversation, typeof conversationOrId === 'string' ? conversationOrId : '');
+      const threadId = resolveConversationThreadId(conversation || {});
+      if (!threadId) throw { msg: '当前会话未绑定Clowder thread，无法取消长期上下文' };
+      const pins = activeManualContextPins(this.manualContextPinsByThread[threadId] || []);
+      const pinId = typeof messageOrPinId === 'string'
+        ? messageOrPinId
+        : firstText(messageOrPinId.manualContextPinId, messagePinIdFromPins(messageOrPinId, pins));
+      if (!pinId) throw { msg: '未找到长期上下文记录' };
+      await nativeImService.removeManualContextPin(threadId, pinId);
+      this.manualContextPinsByThread[threadId] = pins.filter((pin) => pin.id !== pinId);
+      if (conversationId) this.applyManualContextPinMarks(conversation || conversationId);
+      return { removed: true, pinId };
+    },
+    async markManualContextSourceDeleted(conversationOrId, message = {}) {
+      const convStore = useConversationStore();
+      const conversation = resolveConversationForPins(convStore, conversationOrId);
+      const conversationId = conversationMessageListId(conversation, typeof conversationOrId === 'string' ? conversationOrId : '');
+      const threadId = resolveConversationThreadId(conversation || {});
+      if (!threadId) return [];
+      const pins = activeManualContextPins(this.manualContextPinsByThread[threadId] || []);
+      const pinId = firstText(message.manualContextPinId, messagePinIdFromPins(message, pins));
+      if (!pinId) return pins;
+      const messageId = firstText(message.messageId, message.message_id, message.id, message.clientMsgNo, message.client_msg_no);
+      if (!messageId) return pins;
+      try {
+        const nextPins = await nativeImService.markManualContextPinSourceStatus(threadId, {
+          messageId,
+          status: 'source_deleted'
+        });
+        this.manualContextPinsByThread[threadId] = activeManualContextPins(nextPins);
+      } catch {
+        this.manualContextPinsByThread[threadId] = pins.filter((pin) => pin.id !== pinId);
+      }
+      if (conversationId) this.applyManualContextPinMarks(conversation || conversationId);
+      return this.manualContextPinsByThread[threadId] || [];
     },
     async sendNativeMessage(conversationOrId, payload, sender = { id: 'me', name: '我' }) {
       const convStore = useConversationStore();
@@ -344,6 +478,7 @@ export const useMessageStore = defineStore('message', {
             sentMessage,
             { currentUser, conversation }
           );
+          this.applyManualContextPinMarks(conversation || identity);
         } catch (error) {
           if (shouldKeepLocalSendSuccess(error, conversation)) {
             local.status = 'success';
@@ -390,6 +525,7 @@ export const useMessageStore = defineStore('message', {
           sentMessage,
           { currentUser, conversation }
         );
+        this.applyManualContextPinMarks(routeContext);
         if (sentMessage.status === 'success' && isClowderDirectCatConversation(routeContext)) {
           this.startAgentPendingFeedback(conversationId, sentMessage, {
             id: agentFeedbackId(routeContext, routeContext),
@@ -455,6 +591,7 @@ export const useMessageStore = defineStore('message', {
         this.messages[identity.conversationId] = synced.length
           ? mergeSyncedMessagesPreservingLocalContext(this.messages[identity.conversationId] || [], synced, { currentUser, conversation: routeContext, preservedContextMessages })
           : this.messages[identity.conversationId] || [];
+        this.applyManualContextPinMarks(routeContext);
         const latest = (this.messages[identity.conversationId] || []).filter(isVisibleChatMessage).at(-1);
         updateConversationSummary(conversation, latest, currentUser);
         this.syncState = 'success';
@@ -499,6 +636,7 @@ export const useMessageStore = defineStore('message', {
         received,
         { currentUser, conversation }
       );
+      this.applyManualContextPinMarks(conversation);
       const visibleReceived = isVisibleChatMessage(received);
       if (conversation) {
         updateConversationSummary(conversation, received, currentUser);
@@ -518,6 +656,7 @@ export const useMessageStore = defineStore('message', {
 
       this.messages[conversationId] = mergeAgentReplyEventIntoList(this.messages[conversationId], event);
       const conversation = findConversation(convStore, conversationId);
+      this.applyManualContextPinMarks(conversation || conversationId);
       const latest = this.messages[conversationId]?.at(-1);
       if (conversation && latest) {
         updateConversationSummary(conversation, latest, readCurrentUser());
@@ -911,13 +1050,22 @@ export const useMessageStore = defineStore('message', {
       if (!list) return;
       const msg = list.find((m) => m.id === messageId);
       if (!msg) return;
+      if (msg.manualContextPinned) {
+        this.markManualContextSourceDeleted(conversationId, msg).catch(() => {});
+      }
       msg.status = 'revoked';
       msg.type = 'system';
       msg.content = '你撤回了一条消息';
+      msg.manualContextPinned = false;
+      msg.manualContextPinId = '';
     },
     deleteMessage(conversationId, messageId) {
       const list = this.messages[conversationId];
       if (!list) return;
+      const msg = list.find((m) => m.id === messageId);
+      if (msg?.manualContextPinned) {
+        this.markManualContextSourceDeleted(conversationId, msg).catch(() => {});
+      }
       this.messages[conversationId] = list.filter((m) => m.id !== messageId);
     },
     clearConversationMessages(conversationId) {
