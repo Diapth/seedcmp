@@ -122,7 +122,8 @@ cover/
 local_settings.py
 db.sqlite3
 db.sqlite3-journal
-
+seedcmp/sections/ui/.ai/tests/
+seedcmp/sections/ui/.ai/tests-e2e/
 # Flask stuff:
 instance/
 .webassets-cache
