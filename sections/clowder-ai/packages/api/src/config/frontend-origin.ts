@@ -7,7 +7,12 @@ export interface WarnLoggerLike {
 }
 
 const DEFAULT_FRONTEND_BASE_URL = 'http://localhost:3000';
-const DEFAULT_CORS_ORIGINS = ['http://localhost:3000', 'http://localhost:3003', 'https://cafe.clowder-ai.com'];
+const DEFAULT_CORS_ORIGINS = [
+  'http://localhost:3000',
+  'http://localhost:3003',
+  'http://localhost:5173',
+  'https://cafe.clowder-ai.com',
+];
 
 /**
  * F156: Loopback (127.x.x.x) is ALWAYS allowed — it is genuinely local.

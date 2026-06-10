@@ -89,6 +89,25 @@ describe('F128 propose / approve / reject lifecycle', () => {
     assert.equal(proposal.approvedBy, 'alice');
   });
 
+  test('approve trusts current IM user from AgentHub UI origin', async () => {
+    const ctx = await createProposalTestContext();
+    const source = await ctx.threadStore.create('alice', 'Source');
+    const { proposalId } = JSON.parse((await ctx.propose({ userId: 'alice', threadId: source.id })).body);
+    const res = await ctx.app.inject({
+      method: 'POST',
+      url: `/api/proposals/${proposalId}/approve`,
+      headers: {
+        origin: 'http://localhost:5173',
+        'x-cat-cafe-user': 'alice',
+        'content-type': 'application/json',
+      },
+      payload: {},
+    });
+    assert.equal(res.statusCode, 200);
+    const body = JSON.parse(res.body);
+    assert.equal(body.status, 'approved');
+  });
+
   // Approve-side dispatch behaviours (queue processor wiring, preferredCats
   // fallback, intent default, fork-and-return header, explicit-mention
   // precedence) moved to proposal-approve-dispatch.test.js to keep this file

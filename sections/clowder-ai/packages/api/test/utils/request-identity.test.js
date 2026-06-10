@@ -50,6 +50,20 @@ describe('resolveHeaderUserId', () => {
     assert.equal(resolveHeaderUserId(req), 'default-user');
   });
 
+  it('returns default-user for AgentHub UI origin without session (browser fallback)', () => {
+    const req = fakeRequest({
+      headers: { origin: 'http://localhost:5173' },
+    });
+    assert.equal(resolveHeaderUserId(req), 'default-user');
+  });
+
+  it('trusts X-Cat-Cafe-User from AgentHub UI origin when session is missing', () => {
+    const req = fakeRequest({
+      headers: { origin: 'http://localhost:5173', 'x-cat-cafe-user': 'real-im-user' },
+    });
+    assert.equal(resolveHeaderUserId(req), 'real-im-user');
+  });
+
   it('returns null for untrusted origin without session (no fallback)', () => {
     const req = fakeRequest({
       headers: { origin: 'http://192.168.1.200:8080' },
@@ -100,6 +114,20 @@ describe('resolveUserId', () => {
       headers: { origin: 'http://localhost:3003' },
     });
     assert.equal(resolveUserId(req), 'default-user');
+  });
+
+  it('returns default-user for AgentHub UI origin even without explicit defaultUserId', () => {
+    const req = fakeRequest({
+      headers: { origin: 'http://localhost:5173' },
+    });
+    assert.equal(resolveUserId(req), 'default-user');
+  });
+
+  it('uses X-Cat-Cafe-User from trusted AgentHub UI origin before defaulting', () => {
+    const req = fakeRequest({
+      headers: { origin: 'http://localhost:5173', 'x-cat-cafe-user': 'real-im-user' },
+    });
+    assert.equal(resolveUserId(req), 'real-im-user');
   });
 
   it('rejects defaultUserId for untrusted private network origin', () => {

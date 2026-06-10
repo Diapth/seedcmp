@@ -1,8 +1,10 @@
 /**
  * Unified request identity resolver.
  *
- * Browser path (Origin header present): session cookie > defaultUserId.
- *   X-Cat-Cafe-User header and body fallback are blocked.
+ * Browser path (Origin header present):
+ *   trusted origin: session cookie > X-Cat-Cafe-User header > defaultUserId.
+ *   untrusted origin: session cookie only.
+ *   body fallback is blocked.
  * Non-browser path (no Origin): session cookie > X-Cat-Cafe-User header > body > defaultUserId.
  *
  * Blocking the header for browser requests prevents cross-origin identity
@@ -42,12 +44,13 @@ export function resolveHeaderUserId(request: FastifyRequest): string | null {
   const fromSession = nonEmptyString((request as FastifyRequest & { sessionUserId?: string }).sessionUserId);
   if (fromSession) return fromSession;
   if (request.headers.origin) {
-    // Trusted browser origins get default-user fallback when session is missing.
+    // Trusted browser origins may pass the IM-bound user header, then fall
+    // back to default-user when session is missing.
     // This prevents 28+ browser-facing routes from returning 401 on session loss
     // (API restart, cookie expiry) while still blocking untrusted origins.
     const origin = String(request.headers.origin);
     if (isOriginAllowed(origin, getTrustedOrigins())) {
-      return 'default-user';
+      return nonEmptyString(request.headers['x-cat-cafe-user']) ?? 'default-user';
     }
     return null;
   }
@@ -62,7 +65,8 @@ export function resolveUserId(request: FastifyRequest, options?: ResolveUserIdOp
   const fromHeader = resolveHeaderUserId(request);
   if (fromHeader) return fromHeader;
 
-  // Browser requests: header was blocked above. Skip body fallback too
+  // Browser requests: header was either accepted for trusted origins or blocked
+  // above. Skip body fallback too
   // (prevents cross-origin POST body identity injection).
   // defaultUserId is only allowed for trusted origins (localhost/loopback/configured).
   // Private network origins (LAN/Tailscale) must use session cookies.
