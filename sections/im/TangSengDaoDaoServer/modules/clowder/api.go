@@ -185,9 +185,13 @@ type ClowderCatTemplate struct {
 	RoleTemplateID     string   `json:"roleTemplateId"`
 	CatID              string   `json:"catId"`
 	DisplayName        string   `json:"displayName"`
+	Nickname           string   `json:"nickname,omitempty"`
 	Aliases            []string `json:"aliases,omitempty"`
 	MentionPatterns    []string `json:"mentionPatterns,omitempty"`
 	Avatar             string   `json:"avatar,omitempty"`
+	RoleDescription    string   `json:"roleDescription,omitempty"`
+	Personality        string   `json:"personality,omitempty"`
+	TeamStrengths      string   `json:"teamStrengths,omitempty"`
 	PersonalitySummary string   `json:"personalitySummary,omitempty"`
 	CapabilitySummary  string   `json:"capabilitySummary,omitempty"`
 	Cloneable          bool     `json:"cloneable"`
@@ -2210,9 +2214,13 @@ func catRoleTemplateCandidate(template catTemplate) (ClowderCatTemplate, bool) {
 		RoleTemplateID:     agent.CatID,
 		CatID:              agent.CatID,
 		DisplayName:        agent.DisplayName,
+		Nickname:           strings.TrimSpace(template.Nickname),
 		Aliases:            agent.Aliases,
 		MentionPatterns:    agent.MentionPatterns,
 		Avatar:             agent.Avatar,
+		RoleDescription:    strings.TrimSpace(template.RoleDescription),
+		Personality:        strings.TrimSpace(template.Personality),
+		TeamStrengths:      strings.TrimSpace(template.TeamStrengths),
 		PersonalitySummary: agent.PersonalitySummary,
 		CapabilitySummary:  agent.CapabilitySummary,
 		Cloneable:          true,
@@ -2310,17 +2318,18 @@ func (c *Clowder) fetchCatDirectory(userID string) (CatDirectoryResponse, error)
 		directory.Agents[idx] = decorateCatDirectoryContact(directory.Agents[idx])
 	}
 	directory.Agents = c.mergeCreatedCatContacts(userID, directory.Agents)
-	templates := catRoleTemplatesFromFallbackAgents(directory.Agents)
+	if templateResponse == nil {
+		rawTemplates, templateErr := c.fetchCatTemplates(userID)
+		if templateErr == nil {
+			templateResponse = &rawTemplates
+		}
+	}
+	var templates []ClowderCatTemplate
+	if templateResponse != nil {
+		templates = catRoleTemplatesFromTemplates(templateResponse.Templates)
+	}
 	if len(templates) == 0 {
-		if templateResponse == nil {
-			rawTemplates, templateErr := c.fetchCatTemplates(userID)
-			if templateErr == nil {
-				templateResponse = &rawTemplates
-			}
-		}
-		if templateResponse != nil {
-			templates = catRoleTemplatesFromTemplates(templateResponse.Templates)
-		}
+		templates = catRoleTemplatesFromFallbackAgents(directory.Agents)
 	}
 	clientDefaults := map[string]ClowderClientDefault(nil)
 	skillCatalog := map[string][]ClowderSkill(nil)

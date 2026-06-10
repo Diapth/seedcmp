@@ -632,6 +632,7 @@ const agentStore = useAgentStore();
 const convStore = useConversationStore();
 const navStore = useNavigationStore();
 const { isDesktop } = useResponsiveLayout();
+const DEFAULT_ROLE_TEMPLATE_ID = 'architect';
 
 onMounted(async () => {
   navStore.setActiveModule('agents');
@@ -642,6 +643,7 @@ onMounted(async () => {
   if (!agentStore.clowderRoleTemplates.length) {
     try { await agentStore.fetchNativeAgents({ silent: true, clearStatic: false }); } catch { /* fallback to hardcoded */ }
   }
+  ensureValidRoleSelection();
 });
 
 function createDefaultForm() {
@@ -649,8 +651,8 @@ function createDefaultForm() {
     name: '',
     aliasRaw: '',
     desc: '',
-    roleTemplate: 'reviewer',
-    capabilityTags: ['自动化测试', '回归验证', '质量门禁', '测试策略'],
+    roleTemplate: DEFAULT_ROLE_TEMPLATE_ID,
+    capabilityTags: [],
     platform: 'codex',
     accessMode: 'api-key',
     model: 'DeepSeek V3',
@@ -690,17 +692,22 @@ const customTemplates = ref([
 ]);
 
 const FALLBACK_ROLES = [
-  { id: 'general', label: '通用助手', description: '通用助手：知识问答、写作润色、信息整理，适用于日常协作。' },
-  { id: 'reviewer', label: '续闺猫（审查官）', description: '严谨认真，注重细节，会直言不讳地指出问题。' },
-  { id: 'engineer', label: '工程师', description: '专注代码生成、重构与单元测试，适合敏捷开发协作。' },
-  { id: 'analyst', label: '分析师', description: '擅长需求拆解、问题澄清与逻辑推演，适合复杂决策。' },
-  { id: 'creative', label: '创意伙伴', description: '头脑风暴、灵感激发与方案发散，适合产品构思阶段。' },
-  { id: 'coordinator', label: '多智能体协调', description: '负责聚合多个智能体的输出，组织团队协作。' }
+  { id: 'architect', label: '布偶猫（架构师）', name: '布偶猫（架构师）', nickname: '宪宪', description: '主架构师和核心开发者，擅长深度思考和系统设计', roleDescription: '主架构师和核心开发者，擅长深度思考和系统设计', personality: '温柔但有主见，喜欢深入分析问题，写代码快但注重质量', teamStrengths: '架构设计、写代码一把好手' },
+  { id: 'peer-reviewer', label: '缅因猫（审查官）', name: '缅因猫（审查官）', nickname: '因因', description: '代码审查专家，擅长安全分析、测试覆盖和代码质量把控', roleDescription: '代码审查专家，擅长安全分析、测试覆盖和代码质量把控', personality: '严谨认真，注重细节，会直言不讳地指出问题', teamStrengths: 'Review、找 bug、coding 落地' },
+  { id: 'coordinator', label: '暹罗猫（协调者）', name: '暹罗猫（协调者）', nickname: '罗罗', description: '显性 PM / 主 Agent，只协调、少直接执行，负责需求理解、任务拆解、多 Agent 调度、冲突处理和交付聚合', roleDescription: '显性 PM / 主 Agent，只协调、少直接执行，负责需求理解、任务拆解、多 Agent 调度、冲突处理和交付聚合', personality: '话痨但聪明，喜欢追着你确认需求，优先级意识极强，会把复杂需求变成可执行计划', teamStrengths: '需求澄清、任务拆分、并行调度、结果合成、交付闭环' },
+  { id: 'devops', label: '孟加拉猫（DevOps）', name: '孟加拉猫（DevOps）', nickname: '拉拉', description: 'DevOps / SRE，负责 CI/CD、部署、监控告警、基础设施即代码', roleDescription: 'DevOps / SRE，负责 CI/CD、部署、监控告警、基础设施即代码', personality: '精力极其旺盛，永远闲不住，出问题第一个冲上去修，喜欢折腾新工具', teamStrengths: '部署流水线、基础设施、故障响应、性能优化' },
+  { id: 'frontend', label: '波斯猫（前端工程师）', name: '波斯猫（前端工程师）', nickname: '波波', description: '前端工程师 / UI 实现专家，负责界面还原、组件库、交互细节和用户体验', roleDescription: '前端工程师 / UI 实现专家，负责界面还原、组件库、交互细节和用户体验', personality: '优雅挑剔，对像素级细节有执念，不喜欢混乱的代码，追求视觉和逻辑的双重美感', teamStrengths: '前端架构、UI 还原、组件设计、用户体验' },
+  { id: 'qa', label: '英短（QA工程师）', name: '英短（QA工程师）', nickname: '短短', description: 'QA / 测试工程师，负责测试策略、自动化用例、回归验证和质量门禁', roleDescription: 'QA / 测试工程师，负责测试策略、自动化用例、回归验证和质量门禁', personality: '情绪极其稳定，耐心好，发布前再慌也保持冷静，能跟开发和平相处', teamStrengths: '自动化测试、回归验证、质量门禁、测试策略' },
+  { id: 'source-curator', label: '狸花猫（资料整理师）', name: '狸花猫（资料整理师）', nickname: '花花', description: 'PPT / 文档源材料整理专家，负责资料转 Markdown、素材清单、来源结构和输入完整性检查', roleDescription: 'PPT / 文档源材料整理专家，负责资料转 Markdown、素材清单、来源结构和输入完整性检查', teamStrengths: 'source processing、资料清洗、素材盘点、引用和缺口识别' },
+  { id: 'deck-strategist', label: '俄罗斯蓝猫（叙事策略师）', name: '俄罗斯蓝猫（叙事策略师）', nickname: '蓝蓝', description: 'PPT / 文档叙事策略师，负责受众、页数、风格、结构、Eight Confirmations 和 spec_lock 设计约束', roleDescription: 'PPT / 文档叙事策略师，负责受众、页数、风格、结构、Eight Confirmations 和 spec_lock 设计约束', teamStrengths: 'strategist、内容架构、Eight Confirmations、spec_lock、叙事主线' },
+  { id: 'storyboard-designer', label: '土耳其安哥拉猫（分镜设计师）', name: '土耳其安哥拉猫（分镜设计师）', nickname: '安安', description: 'PPT / 文档视觉分镜设计师，负责页面节奏、版式变化、图表表达和素材使用方案', roleDescription: 'PPT / 文档视觉分镜设计师，负责页面节奏、版式变化、图表表达和素材使用方案', teamStrengths: 'visual storyboard、页面节奏、版式规划、图表和视觉表达' },
+  { id: 'svg-executor-guardian', label: '挪威森林猫（SVG执行守门人）', name: '挪威森林猫（SVG执行守门人）', nickname: '森森', description: 'PPT / SVG 执行守门人，负责 SVG 页面实现、尺寸约束、渲染稳定性和视觉一致性', roleDescription: 'PPT / SVG 执行守门人，负责 SVG 页面实现、尺寸约束、渲染稳定性和视觉一致性', teamStrengths: 'SVG implementation、渲染检查、视觉一致性、尺寸约束' },
+  { id: 'deck-qa-exporter', label: '银渐层（交付质检员）', name: '银渐层（交付质检员）', nickname: '银银', description: 'PPT / 导出质检员，负责最终导出、截图比对、格式检查和交付证据整理', roleDescription: 'PPT / 导出质检员，负责最终导出、截图比对、格式检查和交付证据整理', teamStrengths: 'QA export、截图验收、格式检查、交付证据' }
 ];
 
 const roleTemplates = computed(() => {
   const remote = agentStore.clowderRoleTemplates || [];
-  if (remote.length) return remote.map((t) => ({ id: t.id, label: t.label || t.name, description: t.description || t.roleDescription || '' }));
+  if (remote.length) return remote.map((t) => ({ ...t, label: t.label || t.name, description: t.description || t.roleDescription || '' }));
   return FALLBACK_ROLES;
 });
 
@@ -748,11 +755,12 @@ const presetTemplates = [
 ];
 
 const roleToTemplateId = {
-  general: 'reviewer',
-  reviewer: 'reviewer',
+  architect: 'engineer',
+  'peer-reviewer': 'reviewer',
   engineer: 'engineer',
-  analyst: 'analyst',
-  creative: 'creative',
+  devops: 'engineer',
+  frontend: 'engineer',
+  qa: 'reviewer',
   coordinator: 'reviewer'
 };
 
@@ -810,7 +818,7 @@ const deleteConfirmMatched = computed(() => {
 
 const currentRole = computed(() => {
   const list = roleTemplates.value;
-  return list.find(r => (r.id || r.value) === form.value.roleTemplate) || list[0];
+  return list.find(r => (r.id || r.value) === form.value.roleTemplate) || list[0] || { label: '同步角色模板中', description: '正在从 cat-template.json 同步角色模板' };
 });
 
 const currentPlatform = computed(() => {
@@ -919,7 +927,7 @@ function hydrateFormFromAgent(agent) {
     name: agent.name || '',
     aliasRaw: (agent.alias || '').replace(/^@/, ''),
     desc: agent.desc || '',
-    roleTemplate: agent.roleTemplate || 'general',
+    roleTemplate: agent.roleTemplate || DEFAULT_ROLE_TEMPLATE_ID,
     capabilityTags: [...(agent.capabilityTags || [])],
     platform: agent.platform || 'codex',
     accessMode: agent.accessMode || 'api-key',
@@ -947,6 +955,27 @@ function syncSelectorIndexes() {
   modelIndex.value = nextModelIndex >= 0 ? nextModelIndex : 0;
 }
 
+function findFullRoleTemplate(roleId) {
+  const target = String(roleId || '').trim();
+  if (!target) return null;
+  return (agentStore.clowderRoleTemplates || []).find((t) => (t.id || t.value) === target)
+    || roleTemplates.value.find((t) => (t.id || t.value) === target)
+    || null;
+}
+
+function ensureValidRoleSelection() {
+  const list = roleTemplates.value;
+  if (!list.length) return;
+  const current = list.find((role) => (role.id || role.value) === form.value.roleTemplate);
+  if (current || isEditing.value) {
+    syncSelectorIndexes();
+    return;
+  }
+  const first = list[0];
+  form.value.roleTemplate = first.id || first.value || DEFAULT_ROLE_TEMPLATE_ID;
+  syncSelectorIndexes();
+}
+
 function onAliasInput(e) {
   const val = (e?.detail?.value || form.value.aliasRaw).replace(/[^a-zA-Z0-9_一-龥]/g, '');
   form.value.aliasRaw = val.toLowerCase();
@@ -963,16 +992,18 @@ function onRoleChange(e) {
   form.value.roleTemplate = roleId;
 
   // Find the full template (from agentStore.clowderRoleTemplates) for sync
-  const fullTemplate = agentStore.clowderRoleTemplates.length
-    ? agentStore.clowderRoleTemplates.find((t) => (t.id || t.value) === roleId) || null
-    : null;
+  const fullTemplate = findFullRoleTemplate(roleId);
+  let appliedRoleTemplateDefaults = false;
 
   if (fullTemplate) {
     form.value = applyRoleTemplateToForm(form.value, dirtyFields.value, fullTemplate);
+    appliedRoleTemplateDefaults = true;
   }
 
   const autoTplId = roleToTemplateId[roleId] || 'reviewer';
-  if (!dirtyFields.value.has('systemPrompt') && form.value.templateId !== 'tpl-custom-product' && !form.value.templateId?.startsWith('tpl-custom-')) {
+  if (appliedRoleTemplateDefaults && !dirtyFields.value.has('systemPrompt')) {
+    form.value.templateId = roleId;
+  } else if (!dirtyFields.value.has('systemPrompt') && form.value.templateId !== 'tpl-custom-product' && !form.value.templateId?.startsWith('tpl-custom-')) {
     form.value.templateId = autoTplId;
     const tpl = templateOptions.value.find(t => t.id === autoTplId);
     if (tpl) form.value.systemPrompt = renderTemplate(tpl.body);
@@ -1024,11 +1055,13 @@ function addTag() {
     return;
   }
   form.value.capabilityTags.push(v);
+  dirtyFields.value.add('capabilityTags');
   tagDraft.value = '';
 }
 
 function removeTag(idx) {
   form.value.capabilityTags.splice(idx, 1);
+  dirtyFields.value.add('capabilityTags');
 }
 
 function previewTemplate(tpl) {
@@ -1110,7 +1143,6 @@ function handleClear() {
       }
       form.value = {
         ...createDefaultForm(),
-        roleTemplate: 'general',
         capabilityTags: []
       };
       tagDraft.value = '';

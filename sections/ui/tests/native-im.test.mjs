@@ -61,6 +61,10 @@ import {
   normalizeUserSkillList
 } from '../services/native-im/skill-state.js';
 import {
+  applyRoleTemplateToForm,
+  buildRoleTemplateOptions
+} from '../services/native-im/role-template-sync.js';
+import {
   buildDeploymentCardMessage,
   isDeploymentCardMessage,
   shouldCreateDeploymentCard,
@@ -1307,6 +1311,131 @@ test('native service can prefer direct clowder api for global official directory
   assert.equal(calls.some((call) => call.url.startsWith('/v1/clowder/cats')), false);
   assert.equal(directory.agents[0].id, 'qa');
   assert.equal(directory.agents[0].creator, 'System');
+});
+
+test('role template options use cat-template roles without virtual defaults', () => {
+  const options = buildRoleTemplateOptions([
+    {
+      id: 'architect',
+      name: '布偶猫（架构师）',
+      nickname: '宪宪',
+      roleDescription: '主架构师和核心开发者',
+      personality: '温柔但有主见',
+      teamStrengths: '架构设计、代码实现'
+    },
+    {
+      id: 'qa',
+      name: '英短（QA工程师）',
+      nickname: '短短',
+      roleDescription: 'QA / 测试工程师',
+      teamStrengths: '自动化测试、回归验证'
+    },
+    {
+      id: 'coordinator',
+      name: '暹罗猫（协调者）',
+      nickname: '罗罗',
+      roleDescription: '显性 PM / 主 Agent，只协调、少直接执行',
+      teamStrengths: '需求澄清、任务拆分、并行调度'
+    }
+  ]);
+
+  assert.deepEqual(options.map((item) => item.id), ['architect', 'qa', 'coordinator']);
+  assert.equal(options.some((item) => item.id === 'general'), false);
+  const coordinator = options.find((item) => item.id === 'coordinator');
+  assert.equal(coordinator?.label, '暹罗猫（协调者）');
+  assert.equal(coordinator?.nickname, '罗罗');
+  assert.equal(applyRoleTemplateToForm({
+    name: '',
+    aliasRaw: '',
+    desc: '',
+    capabilityTags: [],
+    systemPrompt: '',
+    roleTemplate: 'architect'
+  }, new Set(), coordinator).aliasRaw, 'luoluo');
+  assert.equal(options[0].label, '布偶猫（架构师）');
+  assert.equal(options[0].description, '主架构师和核心开发者');
+  assert.deepEqual(options[1].capabilityTags, ['自动化测试', '回归验证']);
+});
+
+test('role template options normalize TangSeng bridged cat template fields', () => {
+  const options = buildRoleTemplateOptions([
+    {
+      roleTemplateId: 'architect',
+      catId: 'architect',
+      displayName: '布偶猫（架构师）',
+      aliases: ['@xianxian'],
+      personalitySummary: '温柔但有主见',
+      capabilitySummary: '主架构师和核心开发者，擅长深度思考和系统设计',
+      source: 'role-template'
+    },
+    {
+      roleTemplateId: 'qa',
+      catId: 'qa',
+      displayName: '英短（QA工程师）',
+      mentionPatterns: ['@duanduan'],
+      personalitySummary: '情绪极其稳定',
+      capabilitySummary: 'QA / 测试工程师，负责测试策略、自动化用例、回归验证和质量门禁',
+      source: 'role-template'
+    }
+  ]);
+  const architect = options.find((item) => item.id === 'architect');
+  const qa = options.find((item) => item.id === 'qa');
+
+  assert.equal(architect.label, '布偶猫（架构师）');
+  assert.equal(architect.name, '布偶猫（架构师）');
+  assert.equal(architect.nickname, 'xianxian');
+  assert.equal(architect.roleDescription, '主架构师和核心开发者，擅长深度思考和系统设计');
+  assert.equal(architect.personality, '温柔但有主见');
+  assert.deepEqual(architect.capabilityTags, ['主架构师和核心开发者', '擅长深度思考和系统设计']);
+  assert.equal(qa.label, '英短（QA工程师）');
+  assert.equal(qa.nickname, 'duanduan');
+});
+
+test('role template selection syncs basic info from cat-template without overwriting dirty fields', () => {
+  const template = buildRoleTemplateOptions([
+    {
+      id: 'peer-reviewer',
+      name: '缅因猫（审查官）',
+      nickname: '因因',
+      roleDescription: '代码审查专家，擅长安全分析、测试覆盖和代码质量把控',
+      personality: '严谨认真，注重细节，会直言不讳地指出问题',
+      teamStrengths: 'Review、找bug、coding落地',
+      restrictions: ['禁止放行未验证的安全风险']
+    }
+  ]).find((item) => item.id === 'peer-reviewer');
+
+  const synced = applyRoleTemplateToForm({
+    name: '',
+    aliasRaw: '',
+    desc: '',
+    capabilityTags: [],
+    systemPrompt: '',
+    roleTemplate: 'general'
+  }, new Set(), template);
+
+  assert.equal(synced.roleTemplate, 'peer-reviewer');
+  assert.equal(synced.name, '缅因猫（审查官）');
+  assert.equal(synced.aliasRaw, 'yinyin');
+  assert.equal(synced.desc, '代码审查专家，擅长安全分析、测试覆盖和代码质量把控');
+  assert.deepEqual(synced.capabilityTags, ['Review', '找bug', 'coding落地']);
+  assert.match(synced.systemPrompt, /严谨认真/);
+  assert.match(synced.systemPrompt, /禁止放行未验证的安全风险/);
+
+  const preserved = applyRoleTemplateToForm({
+    name: '自定义名字',
+    aliasRaw: 'custom',
+    desc: '保留介绍',
+    capabilityTags: ['保留标签'],
+    systemPrompt: '保留提示词',
+    roleTemplate: 'general'
+  }, new Set(['name', 'alias', 'desc', 'capabilityTags', 'systemPrompt']), template);
+
+  assert.equal(preserved.roleTemplate, 'peer-reviewer');
+  assert.equal(preserved.name, '自定义名字');
+  assert.equal(preserved.aliasRaw, 'custom');
+  assert.equal(preserved.desc, '保留介绍');
+  assert.deepEqual(preserved.capabilityTags, ['保留标签']);
+  assert.equal(preserved.systemPrompt, '保留提示词');
 });
 
 test('native service keeps normalized clowder cat ids for deletion and direct routing', async () => {
