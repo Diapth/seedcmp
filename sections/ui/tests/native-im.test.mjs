@@ -3,7 +3,8 @@ import { test } from 'node:test';
 
 import {
   createNativeImService,
-  selectWsAddressForBrowser
+  selectWsAddressForBrowser,
+  shouldPreferDirectClowderDirectory
 } from '../services/native-im/service.js';
 import {
   createLocalOAuthCapabilityLoader,
@@ -366,6 +367,71 @@ test('native service fetches clowder cat directory as agent cards', async () => 
     preferred: true,
     raw: rawAgent
   });
+});
+
+test('native service uses TangSeng clowder directory unless direct mode is explicit', () => {
+  assert.equal(shouldPreferDirectClowderDirectory(), false);
+  assert.equal(shouldPreferDirectClowderDirectory({}), false);
+  assert.equal(shouldPreferDirectClowderDirectory({ preferDirect: false }), false);
+  assert.equal(shouldPreferDirectClowderDirectory({ preferDirect: true }), true);
+});
+
+test('native service marks user-scoped clowder contacts as custom agent cards', async () => {
+  const rawRuntimeAgent = {
+    catId: 'clowder_cat:issue-036-runtime',
+    displayName: 'Issue 036 Runtime',
+    source: 'runtime-created',
+    capabilitySummary: '用户刚创建的智能体',
+    available: true
+  };
+  const rawUserAgent = {
+    catId: 'issue-036-user-created',
+    displayName: 'Issue 036 User Created',
+    source: 'user-created',
+    capabilitySummary: '历史创建智能体',
+    available: true
+  };
+  const rawContactAgent = {
+    catId: 'issue-036-contact',
+    displayName: 'Issue 036 Contact',
+    sourceType: 'contact',
+    capabilitySummary: '用户联系人智能体',
+    available: true
+  };
+  const rawExistingAgent = {
+    catId: 'issue-036-existing',
+    displayName: 'Issue 036 Existing',
+    source: 'existing',
+    capabilitySummary: '用户已连接智能体',
+    available: true
+  };
+  const rawTemplate = {
+    roleTemplateId: 'official-reviewer',
+    displayName: 'Official Reviewer',
+    source: 'role-template',
+    capabilitySummary: '官方审查模板'
+  };
+  const request = makeRequestStub({
+    'GET clowder/cats?includeUnavailable=true': {
+      agents: [rawRuntimeAgent, rawUserAgent, rawContactAgent, rawExistingAgent],
+      templates: [rawTemplate]
+    }
+  });
+  const service = createNativeImService({
+    baseUrl: '/v1/',
+    request,
+    getToken: () => 'token'
+  });
+
+  const directory = await service.fetchClowderCatDirectory({ includeUnavailable: true });
+  const creatorById = Object.fromEntries(directory.agents.map((agent) => [agent.id, agent.creator]));
+
+  assert.equal(request.calls[0].url, '/v1/clowder/cats?includeUnavailable=true');
+  assert.equal(creatorById['clowder_cat:issue-036-runtime'], 'User');
+  assert.equal(creatorById['issue-036-user-created'], 'User');
+  assert.equal(creatorById['issue-036-contact'], 'User');
+  assert.equal(creatorById['issue-036-existing'], 'User');
+  assert.equal(creatorById['official-reviewer'], 'System');
 });
 
 test('native service scans clowder templates as official agent cards', async () => {

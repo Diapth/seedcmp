@@ -349,6 +349,37 @@ function splitCapabilityTags(value = '') {
     .slice(0, 6);
 }
 
+export function shouldPreferDirectClowderDirectory(options = {}) {
+  return options?.preferDirect === true;
+}
+
+function clowderAgentSource(agent = {}) {
+  return firstNonEmpty(
+    agent.source,
+    agent.sourceType,
+    agent.source_type,
+    agent.contact?.source,
+    agent.contact?.sourceType,
+    agent.raw?.source,
+    agent.raw?.sourceType
+  ).toLowerCase();
+}
+
+function isUserScopedClowderAgent(agent = {}) {
+  const source = clowderAgentSource(agent).replace(/_/g, '-');
+  if (firstNonEmpty(agent.creator, agent.createdBy, agent.created_by).toLowerCase() === 'user') {
+    return true;
+  }
+  return [
+    'runtime-created',
+    'user-created',
+    'user',
+    'contact',
+    'existing',
+    'connected'
+  ].includes(source);
+}
+
 function normalizeClowderAgent(agent = {}) {
   const id = firstNonEmpty(agent.catId, agent.cat_id, agent.roleTemplateId, agent.role_template_id, agent.id, agent.agentId, agent.uid);
   const name = firstNonEmpty(agent.displayName, agent.display_name, agent.name, agent.nickname, id, '智能体');
@@ -379,7 +410,7 @@ function normalizeClowderAgent(agent = {}) {
     desc: capabilitySummary || personalitySummary || '后端智能体已连接，可以开始协作',
     avatar: firstNonEmpty(agent.avatar, agent.logo),
     status: available ? 'active' : 'inactive',
-    creator: agent.source === 'runtime-created' ? 'User' : 'System',
+    creator: isUserScopedClowderAgent(agent) ? 'User' : 'System',
     platform: firstNonEmpty(agent.platform, 'clowder'),
     accessMode: firstNonEmpty(agent.accessMode, 'backend'),
     model: firstNonEmpty(agent.model, agent.defaultModel),
@@ -1141,7 +1172,7 @@ export function createNativeImService(options = {}) {
 
   async function fetchClowderCatDirectory(params = {}) {
     let resp = null;
-    if (params.preferDirect) {
+    if (shouldPreferDirectClowderDirectory(params)) {
       resp = await fetchDirectClowderCatDirectory(params);
     } else try {
       resp = await client.get('clowder/cats', {

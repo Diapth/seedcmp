@@ -60,7 +60,7 @@
               </view>
             </view>
 
-            <scroll-view scroll-x class="skills-scroll">
+            <view class="skills-scroll">
               <view class="skills-grid">
                 <view
                   v-for="skill in userSkills"
@@ -85,7 +85,7 @@
                   </view>
                 </view>
               </view>
-            </scroll-view>
+            </view>
           </view>
 
           <view class="agent-toolbar">
@@ -100,7 +100,7 @@
               <view class="shortcut-key">/</view>
             </view>
 
-            <scroll-view scroll-x class="filter-scroll">
+            <view class="filter-scroll">
               <view class="filter-row">
                 <view
                   v-for="filter in filters"
@@ -114,7 +114,7 @@
                   <text class="filter-label">{{ filter.label }}</text>
                 </view>
               </view>
-            </scroll-view>
+            </view>
 
             <view class="toolbar-spacer" />
 
@@ -436,6 +436,9 @@ function skillAgentSummary(skill) {
 
 .skills-scroll {
   width: 100%;
+  overflow-x: auto;
+  overflow-y: hidden;
+  -webkit-overflow-scrolling: touch;
 }
 
 .skills-grid {
@@ -619,6 +622,9 @@ function skillAgentSummary(skill) {
   width: auto;
   max-width: 420px;
   white-space: nowrap;
+  overflow-x: auto;
+  overflow-y: hidden;
+  -webkit-overflow-scrolling: touch;
 }
 
 .filter-row {

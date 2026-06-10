@@ -624,7 +624,7 @@ export const useAgentStore = defineStore('agent', {
         const directory = await nativeImService.fetchClowderCatDirectory({
           query: options.query,
           includeUnavailable: true,
-          preferDirect: options.preferDirect !== false
+          preferDirect: options.preferDirect === true
         });
         this.applyNativeAgents(directory.agents || []);
         this.applyNativeSkills(directory.skillCatalog || {});
