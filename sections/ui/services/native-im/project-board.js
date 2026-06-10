@@ -34,12 +34,26 @@ function normalizeProgress(task = {}) {
 }
 
 function normalizeDocument(doc = {}, index = 0) {
-  const name = firstText(doc.name, doc.filename, doc.fileName, doc.title, `产出文档 ${index + 1}`);
+  const workspacePath = firstText(doc.workspacePath, doc.workspace_path, doc.workspaceRelativePath, doc.workspace_relative_path, doc.path);
+  const name = firstText(doc.name, doc.filename, doc.fileName, doc.title, workspacePath.split('/').filter(Boolean).pop(), `产出文档 ${index + 1}`);
   return {
     id: firstText(doc.id, doc.artifactId, doc.path, name),
     name,
+    fileName: firstText(doc.fileName, doc.filename, name),
     type: firstText(doc.type, doc.kind, doc.ext, name.split('.').pop(), 'md').toLowerCase(),
-    summary: firstText(doc.summary, doc.description, doc.desc, doc.path, 'Clowder 任务产物')
+    fileType: firstText(doc.fileType, doc.type, doc.kind, doc.ext, name.split('.').pop(), 'md').toLowerCase(),
+    summary: firstText(doc.summary, doc.description, doc.desc, workspacePath, 'Clowder 任务产物'),
+    path: workspacePath,
+    workspacePath,
+    worktreeId: firstText(doc.worktreeId, doc.worktree_id, doc.workspaceWorktreeId, doc.workspace_worktree_id, doc.workspaceId, doc.workspace_id),
+    workspaceId: firstText(doc.workspaceId, doc.workspace_id),
+    url: firstText(doc.url, doc.rawUrl, doc.raw_url, doc.downloadUrl, doc.download_url),
+    sourceUrl: firstText(doc.sourceUrl, doc.source_url, doc.rawUrl, doc.raw_url),
+    contentUrl: firstText(doc.contentUrl, doc.content_url, doc.rawUrl, doc.raw_url),
+    source: firstText(doc.source, 'clowder'),
+    generatedByAgent: Boolean(doc.generatedByAgent ?? doc.generated_by_agent ?? doc.path ?? doc.workspacePath ?? doc.workspace_path),
+    status: firstText(doc.status, 'available'),
+    raw: doc
   };
 }
 

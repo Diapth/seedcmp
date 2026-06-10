@@ -1,5 +1,6 @@
 import { defineStore } from 'pinia';
 import { nativeImService } from '@/services/native-im/service';
+import { mergeGroupMembersWithAgentMembers } from '@/services/native-im/agent-state';
 import { useConversationStore } from '@/stores/conversation';
 
 export const useGroupStore = defineStore('group', {
@@ -92,10 +93,17 @@ export const useGroupStore = defineStore('group', {
       if (!groupId) return [];
       try {
         const members = await nativeImService.syncGroupMembers(groupId, options);
-        useConversationStore().initFromGroupMembers(groupId, members, members.find((item) => item.role === 'owner')?.id);
+        let groupCats = [];
+        try {
+          groupCats = await nativeImService.fetchGroupCats({ groupId });
+        } catch {
+          groupCats = [];
+        }
+        const mergedMembers = mergeGroupMembersWithAgentMembers(members, groupCats);
+        useConversationStore().initFromGroupMembers(groupId, mergedMembers, mergedMembers.find((item) => item.role === 'owner')?.id);
         const group = this.groups.find((item) => item.id === groupId);
-        if (group) group.memberCount = members.length || group.memberCount || 0;
-        return members;
+        if (group) group.memberCount = mergedMembers.length || group.memberCount || 0;
+        return mergedMembers;
       } catch (error) {
         this.syncError = error?.msg || error?.message || '群成员同步失败';
         if (!options.silent) throw error;

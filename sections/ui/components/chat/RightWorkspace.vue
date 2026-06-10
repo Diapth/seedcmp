@@ -86,7 +86,12 @@
                   <text>产出文档</text>
                 </view>
                 <view v-if="task.documents.length" class="document-list flex-column">
-                  <view v-for="doc in task.documents" :key="doc.id" class="document-row flex-row align-center">
+                  <view
+                    v-for="doc in task.documents"
+                    :key="doc.id"
+                    class="document-row flex-row align-center"
+                    @click.stop="openTaskDocument(doc)"
+                  >
                     <text class="doc-type">{{ doc.type.toUpperCase() }}</text>
                     <view class="doc-meta flex-column flex-1">
                       <text class="doc-name">{{ doc.name }}</text>
@@ -337,6 +342,10 @@ function openBoardTaskLog(task) {
   uni.navigateTo({
     url: `/pages/agents/log?boardId=${encodeURIComponent(board.id)}&taskId=${encodeURIComponent(task.id)}`
   });
+}
+
+function openTaskDocument(doc) {
+  emit('preview-file', doc);
 }
 
 function atModify(task) {
@@ -652,6 +661,7 @@ function atModify(task) {
   border-radius: 8px;
   background-color: var(--color-bg-muted);
   box-sizing: border-box;
+  cursor: pointer;
 }
 
 .doc-type {

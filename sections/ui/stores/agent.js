@@ -650,6 +650,7 @@ export const useAgentStore = defineStore('agent', {
         }
         const threadId = binding.projectThreadId || binding.project_thread_id || binding.threadId || binding.thread_id;
         let tasks = [];
+        let artifacts = [];
         if (threadId) {
           try {
             tasks = await nativeImService.fetchThreadTasks(threadId);
@@ -657,6 +658,28 @@ export const useAgentStore = defineStore('agent', {
             tasks = [];
             this.nativeError = agentErrorText(error);
           }
+          try {
+            artifacts = await nativeImService.fetchThreadArtifacts(threadId);
+          } catch (error) {
+            artifacts = [];
+            this.nativeError = agentErrorText(error);
+          }
+        }
+        if (artifacts.length) {
+          const artifactsByTask = new Map();
+          artifacts.forEach((artifact) => {
+            const key = artifact.taskId || artifact.task_id || '';
+            if (!key) return;
+            if (!artifactsByTask.has(key)) artifactsByTask.set(key, []);
+            artifactsByTask.get(key).push(artifact);
+          });
+          tasks = tasks.map((task) => ({
+            ...task,
+            artifacts: [
+              ...(Array.isArray(task.artifacts) ? task.artifacts : []),
+              ...(artifactsByTask.get(task.id || task.taskId || task.task_id) || [])
+            ]
+          }));
         }
         const board = normalizeClowderProjectBoard({
           binding,

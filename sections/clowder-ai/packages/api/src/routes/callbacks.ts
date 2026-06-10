@@ -2248,6 +2248,7 @@ export const callbacksRoutes: FastifyPluginAsync<CallbackRoutesOptions> = async 
       threadStore: opts.threadStore,
       messageStore: opts.messageStore,
       socketManager,
+      outboundHook: opts.outboundHook,
     });
   }
 

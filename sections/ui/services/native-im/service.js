@@ -109,6 +109,16 @@ function defaultDeviceFactory() {
   };
 }
 
+function readCurrentUserId() {
+  try {
+    const raw = readStorage('app_user');
+    const user = raw ? JSON.parse(raw) : {};
+    return firstNonEmpty(user.id, user.uid, user.userId, user.raw?.uid, user.raw?.id, readStorage('app_user_uid'));
+  } catch {
+    return firstNonEmpty(readStorage('app_user_uid'));
+  }
+}
+
 function firstArray(...values) {
   for (const value of values) {
     if (Array.isArray(value)) return value;
@@ -546,6 +556,77 @@ function normalizeFetchedGroupCat(cat = {}) {
   };
 }
 
+function fileNameFromPath(path = '') {
+  const parts = String(path || '').replace(/\\/g, '/').split('/').filter(Boolean);
+  return parts[parts.length - 1] || '';
+}
+
+function normalizeWorkspaceArtifactPath(value = '') {
+  const raw = firstNonEmpty(value);
+  if (!raw || /^(https?:|blob:|data:|javascript:)/i.test(raw)) return '';
+  return raw.replace(/^\.?\//, '').replace(/\\/g, '/');
+}
+
+function normalizeThreadArtifact(artifact = {}, index = 0, threadId = '') {
+  const workspacePath = normalizeWorkspaceArtifactPath(firstNonEmpty(
+    artifact.workspacePath,
+    artifact.workspace_path,
+    artifact.workspaceRelativePath,
+    artifact.workspace_relative_path,
+    artifact.relativePath,
+    artifact.relative_path,
+    artifact.path
+  ));
+  const name = firstNonEmpty(
+    artifact.fileName,
+    artifact.filename,
+    artifact.name,
+    artifact.title,
+    fileNameFromPath(workspacePath),
+    fileNameFromPath(artifact.path),
+    `智能体产物-${index + 1}`
+  );
+  const ext = firstNonEmpty(
+    artifact.fileType,
+    artifact.ext,
+    String(name).includes('.') ? String(name).split('.').pop() : '',
+    artifact.kind,
+    'file'
+  ).toLowerCase();
+  const worktreeId = firstNonEmpty(
+    artifact.worktreeId,
+    artifact.worktree_id,
+    artifact.workspaceWorktreeId,
+    artifact.workspace_worktree_id,
+    artifact.workspaceId,
+    artifact.workspace_id
+  );
+  return {
+    id: firstNonEmpty(artifact.id, artifact.artifactId, artifact.artifact_id, `${threadId || 'thread'}-artifact-${index + 1}`),
+    name,
+    fileName: name,
+    type: ext,
+    fileType: ext,
+    ext,
+    summary: firstNonEmpty(artifact.summary, artifact.description, artifact.desc, artifact.reason, workspacePath, 'Clowder 任务产物'),
+    path: workspacePath,
+    workspacePath,
+    worktreeId,
+    workspaceId: firstNonEmpty(artifact.workspaceId, artifact.workspace_id),
+    absolutePath: firstNonEmpty(artifact.absolutePath, artifact.absolute_path),
+    url: firstNonEmpty(artifact.url, artifact.rawUrl, artifact.raw_url, artifact.downloadUrl, artifact.download_url),
+    sourceUrl: firstNonEmpty(artifact.sourceUrl, artifact.source_url, artifact.rawUrl, artifact.raw_url),
+    contentUrl: firstNonEmpty(artifact.contentUrl, artifact.content_url, artifact.rawUrl, artifact.raw_url),
+    ownerCatId: firstNonEmpty(artifact.ownerCatId, artifact.owner_cat_id, artifact.catId, artifact.cat_id),
+    taskId: firstNonEmpty(artifact.taskId, artifact.task_id),
+    status: firstNonEmpty(artifact.status, 'available'),
+    source: 'clowder',
+    generatedByAgent: true,
+    createdAt: artifact.createdAt || artifact.created_at || 0,
+    raw: artifact
+  };
+}
+
 function clientIdForAgentPlatform(platform = '') {
   const value = firstNonEmpty(platform).toLowerCase();
   if (value.includes('claude') || value.includes('anthropic')) return 'anthropic';
@@ -955,7 +1036,12 @@ export function createNativeImService(options = {}) {
     const id = String(groupId || '').trim();
     if (!id) throw { msg: 'groupId不能为空' };
     const resp = await client.get('clowder/group/cats', { groupId: id });
-    return firstArray(resp.cats, resp.data?.cats, resp.agents, resp.data?.agents).map(normalizeFetchedGroupCat);
+    const cats = firstArray(resp.cats, resp.data?.cats, resp.agents, resp.data?.agents);
+    const catIds = firstArray(resp.catIds, resp.cat_ids, resp.data?.catIds, resp.data?.cat_ids);
+    const catRecords = cats.length
+      ? cats
+      : catIds.map((catId) => ({ catId, displayName: catId, source: 'clowder', connected: true }));
+    return catRecords.map(normalizeFetchedGroupCat);
   }
 
   async function ensureProjectGroup(payload = {}) {
@@ -1387,6 +1473,36 @@ export function createNativeImService(options = {}) {
     return firstArray(resp.tasks, resp.data?.tasks, resp.items, resp.data?.items, resp.data);
   }
 
+  async function fetchThreadArtifacts(threadId, params = {}) {
+    const id = String(threadId || '').trim();
+    if (!id) return [];
+    const resp = await client.get(`clowder/thread/${encodeURIComponent(id)}/artifacts`, params);
+    return firstArray(resp.artifacts, resp.data?.artifacts, resp.items, resp.data?.items, resp.data)
+      .map((artifact, index) => normalizeThreadArtifact(artifact, index, id));
+  }
+
+  async function approveThreadProposal(proposalId, payload = {}) {
+    const id = String(proposalId || '').trim();
+    if (!id) throw { msg: 'proposalId不能为空' };
+    const userId = firstNonEmpty(payload.userId, payload.user_id, readCurrentUserId());
+    if (!userId) throw { msg: '当前用户不能为空' };
+    const { userId: _userId, user_id: _user_id, ...body } = payload;
+    return clowderClient.post(`proposals/${encodeURIComponent(id)}/approve`, body, {
+      header: { 'X-Cat-Cafe-User': userId }
+    });
+  }
+
+  async function rejectThreadProposal(proposalId, payload = {}) {
+    const id = String(proposalId || '').trim();
+    if (!id) throw { msg: 'proposalId不能为空' };
+    const userId = firstNonEmpty(payload.userId, payload.user_id, readCurrentUserId());
+    if (!userId) throw { msg: '当前用户不能为空' };
+    const { userId: _userId, user_id: _user_id, ...body } = payload;
+    return clowderClient.post(`proposals/${encodeURIComponent(id)}/reject`, body, {
+      header: { 'X-Cat-Cafe-User': userId }
+    });
+  }
+
   async function listManualContextPins(threadId, params = {}) {
     const id = String(threadId || '').trim();
     if (!id) return [];
@@ -1537,6 +1653,9 @@ export function createNativeImService(options = {}) {
     uploadSkillPackage,
     fetchActiveProjectGroup,
     fetchThreadTasks,
+    fetchThreadArtifacts,
+    approveThreadProposal,
+    rejectThreadProposal,
     listManualContextPins,
     upsertManualContextPin,
     removeManualContextPin,

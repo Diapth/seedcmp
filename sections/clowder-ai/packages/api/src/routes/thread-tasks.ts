@@ -18,7 +18,7 @@
  */
 
 import { existsSync } from 'node:fs';
-import { isAbsolute, resolve, sep } from 'node:path';
+import { basename, isAbsolute, resolve, sep } from 'node:path';
 import type { FastifyPluginAsync, FastifyRequest } from 'fastify';
 import { createCatId, type CatId, type TaskItem } from '@cat-cafe/shared';
 import type { ITaskStore } from '../domains/cats/services/stores/ports/TaskStore.js';
@@ -27,6 +27,7 @@ import type { IMaomiWorkspaceStore } from '../domains/maomi-workspaces/MaomiWork
 import type { IThreadWorkspaceBindingStore } from '../domains/maomi-workspaces/ThreadWorkspaceBindingStore.js';
 import { isUnderAllowedRoot, validateProjectPath } from '../utils/project-path.js';
 import { resolveUserId } from '../utils/request-identity.js';
+import { registerWorktrees, resolveWorktreeIdByPath } from '../domains/workspace/workspace-security.js';
 
 /** V3-31: minimal view of a running invocation used to synthesize live kanban cards. */
 export interface RunningInvocationView {
@@ -69,6 +70,7 @@ export interface ThreadArtifact {
   path: string;                // relative to projectPath
   absolutePath: string;        // absolute when known
   workspaceId?: string;
+  worktreeId?: string;
   workspaceRelativePath?: string;
   kind: ArtifactKind;
   description?: string;
@@ -348,6 +350,7 @@ export function buildThreadArtifact(
   source: ThreadArtifactSource = 'task_ref',
   workspaceId?: string,
   workspaceRelativePath?: string,
+  worktreeId?: string,
 ): ThreadArtifact {
   const absolutePath = isAbsolute(path) ? path : resolve(projectPath, path);
   const outsideProject = Boolean(projectPath && !isPathInsideRoot(absolutePath, projectPath));
@@ -357,6 +360,7 @@ export function buildThreadArtifact(
     path: projectPath && !outsideProject ? absolutePath.slice(projectPath.length).replace(/^[\\/]+/, '') : path,
     absolutePath,
     ...(workspaceId ? { workspaceId } : {}),
+    ...(worktreeId ? { worktreeId } : {}),
     ...(workspaceRelativePath ? { workspaceRelativePath } : {}),
     kind,
     description,
@@ -368,6 +372,32 @@ export function buildThreadArtifact(
     ...(status === 'outside_project' ? { reason: 'artifact path is outside thread projectPath' } : {}),
     ...(status === 'missing' ? { reason: 'artifact path does not exist on disk' } : {}),
   };
+}
+
+async function resolveArtifactWorktreeId(rootPath: string | null, preferredId?: string): Promise<string | undefined> {
+  if (!rootPath) return preferredId;
+  if (preferredId) {
+    registerWorktrees([{
+      id: preferredId,
+      root: rootPath,
+      branch: 'workspace',
+      head: '',
+    }]);
+    return preferredId;
+  }
+  try {
+    return await resolveWorktreeIdByPath(rootPath);
+  } catch {
+    const fallback = basename(rootPath).replace(/[^a-zA-Z0-9_-]/g, '_');
+    if (!fallback) return undefined;
+    registerWorktrees([{
+      id: fallback,
+      root: rootPath,
+      branch: 'workspace',
+      head: '',
+    }]);
+    return fallback;
+  }
 }
 
 export const threadTasksRoutes: FastifyPluginAsync<ThreadTasksRoutesOptions> = async (
@@ -576,6 +606,7 @@ export const threadTasksRoutes: FastifyPluginAsync<ThreadTasksRoutesOptions> = a
         const parsedRef = parseArtifactRef(ref);
         const effectiveProjectPath = activeWorkspacePath ?? projectPath;
         const workspaceId = task.workspaceId ?? activeWorkspace?.id;
+        const worktreeId = await resolveArtifactWorktreeId(effectiveProjectPath, workspaceId);
         const workspaceRelativePath = task.workspaceRelativePath ?? (!isAbsolute(parsedRef.path) ? parsedRef.path : undefined);
         if (!effectiveProjectPath) {
           const owner = task.ownerCatId ?? 'unknown';
@@ -583,6 +614,7 @@ export const threadTasksRoutes: FastifyPluginAsync<ThreadTasksRoutesOptions> = a
             path: parsedRef.path,
             absolutePath: parsedRef.path,
             ...(workspaceId ? { workspaceId } : {}),
+            ...(worktreeId ? { worktreeId } : {}),
             ...(workspaceRelativePath ? { workspaceRelativePath } : {}),
             kind: parsedRef.kind,
             ...(parsedRef.description ? { description: parsedRef.description } : {}),
@@ -604,6 +636,7 @@ export const threadTasksRoutes: FastifyPluginAsync<ThreadTasksRoutesOptions> = a
           parsedRef.source,
           workspaceId,
           workspaceRelativePath,
+          worktreeId,
         );
         artifacts.push(artifact);
       }

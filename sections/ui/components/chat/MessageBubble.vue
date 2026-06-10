@@ -109,6 +109,13 @@
             />
           </view>
 
+          <view
+            v-else-if="data.type === 'proposal_card'"
+            class="bubble-proposal-card"
+          >
+            <ProposalCard :card="data.proposalCard || {}" :message="data" />
+          </view>
+
           <!-- Text Message -->
           <text
             v-else-if="data.type === 'text' && !isMarkdownText"
@@ -205,6 +212,7 @@ import MessageReactions from './MessageReactions.vue';
 import CoordinatorProjectGroupCard from './CoordinatorProjectGroupCard.vue';
 import CoordinatorTemplateCatsCard from './CoordinatorTemplateCatsCard.vue';
 import DeploymentCard from './DeploymentCard.vue';
+import ProposalCard from './ProposalCard.vue';
 import {
   isSelfSender,
   resolveSelfAvatar,

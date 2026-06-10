@@ -53,7 +53,8 @@ import {
   resolveAgentDeleteIdentity
 } from '../services/native-im/agent-cleanup.js';
 import {
-  createAgentConversation
+  createAgentConversation,
+  mergeGroupMembersWithAgentMembers
 } from '../services/native-im/agent-state.js';
 import {
   buildSelectableGroupMembers,
@@ -887,6 +888,20 @@ test('native service fetches active project group, thread tasks, and creates coo
         }
       ]
     },
+    'GET clowder/thread/thread-project-1/artifacts': {
+      artifacts: [
+        {
+          taskId: 'task-1',
+          path: 'docs/注册验收.md',
+          workspaceRelativePath: 'docs/注册验收.md',
+          worktreeId: 'seedcmp',
+          kind: 'doc',
+          description: '注册链路验收文档',
+          ownerCatId: 'codex',
+          status: 'available'
+        }
+      ]
+    },
     'POST clowder/coordinator/coordination': {
       coordinationId: 'coord-1',
       status: 'created'
@@ -900,6 +915,7 @@ test('native service fetches active project group, thread tasks, and creates coo
 
   const binding = await service.fetchActiveProjectGroup({ projectGroupNo: 'g-project' });
   const tasks = await service.fetchThreadTasks('thread-project-1');
+  const artifacts = await service.fetchThreadArtifacts('thread-project-1');
   const coordination = await service.createCoordination({
     threadId: 'thread-project-1',
     goal: '验收项目群看板'
@@ -909,10 +925,16 @@ test('native service fetches active project group, thread tasks, and creates coo
   assert.equal(request.calls[0].url, '/v1/clowder/project-groups/active?projectGroupNo=g-project');
   assert.equal(request.calls[1].method, 'GET');
   assert.equal(request.calls[1].url, '/v1/clowder/thread/thread-project-1/tasks');
-  assert.equal(request.calls[2].method, 'POST');
-  assert.equal(request.calls[2].url, '/v1/clowder/coordinator/coordination');
+  assert.equal(request.calls[2].method, 'GET');
+  assert.equal(request.calls[2].url, '/v1/clowder/thread/thread-project-1/artifacts');
+  assert.equal(request.calls[3].method, 'POST');
+  assert.equal(request.calls[3].url, '/v1/clowder/coordinator/coordination');
   assert.equal(binding.id, 'binding-1');
   assert.equal(tasks[0].id, 'task-1');
+  assert.equal(artifacts[0].fileName, '注册验收.md');
+  assert.equal(artifacts[0].workspacePath, 'docs/注册验收.md');
+  assert.equal(artifacts[0].worktreeId, 'seedcmp');
+  assert.equal(artifacts[0].generatedByAgent, true);
   assert.equal(coordination.coordinationId, 'coord-1');
 });
 
@@ -999,6 +1021,52 @@ test('native service posts ensure project group and updates binding thread', asy
   assert.equal(groupCats[0].name, 'Codex');
   assert.equal(updated.binding.projectThreadId, 'thread-updated');
 });
+
+test('native service restores clowder group cats from catIds when cat payloads are missing', async () => {
+  const request = makeRequestStub({
+    'GET clowder/group/cats?groupId=g-only-ids': {
+      groupId: 'g-only-ids',
+      catIds: ['coordinator', 'codex']
+    }
+  });
+  const service = createNativeImService({
+    baseUrl: '/v1/',
+    request,
+    getToken: () => 'token'
+  });
+
+  const groupCats = await service.fetchGroupCats({ groupId: 'g-only-ids' });
+
+  assert.deepEqual(groupCats.map((cat) => cat.id), ['coordinator', 'codex']);
+  assert.equal(groupCats[0].isAgent, true);
+  assert.equal(groupCats[0].alias, '@coordinator');
+});
+
+test('native service approves and rejects clowder thread proposals with user identity header', async () => {
+  const request = makeRequestStub({
+    'POST proposals/prop-1/approve': { proposalId: 'prop-1', status: 'approved', threadId: 'thread-new' },
+    'POST proposals/prop-2/reject': { proposalId: 'prop-2', status: 'rejected' }
+  });
+  const service = createNativeImService({
+    baseUrl: '/v1/',
+    clowderBaseUrl: '/v1/',
+    request,
+    getToken: () => 'token'
+  });
+
+  await service.approveThreadProposal('prop-1', { userId: 'u-owner' });
+  await service.rejectThreadProposal('prop-2', { userId: 'u-owner', reason: '暂不需要' });
+
+  assert.equal(request.calls[0].method, 'POST');
+  assert.equal(request.calls[0].url, '/v1/proposals/prop-1/approve');
+  assert.equal(request.calls[0].header['X-Cat-Cafe-User'], 'u-owner');
+  assert.deepEqual(request.calls[0].data, {});
+  assert.equal(request.calls[1].method, 'POST');
+  assert.equal(request.calls[1].url, '/v1/proposals/prop-2/reject');
+  assert.equal(request.calls[1].header['X-Cat-Cafe-User'], 'u-owner');
+  assert.deepEqual(request.calls[1].data, { reason: '暂不需要' });
+});
+
 
 test('project group confirmation card upserts and updates idempotently', async () => {
   const {
@@ -1212,7 +1280,15 @@ test('clowder project binding and thread tasks normalize into a group board', ()
         status: 'in_progress',
         assigneeCatId: 'coordinator',
         progress: 60,
-        artifacts: [{ id: 'doc-1', name: '项目群验收.md', type: 'md', summary: '成员与消息同步' }],
+        artifacts: [{
+          id: 'doc-1',
+          name: '项目群验收.md',
+          type: 'md',
+          summary: '成员与消息同步',
+          workspacePath: 'docs/project.md',
+          worktreeId: 'seedcmp',
+          generatedByAgent: true
+        }],
         logs: [{ time: '10:20', title: '同步成员', detail: '补齐 userMemberIds' }]
       },
       {
@@ -1239,6 +1315,9 @@ test('clowder project binding and thread tasks normalize into a group board', ()
   assert.equal(board.tasks[0].agentId, 'coordinator');
   assert.equal(board.tasks[0].status, 'doing');
   assert.equal(board.tasks[0].documents[0].name, '项目群验收.md');
+  assert.equal(board.tasks[0].documents[0].workspacePath, 'docs/project.md');
+  assert.equal(board.tasks[0].documents[0].worktreeId, 'seedcmp');
+  assert.equal(board.tasks[0].documents[0].generatedByAgent, true);
   assert.equal(board.tasks[1].status, 'done');
   assert.equal(board.tasks[1].documents[0].name, '看板截图.png');
 });
@@ -2225,6 +2304,36 @@ test('native group mention messages preserve highlight metadata from synced payl
     name: 'leng_test_updated',
     offset: 0
   }]);
+});
+
+test('native messages preserve clowder proposal rich blocks as proposal cards', () => {
+  const message = normalizeMessage({
+    message_id: 'proposal-msg-1',
+    from_uid: 'clowder_cat:coordinator',
+    payload: JSON.stringify({
+      type: 1,
+      content: '提议新建 thread：注册链路',
+      rich_blocks: [
+        {
+          id: 'proposal-prop-1',
+          kind: 'card',
+          title: '提议新建 thread：注册链路',
+          bodyMarkdown: '建议拆成独立 thread 跟进。',
+          fields: [{ label: '建议成员', value: 'codex' }],
+          actions: [
+            { label: '批准并创建', action: 'propose:approve', payload: { proposalId: 'prop-1' } },
+            { label: '驳回', action: 'propose:reject', payload: { proposalId: 'prop-1' } }
+          ]
+        }
+      ]
+    })
+  });
+
+  assert.equal(message.type, 'proposal_card');
+  assert.equal(message.content, '提议新建 thread：注册链路');
+  assert.equal(message.proposalCard.proposalId, 'prop-1');
+  assert.equal(message.proposalCard.fields[0].value, 'codex');
+  assert.equal(message.richBlocks.length, 1);
 });
 
 test('conversation summary marks group messages that mention the current user', () => {
@@ -3453,6 +3562,19 @@ test('agent helpers create direct conversations and group mention members', asyn
     }),
     false
   );
+
+  const mergedMembers = mergeGroupMembersWithAgentMembers([
+    { id: 'u1', nickname: '用户一', role: 'owner' },
+    { id: 'clowder_cat:coordinator', nickname: 'PM', role: 'admin' }
+  ], [
+    { catId: 'coordinator', displayName: '暹罗猫（协调者）', alias: '@pm', source: 'clowder' },
+    { catId: 'codex', displayName: 'Codex', alias: '@codex', source: 'clowder' }
+  ]);
+
+  assert.equal(mergedMembers.length, 3);
+  assert.equal(mergedMembers.find((item) => item.id === 'clowder_cat:coordinator').isAgent, true);
+  assert.equal(mergedMembers.find((item) => item.id === 'clowder_cat:coordinator').agentId, 'coordinator');
+  assert.equal(mergedMembers.find((item) => item.id === 'codex').nickname, 'Codex');
 
   const restoredConversations = applyClowderAgentDirectoryToConversations([
     {

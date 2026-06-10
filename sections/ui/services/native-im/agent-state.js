@@ -203,9 +203,10 @@ export function createAgentConversation(agent = {}) {
 }
 
 export function createAgentMember(agent = {}) {
-  const id = firstNonEmpty(agent.id, agent.agentId, agent.uid, agent.alias);
-  const name = firstNonEmpty(agent.name, agent.nickname, agent.alias, '智能体');
+  const id = firstNonEmpty(agent.id, agent.agentId, agent.uid, agent.catId, agent.cat_id, agent.directCatId, agent.direct_cat_id, agent.alias);
+  const name = firstNonEmpty(agent.displayName, agent.display_name, agent.name, agent.nickname, agent.alias, '智能体');
   const alias = firstNonEmpty(agent.alias, name.startsWith('@') ? name : `@${id || name}`);
+  const catId = isClowderAgent(agent) ? resolveClowderCatId(agent, id) : '';
   return {
     id,
     uid: id,
@@ -216,7 +217,97 @@ export function createAgentMember(agent = {}) {
     role: 'member',
     isMuted: false,
     isAgent: true,
-    agentId: id,
+    agentId: catId || id,
+    ...(catId ? {
+      catId,
+      directCatId: catId,
+      source: 'clowder'
+    } : {}),
     status: agent.status || 'active'
   };
+}
+
+function memberLookupValues(entity = {}) {
+  const raw = entity.raw || {};
+  const values = [
+    entity.id,
+    entity.uid,
+    entity.agentId,
+    entity.agent_id,
+    entity.catId,
+    entity.cat_id,
+    entity.directCatId,
+    entity.direct_cat_id,
+    raw.id,
+    raw.uid,
+    raw.agentId,
+    raw.agent_id,
+    raw.catId,
+    raw.cat_id,
+    raw.directCatId,
+    raw.direct_cat_id
+  ].map((value) => firstNonEmpty(value)).filter(Boolean);
+  const expanded = new Set();
+  values.forEach((value) => {
+    const text = firstNonEmpty(value);
+    if (!text) return;
+    expanded.add(text);
+    expanded.add(text.replace(/^agent:/, ''));
+    if (text.startsWith(CLOWDER_CAT_CONTACT_PREFIX)) {
+      expanded.add(text.slice(CLOWDER_CAT_CONTACT_PREFIX.length));
+    } else {
+      expanded.add(`${CLOWDER_CAT_CONTACT_PREFIX}${text}`);
+    }
+  });
+  return [...expanded].map((value) => value.toLowerCase());
+}
+
+function indexGroupMembersByIdentity(members = []) {
+  const index = new Map();
+  members.forEach((member, memberIndex) => {
+    memberLookupValues(member).forEach((key) => {
+      if (!index.has(key)) index.set(key, memberIndex);
+    });
+  });
+  return index;
+}
+
+export function mergeGroupMembersWithAgentMembers(members = [], agents = []) {
+  const next = (members || []).map((member) => ({ isMuted: false, role: 'member', ...member }));
+  const memberIndexByIdentity = indexGroupMembersByIdentity(next);
+
+  (agents || []).forEach((agent) => {
+    const agentMember = createAgentMember(agent);
+    if (!agentMember.id) return;
+    const identities = memberLookupValues({ ...agent, ...agentMember });
+    const existingIndex = identities
+      .map((key) => memberIndexByIdentity.get(key))
+      .find((index) => index !== undefined);
+
+    if (existingIndex !== undefined) {
+      const existing = next[existingIndex];
+      next[existingIndex] = {
+        ...existing,
+        ...agentMember,
+        id: existing.id || agentMember.id,
+        uid: existing.uid || existing.id || agentMember.uid,
+        role: existing.role || agentMember.role || 'member',
+        isMuted: existing.isMuted ?? agentMember.isMuted ?? false,
+        isAgent: true,
+        agentId: agentMember.agentId || existing.agentId || existing.id
+      };
+      memberLookupValues(next[existingIndex]).forEach((key) => {
+        if (!memberIndexByIdentity.has(key)) memberIndexByIdentity.set(key, existingIndex);
+      });
+      return;
+    }
+
+    const newIndex = next.length;
+    next.push(agentMember);
+    identities.forEach((key) => {
+      if (!memberIndexByIdentity.has(key)) memberIndexByIdentity.set(key, newIndex);
+    });
+  });
+
+  return next;
 }

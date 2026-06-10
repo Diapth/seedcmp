@@ -76,7 +76,7 @@ function messageIdentityValues(message = {}) {
     message.id,
     message.clientMsgNo,
     message.client_msg_no
-  ].map(firstNonEmpty).filter(Boolean);
+  ].map((value) => firstNonEmpty(value)).filter(Boolean);
 }
 
 function stripMarkdown(value = '') {

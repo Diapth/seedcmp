@@ -174,7 +174,7 @@ function messageTargetIds(message = {}) {
     message.id,
     message.clientMsgNo,
     message.client_msg_no
-  ].map(firstText).filter(Boolean));
+  ].map((value) => firstText(value)).filter(Boolean));
 }
 
 function agentFeedbackId(agent = {}, conversation = {}) {
@@ -226,7 +226,7 @@ function messagePinIdFromPins(message = {}, pins = []) {
     message.id,
     message.clientMsgNo,
     message.client_msg_no
-  ].map(firstText).filter(Boolean));
+  ].map((value) => firstText(value)).filter(Boolean));
   const pin = activeManualContextPins(pins).find((item) => ids.has(item.messageId));
   return pin?.id || '';
 }

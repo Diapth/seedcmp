@@ -525,6 +525,52 @@ export function normalizeContent(payload) {
   };
 }
 
+function normalizeRichBlocks(input = {}, raw = {}) {
+  return firstArray(
+    input.richBlocks,
+    input.rich_blocks,
+    raw.richBlocks,
+    raw.rich_blocks,
+    input.extra?.rich?.blocks,
+    raw.extra?.rich?.blocks,
+    input.metadata?.richBlocks,
+    input.metadata?.rich_blocks,
+    raw.metadata?.richBlocks,
+    raw.metadata?.rich_blocks
+  ).filter((block) => block && typeof block === 'object');
+}
+
+function isProposalRichBlock(block = {}) {
+  const actions = firstArray(block.actions);
+  return String(block.id || '').startsWith('proposal-')
+    || actions.some((action) => /^propose:(approve|reject)$/.test(String(action?.action || '')));
+}
+
+function normalizeProposalCard(block = {}) {
+  const actions = firstArray(block.actions).map((action = {}) => ({
+    label: firstText(action.label, action.text, action.action),
+    action: firstText(action.action),
+    payload: action.payload && typeof action.payload === 'object' ? action.payload : {}
+  }));
+  const proposalId = firstText(
+    actions.find((action) => action.payload?.proposalId)?.payload?.proposalId,
+    String(block.id || '').replace(/^proposal-/, '')
+  );
+  return {
+    id: firstText(block.id, proposalId),
+    proposalId,
+    title: firstText(block.title, '提议新建 thread'),
+    bodyMarkdown: firstText(block.bodyMarkdown, block.body, block.content, block.description),
+    tone: firstText(block.tone, 'info'),
+    fields: firstArray(block.fields).map((field = {}) => ({
+      label: firstText(field.label, field.name),
+      value: firstText(field.value, field.text)
+    })).filter((field) => field.label || field.value),
+    actions,
+    status: 'pending'
+  };
+}
+
 export function normalizeMessage(input = {}, options = {}) {
   const payload = input.payload ?? input.content ?? input.contentObj ?? {};
   const normalizedContent = normalizeContent({ ...input, payload });
@@ -534,6 +580,9 @@ export function normalizeMessage(input = {}, options = {}) {
   const raw = parsePayload(payload);
   const mention = raw.mention || input.mention || {};
   const mentions = normalizeMentions(mention, normalizedContent.content, raw.mentions, input.mentions);
+  const richBlocks = normalizeRichBlocks(input, raw);
+  const proposalBlock = richBlocks.find(isProposalRichBlock);
+  const proposalCard = proposalBlock ? normalizeProposalCard(proposalBlock) : null;
 
   return {
     id: String(id || `local-${Date.now()}`),
@@ -552,7 +601,13 @@ export function normalizeMessage(input = {}, options = {}) {
     mentionAll: normalizeMentionAll(mention.all),
     mentionUids: mentions.map((item) => item.userId).filter(Boolean),
     raw,
-    ...normalizedContent
+    ...normalizedContent,
+    ...(richBlocks.length ? { richBlocks } : {}),
+    ...(proposalCard ? {
+      type: 'proposal_card',
+      content: proposalCard.title,
+      proposalCard
+    } : {})
   };
 }
 

@@ -17,7 +17,9 @@ import type { InvocationRegistry } from '../domains/cats/services/agents/invocat
 import type { IMessageStore } from '../domains/cats/services/stores/ports/MessageStore.js';
 import type { IProposalStore } from '../domains/cats/services/stores/ports/ProposalStore.js';
 import type { IThreadStore } from '../domains/cats/services/stores/ports/ThreadStore.js';
+import { buildThreadDeepLink } from '../infrastructure/connectors/connector-command-helpers.js';
 import type { SocketManager } from '../infrastructure/websocket/index.js';
+import { resolveFrontendBaseUrl } from '../config/frontend-origin.js';
 import { normalizeCatIdMentionsInText } from '../utils/cat-mention-handle.js';
 import { requireCallbackAuth } from './callback-auth-prehandler.js';
 
@@ -36,6 +38,17 @@ export interface ProposeThreadDeps {
   threadStore: IThreadStore;
   messageStore: IMessageStore;
   socketManager: SocketManager;
+  outboundHook?: {
+    deliver(
+      threadId: string,
+      content: string,
+      catId?: string,
+      richBlocks?: RichCardBlock[],
+      threadMeta?: { threadShortId: string; threadTitle?: string; deepLinkUrl?: string },
+      origin?: 'callback' | 'agent' | 'system',
+      triggerMessageId?: string,
+    ): Promise<void>;
+  };
 }
 
 export function buildProposalCardBlock(proposal: ThreadProposal): RichCardBlock {
@@ -63,7 +76,7 @@ export function buildProposalCardBlock(proposal: ThreadProposal): RichCardBlock 
 }
 
 export function registerCallbackProposeThreadRoutes(app: FastifyInstance, deps: ProposeThreadDeps): void {
-  const { registry, proposalStore, threadStore, messageStore, socketManager } = deps;
+  const { registry, proposalStore, threadStore, messageStore, socketManager, outboundHook } = deps;
 
   app.post('/api/callbacks/propose-thread', async (request, reply) => {
     const record = requireCallbackAuth(request, reply);
@@ -283,6 +296,24 @@ export function registerCallbackProposeThreadRoutes(app: FastifyInstance, deps: 
         extra: stored.extra,
       },
     });
+    if (outboundHook) {
+      const frontendBase = resolveFrontendBaseUrl(process.env);
+      outboundHook.deliver(
+        record.threadId,
+        stored.content,
+        record.catId,
+        [cardBlock],
+        {
+          threadShortId: record.threadId.slice(0, 15),
+          threadTitle: sourceThread.title ?? undefined,
+          deepLinkUrl: buildThreadDeepLink(frontendBase, record.threadId),
+        },
+        'callback',
+        stored.id,
+      ).catch((err: unknown) => {
+        app.log.error({ err, threadId: record.threadId, proposalId }, '[propose-thread] Outbound delivery failed');
+      });
+    }
     socketManager.emitToUser(record.userId, 'proposal_created', proposal);
 
     return {
