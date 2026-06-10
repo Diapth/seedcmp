@@ -37,7 +37,7 @@
 </template>
 
 <script setup>
-import { computed, ref } from 'vue';
+import { computed, onMounted, ref, watch } from 'vue';
 import { nativeImService } from '@/services/native-im/service';
 
 const props = defineProps({
@@ -53,14 +53,43 @@ const props = defineProps({
 
 const status = ref(props.card.status || 'pending');
 const submitting = ref(false);
+const hydrating = ref(Boolean(props.card.proposalId && status.value === 'pending'));
 const errorText = ref('');
 
+watch(() => props.card.status, (next) => {
+  status.value = next || 'pending';
+});
+
+watch(() => props.card.error, (next) => {
+  errorText.value = next || '';
+});
+
+// 刷新/重进后从后端同步真实状态，避免已批准的提案再次显示「批准并创建」。
+onMounted(async () => {
+  if (!props.card.proposalId) {
+    hydrating.value = false;
+    return;
+  }
+  try {
+    const proposal = await nativeImService.fetchThreadProposal(props.card.proposalId);
+    const remoteStatus = String(proposal?.status || '');
+    if (remoteStatus === 'approved' || remoteStatus === 'rejected') {
+      status.value = remoteStatus;
+    }
+  } catch {
+    // best-effort 同步；失败时保持本地状态
+  } finally {
+    hydrating.value = false;
+  }
+});
+
 const fields = computed(() => props.card.fields || []);
-const canSubmit = computed(() => status.value === 'pending' || status.value === 'failed');
+const canSubmit = computed(() => !hydrating.value && (status.value === 'pending' || status.value === 'failed'));
 const statusText = computed(() => {
   if (status.value === 'approved') return '已批准';
   if (status.value === 'rejected') return '已驳回';
   if (status.value === 'failed') return '失败';
+  if (hydrating.value) return '同步中';
   if (submitting.value) return '处理中';
   return '待审批';
 });

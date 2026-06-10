@@ -1056,6 +1056,7 @@ export async function startConnectorGateway(
     log,
     mediaPathResolver,
     messageLookup,
+    threadLookup: async (threadId: string) => deps.threadStore.get(threadId),
     ...(deps.taskStore
       ? {
           artifactRegistrar: async (record) => {

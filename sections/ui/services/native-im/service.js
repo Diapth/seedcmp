@@ -396,7 +396,11 @@ function isUserScopedClowderAgent(agent = {}) {
 }
 
 function normalizeClowderAgent(agent = {}) {
-  const id = firstNonEmpty(agent.catId, agent.cat_id, agent.roleTemplateId, agent.role_template_id, agent.id, agent.agentId, agent.uid);
+  const source = clowderAgentSource(agent).replace(/_/g, '-');
+  const templateId = firstNonEmpty(agent.roleTemplateId, agent.role_template_id);
+  const id = source === 'role-template'
+    ? firstNonEmpty(agent.catId, agent.cat_id, templateId, agent.id, agent.agentId, agent.uid)
+    : firstNonEmpty(agent.catId, agent.cat_id, agent.id, agent.agentId, agent.uid, templateId);
   const name = firstNonEmpty(agent.displayName, agent.display_name, agent.name, agent.nickname, id, '智能体');
   const aliases = firstList(agent.aliases, agent.mentionPatterns, agent.mention_patterns);
   const alias = normalizeMention(aliases[0] || agent.alias, id || name);
@@ -1496,6 +1500,17 @@ export function createNativeImService(options = {}) {
       .map((artifact, index) => normalizeThreadArtifact(artifact, index, id));
   }
 
+  async function fetchThreadProposal(proposalId, payload = {}) {
+    const id = String(proposalId || '').trim();
+    if (!id) throw { msg: 'proposalId不能为空' };
+    const userId = firstNonEmpty(payload.userId, payload.user_id, readCurrentUserId());
+    if (!userId) throw { msg: '当前用户不能为空' };
+    const resp = await clowderClient.get(`proposals/${encodeURIComponent(id)}`, {}, {
+      header: { 'X-Cat-Cafe-User': userId }
+    });
+    return resp.proposal || resp.data?.proposal || resp.data || resp;
+  }
+
   async function approveThreadProposal(proposalId, payload = {}) {
     const id = String(proposalId || '').trim();
     if (!id) throw { msg: 'proposalId不能为空' };
@@ -1669,6 +1684,7 @@ export function createNativeImService(options = {}) {
     fetchActiveProjectGroup,
     fetchThreadTasks,
     fetchThreadArtifacts,
+    fetchThreadProposal,
     approveThreadProposal,
     rejectThreadProposal,
     listManualContextPins,

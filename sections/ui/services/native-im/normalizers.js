@@ -552,6 +552,7 @@ function normalizeProposalCard(block = {}) {
     action: firstText(action.action),
     payload: action.payload && typeof action.payload === 'object' ? action.payload : {}
   }));
+  const status = firstText(block.status, block.state, block.meta?.status);
   const proposalId = firstText(
     actions.find((action) => action.payload?.proposalId)?.payload?.proposalId,
     String(block.id || '').replace(/^proposal-/, '')
@@ -567,7 +568,7 @@ function normalizeProposalCard(block = {}) {
       value: firstText(field.value, field.text)
     })).filter((field) => field.label || field.value),
     actions,
-    status: 'pending'
+    status: ['approved', 'rejected', 'failed', 'pending'].includes(status) ? status : 'pending'
   };
 }
 

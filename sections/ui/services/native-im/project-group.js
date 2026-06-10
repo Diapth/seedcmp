@@ -7,6 +7,42 @@ const PROJECT_NAME_PATTERNS = [
   /群(?:名|名称)(?:叫|为|是)?\s*[「『“"]?([^」』”"\n，。,.!?！？；;]{2,40})/i
 ];
 
+const PROJECT_GROUP_CONFIRM_EXACT = new Set([
+  '确认',
+  '同意',
+  '批准',
+  '可以',
+  '可以的',
+  '好',
+  '好的',
+  '行',
+  '行吧',
+  '没问题',
+  '创建吧',
+  '建群吧',
+  '拉群吧',
+  '可以创建吧',
+  '可以建群吧',
+  '就这样',
+  '就按这个来',
+  '按这个来',
+  '按这个建群',
+  '按这个创建',
+  '继续',
+  '继续创建',
+  '继续建群',
+  'ok',
+  'okay',
+  'yes',
+  'yep'
+]);
+
+const PROJECT_GROUP_CANCEL_RE = /(不建|别建|不用建|不要建|先不要|先别|取消|算了|暂停|驳回|拒绝|不同意|不批准|不可以|不用了|别拉|不要拉)/i;
+const PROJECT_GROUP_RECOVER_RE = /(重新|重发|再发).*(发|给|来|一下)|找不到.*(?:按钮|卡片)|(?:按钮|卡片).*(?:没|不见|丢|失效|不可用)/i;
+const PROJECT_GROUP_CONFIRM_RE = /(?:确认|同意|批准|可以|按这个|就这样|继续).*(?:建群|创建|拉群|项目群|全员群)/i;
+const PROJECT_GROUP_PROPOSAL_RE = /(项目群|全员群|创建.*群|建群|拉群|拉.*(?:猫|智能体|agent|codex|claude)|分工执行|协调.*(?:智能体|agent|codex|claude))/i;
+const PENDING_PROJECT_GROUP_STATUSES = new Set(['', 'pending', 'pending_confirmation', 'failed']);
+
 const CLOWDER_CAT_CONTACT_PREFIX = 'clowder_cat:';
 const COORDINATOR_KEYWORDS = [
   'coordinator',
@@ -79,6 +115,50 @@ function normalizeKeyword(value = '') {
     .replace(/^@/, '')
     .replace(/[\s_\-:：/]+/g, '')
     .replace(/智能体|agent|ai/g, '');
+}
+
+function compactIntentText(text = '') {
+  return String(text || '')
+    .trim()
+    .toLowerCase()
+    .replace(/[\s，,。.!！?？；;：:、"'“”‘’「」『』（）()【】[\]{}<>《》-]+/g, '');
+}
+
+function messageText(message = {}) {
+  return firstText(message.content, message.text, message.payload?.content, message.raw?.content);
+}
+
+function messageStatus(message = {}) {
+  return String(message.projectGroupCard?.status || message.status || '').trim().toLowerCase();
+}
+
+function isPendingProjectGroupMessage(message = {}) {
+  if (!isProjectGroupConfirmationMessage(message)) return false;
+  const status = String(message.projectGroupCard?.status || '').trim().toLowerCase();
+  return PENDING_PROJECT_GROUP_STATUSES.has(status);
+}
+
+function proposalText(message = {}) {
+  const card = message.proposalCard || {};
+  const fields = Array.isArray(card.fields)
+    ? card.fields.map((field = {}) => `${firstText(field.label)} ${firstText(field.value)}`)
+    : [];
+  return [
+    message.content,
+    card.title,
+    card.bodyMarkdown,
+    card.description,
+    ...fields
+  ].map((value) => String(value || '').trim()).filter(Boolean).join('\n');
+}
+
+function isPendingProjectGroupProposal(message = {}) {
+  const card = message.proposalCard || {};
+  const proposalId = firstText(card.proposalId, card.id);
+  if (!proposalId) return false;
+  const status = String(card.status || message.status || 'pending').trim().toLowerCase();
+  if (!PENDING_PROJECT_GROUP_STATUSES.has(status)) return false;
+  return PROJECT_GROUP_PROPOSAL_RE.test(proposalText(message));
 }
 
 function keywordValues(entity = {}) {
@@ -223,6 +303,12 @@ function cardErrorText(error = '') {
   return firstText(error.msg, error.message, error.error, '项目群创建失败');
 }
 
+function proposalErrorText(error = '') {
+  if (!error) return '';
+  if (typeof error === 'string') return error;
+  return firstText(error.msg, error.message, error.error, '提案处理失败');
+}
+
 function projectGroupCardSummary(card = {}) {
   const name = firstText(card.projectName, card.projectGroupName, 'Clowder 项目群');
   if (card.status === 'creating') return `正在创建或复用项目群：${name}`;
@@ -273,6 +359,107 @@ export function isProjectGroupConfirmationMessage(message = {}) {
     || message.contentType === 'project_group_confirmation'
     || message.metadata?.project_group_confirmation === true
     || message.projectGroupCard?.cardId;
+}
+
+export function isProjectGroupTextCancelIntent(text = '') {
+  const source = String(text || '').trim();
+  return Boolean(source && PROJECT_GROUP_CANCEL_RE.test(source));
+}
+
+export function isProjectGroupTextRecoverIntent(text = '') {
+  const source = String(text || '').trim();
+  return Boolean(source && PROJECT_GROUP_RECOVER_RE.test(source));
+}
+
+export function isProjectGroupTextConfirmIntent(text = '') {
+  const source = String(text || '').trim();
+  if (!source || isProjectGroupTextCancelIntent(source)) return false;
+  const compact = compactIntentText(source);
+  return PROJECT_GROUP_CONFIRM_EXACT.has(compact)
+    || PROJECT_GROUP_CONFIRM_RE.test(source)
+    || isProjectGroupTextRecoverIntent(source);
+}
+
+export function findPendingProjectGroupConfirmation(messages = []) {
+  const list = Array.isArray(messages) ? messages : [];
+  for (let index = list.length - 1; index >= 0; index -= 1) {
+    const message = list[index] || {};
+    if (isPendingProjectGroupMessage(message)) return message;
+  }
+  return null;
+}
+
+export function findRecoverableProjectGroupContext({
+  messages = [],
+  conversation = {},
+  agent = {}
+} = {}) {
+  const list = Array.isArray(messages) ? messages : [];
+  for (let index = list.length - 1; index >= 0; index -= 1) {
+    const message = list[index] || {};
+    if (isProjectGroupConfirmationMessage(message)) continue;
+    const text = messageText(message);
+    if (!text || messageStatus(message) === 'failed') continue;
+    if (!shouldCreateProjectGroupConfirmation({ conversation, agent, text })) continue;
+    return {
+      message,
+      sourceMessage: message,
+      sourceText: text
+    };
+  }
+  return null;
+}
+
+export function findPendingProjectGroupProposal(messages = []) {
+  const list = Array.isArray(messages) ? messages : [];
+  for (let index = list.length - 1; index >= 0; index -= 1) {
+    const message = list[index] || {};
+    if (isPendingProjectGroupProposal(message)) return message;
+  }
+  return null;
+}
+
+export function resolveProjectGroupTextConfirmation({
+  text = '',
+  messages = [],
+  conversation = {},
+  agent = {}
+} = {}) {
+  const hasCancelIntent = isProjectGroupTextCancelIntent(text);
+  const hasConfirmIntent = isProjectGroupTextConfirmIntent(text);
+  if (!hasCancelIntent && !hasConfirmIntent) return null;
+
+  const pendingMessage = findPendingProjectGroupConfirmation(messages);
+  if (pendingMessage) {
+    const cardId = firstText(pendingMessage.projectGroupCard?.cardId, pendingMessage.id);
+    return {
+      action: hasCancelIntent ? 'cancel' : 'confirm',
+      intent: hasCancelIntent ? 'cancel' : (isProjectGroupTextRecoverIntent(text) ? 'recover' : 'confirm'),
+      cardId,
+      message: pendingMessage,
+      card: pendingMessage.projectGroupCard || {}
+    };
+  }
+
+  const pendingProposal = findPendingProjectGroupProposal(messages);
+  if (pendingProposal) {
+    const proposalId = firstText(pendingProposal.proposalCard?.proposalId, pendingProposal.proposalCard?.id);
+    return {
+      action: hasCancelIntent ? 'reject_proposal' : 'approve_proposal',
+      intent: hasCancelIntent ? 'cancel' : (isProjectGroupTextRecoverIntent(text) ? 'recover' : 'confirm'),
+      proposalId,
+      message: pendingProposal,
+      proposalCard: pendingProposal.proposalCard || {}
+    };
+  }
+
+  const recoverable = findRecoverableProjectGroupContext({ messages, conversation, agent });
+  if (!recoverable) return null;
+  return {
+    action: hasCancelIntent ? 'cancel_context' : 'create_and_confirm',
+    intent: hasCancelIntent ? 'cancel' : (isProjectGroupTextRecoverIntent(text) ? 'recover' : 'confirm'),
+    ...recoverable
+  };
 }
 
 export function createProjectGroupConfirmationMessage(input = {}) {
@@ -350,6 +537,34 @@ export function updateProjectGroupConfirmationMessage(list = [], cardId = '', pa
         ...(message.metadata || {}),
         project_group_confirmation: true,
         projectGroupCard: mergedCard
+      }
+    };
+  });
+}
+
+export function updateProjectGroupProposalMessage(list = [], proposalId = '', patch = {}) {
+  const id = String(proposalId || '').trim();
+  if (!id) return list;
+  return list.map((message) => {
+    const card = message.proposalCard || {};
+    const currentProposalId = firstText(card.proposalId, card.id);
+    if (message.id !== id && currentProposalId !== id) return message;
+    const mergedCard = {
+      ...card,
+      ...patch,
+      proposalId: currentProposalId || id,
+      id: card.id || `proposal-${currentProposalId || id}`,
+      error: proposalErrorText(patch.error ?? card.error),
+      updatedAt: patch.updatedAt || Date.now()
+    };
+    return {
+      ...message,
+      status: 'success',
+      proposalCard: mergedCard,
+      metadata: {
+        ...(message.metadata || {}),
+        project_group_text_fallback: true,
+        proposalCard: mergedCard
       }
     };
   });

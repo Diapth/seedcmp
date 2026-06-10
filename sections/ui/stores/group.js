@@ -99,8 +99,12 @@ export const useGroupStore = defineStore('group', {
         } catch {
           groupCats = [];
         }
-        const mergedMembers = mergeGroupMembersWithAgentMembers(members, groupCats);
-        useConversationStore().initFromGroupMembers(groupId, mergedMembers, mergedMembers.find((item) => item.role === 'owner')?.id);
+        const convStore = useConversationStore();
+        const existingAgentMembers = (convStore.members[groupId] || []).filter(
+          (member) => member?.isAgent || member?.source === 'clowder' || member?.catId || member?.directCatId
+        );
+        const mergedMembers = mergeGroupMembersWithAgentMembers(members, [...existingAgentMembers, ...groupCats]);
+        convStore.initFromGroupMembers(groupId, mergedMembers, mergedMembers.find((item) => item.role === 'owner')?.id);
         const group = this.groups.find((item) => item.id === groupId);
         if (group) group.memberCount = mergedMembers.length || group.memberCount || 0;
         return mergedMembers;

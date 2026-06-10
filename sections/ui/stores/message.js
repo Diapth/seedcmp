@@ -14,11 +14,14 @@ import {
   buildDeploymentCardMessage
 } from '@/services/native-im/deployment';
 import {
+  buildProjectGroupConfirmationInput,
   buildProjectGroupEnsurePayload,
   isProjectGroupConfirmationMessage,
   projectGroupCreatedPatch,
   projectGroupFailedPatch,
+  resolveProjectGroupTextConfirmation,
   updateProjectGroupConfirmationMessage,
+  updateProjectGroupProposalMessage,
   upsertProjectGroupConfirmationMessage
 } from '@/services/native-im/project-group';
 import {
@@ -675,6 +678,13 @@ export const useMessageStore = defineStore('message', {
         message.id === cardId || message.projectGroupCard?.cardId === cardId
       )) || null;
     },
+    updateProjectGroupProposal(conversationId, proposalId, patch = {}) {
+      if (!conversationId || !proposalId) return null;
+      this.messages[conversationId] = updateProjectGroupProposalMessage(this.messages[conversationId] || [], proposalId, patch);
+      return (this.messages[conversationId] || []).find((message) => (
+        message.id === proposalId || message.proposalCard?.proposalId === proposalId || message.proposalCard?.id === proposalId
+      )) || null;
+    },
     createCoordinatorTemplateCatsRequest(conversationId, input = {}) {
       if (!conversationId) return null;
       this.messages[conversationId] = upsertCoordinatorTemplateCatsMessage(this.messages[conversationId] || [], input);
@@ -946,6 +956,7 @@ export const useMessageStore = defineStore('message', {
         groupStore.addGroup(group);
         convStore.upsertGroupConversation(group);
         agents.forEach((agent) => convStore.addAgentMember(groupId, agent));
+        groupStore.syncNativeGroupMembers(groupId, { silent: true }).catch(() => {});
 
         if (card.sourceText) {
           await nativeImService.sendClowderConversationMessage({
@@ -962,6 +973,71 @@ export const useMessageStore = defineStore('message', {
       } catch (error) {
         return this.updateProjectGroupConfirmation(conversationId, cardId, projectGroupFailedPatch(error));
       }
+    },
+    async handleProjectGroupTextFallback(conversation = {}, text = '', options = {}) {
+      const conversationId = firstText(conversation?.id, conversation?.conversationId, conversation?.channelId, options.conversationId);
+      if (!conversationId || !text) return null;
+      const resolution = resolveProjectGroupTextConfirmation({
+        text,
+        messages: this.messages[conversationId] || [],
+        conversation,
+        agent: options.agent || conversation
+      });
+      if (!resolution) return null;
+
+      if (resolution.action === 'cancel') {
+        return this.updateProjectGroupConfirmation(conversationId, resolution.cardId, { status: 'cancelled' });
+      }
+      if (resolution.action === 'confirm') {
+        return this.confirmProjectGroupFromCard(conversationId, resolution.cardId, options);
+      }
+      if (resolution.action === 'approve_proposal') {
+        this.updateProjectGroupProposal(conversationId, resolution.proposalId, { status: 'submitting', error: '' });
+        try {
+          await nativeImService.approveThreadProposal(resolution.proposalId, {
+            userId: options.currentUser?.id || options.currentUser?.uid || options.currentUser?.userId
+          });
+          return this.updateProjectGroupProposal(conversationId, resolution.proposalId, { status: 'approved', error: '' });
+        } catch (error) {
+          return this.updateProjectGroupProposal(conversationId, resolution.proposalId, { status: 'failed', error });
+        }
+      }
+      if (resolution.action === 'reject_proposal') {
+        this.updateProjectGroupProposal(conversationId, resolution.proposalId, { status: 'submitting', error: '' });
+        try {
+          await nativeImService.rejectThreadProposal(resolution.proposalId, {
+            userId: options.currentUser?.id || options.currentUser?.uid || options.currentUser?.userId,
+            reason: text
+          });
+          return this.updateProjectGroupProposal(conversationId, resolution.proposalId, { status: 'rejected', error: '' });
+        } catch (error) {
+          return this.updateProjectGroupProposal(conversationId, resolution.proposalId, { status: 'failed', error });
+        }
+      }
+      if (resolution.action === 'cancel_context') {
+        const card = this.createProjectGroupConfirmation(conversationId, buildProjectGroupConfirmationInput({
+          conversation,
+          agent: options.agent || conversation,
+          sourceMessage: resolution.sourceMessage,
+          text: resolution.sourceText,
+          currentUser: options.currentUser || {},
+          availableAgents: options.availableAgents || []
+        }));
+        return this.updateProjectGroupConfirmation(conversationId, card?.projectGroupCard?.cardId || card?.id, { status: 'cancelled' });
+      }
+      if (resolution.action === 'create_and_confirm') {
+        const card = this.createProjectGroupConfirmation(conversationId, buildProjectGroupConfirmationInput({
+          conversation,
+          agent: options.agent || conversation,
+          sourceMessage: resolution.sourceMessage,
+          text: resolution.sourceText,
+          currentUser: options.currentUser || {},
+          availableAgents: options.availableAgents || []
+        }));
+        const cardId = card?.projectGroupCard?.cardId || card?.id;
+        return cardId ? this.confirmProjectGroupFromCard(conversationId, cardId, options) : null;
+      }
+      return null;
     },
     startClowderMarkdownStream(conversationId, prompt = '', options = {}) {
       if (!conversationId) return [];

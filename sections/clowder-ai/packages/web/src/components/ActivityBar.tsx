@@ -7,6 +7,7 @@ import { usePinnedSections } from '@/hooks/usePinnedSections';
 import { useCallbackAuthAggregate, useCallbackAuthAvailable } from '@/stores/callbackAuthStore';
 import { HubIcon } from './hub-icons';
 import { MemoryIcon } from './icons/MemoryIcon';
+import { WorkspacesIcon } from './icons/WorkspacesIcon';
 import { SETTINGS_SECTIONS } from './settings/settings-nav-config';
 import { getThreadIdFromPathname } from './ThreadSidebar/thread-navigation';
 
@@ -15,6 +16,7 @@ const NAV_ITEMS = [
   { id: 'memory', path: '/memory', label: '记忆', match: (p: string) => p.startsWith('/memory') },
   { id: 'mission', path: '/mission-hub', label: 'Mission Hub', match: (p: string) => p.startsWith('/mission') },
   { id: 'signals', path: '/signals', label: '信号', match: (p: string) => p.startsWith('/signals') },
+  { id: 'workspaces', path: '/workspaces', label: '项目群', match: (p: string) => p.startsWith('/workspaces') },
 ] as const;
 
 function ChatIcon({ className = 'w-5 h-5' }: { className?: string }) {
@@ -105,6 +107,7 @@ const ICON_MAP: Record<string, ({ className }: { className?: string }) => JSX.El
   signals: SignalIcon,
   memory: MemoryIcon,
   mission: MissionIcon,
+  workspaces: WorkspacesIcon,
   settings: SettingsIcon,
 };
 

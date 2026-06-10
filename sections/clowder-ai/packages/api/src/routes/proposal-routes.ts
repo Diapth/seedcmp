@@ -185,7 +185,11 @@ export const proposalRoutes: FastifyPluginAsync<ProposalRoutesOptions> = async (
         warnings.push(`updatePreferredCats failed: ${err instanceof Error ? err.message : String(err)}`);
       }
     }
-    if (finalInitialMessage) {
+    // Bug fix: dispatch must run when there is EITHER a typed initialMessage
+    // OR proposed members (preferredCats). Previously this was gated only on
+    // finalInitialMessage, so a proposal that picked members (e.g. 宪宪) but
+    // carried no opening line woke nobody → user saw "批准了但 AI 没反馈".
+    if (finalInitialMessage || finalPreferredCats.length > 0) {
       try {
         // F128 (thread-orchestration skill Step 5 enforcement): inject the
         // "## 主 Thread" header into the first sub-thread message so cats
@@ -195,8 +199,12 @@ export const proposalRoutes: FastifyPluginAsync<ProposalRoutesOptions> = async (
         // The proposal store keeps the raw user-typed initialMessage; only
         // the appended thread message gets enriched.
         const sourceThread = await threadStore.get(proposal.sourceThreadId);
+        // When the proposal has no initialMessage, synthesize a minimal opening
+        // so the proposed members are actually invoked (the preferredCats
+        // fallback in appendApprovedInitialMessage routes to them).
+        const baseContent = finalInitialMessage ?? buildDefaultProposalOpening(finalTitle, proposal.reason);
         const enrichedContent = enrichWithParentThreadHeader(
-          finalInitialMessage,
+          baseContent,
           proposal.sourceThreadId,
           sourceThread?.title,
         );
@@ -222,6 +230,7 @@ export const proposalRoutes: FastifyPluginAsync<ProposalRoutesOptions> = async (
     }
 
     const updatedThread = (await threadStore.get(thread.id)) ?? thread;
+    await updateProposalCardMessageStatus(messageStore, finalized.cardMessageId, finalized.proposalId, 'approved');
     socketManager.emitToUser(userId, 'thread_created', updatedThread);
     socketManager.emitToUser(userId, 'proposal_updated', finalized);
 
@@ -284,6 +293,7 @@ export const proposalRoutes: FastifyPluginAsync<ProposalRoutesOptions> = async (
       return { error: 'Proposal status changed concurrently — retry reject' };
     }
 
+    await updateProposalCardMessageStatus(messageStore, marked.cardMessageId, marked.proposalId, 'rejected');
     socketManager.emitToUser(userId, 'proposal_updated', marked);
 
     return { proposalId: marked.proposalId, status: marked.status };
@@ -326,4 +336,51 @@ function resolveInitialMessage(
   if (override === undefined) return fromProposal;
   if (override === null) return undefined;
   return override;
+}
+
+/**
+ * When an approved proposal has no user/cat-typed initialMessage but DID pick
+ * members, we still must wake those members. Synthesize a neutral opening
+ * derived from the proposal so the sub-thread starts with context.
+ */
+function buildDefaultProposalOpening(title: string, reason: string | undefined): string {
+  const reasonLine = reason?.trim() ? `\n\n背景：${reason.trim()}` : '';
+  return `这个 thread「${title}」已根据提案创建，请相关成员开始协作。${reasonLine}`;
+}
+
+async function updateProposalCardMessageStatus(
+  messageStore: IMessageStore,
+  cardMessageId: string | undefined,
+  proposalId: string,
+  status: 'approved' | 'rejected',
+): Promise<void> {
+  if (!cardMessageId) return;
+  try {
+    const msg = await messageStore.getById(cardMessageId);
+    if (!msg?.extra?.rich?.blocks?.length) return;
+    const targetId = `proposal-${proposalId}`;
+    const blocks = msg.extra.rich.blocks.map((block) => {
+      const actionProposalId = block.kind === 'card'
+        ? block.actions?.find((action) => action.payload?.proposalId === proposalId)?.payload?.proposalId
+        : undefined;
+      if (block.id !== targetId && actionProposalId !== proposalId) return block;
+      if (block.kind !== 'card') return block;
+      const tone = status === 'approved' ? ('success' as const) : ('danger' as const);
+      return {
+        ...block,
+        tone,
+        meta: {
+          ...(block.meta ?? {}),
+          status,
+        },
+        actions: [],
+      };
+    });
+    await messageStore.updateExtra(cardMessageId, {
+      ...msg.extra,
+      rich: { v: 1, blocks },
+    });
+  } catch {
+    // Best-effort UI persistence. ProposalStore remains the source of truth.
+  }
 }

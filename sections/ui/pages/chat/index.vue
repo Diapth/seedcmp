@@ -677,6 +677,11 @@ async function handleSendMessage({ type, content, fileName, fileSize, fileSizeBy
   }, sender);
   const localMessage = await sendPromise;
   if (type === 'text') {
+    const handledProjectGroupFallback = await maybeHandleProjectGroupTextFallback(conversation, content);
+    if (handledProjectGroupFallback) {
+      replyTarget.value = null;
+      return;
+    }
     maybeStartAgentPendingFeedback(conversation, localMessage, extra.mentions || []);
     await maybeCreateCoordinatorTemplateCatsCard(conversation, content, localMessage);
     maybeCreateProjectGroupCard(conversation, content, localMessage);
@@ -688,6 +693,24 @@ async function handleSendMessage({ type, content, fileName, fileSize, fileSizeBy
     });
   }
   replyTarget.value = null;
+}
+
+async function maybeHandleProjectGroupTextFallback(conversation, text) {
+  if (!conversation || !text) return false;
+  const agent = resolveAgentForConversation(conversation) || conversation;
+  const message = await messageStore.handleProjectGroupTextFallback(conversation, text, {
+    agent,
+    currentUser: appStore.currentUser || {},
+    agents: agentStore.agents,
+    availableAgents: agentStore.agents
+  });
+  if (message?.projectGroupCard?.status === 'failed') {
+    uni.showToast({ title: message.projectGroupCard.error || '项目群创建失败', icon: 'none' });
+  }
+  if (message?.proposalCard?.status === 'failed') {
+    uni.showToast({ title: message.proposalCard.error || '提案处理失败', icon: 'none' });
+  }
+  return Boolean(message);
 }
 
 function maybeCreateProjectGroupCard(conversation, text, sourceMessage) {

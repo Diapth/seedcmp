@@ -86,7 +86,20 @@ export function markAgentDeleted(records = {}, agent = {}, deletedAt = Date.now(
 export function isAgentDeleted(agent = {}, records = {}) {
   const identity = resolveAgentDeleteIdentity(agent);
   if (!identity.catId) return false;
-  return Boolean(records[identity.catId]);
+  const record = records[identity.catId];
+  if (!record) return false;
+  const deletedAt = Number(record.deletedAt || 0);
+  const lastActiveAt = Number(
+    agent.lastActiveAt
+    || agent.last_active_at
+    || agent.updatedAt
+    || agent.updated_at
+    || agent.createdAt
+    || agent.created_at
+    || 0
+  );
+  if (lastActiveAt > deletedAt) return false;
+  return true;
 }
 
 export function filterDeletedAgents(agents = [], records = {}) {

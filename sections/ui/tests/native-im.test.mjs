@@ -492,6 +492,39 @@ test('native service marks user-scoped clowder contacts as custom agent cards', 
   assert.equal(creatorById['official-reviewer'], 'System');
 });
 
+test('native service keeps runtime-created cats distinct from their role templates', async () => {
+  const request = makeRequestStub({
+    'GET clowder/cats?includeUnavailable=true': {
+      agents: [{
+        id: 'custom-qa-cat',
+        roleTemplateId: 'qa',
+        displayName: '英短（QA工程师）',
+        source: 'runtime-created',
+        capabilitySummary: '自动化测试、回归验证',
+        available: true
+      }],
+      templates: [{
+        roleTemplateId: 'qa',
+        displayName: '官方 QA 模板',
+        source: 'role-template',
+        capabilitySummary: '测试策略'
+      }]
+    }
+  });
+  const service = createNativeImService({
+    baseUrl: '/v1/',
+    request,
+    getToken: () => 'token'
+  });
+
+  const directory = await service.fetchClowderCatDirectory({ includeUnavailable: true });
+
+  assert.deepEqual(directory.agents.map((agent) => agent.id), ['custom-qa-cat', 'qa']);
+  assert.equal(directory.agents[0].catId, 'custom-qa-cat');
+  assert.equal(directory.agents[0].creator, 'User');
+  assert.equal(directory.agents[1].creator, 'System');
+});
+
 test('native service scans clowder templates as official agent cards', async () => {
   const rawTemplate = {
     roleTemplateId: 'coordinator',
@@ -1144,6 +1177,191 @@ test('project group confirmation card keeps one retryable failed state', async (
   assert.equal(list[0].projectGroupCard.status, 'failed');
   assert.equal(list[0].projectGroupCard.error, '再次同步失败');
   assert.match(list[0].content, /创建失败/);
+});
+
+test('project group text confirmation resolves only with pending context', async () => {
+  const {
+    resolveProjectGroupTextConfirmation,
+    upsertProjectGroupConfirmationMessage
+  } = await import('../services/native-im/project-group.js');
+  const sourceMessage = { id: 'prompt-text-confirm', content: '项目名叫 ISSUE-048项目群，拉 Codex 分工执行' };
+  const messages = upsertProjectGroupConfirmationMessage([], {
+    sourceMessage,
+    projectName: 'ISSUE-048项目群',
+    targetCatIds: ['codex']
+  });
+
+  const confirm = resolveProjectGroupTextConfirmation({
+    text: '确认',
+    messages
+  });
+  assert.equal(confirm.action, 'confirm');
+  assert.equal(confirm.cardId, 'project-group-card:prompt-text-confirm');
+  assert.equal(confirm.message.id, 'project-group-card:prompt-text-confirm');
+
+  const buildIt = resolveProjectGroupTextConfirmation({
+    text: '可以，建群吧',
+    messages
+  });
+  assert.equal(buildIt.action, 'confirm');
+
+  const resend = resolveProjectGroupTextConfirmation({
+    text: '重新发我一下',
+    messages
+  });
+  assert.equal(resend.action, 'confirm');
+  assert.equal(resend.intent, 'recover');
+
+  const cancel = resolveProjectGroupTextConfirmation({
+    text: '先不要，取消',
+    messages
+  });
+  assert.equal(cancel.action, 'cancel');
+  assert.equal(cancel.cardId, 'project-group-card:prompt-text-confirm');
+
+  assert.equal(resolveProjectGroupTextConfirmation({ text: '确认', messages: [] }), null);
+  assert.equal(resolveProjectGroupTextConfirmation({
+    text: '取消',
+    messages: upsertProjectGroupConfirmationMessage([], {
+      sourceMessage,
+      projectName: 'ISSUE-048项目群',
+      status: 'created'
+    })
+  }), null);
+});
+
+test('project group text confirmation can approve or reject pending project proposals', async () => {
+  const {
+    resolveProjectGroupTextConfirmation
+  } = await import('../services/native-im/project-group.js');
+  const projectProposal = {
+    id: 'proposal-msg-project',
+    type: 'proposal_card',
+    proposalCard: {
+      proposalId: 'proposal-project-1',
+      title: '创建全员群项目 thread',
+      bodyMarkdown: '建议批准并创建 ISSUE-048 项目群，并拉 Codex 分工执行。',
+      fields: [{ label: '成员', value: 'Codex' }],
+      status: 'pending'
+    }
+  };
+  const plainThreadProposal = {
+    id: 'proposal-msg-thread',
+    type: 'proposal_card',
+    proposalCard: {
+      proposalId: 'proposal-thread-1',
+      title: '提议新建 thread：登录排查',
+      bodyMarkdown: '建议拆成独立 thread 跟进。',
+      fields: [{ label: '建议成员', value: 'Codex' }],
+      status: 'pending'
+    }
+  };
+
+  const approved = resolveProjectGroupTextConfirmation({
+    text: '批准',
+    messages: [projectProposal]
+  });
+  assert.equal(approved.action, 'approve_proposal');
+  assert.equal(approved.proposalId, 'proposal-project-1');
+  assert.equal(approved.message.id, 'proposal-msg-project');
+
+  const rejected = resolveProjectGroupTextConfirmation({
+    text: '取消',
+    messages: [projectProposal]
+  });
+  assert.equal(rejected.action, 'reject_proposal');
+  assert.equal(rejected.proposalId, 'proposal-project-1');
+
+  assert.equal(resolveProjectGroupTextConfirmation({
+    text: '确认',
+    messages: [plainThreadProposal]
+  }), null);
+});
+
+test('project group proposal card status updates from text fallback', async () => {
+  const {
+    updateProjectGroupProposalMessage
+  } = await import('../services/native-im/project-group.js');
+  const list = [{
+    id: 'proposal-msg-project',
+    type: 'proposal_card',
+    content: '创建全员群项目 thread',
+    proposalCard: {
+      proposalId: 'proposal-project-1',
+      title: '创建全员群项目 thread',
+      status: 'pending'
+    }
+  }];
+
+  const approved = updateProjectGroupProposalMessage(list, 'proposal-project-1', {
+    status: 'approved'
+  });
+  assert.equal(approved[0].proposalCard.status, 'approved');
+  assert.equal(approved[0].metadata.project_group_text_fallback, true);
+
+  const failed = updateProjectGroupProposalMessage(approved, 'proposal-project-1', {
+    status: 'failed',
+    error: { msg: '批准失败' }
+  });
+  assert.equal(failed[0].proposalCard.status, 'failed');
+  assert.equal(failed[0].proposalCard.error, '批准失败');
+
+  assert.deepEqual(updateProjectGroupProposalMessage(failed, 'missing', { status: 'rejected' }), failed);
+});
+
+test('project group text confirmation can recover from recent project start context', async () => {
+  const {
+    resolveProjectGroupTextConfirmation
+  } = await import('../services/native-im/project-group.js');
+  const conversation = {
+    id: 'clowder_cat:coordinator',
+    channelId: 'clowder_cat:coordinator',
+    channelType: 1,
+    type: 'robot',
+    source: 'clowder',
+    directCatId: 'coordinator',
+    name: 'PM 智能体'
+  };
+  const agent = {
+    id: 'coordinator',
+    name: 'PM 智能体',
+    roleTemplate: 'coordinator'
+  };
+  const messages = [
+    {
+      id: 'prompt-lost-card',
+      senderId: 'u-owner',
+      type: 'text',
+      content: '项目名叫 ISSUE-048项目群，拉 Codex 分工执行',
+      status: 'success'
+    }
+  ];
+
+  const resolved = resolveProjectGroupTextConfirmation({
+    text: '就按这个来',
+    messages,
+    conversation,
+    agent
+  });
+  assert.equal(resolved.action, 'create_and_confirm');
+  assert.equal(resolved.sourceMessage.id, 'prompt-lost-card');
+  assert.equal(resolved.sourceText, '项目名叫 ISSUE-048项目群，拉 Codex 分工执行');
+
+  const cancelled = resolveProjectGroupTextConfirmation({
+    text: '不建了',
+    messages,
+    conversation,
+    agent
+  });
+  assert.equal(cancelled.action, 'cancel_context');
+  assert.equal(cancelled.sourceMessage.id, 'prompt-lost-card');
+
+  assert.equal(resolveProjectGroupTextConfirmation({
+    text: '确认',
+    messages: [{ id: 'plain-1', type: 'text', content: '今天天气不错', status: 'success' }],
+    conversation,
+    agent
+  }), null);
 });
 
 test('project group confirmation trigger is limited to coordinator direct chats', async () => {
@@ -1885,6 +2103,29 @@ test('deleted agent records suppress stale directory agents', () => {
   assert.deepEqual(filtered.map((agent) => agent.id), ['architect']);
 });
 
+test('deleted agent records allow newer recreated custom agents', () => {
+  const deletedRecords = {};
+  markAgentDeleted(deletedRecords, {
+    id: 'qqqa',
+    catId: 'qqqa',
+    name: 'QQQA',
+    source: 'clowder'
+  }, 1781067000000);
+
+  const filtered = filterDeletedAgents([
+    {
+      id: 'qqqa',
+      catId: 'qqqa',
+      name: 'QQQA',
+      source: 'clowder',
+      creator: 'User',
+      lastActiveAt: 1781068000000
+    }
+  ], deletedRecords);
+
+  assert.deepEqual(filtered.map((agent) => agent.id), ['qqqa']);
+});
+
 test('agent cleanup prunes agents conversations group members and optional direct messages', () => {
   const state = {
     agents: [
@@ -2397,6 +2638,31 @@ test('native messages preserve clowder proposal rich blocks as proposal cards', 
   assert.equal(message.proposalCard.proposalId, 'prop-1');
   assert.equal(message.proposalCard.fields[0].value, 'codex');
   assert.equal(message.richBlocks.length, 1);
+});
+
+test('native messages render textual clowder proposal ids as proposal cards', () => {
+  const message = normalizeMessage({
+    message_id: 'proposal-msg-text',
+    from_uid: 'clowder_cat:coordinator',
+    payload: JSON.stringify({
+      type: 1,
+      content: [
+        '架构师完成，我来发起一个新 thread 提案。',
+        '',
+        '提案摘要：',
+        '- 📌 标题：架构师测试群',
+        '- 👥 成员：宪宪（布偶猫/架构师） + 我（协调者）',
+        '- 🔗 提案 ID：proposal_mq84hcmdtx4eadem',
+        '',
+        '你那边应该能看到一个提案卡片，点「创建」后 thread 就开了。'
+      ].join('\n')
+    })
+  });
+
+  assert.equal(message.type, 'proposal_card');
+  assert.equal(message.proposalCard.proposalId, 'proposal_mq84hcmdtx4eadem');
+  assert.equal(message.proposalCard.title, '架构师测试群');
+  assert.deepEqual(message.proposalCard.actions.map((action) => action.action), ['propose:approve', 'propose:reject']);
 });
 
 test('conversation summary marks group messages that mention the current user', () => {

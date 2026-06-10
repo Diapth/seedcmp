@@ -6,6 +6,7 @@ import { fileURLToPath } from 'node:url';
 import { gzipSync } from 'node:zlib';
 import { type CatId, catRegistry, type RichBlock } from '@cat-cafe/shared';
 import type { FastifyBaseLogger } from 'fastify';
+import type { Thread } from '../../domains/cats/services/stores/ports/ThreadStore.js';
 import { publishGeneratedImage } from '../../domains/cats/services/agents/providers/generated-image-publication.js';
 import { buildArtifactProvenance, promotionTargetPath, rootsFromEnv } from '../../domains/artifacts/artifact-provenance.js';
 import { findLaunchedProjectRoot, resolveMaomiWorkspaceRoot } from '../../domains/maomi-workspaces/workspace-root.js';
@@ -108,6 +109,8 @@ interface NativeFileMediaPayload {
   readonly sourcePath?: string;
 }
 
+type DeliveryThreadLookupResult = Pick<Thread, 'id'> & Partial<Pick<Thread, 'sourceThreadId' | 'parentThreadId'>>;
+
 /** V3-31: a delivered file the connector auto-registers as a thread artifact. */
 export interface DeliveredArtifactRecord {
   readonly threadId: string;
@@ -140,6 +143,10 @@ export interface OutboundDeliveryHookOptions {
   /** F134: Look up a stored message by ID to retrieve its source.sender for group chat @sender replies. */
   readonly messageLookup?:
     | ((messageId: string) => Promise<{ source?: { sender?: { id: string; name?: string } } } | null>)
+    | undefined;
+  /** Look up a thread so proposal-created sub-threads can deliver back through the source IM binding. */
+  readonly threadLookup?:
+    | ((threadId: string) => Promise<DeliveryThreadLookupResult | null>)
     | undefined;
   /** Resolve audio blocks with text but no url (voiceMode frontend-only blocks) by synthesizing TTS. */
   readonly resolveVoiceBlocks?: ((blocks: RichBlock[], catId: string) => Promise<RichBlock[]>) | undefined;
@@ -191,7 +198,7 @@ export class OutboundDeliveryHook {
       { threadId, catId, contentLen: content.length, hasRichBlocks: !!(richBlocks && richBlocks.length) },
       '[OutboundDeliveryHook] deliver() called',
     );
-    const bindings = await this.opts.bindingStore.getByThread(threadId);
+    const { bindings, deliveryThreadId, fallbackFromThreadId } = await this.resolveDeliveryBindings(threadId);
     if (bindings.length === 0) {
       this.opts.log.warn(
         { threadId },
@@ -200,7 +207,13 @@ export class OutboundDeliveryHook {
       return;
     }
     this.opts.log.info(
-      { threadId, bindingCount: bindings.length, connectors: bindings.map((b) => b.connectorId) },
+      {
+        threadId,
+        deliveryThreadId,
+        fallbackFromThreadId,
+        bindingCount: bindings.length,
+        connectors: bindings.map((b) => b.connectorId),
+      },
       '[OutboundDeliveryHook] Found bindings, delivering',
     );
 
@@ -248,7 +261,7 @@ export class OutboundDeliveryHook {
     let finalBlocks = resolvedBlocks ?? [];
     finalBlocks = await this.publishLocalFileBlocks(finalBlocks, threadMeta, content);
     finalBlocks = await this.enrichLocalFileBlockSizes(finalBlocks);
-    const textFileDeliveries = await this.publishTextFileReferences(content, threadId, threadMeta);
+    const textFileDeliveries = await this.publishTextFileReferences(content, deliveryThreadId, threadMeta);
     const hasRichBlocks = finalBlocks.length > 0;
     const hasOnlyNativeFileRichBlocks = finalBlocks.every((block) => block.kind === 'file');
     const outMeta = replyToSender ? { replyToSender } : undefined;
@@ -547,6 +560,40 @@ export class OutboundDeliveryHook {
     // V3-31: best-effort auto-register delivered files as thread artifacts so the
     // 产物 panel reflects real output even when the cat skipped declare_artifact.
     await this.registerDeliveredArtifacts(threadId, catId, bindings, textFileDeliveries, finalBlocks, content);
+  }
+
+  private async resolveDeliveryBindings(threadId: string): Promise<{
+    bindings: Awaited<ReturnType<IConnectorThreadBindingStore['getByThread']>>;
+    deliveryThreadId: string;
+    fallbackFromThreadId?: string;
+  }> {
+    const direct = await this.opts.bindingStore.getByThread(threadId);
+    if (direct.length > 0) return { bindings: direct, deliveryThreadId: threadId };
+
+    if (!this.opts.threadLookup) return { bindings: direct, deliveryThreadId: threadId };
+    let thread: DeliveryThreadLookupResult | null = null;
+    try {
+      thread = await this.opts.threadLookup(threadId);
+    } catch (err) {
+      this.opts.log.warn({ err, threadId }, '[OutboundDeliveryHook] threadLookup failed');
+      return { bindings: direct, deliveryThreadId: threadId };
+    }
+
+    const fallbackIds = [thread?.sourceThreadId, thread?.parentThreadId].filter(
+      (id): id is string => typeof id === 'string' && id.length > 0 && id !== threadId,
+    );
+    for (const fallbackId of fallbackIds) {
+      const fallbackBindings = await this.opts.bindingStore.getByThread(fallbackId);
+      if (fallbackBindings.length > 0) {
+        return {
+          bindings: fallbackBindings,
+          deliveryThreadId: fallbackId,
+          fallbackFromThreadId: threadId,
+        };
+      }
+    }
+
+    return { bindings: direct, deliveryThreadId: threadId };
   }
 
   private async registerDeliveredArtifacts(

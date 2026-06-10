@@ -10,7 +10,7 @@ import { ResizeHandle } from './workspace/ResizeHandle';
 
 const CHROMELESS_ROUTES = ['/story-export', '/pixel-brawl', '/showcase'];
 
-const SIDEBAR_HIDDEN_ROUTES = ['/settings', '/marketplace', '/signals', '/memory', '/mission'];
+const SIDEBAR_HIDDEN_ROUTES = ['/settings', '/marketplace', '/signals', '/memory', '/mission', '/workspaces'];
 
 interface AppShellProps {
   children: React.ReactNode;

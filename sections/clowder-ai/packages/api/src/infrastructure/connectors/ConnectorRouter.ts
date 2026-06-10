@@ -461,6 +461,15 @@ export class ConnectorRouter {
     const explicitTargetCatIds = this.normalizeExplicitTargetCatIds(routing);
     let targetCatId = this.resolveConnectorTargetCatId(connectorId, mentionResult, explicitTargetCatIds);
     if (
+      connectorId === 'im-web' &&
+      chatType === 'group' &&
+      !mentionResult.matched &&
+      explicitTargetCatIds.length === 0 &&
+      COORDINATION_TRIGGER_RE.test(resolvedText)
+    ) {
+      targetCatId = COORDINATOR_CAT_ID;
+    }
+    if (
       !mentionResult.matched &&
       explicitTargetCatIds.length === 0 &&
       targetCatId !== COORDINATOR_CAT_ID &&
