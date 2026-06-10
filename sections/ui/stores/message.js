@@ -926,7 +926,10 @@ export const useMessageStore = defineStore('message', {
           catIds,
           agents,
           prompt: `项目群「${groupName}」已创建，请按用户原始任务协作执行。`,
-          autoReplyMode: 'mentions_only'
+          proactiveReplies: true,
+          autoReplyMode: 'auto',
+          projectThreadId: createdPatch.projectThreadId,
+          projectBindingId: createdPatch.projectBindingId
         });
 
         const memberCount = new Set([...(ensurePayload.userMemberIds || []), ...catIds]).size || undefined;
@@ -950,7 +953,8 @@ export const useMessageStore = defineStore('message', {
             channelType: 2,
             text: card.sourceText,
             targetCatIds: card.targetCatIds || card.workerCatIds || [],
-            promptContext: `项目群：${groupName}`
+            promptContext: `项目群：${groupName}`,
+            threadId: createdPatch.projectThreadId
           });
         }
 

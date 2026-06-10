@@ -35,6 +35,7 @@ type Attachment struct {
 type InboundMessage struct {
 	ConnectorID    string             `json:"connectorId"`
 	ExternalChatID string             `json:"externalChatId"`
+	ThreadID       string             `json:"threadId,omitempty"`
 	ChannelID      string             `json:"channelId"`
 	ChannelType    uint8              `json:"channelType"`
 	ChatType       string             `json:"chatType"`

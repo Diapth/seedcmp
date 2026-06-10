@@ -288,6 +288,8 @@ type groupCatSyncRequest struct {
 	Prompt           string         `json:"prompt"`
 	ProactiveReplies bool           `json:"proactiveReplies,omitempty"`
 	AutoReplyMode    string         `json:"autoReplyMode,omitempty"`
+	ProjectThreadID  string         `json:"projectThreadId,omitempty"`
+	ProjectBindingID string         `json:"projectBindingId,omitempty"`
 }
 
 type groupCatSyncResponse struct {
@@ -298,6 +300,8 @@ type groupCatSyncResponse struct {
 	Prompt           string         `json:"prompt"`
 	ProactiveReplies bool           `json:"proactiveReplies,omitempty"`
 	AutoReplyMode    string         `json:"autoReplyMode,omitempty"`
+	ProjectThreadID  string         `json:"projectThreadId,omitempty"`
+	ProjectBindingID string         `json:"projectBindingId,omitempty"`
 }
 
 type projectGroupEnsureRequest struct {
@@ -1117,6 +1121,7 @@ func (c *Clowder) ensureProjectGroup(ctx *wkhttp.Context) {
 		if req.ProjectThreadID != "" {
 			binding.ProjectThreadID = strings.TrimSpace(req.ProjectThreadID)
 		}
+		binding = projectGroupBindingWithInheritedThread(binding)
 		binding.UserMemberIDs = projectGroupRequiredMemberUIDsForBinding(userID, pmMemberID, binding.UserMemberIDs, req.UserMemberIDs)
 		binding.CatMemberIDs = cleanStringList(append(binding.CatMemberIDs, req.CatMemberIDs...))
 		c.projectGroupBindings[key] = binding
@@ -1165,6 +1170,7 @@ func (c *Clowder) ensureProjectGroup(ctx *wkhttp.Context) {
 	if strings.TrimSpace(req.CreatedBy) != "" {
 		binding.CreatedBy = strings.TrimSpace(req.CreatedBy)
 	}
+	binding = projectGroupBindingWithInheritedThread(binding)
 	c.projectGroupBindings[key] = binding
 	_ = c.sendProjectGroupHandoff(userID, req, binding, reused)
 
@@ -1259,6 +1265,8 @@ func (c *Clowder) storeGroupCats(req groupCatSyncRequest) groupCatSyncResponse {
 		Prompt:           strings.TrimSpace(req.Prompt),
 		ProactiveReplies: autoReplyMode == "soft_mentions",
 		AutoReplyMode:    autoReplyMode,
+		ProjectThreadID:  strings.TrimSpace(req.ProjectThreadID),
+		ProjectBindingID: strings.TrimSpace(req.ProjectBindingID),
 	}
 	c.groupCatsMu.Lock()
 	if c.groupCatState == nil {
@@ -1425,6 +1433,16 @@ func projectGroupResponse(groupNo string, groupName string, owner string) map[st
 		"status":   1,
 		"role":     1,
 	}
+}
+
+func projectGroupBindingWithInheritedThread(binding ProjectGroupBinding) ProjectGroupBinding {
+	if strings.TrimSpace(binding.ProjectThreadID) == "" {
+		binding.ProjectThreadID = strings.TrimSpace(binding.PMDirectThreadID)
+	} else {
+		binding.ProjectThreadID = strings.TrimSpace(binding.ProjectThreadID)
+	}
+	binding.PMDirectThreadID = strings.TrimSpace(binding.PMDirectThreadID)
+	return binding
 }
 
 func (c *Clowder) findActiveProjectGroupBinding(userID string, pmChannelID string, pmChannelType uint8, projectName string) (ProjectGroupBinding, bool) {
@@ -1967,7 +1985,7 @@ func (c *Clowder) conversationMessage(ctx *wkhttp.Context) {
 		ctx.JSON(http.StatusBadGateway, map[string]string{"error": "persist_failed", "message": err.Error()})
 		return
 	}
-	response, err := c.sendInboundTextWithRouting(req.ChannelID, req.ChannelType, ctx.GetLoginUID(), routeTextForCatRequest(req), req.DirectCatID, req.TargetCatIDs, req.PromptContext)
+	response, err := c.sendInboundTextWithRouting(req.ChannelID, req.ChannelType, ctx.GetLoginUID(), routeTextForCatRequest(req), req.DirectCatID, req.TargetCatIDs, req.PromptContext, req.ThreadID)
 	if err != nil {
 		ctx.JSON(http.StatusBadGateway, map[string]string{"error": "message_failed", "message": err.Error()})
 		return
@@ -2456,10 +2474,15 @@ func (c *Clowder) sendInboundText(channelID string, channelType uint8, userID st
 	return c.sendInboundTextWithRouting(channelID, channelType, userID, text, "", nil, "")
 }
 
-func (c *Clowder) sendInboundTextWithRouting(channelID string, channelType uint8, userID string, text string, directCatID string, targetCatIDs []string, promptContext string) (RouteResponse, error) {
+func (c *Clowder) sendInboundTextWithRouting(channelID string, channelType uint8, userID string, text string, directCatID string, targetCatIDs []string, promptContext string, threadIDs ...string) (RouteResponse, error) {
+	threadID := ""
+	if len(threadIDs) > 0 {
+		threadID = strings.TrimSpace(threadIDs[0])
+	}
 	return NewClient(c.config.APIBaseURL, c.config.ConnectorSecret, c.config.RequestTimeout).ForwardInbound(InboundMessage{
 		ConnectorID:    ConnectorID,
 		ExternalChatID: externalChatIDForUser(channelID, channelType, userID),
+		ThreadID:       threadID,
 		ChannelID:      channelID,
 		ChannelType:    channelType,
 		ChatType:       chatType(channelType),

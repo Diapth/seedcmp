@@ -14,6 +14,7 @@ export interface ImWebInboundHandlerOptions {
 interface ImWebInboundPayload {
   readonly connectorId: 'im-web';
   readonly externalChatId: string;
+  readonly threadId?: string;
   readonly channelId: string;
   readonly channelType: number;
   readonly chatType?: 'direct' | 'group';
@@ -99,6 +100,7 @@ export class ImWebInboundHandler implements ConnectorWebhookHandler {
       payload.chatType === 'group' ? 'group' : 'p2p',
       payload.chatName,
       {
+        ...(payload.threadId ? { threadId: payload.threadId } : {}),
         ...(payload.directCatId ? { directCatId: payload.directCatId } : {}),
         ...(payload.targetCatIds ? { targetCatIds: payload.targetCatIds } : {}),
         ...(payload.promptContext ? { promptContext: payload.promptContext } : {}),

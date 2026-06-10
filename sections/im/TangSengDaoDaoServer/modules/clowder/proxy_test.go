@@ -644,6 +644,51 @@ func TestUpdateProjectGroupBindingThreadPersistsThreadID(t *testing.T) {
 	assert.Greater(t, c.projectGroupBindings[key].UpdatedAt, int64(100))
 }
 
+func TestProjectGroupBindingThreadFallsBackToPMDirectThread(t *testing.T) {
+	binding := projectGroupBindingWithInheritedThread(ProjectGroupBinding{
+		PMDirectThreadID: "thread-pm-1",
+	})
+
+	assert.Equal(t, "thread-pm-1", binding.ProjectThreadID)
+
+	explicit := projectGroupBindingWithInheritedThread(ProjectGroupBinding{
+		PMDirectThreadID: "thread-pm-1",
+		ProjectThreadID:  "thread-project-1",
+	})
+
+	assert.Equal(t, "thread-project-1", explicit.ProjectThreadID)
+}
+
+func TestSendInboundTextWithRoutingForwardsInheritedThreadID(t *testing.T) {
+	var got InboundMessage
+	upstream := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		require.Equal(t, http.MethodPost, r.Method)
+		require.Equal(t, "/api/connectors/im-web/inbound", r.URL.Path)
+		require.NoError(t, json.NewDecoder(r.Body).Decode(&got))
+		_ = json.NewEncoder(w).Encode(RouteResponse{Kind: "routed", ThreadID: "thread-project-1", MessageID: "msg-1"})
+	}))
+	defer upstream.Close()
+
+	c := New(nil)
+	c.SetConfig(commonmodule.ClowderBridgeConfig{
+		Enabled:            true,
+		APIBaseURL:         upstream.URL,
+		ConnectorID:        "im-web",
+		ConnectorSecret:    "secret",
+		DefaultOwnerUserID: "owner-1",
+		RequestTimeout:     time.Second,
+		SignatureTolerance: time.Minute,
+	})
+
+	response, err := c.sendInboundTextWithRouting("group-project", 2, "user-1", "继续推进", "", []string{"coordinator", "codex"}, "Group context", "thread-project-1")
+
+	require.NoError(t, err)
+	assert.Equal(t, "thread-project-1", response.ThreadID)
+	assert.Equal(t, "2:group-project", got.ExternalChatID)
+	assert.Equal(t, "thread-project-1", got.ThreadID)
+	assert.Equal(t, []string{"coordinator", "codex"}, got.TargetCatIDs)
+}
+
 func TestProjectGroupRequiredMembersAlwaysIncludeUserAndPM(t *testing.T) {
 	members := projectGroupRequiredMemberUIDs("user-1", defaultPMMemberID, []string{"user-1", "helper-1", defaultPMMemberID})
 

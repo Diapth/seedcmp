@@ -954,7 +954,8 @@ export function createNativeImService(options = {}) {
     text = '',
     directCatId = '',
     targetCatIds,
-    promptContext = ''
+    promptContext = '',
+    threadId = ''
   } = {}) {
     if (!channelId) throw { msg: 'channelId不能为空' };
     const trimmedText = String(text || '').trim();
@@ -969,6 +970,7 @@ export function createNativeImService(options = {}) {
       payload.targetCatIds = targetCatIds.map(String).filter(Boolean);
     }
     if (promptContext) payload.promptContext = String(promptContext);
+    if (threadId) payload.threadId = String(threadId);
 
     const resp = await client.post('clowder/conversation/message', payload);
     const source = resp.message || resp.data?.message || resp.data || resp;
@@ -1013,7 +1015,18 @@ export function createNativeImService(options = {}) {
     return normalizeLocalOAuthCapabilities(resp);
   }
 
-  async function syncGroupCats({ groupId, groupName = '', agents = [], catIds = [], cats = [], prompt = '', proactiveReplies = false, autoReplyMode = 'mentions_only' } = {}) {
+  async function syncGroupCats({
+    groupId,
+    groupName = '',
+    agents = [],
+    catIds = [],
+    cats = [],
+    prompt = '',
+    proactiveReplies = true,
+    autoReplyMode = 'auto',
+    projectThreadId = '',
+    projectBindingId = ''
+  } = {}) {
     const id = String(groupId || '').trim();
     if (!id) throw { msg: 'groupId不能为空' };
     const normalizedCats = (cats.length > 0 ? cats : agents).map((cat) => normalizeGroupCatForSync(cat));
@@ -1029,6 +1042,8 @@ export function createNativeImService(options = {}) {
       proactiveReplies: proactiveReplies === true,
       autoReplyMode
     };
+    if (projectThreadId) payload.projectThreadId = String(projectThreadId);
+    if (projectBindingId) payload.projectBindingId = String(projectBindingId);
     return client.post('clowder/group/cats/sync', payload);
   }
 

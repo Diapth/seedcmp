@@ -1,0 +1,112 @@
+[
+  {
+    "label": "desktop",
+    "type": "debug",
+    "text": "[vite] connecting..."
+  },
+  {
+    "label": "desktop",
+    "type": "debug",
+    "text": "[vite] connected."
+  },
+  {
+    "label": "desktop",
+    "type": "warning",
+    "text": "[vue-router]: importing from 'vue-router/dist/vue-router.esm-bundler.js' is deprecated. Use 'vue-router' directly."
+  },
+  {
+    "label": "desktop",
+    "type": "log",
+    "text": "App Launch"
+  },
+  {
+    "label": "desktop",
+    "type": "log",
+    "text": "App Show"
+  },
+  {
+    "label": "desktop",
+    "type": "log",
+    "text": "UniApp运行环境"
+  },
+  {
+    "label": "desktop",
+    "type": "log",
+    "text": "打开websocket成功"
+  },
+  {
+    "label": "desktop",
+    "type": "log",
+    "text": "websocket SocketTask"
+  },
+  {
+    "label": "desktop",
+    "type": "log",
+    "text": "onopen..."
+  },
+  {
+    "label": "desktop",
+    "type": "log",
+    "text": "服务器协议版本: 5"
+  },
+  {
+    "label": "desktop",
+    "type": "log",
+    "text": "成功连接到节点[1]"
+  },
+  {
+    "label": "mobile",
+    "type": "debug",
+    "text": "[vite] connecting..."
+  },
+  {
+    "label": "mobile",
+    "type": "debug",
+    "text": "[vite] connected."
+  },
+  {
+    "label": "mobile",
+    "type": "warning",
+    "text": "[vue-router]: importing from 'vue-router/dist/vue-router.esm-bundler.js' is deprecated. Use 'vue-router' directly."
+  },
+  {
+    "label": "mobile",
+    "type": "log",
+    "text": "App Launch"
+  },
+  {
+    "label": "mobile",
+    "type": "log",
+    "text": "App Show"
+  },
+  {
+    "label": "mobile",
+    "type": "log",
+    "text": "UniApp运行环境"
+  },
+  {
+    "label": "mobile",
+    "type": "log",
+    "text": "打开websocket成功"
+  },
+  {
+    "label": "mobile",
+    "type": "log",
+    "text": "websocket SocketTask"
+  },
+  {
+    "label": "mobile",
+    "type": "log",
+    "text": "onopen..."
+  },
+  {
+    "label": "mobile",
+    "type": "log",
+    "text": "服务器协议版本: 5"
+  },
+  {
+    "label": "mobile",
+    "type": "log",
+    "text": "成功连接到节点[1]"
+  }
+]

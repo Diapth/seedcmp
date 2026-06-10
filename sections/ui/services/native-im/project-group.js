@@ -34,6 +34,33 @@ function firstText(...values) {
   return '';
 }
 
+function resolveThreadId(source = {}) {
+  const binding = source.binding || {};
+  const raw = source.raw || {};
+  return firstText(
+    source.projectThreadId,
+    source.project_thread_id,
+    source.threadId,
+    source.thread_id,
+    source.directThreadId,
+    source.direct_thread_id,
+    source.clowderThreadId,
+    source.clowder_thread_id,
+    binding.projectThreadId,
+    binding.project_thread_id,
+    binding.threadId,
+    binding.thread_id,
+    raw.projectThreadId,
+    raw.project_thread_id,
+    raw.threadId,
+    raw.thread_id,
+    raw.binding?.projectThreadId,
+    raw.binding?.project_thread_id,
+    raw.binding?.threadId,
+    raw.binding?.thread_id
+  );
+}
+
 function cleanProjectName(value = '') {
   return String(value || '')
     .trim()
@@ -168,12 +195,15 @@ export function buildProjectGroupConfirmationInput({
   const targetCatIds = mentionedWorkerIds(text || sourceMessage.content, availableAgents);
   const workerCatIds = targetCatIds.length ? targetCatIds : defaultWorkerIds(availableAgents);
   const userId = firstText(currentUser.id, currentUser.uid, currentUser.userId, currentUser.raw?.uid, currentUser.raw?.id);
+  const threadId = resolveThreadId(conversation) || resolveThreadId(agent);
   return {
     sourceMessage,
     sourceText: firstText(text, sourceMessage.content),
     projectName: resolveProjectGroupName(text || sourceMessage.content, conversation.name || agent.name || 'Clowder'),
     pmDirectChannelId,
     pmDirectChannelType: Number(conversation.channelType || conversation.channel_type || 1),
+    pmDirectThreadId: threadId,
+    projectThreadId: threadId,
     pmMemberId: coordinatorId ? `${CLOWDER_CAT_CONTACT_PREFIX}${coordinatorId}` : CLOWDER_CAT_CONTACT_PREFIX + 'coordinator',
     userMemberIds: userId ? [userId] : [],
     catMemberIds: uniqueStrings([coordinatorId, ...workerCatIds]),

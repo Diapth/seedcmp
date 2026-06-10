@@ -48,6 +48,9 @@ function createHarness() {
         return thread;
       },
       updateConnectorHubState() {},
+      get(threadId) {
+        return threads.get(threadId) ?? null;
+      },
     },
     invokeTrigger: {
       trigger(...args) {
@@ -68,7 +71,7 @@ function createHarness() {
     log: noopLog(),
   });
 
-  return { handler, bindingStore, messages, triggerCalls };
+  return { handler, bindingStore, messages, triggerCalls, threads };
 }
 
 function signedRequest(payload) {
@@ -145,6 +148,33 @@ describe('im-web inbound bridge', () => {
     assert.equal(triggerCalls[0][1], 'coordinator');
     assert.deepEqual(messages[0].mentions, ['coordinator']);
     assert.equal(messages[0].extra.imWebRouting.promptContext, 'Group context');
+  });
+
+  it('binds IM Web project groups to inherited PM thread ids without creating a new thread', async () => {
+    const { handler, bindingStore, messages, triggerCalls, threads } = createHarness();
+    threads.set('thread-pm-project-1', {
+      id: 'thread-pm-project-1',
+      userId: 'owner-1',
+      title: 'PM project thread',
+    });
+    const req = signedRequest(
+      createImWebInboundPayload({
+        text: '继续推进项目群里的实现',
+        threadId: 'thread-pm-project-1',
+        targetCatIds: ['coordinator', 'codex'],
+        promptContext: '项目群继承 PM thread',
+      }),
+    );
+
+    const result = await handler.handleWebhook(req.body, req.headers, req.rawBody);
+
+    assert.equal(result.kind, 'routed');
+    assert.equal(result.threadId, 'thread-pm-project-1');
+    assert.equal(messages[0].threadId, 'thread-pm-project-1');
+    assert.equal(triggerCalls[0][0], 'thread-pm-project-1');
+    assert.equal(bindingStore.getByExternal('im-web', '2:group-clowder').threadId, 'thread-pm-project-1');
+    assert.equal(threads.size, 1, 'inherited project group must not create an isolated connector thread');
+    assert.equal(threads.has('thread-1'), false);
   });
 
   it('skips duplicate IM Web retries by message id', async () => {
