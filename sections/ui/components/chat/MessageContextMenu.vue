@@ -30,6 +30,7 @@
         :key="item.action"
         class="msg-ctx-item"
         :class="{ destructive: item.danger, disabled: item.disabled }"
+        :title="item.disabled ? (item.disabledReason || item.label) : item.label"
         @click="!item.disabled && emitAction(item.action)"
       >
         <AppIcon
@@ -55,7 +56,9 @@ const props = defineProps({
   msg: { type: Object, default: null },
   x: { type: Number, default: 100 },
   y: { type: Number, default: 100 },
-  isDesktop: { type: Boolean, default: true }
+  isDesktop: { type: Boolean, default: true },
+  canPinAsContext: { type: Boolean, default: false },
+  pinContextDisabledReason: { type: String, default: '' }
 });
 
 const emit = defineEmits(['update:visible', 'action']);
@@ -69,6 +72,7 @@ const isDesktopMode = computed(() => props.isDesktop);
 const isMyMsg = computed(() => props.msg && isSelfSender(props.msg.senderId, appStore.currentUser));
 const isRevoked = computed(() => props.msg?.status === 'revoked' || props.msg?.type === 'system');
 const canReact = computed(() => !!props.msg && !isRevoked.value);
+const isManualContextPinned = computed(() => Boolean(props.msg?.manualContextPinned));
 
 const xPx = computed(() => {
   const w = typeof window !== 'undefined' ? window.innerWidth : 375;
@@ -97,6 +101,16 @@ const menuItems = computed(() => {
       disabled: isRevoked.value
     }
   ];
+
+  if (!isRevoked.value) {
+    items.push({
+      action: isManualContextPinned.value ? 'unpin-context' : 'pin-context',
+      label: isManualContextPinned.value ? '取消长期上下文' : '设为长期上下文',
+      icon: 'pin',
+      disabled: !props.canPinAsContext,
+      disabledReason: props.pinContextDisabledReason || '当前会话未绑定 Clowder thread'
+    });
+  }
 
   if (isMyMsg.value && !isRevoked.value) {
     items.push({

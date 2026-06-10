@@ -186,6 +186,8 @@
       :x="menuX"
       :y="menuY"
       :is-desktop="isDesktop"
+      :can-pin-as-context="canPinSelectedMessageAsContext"
+      :pin-context-disabled-reason="pinContextDisabledReason"
       @action="handleMenuAction"
     />
 
@@ -286,7 +288,7 @@
 </template>
 
 <script setup>
-import { ref, computed, onMounted, nextTick } from 'vue';
+import { ref, computed, onMounted, nextTick, watch } from 'vue';
 import { useResponsiveLayout } from '@/composables/useResponsiveLayout';
 import { getNotificationPermissionState, requestNotificationPermission as requestSystemNotificationPermission } from '@/composables/useSystemNotification';
 import { useAppStore } from '@/stores/app';
@@ -337,6 +339,9 @@ import {
 import {
   encodePreviewFile
 } from '@/services/native-im/file-preview';
+import {
+  resolveConversationThreadId
+} from '@/services/native-im/manual-context-pins';
 
 const { isDesktop } = useResponsiveLayout();
 const appStore = useAppStore();
@@ -421,6 +426,16 @@ const messagesList = computed(() => {
 });
 
 const activeReplyTarget = computed(() => replyTargetForConversation(replyTarget.value, convStore.activeId));
+const activeManualContextThreadId = computed(() => resolveConversationThreadId(activeConversation.value || {}));
+const canPinSelectedMessageAsContext = computed(() => Boolean(
+  selectedMenuMsg.value
+  && activeManualContextThreadId.value
+  && selectedMenuMsg.value.type !== 'system'
+  && selectedMenuMsg.value.status !== 'revoked'
+));
+const pinContextDisabledReason = computed(() => (
+  activeManualContextThreadId.value ? '' : '当前会话未绑定 Clowder thread'
+));
 
 const mentionCandidates = computed(() => {
   if (!activeConversation.value) return [];
@@ -480,9 +495,14 @@ onMounted(() => {
     convStore.setActiveId(persistedId);
     convStore.markConversationRead(persistedId, { silent: true });
     syncActiveMessages({ silent: true });
+    syncActiveManualContextPins({ silent: true });
   }
   appStore.bootstrapNativeSession();
   groupStore.syncNativeGroups({ silent: true });
+});
+
+watch(() => activeManualContextThreadId.value, (threadId) => {
+  if (threadId) syncActiveManualContextPins({ silent: true });
 });
 
 function handleSelectConversation(id) {
@@ -493,6 +513,7 @@ function handleSelectConversation(id) {
   convStore.setActiveId(id);
   convStore.markConversationRead(id, { silent: true });
   syncActiveMessages({ silent: true });
+  syncActiveManualContextPins({ silent: true });
   closeFilePreview();
   closeMemberProfile();
   if (!isDesktop.value) {
@@ -596,6 +617,16 @@ async function syncActiveMessages(options = {}) {
   } catch {
     // keep the mock/local list visible when a backend is not configured
   }
+}
+
+function syncActiveManualContextPins(options = {}) {
+  const conv = activeConversation.value;
+  if (!conv) return Promise.resolve([]);
+  if (!resolveConversationThreadId(conv)) {
+    messageStore.applyManualContextPinMarks(conv);
+    return Promise.resolve([]);
+  }
+  return messageStore.syncManualContextPins(conv, { silent: true, ...options }).catch(() => []);
 }
 
 async function handleSendMessage({ type, content, fileName, fileSize, fileSizeBytes, replyRef, previewContent, fileType, mimeType, path, file, url }) {
@@ -807,7 +838,7 @@ function openContextMenu({ event, msg }) {
   menuVisible.value = true;
 }
 
-function handleMenuAction({ action, msg, emoji }) {
+async function handleMenuAction({ action, msg, emoji }) {
   if (action === 'react-emoji') {
     messageStore.reactMessage(convStore.activeId, msg.id, emoji, selfReactionId.value);
   } else if (action === 'delete') {
@@ -825,6 +856,20 @@ function handleMenuAction({ action, msg, emoji }) {
     emojiPickerMode.value = 'reaction';
     selectedMenuMsg.value = msg;
     emojiPickerVisible.value = true;
+  } else if (action === 'pin-context') {
+    try {
+      await messageStore.pinMessageAsContext(activeConversation.value, msg);
+      uni.showToast({ title: '已设为长期上下文', icon: 'success' });
+    } catch (error) {
+      uni.showToast({ title: error?.msg || error?.message || '设置长期上下文失败', icon: 'none' });
+    }
+  } else if (action === 'unpin-context') {
+    try {
+      await messageStore.unpinMessageAsContext(activeConversation.value, msg);
+      uni.showToast({ title: '已取消长期上下文', icon: 'none' });
+    } catch (error) {
+      uni.showToast({ title: error?.msg || error?.message || '取消长期上下文失败', icon: 'none' });
+    }
   }
 }
 

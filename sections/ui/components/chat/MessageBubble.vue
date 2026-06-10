@@ -150,6 +150,16 @@
             :is-me="isMe"
           />
 
+          <view
+            v-if="data.manualContextPinned"
+            class="manual-context-badge flex-row align-center"
+            :class="{ 'manual-context-badge-me': isMe }"
+            title="这条消息已设为 Agent 长期上下文"
+          >
+            <AppIcon name="pin" :size="12" color="currentColor" />
+            <text class="manual-context-badge-text">长期上下文</text>
+          </view>
+
         </view>
 
       </view>
@@ -359,6 +369,32 @@ function openLightbox(images, index) {
   background-color: var(--color-bg-hover);
   padding: 4px 10px;
   border-radius: 6px;
+}
+
+.manual-context-badge {
+  width: fit-content;
+  max-width: 100%;
+  margin-top: 8px;
+  gap: 4px;
+  padding: 3px 7px;
+  border-radius: 999px;
+  background-color: rgba(37, 99, 235, 0.08);
+  color: #2563eb;
+  font-size: 11px;
+  line-height: 1;
+  box-sizing: border-box;
+}
+
+.manual-context-badge-me {
+  margin-left: auto;
+  background-color: rgba(255, 255, 255, 0.18);
+  color: rgba(255, 255, 255, 0.92);
+}
+
+.manual-context-badge-text {
+  font-size: 11px;
+  line-height: 1;
+  white-space: nowrap;
 }
 
 .system-text {
