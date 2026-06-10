@@ -127,10 +127,12 @@ seedcmp/sections/ui/.ai/tests-e2e/
 # Flask stuff:
 instance/
 .webassets-cache
-
+assets/roadmap/evidence/
 # Scrapy stuff:
 .scrapy
-
+ai-output/
+assets/roadmap/evidence/
+final_docs/
 # Sphinx documentation
 docs/_build/
 
