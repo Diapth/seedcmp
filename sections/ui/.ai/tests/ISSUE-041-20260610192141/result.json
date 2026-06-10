@@ -1,0 +1,91 @@
+{
+  "issue": "ISSUE-041",
+  "generatedAt": "2026-06-10T11:41:39.116Z",
+  "pass": true,
+  "results": [
+    {
+      "name": "desktop: created agent has threadId",
+      "pass": true,
+      "detail": "{\"createdId\":\"pmdesktop00513\",\"agentThreadId\":\"thread_mq80051q15e5rnj9\",\"conversationId\":\"clowder_cat:pmdesktop00513\",\"conversationThreadId\":\"thread_mq80051q15e5rnj9\",\"directCatId\":\"pmdesktop00513\",\"name\":\"PM 自动绑定 desktop\",\"alias\":\"@pmdesktop00513\"}"
+    },
+    {
+      "name": "desktop: conversation has threadId",
+      "pass": true,
+      "detail": "{\"createdId\":\"pmdesktop00513\",\"agentThreadId\":\"thread_mq80051q15e5rnj9\",\"conversationId\":\"clowder_cat:pmdesktop00513\",\"conversationThreadId\":\"thread_mq80051q15e5rnj9\",\"directCatId\":\"pmdesktop00513\",\"name\":\"PM 自动绑定 desktop\",\"alias\":\"@pmdesktop00513\"}"
+    },
+    {
+      "name": "desktop: no unbound-thread warning after send",
+      "pass": true,
+      "detail": "{\"noBindCount\":0,\"conversationThreadId\":\"thread_mq80051q15e5rnj9\",\"messageCount\":2,\"bodyTextSample\":\"I\\n聊天\\n通讯录\\n智能体\\n文件\\n设置\\n搜索会话...\\nP\\nPM 自动绑定 desktop\\n19:41\\nissue041 ping desktop\\nPM 自动绑定 desktop\\n19:41\\nC\\n\\n✨ 新 thread \\\"PM 自动绑定 desktop\\\" 已创建\\nID: thread_mq80051q15e5rnj9\\n🔗 http://localhost:3000/thread/thread_mq80051q15e5rnj9\\n\\n现在的消息会发到这个 thread。\\n\\nissue041 ping desktop\\n👀\\n1\\nI\\n输入消息...\\n会话详情\\nP\\nPM 自动绑定 desktop\\n智能体/机器人\\n置顶会话\\n消息免打扰\\n共享文件\\n暂无共享文件\"}"
+    },
+    {
+      "name": "desktop: sent message rendered",
+      "pass": true,
+      "detail": "{\"noBindCount\":0,\"conversationThreadId\":\"thread_mq80051q15e5rnj9\",\"messageCount\":2,\"bodyTextSample\":\"I\\n聊天\\n通讯录\\n智能体\\n文件\\n设置\\n搜索会话...\\nP\\nPM 自动绑定 desktop\\n19:41\\nissue041 ping desktop\\nPM 自动绑定 desktop\\n19:41\\nC\\n\\n✨ 新 thread \\\"PM 自动绑定 desktop\\\" 已创建\\nID: thread_mq80051q15e5rnj9\\n🔗 http://localhost:3000/thread/thread_mq80051q15e5rnj9\\n\\n现在的消息会发到这个 thread。\\n\\nissue041 ping desktop\\n👀\\n1\\nI\\n输入消息...\\n会话详情\\nP\\nPM 自动绑定 desktop\\n智能体/机器人\\n置顶会话\\n消息免打扰\\n共享文件\\n暂无共享文件\"}"
+    },
+    {
+      "name": "mobile: created agent has threadId",
+      "pass": true,
+      "detail": "{\"createdId\":\"pmmobile00aqe\",\"agentThreadId\":\"thread_mq800aqpe9e35rdm\",\"conversationId\":\"clowder_cat:pmmobile00aqe\",\"conversationThreadId\":\"thread_mq800aqpe9e35rdm\",\"directCatId\":\"pmmobile00aqe\",\"name\":\"PM 自动绑定 mobile\",\"alias\":\"@pmmobile00aqe\"}"
+    },
+    {
+      "name": "mobile: conversation has threadId",
+      "pass": true,
+      "detail": "{\"createdId\":\"pmmobile00aqe\",\"agentThreadId\":\"thread_mq800aqpe9e35rdm\",\"conversationId\":\"clowder_cat:pmmobile00aqe\",\"conversationThreadId\":\"thread_mq800aqpe9e35rdm\",\"directCatId\":\"pmmobile00aqe\",\"name\":\"PM 自动绑定 mobile\",\"alias\":\"@pmmobile00aqe\"}"
+    },
+    {
+      "name": "mobile: no unbound-thread warning after send",
+      "pass": true,
+      "detail": "{\"noBindCount\":0,\"conversationThreadId\":\"thread_mq800aqpe9e35rdm\",\"messageCount\":2,\"bodyTextSample\":\"PM 自动绑定 mobile\\n智能体会话\\n19:41\\nC\\n\\n✨ 新 thread \\\"PM 自动绑定 mobile\\\" 已创建\\nID: thread_mq800aqpe9e35rdm\\n🔗 http://localhost:3000/thread/thread_mq800aqpe9e35rdm\\n\\n现在的消息会发到这个 thread。\\n\\nissue041 ping mobile\\n👀\\n1\\nI\\n输入消息...\\n发送\"}"
+    },
+    {
+      "name": "mobile: sent message rendered",
+      "pass": true,
+      "detail": "{\"noBindCount\":0,\"conversationThreadId\":\"thread_mq800aqpe9e35rdm\",\"messageCount\":2,\"bodyTextSample\":\"PM 自动绑定 mobile\\n智能体会话\\n19:41\\nC\\n\\n✨ 新 thread \\\"PM 自动绑定 mobile\\\" 已创建\\nID: thread_mq800aqpe9e35rdm\\n🔗 http://localhost:3000/thread/thread_mq800aqpe9e35rdm\\n\\n现在的消息会发到这个 thread。\\n\\nissue041 ping mobile\\n👀\\n1\\nI\\n输入消息...\\n发送\"}"
+    }
+  ],
+  "details": [
+    {
+      "label": "desktop",
+      "session": {
+        "uid": "a94a3189cd134efaa111d8042dea23b8"
+      },
+      "created": {
+        "createdId": "pmdesktop00513",
+        "agentThreadId": "thread_mq80051q15e5rnj9",
+        "conversationId": "clowder_cat:pmdesktop00513",
+        "conversationThreadId": "thread_mq80051q15e5rnj9",
+        "directCatId": "pmdesktop00513",
+        "name": "PM 自动绑定 desktop",
+        "alias": "@pmdesktop00513"
+      },
+      "chatState": {
+        "noBindCount": 0,
+        "conversationThreadId": "thread_mq80051q15e5rnj9",
+        "messageCount": 2,
+        "bodyTextSample": "I\n聊天\n通讯录\n智能体\n文件\n设置\n搜索会话...\nP\nPM 自动绑定 desktop\n19:41\nissue041 ping desktop\nPM 自动绑定 desktop\n19:41\nC\n\n✨ 新 thread \"PM 自动绑定 desktop\" 已创建\nID: thread_mq80051q15e5rnj9\n🔗 http://localhost:3000/thread/thread_mq80051q15e5rnj9\n\n现在的消息会发到这个 thread。\n\nissue041 ping desktop\n👀\n1\nI\n输入消息...\n会话详情\nP\nPM 自动绑定 desktop\n智能体/机器人\n置顶会话\n消息免打扰\n共享文件\n暂无共享文件"
+      }
+    },
+    {
+      "label": "mobile",
+      "session": {
+        "uid": "1413614dcd3a42979aaa456562083c43"
+      },
+      "created": {
+        "createdId": "pmmobile00aqe",
+        "agentThreadId": "thread_mq800aqpe9e35rdm",
+        "conversationId": "clowder_cat:pmmobile00aqe",
+        "conversationThreadId": "thread_mq800aqpe9e35rdm",
+        "directCatId": "pmmobile00aqe",
+        "name": "PM 自动绑定 mobile",
+        "alias": "@pmmobile00aqe"
+      },
+      "chatState": {
+        "noBindCount": 0,
+        "conversationThreadId": "thread_mq800aqpe9e35rdm",
+        "messageCount": 2,
+        "bodyTextSample": "PM 自动绑定 mobile\n智能体会话\n19:41\nC\n\n✨ 新 thread \"PM 自动绑定 mobile\" 已创建\nID: thread_mq800aqpe9e35rdm\n🔗 http://localhost:3000/thread/thread_mq800aqpe9e35rdm\n\n现在的消息会发到这个 thread。\n\nissue041 ping mobile\n👀\n1\nI\n输入消息...\n发送"
+      }
+    }
+  ]
+}

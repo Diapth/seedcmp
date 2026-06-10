@@ -440,6 +440,19 @@ function isNotFoundError(error = {}) {
 
 function normalizeCreatedClowderCat(resp = {}) {
   const agentSource = resp.agent || resp.data?.agent || resp.cat || resp.data?.cat || resp.data || resp;
+  const binding = resp.binding || resp.data?.binding || agentSource.binding || {};
+  const threadId = firstNonEmpty(
+    resp.threadId,
+    resp.thread_id,
+    resp.data?.threadId,
+    resp.data?.thread_id,
+    binding.threadId,
+    binding.thread_id,
+    agentSource.threadId,
+    agentSource.thread_id,
+    agentSource.directThreadId,
+    agentSource.direct_thread_id
+  );
   const normalized = normalizeClowderAgent({
     ...agentSource,
     source: agentSource.source || resp.contact?.source || resp.data?.contact?.source || 'runtime-created',
@@ -452,6 +465,9 @@ function normalizeCreatedClowderCat(resp = {}) {
     creator: 'User',
     source: 'clowder',
     connected: normalized.connected !== false,
+    threadId,
+    directThreadId: threadId,
+    binding,
     apiKey: '',
     apiUrl: '',
     customModel: ''

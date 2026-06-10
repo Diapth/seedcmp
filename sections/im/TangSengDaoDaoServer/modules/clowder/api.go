@@ -43,6 +43,9 @@ type Clowder struct {
 const clowderAIDirectChannelID = "clowder_ai"
 const defaultPMMemberID = "clowder_cat:coordinator"
 
+var errBindLookupFailed = errors.New("bind_lookup_failed")
+var errBindThreadMissing = errors.New("bind_thread_missing")
+
 func New(ctx *config.Context) *Clowder {
 	return &Clowder{
 		ctx:                  ctx,
@@ -264,8 +267,10 @@ type createCatRequest struct {
 }
 
 type catContactEnvelope struct {
-	Agent   ClowderAgent `json:"agent"`
-	Contact struct {
+	Agent    ClowderAgent        `json:"agent"`
+	ThreadID string              `json:"threadId,omitempty"`
+	Binding  *IMConnectorBinding `json:"binding,omitempty"`
+	Contact  struct {
 		Connected bool   `json:"connected"`
 		Source    string `json:"source"`
 	} `json:"contact"`
@@ -938,29 +943,22 @@ func (c *Clowder) createCatAndConnect(ctx *wkhttp.Context) {
 		ctx.JSON(http.StatusBadRequest, map[string]string{"error": "name_required"})
 		return
 	}
-	createCommand, ok := buildCreateCatCommand(req)
-	if !ok {
+	if _, ok := buildCreateCatCommand(req); !ok {
 		ctx.JSON(http.StatusBadRequest, map[string]string{"error": "platform_required"})
 		return
 	}
 	alias := normalizeCatAlias(req.Alias, name)
-	if _, err := c.sendCommand(clowderAIDirectChannelID, 1, ctx.GetLoginUID(), createCommand); err != nil {
+	agent, err := c.createCatViaUpstream(req, alias, ctx.GetLoginUID())
+	if err != nil {
 		ctx.JSON(http.StatusBadGateway, map[string]string{"error": "cat_create_failed", "message": err.Error()})
 		return
 	}
-	if directory, err := c.fetchCatDirectory(ctx.GetLoginUID()); err == nil {
-		if response, ok := catContactResponse(name, directory.Agents, "runtime-created"); ok {
-			c.storeCreatedCatContact(ctx.GetLoginUID(), response.Agent)
-			ctx.JSON(http.StatusOK, response)
-			return
-		}
-		if response, ok := catContactResponse(alias, directory.Agents, "runtime-created"); ok {
-			c.storeCreatedCatContact(ctx.GetLoginUID(), response.Agent)
-			ctx.JSON(http.StatusOK, response)
-			return
-		}
+	response := catEnvelope(decorateCatContact(agent, "runtime-created"), "runtime-created")
+	response, err = c.attachDirectThreadToCatContact(ctx.GetLoginUID(), name, response)
+	if err != nil {
+		ctx.JSON(http.StatusBadGateway, map[string]string{"error": "cat_thread_bind_failed", "message": err.Error()})
+		return
 	}
-	response := fallbackCreatedCatResponse(req, alias)
 	c.storeCreatedCatContact(ctx.GetLoginUID(), response.Agent)
 	ctx.JSON(http.StatusOK, response)
 }
@@ -1768,37 +1766,77 @@ func (c *Clowder) bindConversation(ctx *wkhttp.Context) {
 		ctx.JSON(http.StatusBadRequest, map[string]string{"error": "channel_required"})
 		return
 	}
-	text := "/new"
-	if strings.TrimSpace(req.Title) != "" {
-		text = "/new " + strings.TrimSpace(req.Title)
-	}
-	response, err := c.sendCommand(req.ChannelID, req.ChannelType, ctx.GetLoginUID(), text)
+	binding, err := c.ensureConversationBinding(req.ChannelID, req.ChannelType, ctx.GetLoginUID(), req.Title)
 	if err != nil {
-		ctx.JSON(http.StatusBadGateway, map[string]string{"error": "bind_failed", "message": err.Error()})
+		code := "bind_failed"
+		if errors.Is(err, errBindLookupFailed) {
+			code = "bind_lookup_failed"
+		} else if errors.Is(err, errBindThreadMissing) {
+			code = "bind_thread_missing"
+		}
+		ctx.JSON(http.StatusBadGateway, map[string]string{"error": code, "message": err.Error()})
 		return
+	}
+	ctx.JSON(http.StatusOK, binding)
+}
+
+func (c *Clowder) ensureConversationBinding(channelID string, channelType uint8, userID string, title string) (IMConnectorBinding, error) {
+	if strings.TrimSpace(channelID) == "" || channelType == 0 {
+		return IMConnectorBinding{}, errors.New("channel_required")
+	}
+	text := "/new"
+	if strings.TrimSpace(title) != "" {
+		text = "/new " + strings.TrimSpace(title)
+	}
+	response, err := c.sendCommand(channelID, channelType, userID, text)
+	if err != nil {
+		return IMConnectorBinding{}, err
 	}
 	threadID := strings.TrimSpace(response.ThreadID)
 	if threadID == "" {
-		directory, err := c.fetchAgentDirectory(req.ChannelID, req.ChannelType, ctx.GetLoginUID())
+		directory, err := c.fetchAgentDirectory(channelID, channelType, userID)
 		if err != nil {
-			ctx.JSON(http.StatusBadGateway, map[string]string{"error": "bind_lookup_failed", "message": err.Error()})
-			return
+			return IMConnectorBinding{}, fmt.Errorf("%w: %v", errBindLookupFailed, err)
 		}
 		threadID = strings.TrimSpace(directory.ThreadID)
 	}
 	if threadID == "" {
-		ctx.JSON(http.StatusBadGateway, map[string]string{"error": "bind_thread_missing"})
-		return
+		return IMConnectorBinding{}, errBindThreadMissing
 	}
-	ctx.JSON(http.StatusOK, IMConnectorBinding{
+	return IMConnectorBinding{
 		ConnectorID:    ConnectorID,
-		ExternalChatID: externalChatIDForUser(req.ChannelID, req.ChannelType, ctx.GetLoginUID()),
-		ChannelID:      req.ChannelID,
-		ChannelType:    req.ChannelType,
+		ExternalChatID: externalChatIDForUser(channelID, channelType, userID),
+		ChannelID:      channelID,
+		ChannelType:    channelType,
 		ThreadID:       threadID,
-		UserID:         ctx.GetLoginUID(),
+		UserID:         userID,
 		Status:         BindingStatusActive,
-	})
+	}, nil
+}
+
+func (c *Clowder) attachDirectThreadToCatContact(userID string, title string, response catContactEnvelope) (catContactEnvelope, error) {
+	channelID := clowderCatDirectChannelID(response.Agent.CatID)
+	if channelID == "" {
+		return response, nil
+	}
+	binding, err := c.ensureConversationBinding(channelID, 1, userID, title)
+	if err != nil {
+		return response, err
+	}
+	response.ThreadID = binding.ThreadID
+	response.Binding = &binding
+	return response, nil
+}
+
+func clowderCatDirectChannelID(catID string) string {
+	id := strings.TrimSpace(catID)
+	if id == "" {
+		return ""
+	}
+	if strings.HasPrefix(id, "clowder_cat:") {
+		return id
+	}
+	return "clowder_cat:" + id
 }
 
 func (c *Clowder) setFocus(ctx *wkhttp.Context) {
@@ -2444,10 +2482,99 @@ func fallbackCreatedCatResponse(req createCatRequest, alias string) catContactEn
 	return catEnvelope(decorateCatContact(agent, "runtime-created"), "runtime-created")
 }
 
+type upstreamCatCreateResponse struct {
+	Cat struct {
+		ID              string   `json:"id"`
+		CatID           string   `json:"catId"`
+		Name            string   `json:"name"`
+		DisplayName     string   `json:"displayName"`
+		Avatar          string   `json:"avatar"`
+		MentionPatterns []string `json:"mentionPatterns"`
+		RoleDescription string   `json:"roleDescription"`
+		Personality     string   `json:"personality"`
+		TeamStrengths   string   `json:"teamStrengths"`
+	} `json:"cat"`
+}
+
+func (c *Clowder) createCatViaUpstream(req createCatRequest, alias string, userID string) (ClowderAgent, error) {
+	if !c.config.IsConfigured() {
+		return ClowderAgent{}, fmt.Errorf("clowder bridge is not configured")
+	}
+	name := strings.TrimSpace(req.Name)
+	catID := runtimeCatID(name, alias)
+	mentions := []string{normalizeCatAlias(alias, name)}
+	payload := map[string]interface{}{
+		"catId":           catID,
+		"name":            name,
+		"displayName":     name,
+		"nickname":        strings.TrimPrefix(strings.TrimSpace(alias), "@"),
+		"avatar":          "/avatars/default.png",
+		"color":           map[string]string{"primary": "#3B82F6", "secondary": "#DBEAFE"},
+		"mentionPatterns": mentions,
+		"accountRef":      strings.TrimSpace(req.AccountRef),
+		"roleDescription": firstTrimmed(req.Personality, name+"，由 TangSeng IM 通过 Clowder 新增。"),
+		"personality":     strings.TrimSpace(req.Personality),
+		"teamStrengths":   strings.Join(cleanStringList(req.Capabilities), "、"),
+		"clientId":        upstreamCatClientID(req),
+		"defaultModel":    strings.TrimSpace(req.DefaultModel),
+		"mcpSupport":      true,
+	}
+
+	body, err := json.Marshal(payload)
+	if err != nil {
+		return ClowderAgent{}, err
+	}
+	endpoint := strings.TrimRight(c.config.APIBaseURL, "/") + "/api/cats"
+	httpReq, err := http.NewRequest(http.MethodPost, endpoint, bytes.NewReader(body))
+	if err != nil {
+		return ClowderAgent{}, err
+	}
+	httpReq.Header.Set("Content-Type", "application/json")
+	c.applyDirectoryUserHeader(httpReq, userID)
+
+	res, err := c.httpClient().Do(httpReq)
+	if err != nil {
+		return ClowderAgent{}, err
+	}
+	defer res.Body.Close()
+	respBody, _ := io.ReadAll(res.Body)
+	if res.StatusCode < 200 || res.StatusCode >= 300 {
+		return ClowderAgent{}, fmt.Errorf("clowder cat create failed: %s %s", res.Status, strings.TrimSpace(string(respBody)))
+	}
+	var response upstreamCatCreateResponse
+	if err := json.Unmarshal(respBody, &response); err != nil {
+		return ClowderAgent{}, err
+	}
+	cat := response.Cat
+	createdCatID := firstTrimmed(cat.CatID, cat.ID, catID)
+	displayName := firstTrimmed(cat.DisplayName, cat.Name, name, createdCatID)
+	mentionPatterns := cleanStringList(cat.MentionPatterns)
+	if len(mentionPatterns) == 0 {
+		mentionPatterns = mentions
+	}
+	capabilitySummary := firstTrimmed(cat.TeamStrengths, strings.Join(cleanStringList(req.Capabilities), "、"), cat.RoleDescription)
+	return ClowderAgent{
+		CatID:              createdCatID,
+		DisplayName:        displayName,
+		Aliases:            mentionPatterns,
+		MentionPatterns:    mentionPatterns,
+		Avatar:             strings.TrimSpace(cat.Avatar),
+		PersonalitySummary: firstTrimmed(cat.Personality, req.Personality),
+		CapabilitySummary:  capabilitySummary,
+		Available:          true,
+		AvailabilityState:  "available",
+		Source:             "runtime-created",
+		Connected:          true,
+	}, nil
+}
+
 func routeTextForCatRequest(req conversationRefRequest) string {
 	text := strings.TrimSpace(req.Text)
 	if text == "" {
 		return ""
+	}
+	if strings.HasPrefix(text, "/") {
+		return text
 	}
 	directCatID := strings.TrimSpace(req.DirectCatID)
 	if directCatID != "" {
@@ -2531,6 +2658,17 @@ func buildCreateCatCommand(req createCatRequest) (string, bool) {
 	return command, true
 }
 
+func upstreamCatClientID(req createCatRequest) string {
+	switch normalizeCatClientPlatform(req) {
+	case "codex":
+		return "openai"
+	case "claude-code":
+		return "anthropic"
+	default:
+		return ""
+	}
+}
+
 func normalizeCatAuthType(value string) string {
 	switch strings.ToLower(strings.TrimSpace(value)) {
 	case "oauth", "subscription":
@@ -2540,6 +2678,16 @@ func normalizeCatAuthType(value string) string {
 	default:
 		return ""
 	}
+}
+
+func firstTrimmed(values ...string) string {
+	for _, value := range values {
+		text := strings.TrimSpace(value)
+		if text != "" {
+			return text
+		}
+	}
+	return ""
 }
 
 func fallbackCatID(name string, alias string) string {
@@ -2560,6 +2708,18 @@ func fallbackCatID(name string, alias string) string {
 	value := strings.Trim(builder.String(), "-_")
 	if value == "" {
 		value = fmt.Sprintf("runtime-cat-%x", time.Now().UnixNano())
+	}
+	return value
+}
+
+func runtimeCatID(name string, alias string) string {
+	value := fallbackCatID(name, alias)
+	if value == "" {
+		return "cat-" + strconv.FormatInt(time.Now().UnixNano(), 36)
+	}
+	first := value[0]
+	if first < 'a' || first > 'z' {
+		value = "cat-" + value
 	}
 	return value
 }

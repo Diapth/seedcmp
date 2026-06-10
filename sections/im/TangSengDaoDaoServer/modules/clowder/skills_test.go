@@ -24,7 +24,7 @@ type skillAPITestServer struct {
 	server *server.Server
 }
 
-func newSkillAPITestServer(t *testing.T) *skillAPITestServer {
+func newSkillAPITestServer(t *testing.T, upstreamOverride ...*httptest.Server) *skillAPITestServer {
 	t.Helper()
 
 	upstream := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -65,7 +65,12 @@ func newSkillAPITestServer(t *testing.T) *skillAPITestServer {
 			http.NotFound(w, r)
 		}
 	}))
-	t.Cleanup(upstream.Close)
+	if len(upstreamOverride) > 0 && upstreamOverride[0] != nil {
+		upstream.Close()
+		upstream = upstreamOverride[0]
+	} else {
+		t.Cleanup(upstream.Close)
+	}
 
 	cfg := config.New()
 	cfg.Test = true

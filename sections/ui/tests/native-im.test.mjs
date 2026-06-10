@@ -53,6 +53,9 @@ import {
   resolveAgentDeleteIdentity
 } from '../services/native-im/agent-cleanup.js';
 import {
+  createAgentConversation
+} from '../services/native-im/agent-state.js';
+import {
   buildSelectableGroupMembers,
   splitSelectedGroupMembers
 } from '../services/native-im/group-member-candidates.js';
@@ -1504,6 +1507,7 @@ test('native service sends direct clowder cat messages through conversation brid
 test('native service creates custom clowder cats as routable direct agents', async () => {
   const request = makeRequestStub({
     'POST clowder/cats': {
+      threadId: 'thread-pm-1',
       agent: {
         catId: 'custom-reviewer',
         displayName: 'DeepSeek 审查猫',
@@ -1517,6 +1521,11 @@ test('native service creates custom clowder cats as routable direct agents', asy
       contact: {
         connected: true,
         source: 'runtime-created'
+      },
+      binding: {
+        channelId: 'clowder_cat:custom-reviewer',
+        channelType: 1,
+        threadId: 'thread-pm-1'
       }
     }
   });
@@ -1554,9 +1563,14 @@ test('native service creates custom clowder cats as routable direct agents', asy
   });
   assert.equal(agent.id, 'custom-reviewer');
   assert.equal(agent.directCatId, 'custom-reviewer');
+  assert.equal(agent.threadId, 'thread-pm-1');
+  assert.equal(agent.directThreadId, 'thread-pm-1');
   assert.equal(agent.source, 'clowder');
   assert.equal(agent.connected, true);
   assert.equal(agent.apiKey, '');
+  const conversation = createAgentConversation(agent);
+  assert.equal(conversation.threadId, 'thread-pm-1');
+  assert.equal(conversation.directThreadId, 'thread-pm-1');
 });
 
 test('native service fetches local oauth capabilities by provider', async () => {

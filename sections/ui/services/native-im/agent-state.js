@@ -107,6 +107,16 @@ export function createAgentConversation(agent = {}) {
   const directCatId = isClowderAgent(agent) ? resolveClowderCatId(agent, baseId) : '';
   const id = directCatId ? buildClowderCatContactId(directCatId) : baseId;
   const name = firstNonEmpty(agent.name, agent.nickname, agent.alias, '智能体');
+  const threadId = firstNonEmpty(
+    agent.threadId,
+    agent.thread_id,
+    agent.directThreadId,
+    agent.direct_thread_id,
+    agent.binding?.threadId,
+    agent.binding?.thread_id,
+    agent.raw?.threadId,
+    agent.raw?.thread_id
+  );
   return {
     id,
     channelId: id,
@@ -122,6 +132,10 @@ export function createAgentConversation(agent = {}) {
     draft: '',
     isAgent: true,
     agentId: directCatId || id,
+    ...(threadId ? {
+      threadId,
+      directThreadId: threadId
+    } : {}),
     ...(directCatId ? {
       source: 'clowder',
       directCatId

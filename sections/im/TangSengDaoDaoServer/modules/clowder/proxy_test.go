@@ -394,6 +394,15 @@ func TestRouteTextForSingleGroupTargetUsesPlainMentionToAutoCreateThread(t *test
 	assert.Contains(t, text, "@布偶猫 帮我总结")
 }
 
+func TestRouteTextForDirectCatKeepsSlashCommandUnprefixed(t *testing.T) {
+	text := routeTextForCatRequest(conversationRefRequest{
+		Text:        "/new PM",
+		DirectCatID: "coordinator",
+	})
+
+	assert.Equal(t, "/new PM", text)
+}
+
 func TestSendInboundTextWithRoutingForwardsExplicitTargets(t *testing.T) {
 	var got InboundMessage
 	upstream := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -746,6 +755,78 @@ func TestBuildCreateCatCommandRequiresAndNormalizesClientPlatform(t *testing.T) 
 
 	_, ok = buildCreateCatCommand(createCatRequest{Name: "无认证猫", ClientID: "openai"})
 	assert.False(t, ok)
+}
+
+func TestCreateCatAndConnectAutoBindsDirectThread(t *testing.T) {
+	inboundMessages := []InboundMessage{}
+	var gotCreateCat map[string]interface{}
+	upstream := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		switch r.URL.Path {
+		case "/api/cats":
+			require.Equal(t, http.MethodPost, r.Method)
+			require.NoError(t, json.NewDecoder(r.Body).Decode(&gotCreateCat))
+			_ = json.NewEncoder(w).Encode(map[string]interface{}{
+				"cat": map[string]interface{}{
+					"id":              "coordinator",
+					"catId":           "coordinator",
+					"displayName":     "PM",
+					"mentionPatterns": []string{"@pm"},
+					"available":       true,
+				},
+			})
+		case "/api/connectors/im-web/inbound":
+			var message InboundMessage
+			require.NoError(t, json.NewDecoder(r.Body).Decode(&message))
+			inboundMessages = append(inboundMessages, message)
+			if strings.HasPrefix(message.Text, "/new") {
+				_ = json.NewEncoder(w).Encode(RouteResponse{Kind: "routed", ThreadID: "thread-pm-1", MessageID: "msg-thread"})
+				return
+			}
+			_ = json.NewEncoder(w).Encode(RouteResponse{Kind: "routed", MessageID: "msg-create"})
+		case "/api/connectors/im-web/agents":
+			_ = json.NewEncoder(w).Encode(map[string]interface{}{
+				"agents": []map[string]interface{}{
+					{
+						"catId":           "coordinator",
+						"displayName":     "PM",
+						"aliases":         []string{"@pm"},
+						"mentionPatterns": []string{"@pm"},
+						"available":       true,
+					},
+				},
+			})
+		case "/api/cat-templates":
+			_ = json.NewEncoder(w).Encode(map[string]interface{}{"templates": []map[string]interface{}{}})
+		default:
+			http.NotFound(w, r)
+		}
+	}))
+	defer upstream.Close()
+	api := newSkillAPITestServer(t, upstream)
+
+	resp := api.request(t, http.MethodPost, "/v1/clowder/cats", strings.NewReader(`{
+		"name":"PM",
+		"alias":"@pm",
+		"roleTemplateId":"coordinator",
+		"clientId":"openai",
+		"authType":"oauth",
+		"accountRef":"codex"
+	}`), "token-user-a", "application/json")
+
+	require.Equal(t, http.StatusOK, resp.Code, resp.Body.String())
+	body := decodeSkillBody(t, resp)
+	assert.Equal(t, "thread-pm-1", body["threadId"])
+	binding, ok := body["binding"].(map[string]interface{})
+	require.True(t, ok, "binding should be returned: %v", body)
+	assert.Equal(t, "clowder_cat:coordinator", binding["channelId"])
+	assert.Equal(t, "thread-pm-1", binding["threadId"])
+	require.NotNil(t, gotCreateCat)
+	assert.Equal(t, "pm", gotCreateCat["catId"])
+	assert.Equal(t, "PM", gotCreateCat["displayName"])
+	assert.Equal(t, []interface{}{"@pm"}, gotCreateCat["mentionPatterns"])
+	require.Len(t, inboundMessages, 1)
+	assert.Equal(t, "clowder_cat:coordinator", inboundMessages[0].ChannelID)
+	assert.Equal(t, "/new PM", inboundMessages[0].Text)
 }
 
 func TestCreatedCatContactsPrependFallbackCatsToDirectory(t *testing.T) {
