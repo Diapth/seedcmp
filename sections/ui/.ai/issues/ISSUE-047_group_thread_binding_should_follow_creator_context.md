@@ -131,7 +131,9 @@ sections/clowder-ai/packages/api/src/infrastructure/connectors/OutboundDeliveryH
 3. 项目群确认后调用 `syncGroupCats` 时带上 `projectThreadId/projectBindingId`，首条项目群 Clowder 消息也带同一个 `threadId`。
 4. TangSeng Clowder bridge 扩展 group cat sync 与 inbound message payload，项目群绑定缺少 `projectThreadId` 时回退到 `pmDirectThreadId`。
 5. Clowder IM Web connector 支持 inherited `threadId`，在群 external chat 首次进入时绑定/修复到已有项目 thread，不再创建孤立 thread。
-6. 增加 UI、Go、Clowder connector 回归测试，并补桌面/移动 Playwright 可视化证据。
+6. TangSeng 群消息 listener 对已同步的项目群自动补齐 `ProjectThreadID`，后续群内消息继续投递到 inherited thread。
+7. Clowder connector 不再用本地 registry 过滤 IM Web 显式 `targetCatIds`，避免项目群同步来的猫 ID 被误丢导致路由回默认猫。
+8. 增加 UI、Go、Clowder connector 回归测试，并补桌面/移动 Playwright 可视化证据。
 
 ---
 
@@ -139,7 +141,7 @@ sections/clowder-ai/packages/api/src/infrastructure/connectors/OutboundDeliveryH
 
 ```bash
 cd sections/ui && npm run test:native-im
-# pass: 112/112
+# pass: 109/109
 
 cd sections/im/TangSengDaoDaoServer && go test ./modules/clowder
 # pass

@@ -116,11 +116,6 @@
   },
   {
     "label": "desktop",
-    "path": "/v1/groups/membersync",
-    "method": "GET"
-  },
-  {
-    "label": "desktop",
     "path": "/v1/clowder/conversation/message",
     "body": {
       "channelId": "issue047-project-group",
@@ -133,11 +128,6 @@
       "promptContext": "项目群：Issue047项目群",
       "threadId": "thread-pm-project-issue047"
     }
-  },
-  {
-    "label": "desktop",
-    "path": "/v1/clowder/group/cats",
-    "method": "GET"
   },
   {
     "label": "mobile",
@@ -256,11 +246,6 @@
   },
   {
     "label": "mobile",
-    "path": "/v1/groups/membersync",
-    "method": "GET"
-  },
-  {
-    "label": "mobile",
     "path": "/v1/clowder/conversation/message",
     "body": {
       "channelId": "issue047-project-group",
@@ -273,10 +258,5 @@
       "promptContext": "项目群：Issue047项目群",
       "threadId": "thread-pm-project-issue047"
     }
-  },
-  {
-    "label": "mobile",
-    "path": "/v1/clowder/group/cats",
-    "method": "GET"
   }
 ]

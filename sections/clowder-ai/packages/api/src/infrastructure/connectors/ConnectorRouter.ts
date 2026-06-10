@@ -186,6 +186,7 @@ export class ConnectorRouter {
     chatType?: 'p2p' | 'group',
     chatName?: string,
     routing?: {
+      threadId?: string;
       directCatId?: string;
       targetCatIds?: string[];
       promptContext?: string;
@@ -423,7 +424,7 @@ export class ConnectorRouter {
 
     // 2. Lookup or create binding
     const projectPath = findMonorepoRoot();
-    let binding = await bindingStore.getByExternal(connectorId, externalChatId);
+    let binding = await this.resolveInheritedBinding(connectorId, externalChatId, routing?.threadId);
     if (!binding) {
       const def = getConnectorDefinition(connectorId);
       const platformLabel = def?.displayName ?? connectorId;
@@ -635,6 +636,36 @@ export class ConnectorRouter {
     return out;
   }
 
+  private async resolveInheritedBinding(connectorId: string, externalChatId: string, threadId?: string) {
+    const inheritedThreadId = String(threadId || '').trim();
+    const existing = await this.opts.bindingStore.getByExternal(connectorId, externalChatId);
+    if (!inheritedThreadId) return existing;
+    if (existing?.threadId === inheritedThreadId) return existing;
+
+    if (this.opts.threadStore.get) {
+      const thread = await this.opts.threadStore.get(inheritedThreadId);
+      if (!thread) {
+        this.opts.log.warn(
+          { connectorId, externalChatId, threadId: inheritedThreadId },
+          '[ConnectorRouter] Ignoring inherited IM Web thread because it does not exist',
+        );
+        return existing;
+      }
+    }
+
+    const rebound = await this.opts.bindingStore.bind(
+      connectorId,
+      externalChatId,
+      inheritedThreadId,
+      existing?.userId ?? this.opts.defaultUserId,
+    );
+    this.opts.log.info(
+      { connectorId, externalChatId, threadId: inheritedThreadId, previousThreadId: existing?.threadId },
+      '[ConnectorRouter] Bound external chat to inherited thread',
+    );
+    return rebound;
+  }
+
   private normalizeExplicitTargetCatIds(routing?: { directCatId?: string; targetCatIds?: string[] }): CatId[] {
     const values = [...(routing?.directCatId ? [routing.directCatId] : []), ...(routing?.targetCatIds ?? [])];
     const out: CatId[] = [];
@@ -643,7 +674,7 @@ export class ConnectorRouter {
       const trimmed = String(raw || '')
         .replace(/^@/, '')
         .trim();
-      if (!trimmed || seen.has(trimmed) || !catRegistry.has(trimmed)) continue;
+      if (!trimmed || seen.has(trimmed)) continue;
       seen.add(trimmed);
       out.push(createCatId(trimmed));
     }

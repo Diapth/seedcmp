@@ -94,3 +94,58 @@ func TestMessagesListenWithRolesAddsGroupRoleSnapshot(t *testing.T) {
 	assert.Equal(t, GroupRoleManager, forwarder.messages[0].Role.Role)
 	assert.True(t, forwarder.messages[0].Role.Admin)
 }
+
+func TestMessagesListenRoutesConfiguredGroupToPmWhenAutoReplyEnabled(t *testing.T) {
+	bridge := New(config.NewContext(config.New()))
+	bridge.config.Enabled = true
+	bridge.config.APIBaseURL = "http://127.0.0.1:3000"
+	bridge.config.ConnectorSecret = "shared-secret"
+	bridge.config.DefaultOwnerUserID = "owner-1"
+	bridge.storeGroupCats(groupCatSyncRequest{
+		GroupID:          "group-clowder",
+		GroupName:        "项目群",
+		CatIDs:           []string{"coordinator", "xianxian"},
+		Prompt:           "项目群上下文",
+		ProactiveReplies: true,
+		ProjectThreadID:  "thread-project-1",
+	})
+	forwarder := &recordingForwarder{}
+
+	bridge.MessagesListen([]*config.MessageResp{{
+		ChannelID:    "group-clowder",
+		ChannelType:  2,
+		FromUID:      "u_10001",
+		MessageIDStr: "m1",
+		ClientMsgNo:  "c1",
+		MessageSeq:   11,
+		Timestamp:    1780000000,
+		Payload:      []byte(`{"type":1,"content":"这个需求怎么拆？"}`),
+	}}, forwarder)
+
+	require.Len(t, forwarder.messages, 1)
+	assert.Equal(t, []string{"coordinator"}, forwarder.messages[0].TargetCatIDs)
+	assert.Equal(t, "项目群上下文", forwarder.messages[0].PromptContext)
+	assert.Equal(t, "thread-project-1", forwarder.messages[0].ThreadID)
+}
+
+func TestMessagesListenSkipsClowderVirtualSenders(t *testing.T) {
+	bridge := New(config.NewContext(config.New()))
+	bridge.config.Enabled = true
+	bridge.config.APIBaseURL = "http://127.0.0.1:3000"
+	bridge.config.ConnectorSecret = "shared-secret"
+	bridge.config.DefaultOwnerUserID = "owner-1"
+	forwarder := &recordingForwarder{}
+
+	bridge.MessagesListen([]*config.MessageResp{{
+		ChannelID:    "group-clowder",
+		ChannelType:  2,
+		FromUID:      "clowder:coordinator",
+		MessageIDStr: "m1",
+		ClientMsgNo:  "c1",
+		MessageSeq:   11,
+		Timestamp:    1780000000,
+		Payload:      []byte(`{"type":1,"content":"我来拆一下任务"}`),
+	}}, forwarder)
+
+	assert.Empty(t, forwarder.messages)
+}

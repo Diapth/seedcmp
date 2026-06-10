@@ -1,18 +1,18 @@
 {
   "issue": "ISSUE-047",
-  "generatedAt": "2026-06-10T17:59:07.739Z",
+  "generatedAt": "2026-06-10T18:26:03.207Z",
   "baseUrl": "http://localhost:5173/",
   "pass": true,
   "results": [
     {
       "name": "desktop: PM direct conversation keeps inherited thread",
       "pass": true,
-      "detail": "{\"seeded\":{\"label\":\"desktop\",\"activeId\":\"clowder_cat:coordinator\",\"conversation\":{\"id\":\"clowder_cat:coordinator\",\"channelId\":\"clowder_cat:coordinator\",\"channelType\":1,\"type\":\"robot\",\"source\":\"clowder\",\"threadId\":\"thread-pm-project-issue047\",\"directThreadId\":\"thread-pm-project-issue047\"},\"agentIds\":[\"coordinator\",\"codex\",\"reviewer\"]},\"result\":{\"pendingCard\":{\"cardId\":\"project-group-card:issue047-source-message\",\"id\":\"project-group-card:issue047-source-message\",\"status\":\"pending_confirmation\",\"projectName\":\"Issue047项目群\",\"sourceText\":\"项目名叫 Issue047项目群，拉 Codex 和 Reviewer 分工执行\",\"sourceMessageId\":\"issue047-source-message\",\"sourceClientMsgNo\":\"issue047-client\",\"pmDirectChannelId\":\"clowder_cat:coordinator\",\"pmDirectChannelType\":1,\"pmDirectThreadId\":\"thread-pm-project-issue047\",\"coordinator\":{\"id\":\"coordinator\",\"name\":\"暹罗猫（协调者）\",\"avatar\":\"\"},\"targetCatIds\":[\"codex\",\"reviewer\"],\"workerCatIds\":[\"codex\",\"reviewer\"],\"workspaceId\":\"\",\"projectGroupNo\":\"\",\"projectGroupName\":\"\",\"projectBindingId\":\"\",\"projectThreadId\":\"thread-pm-project-issue047\",\"projectHandoff\":null,\"reused\":false,\"error\":\"\",\"updatedAt\":1781114346322},\"confirmedCard\":{\"cardId\":\"project-group-card:issue047-source-message\",\"id\":\"project-group-card:issue047-source-message\",\"status\":\"created\",\"projectName\":\"Issue047项目群\",\"sourceText\":\"项目名叫 Issue047项目群，拉 Codex 和 Reviewer 分工执行\",\"sourceMessageId\":\"issue047-source-message\",\"sourceClientMsgNo\":\"issue047-client\",\"pmDirectChannelId\":\"clowder_cat:coordinator\",\"pmDirectChannelType\":1,\"pmDirectThreadId\":\"thread-pm-project-issue047\",\"coordinator\":{\"id\":\"coordinator\",\"name\":\"暹罗猫（协调者）\",\"avatar\":\"\"},\"targetCatIds\":[\"codex\",\"reviewer\"],\"workerCatIds\":[\"codex\",\"reviewer\"],\"workspaceId\":\"\",\"projectGroupNo\":\"issue047-project-group\",\"projectGroupName\":\"Issue047项目群\",\"projectBindingId\":\"binding-issue047\",\"projectThreadId\":\"thread-pm-project-issue047\",\"projectHandoff\":null,\"reused\":false,\"error\":\"\",\"updatedAt\":1781114346347,\"catMemberIds\":[\"codex\",\"reviewer\"]},\"groupConversation\":{\"id\":\"issue047-project-group\",\"channelId\":\"issue047-project-group\",\"channelType\":2,\"type\":\"group\",\"name\":\"Issue047项目群\",\"avatar\":\"\",\"unread\":0,\"lastMessage\":\"你已加入群聊 Issue047项目群\",\"lastTime\":0,\"memberCount\":3,\"isPinned\":false,\"isMuted\":false,\"draft\":\"\"},\"activeId\":\"clowder_cat:coordinator\",\"groupMembers\":[{\"isMuted\":false,\"role\":\"member\",\"id\":\"codex\",\"uid\":\"codex\",\"nickname\":\"狸花猫（工程师）\",\"name\":\"狸花猫（工程师）\",\"alias\":\"@codex\",\"avatar\":\"\",\"isAgent\":true,\"agentId\":\"codex\",\"catId\":\"codex\",\"directCatId\":\"codex\",\"source\":\"clowder\",\"status\":\"active\"},{\"isMuted\":false,\"role\":\"member\",\"id\":\"reviewer\",\"uid\":\"reviewer\",\"nickname\":\"布偶猫（评审）\",\"name\":\"布偶猫（评审）\",\"alias\":\"@reviewer\",\"avatar\":\"\",\"isAgent\":true,\"agentId\":\"reviewer\",\"catId\":\"reviewer\",\"directCatId\":\"reviewer\",\"source\":\"clowder\",\"status\":\"active\"}],\"pmConversationThreadId\":\"thread-pm-project-issue047\",\"pmConversation\":{\"id\":\"clowder_cat:coordinator\",\"channelId\":\"clowder_cat:coordinator\",\"channelType\":1,\"type\":\"robot\",\"source\":\"clowder\",\"threadId\":\"thread-pm-project-issue047\",\"directThreadId\":\"thread-pm-project-issue047\"},\"inheritedThreadId\":\"thread-pm-project-issue047\"}}"
+      "detail": "{\"seeded\":{\"label\":\"desktop\",\"activeId\":\"clowder_cat:coordinator\",\"conversation\":{\"id\":\"clowder_cat:coordinator\",\"channelId\":\"clowder_cat:coordinator\",\"channelType\":1,\"type\":\"robot\",\"source\":\"clowder\",\"threadId\":\"thread-pm-project-issue047\",\"directThreadId\":\"thread-pm-project-issue047\"},\"agentIds\":[\"coordinator\",\"codex\",\"reviewer\"]},\"result\":{\"pendingCard\":{\"cardId\":\"project-group-card:issue047-source-message\",\"id\":\"project-group-card:issue047-source-message\",\"status\":\"pending_confirmation\",\"projectName\":\"Issue047项目群\",\"sourceText\":\"项目名叫 Issue047项目群，拉 Codex 和 Reviewer 分工执行\",\"sourceMessageId\":\"issue047-source-message\",\"sourceClientMsgNo\":\"issue047-client\",\"pmDirectChannelId\":\"clowder_cat:coordinator\",\"pmDirectChannelType\":1,\"pmDirectThreadId\":\"thread-pm-project-issue047\",\"coordinator\":{\"id\":\"coordinator\",\"name\":\"暹罗猫（协调者）\",\"avatar\":\"\"},\"targetCatIds\":[\"codex\",\"reviewer\"],\"workerCatIds\":[\"codex\",\"reviewer\"],\"workspaceId\":\"\",\"projectGroupNo\":\"\",\"projectGroupName\":\"\",\"projectBindingId\":\"\",\"projectThreadId\":\"thread-pm-project-issue047\",\"projectHandoff\":null,\"reused\":false,\"error\":\"\",\"updatedAt\":1781115961805},\"confirmedCard\":{\"cardId\":\"project-group-card:issue047-source-message\",\"id\":\"project-group-card:issue047-source-message\",\"status\":\"created\",\"projectName\":\"Issue047项目群\",\"sourceText\":\"项目名叫 Issue047项目群，拉 Codex 和 Reviewer 分工执行\",\"sourceMessageId\":\"issue047-source-message\",\"sourceClientMsgNo\":\"issue047-client\",\"pmDirectChannelId\":\"clowder_cat:coordinator\",\"pmDirectChannelType\":1,\"pmDirectThreadId\":\"thread-pm-project-issue047\",\"coordinator\":{\"id\":\"coordinator\",\"name\":\"暹罗猫（协调者）\",\"avatar\":\"\"},\"targetCatIds\":[\"codex\",\"reviewer\"],\"workerCatIds\":[\"codex\",\"reviewer\"],\"workspaceId\":\"\",\"projectGroupNo\":\"issue047-project-group\",\"projectGroupName\":\"Issue047项目群\",\"projectBindingId\":\"binding-issue047\",\"projectThreadId\":\"thread-pm-project-issue047\",\"projectHandoff\":null,\"reused\":false,\"error\":\"\",\"updatedAt\":1781115961827,\"catMemberIds\":[\"codex\",\"reviewer\"]},\"groupConversation\":{\"id\":\"issue047-project-group\",\"channelId\":\"issue047-project-group\",\"channelType\":2,\"type\":\"group\",\"name\":\"Issue047项目群\",\"avatar\":\"\",\"unread\":0,\"lastMessage\":\"你已加入群聊 Issue047项目群\",\"lastTime\":0,\"memberCount\":3,\"isPinned\":false,\"isMuted\":false,\"draft\":\"\"},\"activeId\":\"clowder_cat:coordinator\",\"groupMembers\":[{\"isMuted\":false,\"role\":\"member\",\"id\":\"codex\",\"uid\":\"codex\",\"nickname\":\"狸花猫（工程师）\",\"name\":\"狸花猫（工程师）\",\"alias\":\"@codex\",\"avatar\":\"\",\"isAgent\":true,\"agentId\":\"codex\",\"catId\":\"codex\",\"directCatId\":\"codex\",\"source\":\"clowder\",\"status\":\"active\"},{\"isMuted\":false,\"role\":\"member\",\"id\":\"reviewer\",\"uid\":\"reviewer\",\"nickname\":\"布偶猫（评审）\",\"name\":\"布偶猫（评审）\",\"alias\":\"@reviewer\",\"avatar\":\"\",\"isAgent\":true,\"agentId\":\"reviewer\",\"catId\":\"reviewer\",\"directCatId\":\"reviewer\",\"source\":\"clowder\",\"status\":\"active\"}],\"pmConversationThreadId\":\"thread-pm-project-issue047\",\"pmConversation\":{\"id\":\"clowder_cat:coordinator\",\"channelId\":\"clowder_cat:coordinator\",\"channelType\":1,\"type\":\"robot\",\"source\":\"clowder\",\"threadId\":\"thread-pm-project-issue047\",\"directThreadId\":\"thread-pm-project-issue047\"},\"inheritedThreadId\":\"thread-pm-project-issue047\"}}"
     },
     {
       "name": "desktop: pending card carries PM and project thread",
       "pass": true,
-      "detail": "{\"cardId\":\"project-group-card:issue047-source-message\",\"id\":\"project-group-card:issue047-source-message\",\"status\":\"pending_confirmation\",\"projectName\":\"Issue047项目群\",\"sourceText\":\"项目名叫 Issue047项目群，拉 Codex 和 Reviewer 分工执行\",\"sourceMessageId\":\"issue047-source-message\",\"sourceClientMsgNo\":\"issue047-client\",\"pmDirectChannelId\":\"clowder_cat:coordinator\",\"pmDirectChannelType\":1,\"pmDirectThreadId\":\"thread-pm-project-issue047\",\"coordinator\":{\"id\":\"coordinator\",\"name\":\"暹罗猫（协调者）\",\"avatar\":\"\"},\"targetCatIds\":[\"codex\",\"reviewer\"],\"workerCatIds\":[\"codex\",\"reviewer\"],\"workspaceId\":\"\",\"projectGroupNo\":\"\",\"projectGroupName\":\"\",\"projectBindingId\":\"\",\"projectThreadId\":\"thread-pm-project-issue047\",\"projectHandoff\":null,\"reused\":false,\"error\":\"\",\"updatedAt\":1781114346322}"
+      "detail": "{\"cardId\":\"project-group-card:issue047-source-message\",\"id\":\"project-group-card:issue047-source-message\",\"status\":\"pending_confirmation\",\"projectName\":\"Issue047项目群\",\"sourceText\":\"项目名叫 Issue047项目群，拉 Codex 和 Reviewer 分工执行\",\"sourceMessageId\":\"issue047-source-message\",\"sourceClientMsgNo\":\"issue047-client\",\"pmDirectChannelId\":\"clowder_cat:coordinator\",\"pmDirectChannelType\":1,\"pmDirectThreadId\":\"thread-pm-project-issue047\",\"coordinator\":{\"id\":\"coordinator\",\"name\":\"暹罗猫（协调者）\",\"avatar\":\"\"},\"targetCatIds\":[\"codex\",\"reviewer\"],\"workerCatIds\":[\"codex\",\"reviewer\"],\"workspaceId\":\"\",\"projectGroupNo\":\"\",\"projectGroupName\":\"\",\"projectBindingId\":\"\",\"projectThreadId\":\"thread-pm-project-issue047\",\"projectHandoff\":null,\"reused\":false,\"error\":\"\",\"updatedAt\":1781115961805}"
     },
     {
       "name": "desktop: ensure project group sends inherited thread",
@@ -32,7 +32,7 @@
     {
       "name": "desktop: created card points to same inherited thread",
       "pass": true,
-      "detail": "{\"cardId\":\"project-group-card:issue047-source-message\",\"id\":\"project-group-card:issue047-source-message\",\"status\":\"created\",\"projectName\":\"Issue047项目群\",\"sourceText\":\"项目名叫 Issue047项目群，拉 Codex 和 Reviewer 分工执行\",\"sourceMessageId\":\"issue047-source-message\",\"sourceClientMsgNo\":\"issue047-client\",\"pmDirectChannelId\":\"clowder_cat:coordinator\",\"pmDirectChannelType\":1,\"pmDirectThreadId\":\"thread-pm-project-issue047\",\"coordinator\":{\"id\":\"coordinator\",\"name\":\"暹罗猫（协调者）\",\"avatar\":\"\"},\"targetCatIds\":[\"codex\",\"reviewer\"],\"workerCatIds\":[\"codex\",\"reviewer\"],\"workspaceId\":\"\",\"projectGroupNo\":\"issue047-project-group\",\"projectGroupName\":\"Issue047项目群\",\"projectBindingId\":\"binding-issue047\",\"projectThreadId\":\"thread-pm-project-issue047\",\"projectHandoff\":null,\"reused\":false,\"error\":\"\",\"updatedAt\":1781114346347,\"catMemberIds\":[\"codex\",\"reviewer\"]}"
+      "detail": "{\"cardId\":\"project-group-card:issue047-source-message\",\"id\":\"project-group-card:issue047-source-message\",\"status\":\"created\",\"projectName\":\"Issue047项目群\",\"sourceText\":\"项目名叫 Issue047项目群，拉 Codex 和 Reviewer 分工执行\",\"sourceMessageId\":\"issue047-source-message\",\"sourceClientMsgNo\":\"issue047-client\",\"pmDirectChannelId\":\"clowder_cat:coordinator\",\"pmDirectChannelType\":1,\"pmDirectThreadId\":\"thread-pm-project-issue047\",\"coordinator\":{\"id\":\"coordinator\",\"name\":\"暹罗猫（协调者）\",\"avatar\":\"\"},\"targetCatIds\":[\"codex\",\"reviewer\"],\"workerCatIds\":[\"codex\",\"reviewer\"],\"workspaceId\":\"\",\"projectGroupNo\":\"issue047-project-group\",\"projectGroupName\":\"Issue047项目群\",\"projectBindingId\":\"binding-issue047\",\"projectThreadId\":\"thread-pm-project-issue047\",\"projectHandoff\":null,\"reused\":false,\"error\":\"\",\"updatedAt\":1781115961827,\"catMemberIds\":[\"codex\",\"reviewer\"]}"
     },
     {
       "name": "desktop: group conversation added without stealing active PM chat",
@@ -47,12 +47,12 @@
     {
       "name": "mobile: PM direct conversation keeps inherited thread",
       "pass": true,
-      "detail": "{\"seeded\":{\"label\":\"mobile\",\"activeId\":\"clowder_cat:coordinator\",\"conversation\":{\"id\":\"clowder_cat:coordinator\",\"channelId\":\"clowder_cat:coordinator\",\"channelType\":1,\"type\":\"robot\",\"source\":\"clowder\",\"threadId\":\"thread-pm-project-issue047\",\"directThreadId\":\"thread-pm-project-issue047\"},\"agentIds\":[\"coordinator\",\"codex\",\"reviewer\"]},\"result\":{\"pendingCard\":{\"cardId\":\"project-group-card:issue047-source-message\",\"id\":\"project-group-card:issue047-source-message\",\"status\":\"pending_confirmation\",\"projectName\":\"Issue047项目群\",\"sourceText\":\"项目名叫 Issue047项目群，拉 Codex 和 Reviewer 分工执行\",\"sourceMessageId\":\"issue047-source-message\",\"sourceClientMsgNo\":\"issue047-client\",\"pmDirectChannelId\":\"clowder_cat:coordinator\",\"pmDirectChannelType\":1,\"pmDirectThreadId\":\"thread-pm-project-issue047\",\"coordinator\":{\"id\":\"coordinator\",\"name\":\"暹罗猫（协调者）\",\"avatar\":\"\"},\"targetCatIds\":[\"codex\",\"reviewer\"],\"workerCatIds\":[\"codex\",\"reviewer\"],\"workspaceId\":\"\",\"projectGroupNo\":\"\",\"projectGroupName\":\"\",\"projectBindingId\":\"\",\"projectThreadId\":\"thread-pm-project-issue047\",\"projectHandoff\":null,\"reused\":false,\"error\":\"\",\"updatedAt\":1781114347669},\"confirmedCard\":{\"cardId\":\"project-group-card:issue047-source-message\",\"id\":\"project-group-card:issue047-source-message\",\"status\":\"created\",\"projectName\":\"Issue047项目群\",\"sourceText\":\"项目名叫 Issue047项目群，拉 Codex 和 Reviewer 分工执行\",\"sourceMessageId\":\"issue047-source-message\",\"sourceClientMsgNo\":\"issue047-client\",\"pmDirectChannelId\":\"clowder_cat:coordinator\",\"pmDirectChannelType\":1,\"pmDirectThreadId\":\"thread-pm-project-issue047\",\"coordinator\":{\"id\":\"coordinator\",\"name\":\"暹罗猫（协调者）\",\"avatar\":\"\"},\"targetCatIds\":[\"codex\",\"reviewer\"],\"workerCatIds\":[\"codex\",\"reviewer\"],\"workspaceId\":\"\",\"projectGroupNo\":\"issue047-project-group\",\"projectGroupName\":\"Issue047项目群\",\"projectBindingId\":\"binding-issue047\",\"projectThreadId\":\"thread-pm-project-issue047\",\"projectHandoff\":null,\"reused\":false,\"error\":\"\",\"updatedAt\":1781114347698,\"catMemberIds\":[\"codex\",\"reviewer\"]},\"groupConversation\":{\"id\":\"issue047-project-group\",\"channelId\":\"issue047-project-group\",\"channelType\":2,\"type\":\"group\",\"name\":\"Issue047项目群\",\"avatar\":\"\",\"unread\":0,\"lastMessage\":\"你已加入群聊 Issue047项目群\",\"lastTime\":0,\"memberCount\":3,\"isPinned\":false,\"isMuted\":false,\"draft\":\"\"},\"activeId\":\"clowder_cat:coordinator\",\"groupMembers\":[{\"isMuted\":false,\"role\":\"member\",\"id\":\"codex\",\"uid\":\"codex\",\"nickname\":\"狸花猫（工程师）\",\"name\":\"狸花猫（工程师）\",\"alias\":\"@codex\",\"avatar\":\"\",\"isAgent\":true,\"agentId\":\"codex\",\"catId\":\"codex\",\"directCatId\":\"codex\",\"source\":\"clowder\",\"status\":\"active\"},{\"isMuted\":false,\"role\":\"member\",\"id\":\"reviewer\",\"uid\":\"reviewer\",\"nickname\":\"布偶猫（评审）\",\"name\":\"布偶猫（评审）\",\"alias\":\"@reviewer\",\"avatar\":\"\",\"isAgent\":true,\"agentId\":\"reviewer\",\"catId\":\"reviewer\",\"directCatId\":\"reviewer\",\"source\":\"clowder\",\"status\":\"active\"}],\"pmConversationThreadId\":\"thread-pm-project-issue047\",\"pmConversation\":{\"id\":\"clowder_cat:coordinator\",\"channelId\":\"clowder_cat:coordinator\",\"channelType\":1,\"type\":\"robot\",\"source\":\"clowder\",\"threadId\":\"thread-pm-project-issue047\",\"directThreadId\":\"thread-pm-project-issue047\"},\"inheritedThreadId\":\"thread-pm-project-issue047\"}}"
+      "detail": "{\"seeded\":{\"label\":\"mobile\",\"activeId\":\"clowder_cat:coordinator\",\"conversation\":{\"id\":\"clowder_cat:coordinator\",\"channelId\":\"clowder_cat:coordinator\",\"channelType\":1,\"type\":\"robot\",\"source\":\"clowder\",\"threadId\":\"thread-pm-project-issue047\",\"directThreadId\":\"thread-pm-project-issue047\"},\"agentIds\":[\"coordinator\",\"codex\",\"reviewer\"]},\"result\":{\"pendingCard\":{\"cardId\":\"project-group-card:issue047-source-message\",\"id\":\"project-group-card:issue047-source-message\",\"status\":\"pending_confirmation\",\"projectName\":\"Issue047项目群\",\"sourceText\":\"项目名叫 Issue047项目群，拉 Codex 和 Reviewer 分工执行\",\"sourceMessageId\":\"issue047-source-message\",\"sourceClientMsgNo\":\"issue047-client\",\"pmDirectChannelId\":\"clowder_cat:coordinator\",\"pmDirectChannelType\":1,\"pmDirectThreadId\":\"thread-pm-project-issue047\",\"coordinator\":{\"id\":\"coordinator\",\"name\":\"暹罗猫（协调者）\",\"avatar\":\"\"},\"targetCatIds\":[\"codex\",\"reviewer\"],\"workerCatIds\":[\"codex\",\"reviewer\"],\"workspaceId\":\"\",\"projectGroupNo\":\"\",\"projectGroupName\":\"\",\"projectBindingId\":\"\",\"projectThreadId\":\"thread-pm-project-issue047\",\"projectHandoff\":null,\"reused\":false,\"error\":\"\",\"updatedAt\":1781115963137},\"confirmedCard\":{\"cardId\":\"project-group-card:issue047-source-message\",\"id\":\"project-group-card:issue047-source-message\",\"status\":\"created\",\"projectName\":\"Issue047项目群\",\"sourceText\":\"项目名叫 Issue047项目群，拉 Codex 和 Reviewer 分工执行\",\"sourceMessageId\":\"issue047-source-message\",\"sourceClientMsgNo\":\"issue047-client\",\"pmDirectChannelId\":\"clowder_cat:coordinator\",\"pmDirectChannelType\":1,\"pmDirectThreadId\":\"thread-pm-project-issue047\",\"coordinator\":{\"id\":\"coordinator\",\"name\":\"暹罗猫（协调者）\",\"avatar\":\"\"},\"targetCatIds\":[\"codex\",\"reviewer\"],\"workerCatIds\":[\"codex\",\"reviewer\"],\"workspaceId\":\"\",\"projectGroupNo\":\"issue047-project-group\",\"projectGroupName\":\"Issue047项目群\",\"projectBindingId\":\"binding-issue047\",\"projectThreadId\":\"thread-pm-project-issue047\",\"projectHandoff\":null,\"reused\":false,\"error\":\"\",\"updatedAt\":1781115963163,\"catMemberIds\":[\"codex\",\"reviewer\"]},\"groupConversation\":{\"id\":\"issue047-project-group\",\"channelId\":\"issue047-project-group\",\"channelType\":2,\"type\":\"group\",\"name\":\"Issue047项目群\",\"avatar\":\"\",\"unread\":0,\"lastMessage\":\"你已加入群聊 Issue047项目群\",\"lastTime\":0,\"memberCount\":3,\"isPinned\":false,\"isMuted\":false,\"draft\":\"\"},\"activeId\":\"clowder_cat:coordinator\",\"groupMembers\":[{\"isMuted\":false,\"role\":\"member\",\"id\":\"codex\",\"uid\":\"codex\",\"nickname\":\"狸花猫（工程师）\",\"name\":\"狸花猫（工程师）\",\"alias\":\"@codex\",\"avatar\":\"\",\"isAgent\":true,\"agentId\":\"codex\",\"catId\":\"codex\",\"directCatId\":\"codex\",\"source\":\"clowder\",\"status\":\"active\"},{\"isMuted\":false,\"role\":\"member\",\"id\":\"reviewer\",\"uid\":\"reviewer\",\"nickname\":\"布偶猫（评审）\",\"name\":\"布偶猫（评审）\",\"alias\":\"@reviewer\",\"avatar\":\"\",\"isAgent\":true,\"agentId\":\"reviewer\",\"catId\":\"reviewer\",\"directCatId\":\"reviewer\",\"source\":\"clowder\",\"status\":\"active\"}],\"pmConversationThreadId\":\"thread-pm-project-issue047\",\"pmConversation\":{\"id\":\"clowder_cat:coordinator\",\"channelId\":\"clowder_cat:coordinator\",\"channelType\":1,\"type\":\"robot\",\"source\":\"clowder\",\"threadId\":\"thread-pm-project-issue047\",\"directThreadId\":\"thread-pm-project-issue047\"},\"inheritedThreadId\":\"thread-pm-project-issue047\"}}"
     },
     {
       "name": "mobile: pending card carries PM and project thread",
       "pass": true,
-      "detail": "{\"cardId\":\"project-group-card:issue047-source-message\",\"id\":\"project-group-card:issue047-source-message\",\"status\":\"pending_confirmation\",\"projectName\":\"Issue047项目群\",\"sourceText\":\"项目名叫 Issue047项目群，拉 Codex 和 Reviewer 分工执行\",\"sourceMessageId\":\"issue047-source-message\",\"sourceClientMsgNo\":\"issue047-client\",\"pmDirectChannelId\":\"clowder_cat:coordinator\",\"pmDirectChannelType\":1,\"pmDirectThreadId\":\"thread-pm-project-issue047\",\"coordinator\":{\"id\":\"coordinator\",\"name\":\"暹罗猫（协调者）\",\"avatar\":\"\"},\"targetCatIds\":[\"codex\",\"reviewer\"],\"workerCatIds\":[\"codex\",\"reviewer\"],\"workspaceId\":\"\",\"projectGroupNo\":\"\",\"projectGroupName\":\"\",\"projectBindingId\":\"\",\"projectThreadId\":\"thread-pm-project-issue047\",\"projectHandoff\":null,\"reused\":false,\"error\":\"\",\"updatedAt\":1781114347669}"
+      "detail": "{\"cardId\":\"project-group-card:issue047-source-message\",\"id\":\"project-group-card:issue047-source-message\",\"status\":\"pending_confirmation\",\"projectName\":\"Issue047项目群\",\"sourceText\":\"项目名叫 Issue047项目群，拉 Codex 和 Reviewer 分工执行\",\"sourceMessageId\":\"issue047-source-message\",\"sourceClientMsgNo\":\"issue047-client\",\"pmDirectChannelId\":\"clowder_cat:coordinator\",\"pmDirectChannelType\":1,\"pmDirectThreadId\":\"thread-pm-project-issue047\",\"coordinator\":{\"id\":\"coordinator\",\"name\":\"暹罗猫（协调者）\",\"avatar\":\"\"},\"targetCatIds\":[\"codex\",\"reviewer\"],\"workerCatIds\":[\"codex\",\"reviewer\"],\"workspaceId\":\"\",\"projectGroupNo\":\"\",\"projectGroupName\":\"\",\"projectBindingId\":\"\",\"projectThreadId\":\"thread-pm-project-issue047\",\"projectHandoff\":null,\"reused\":false,\"error\":\"\",\"updatedAt\":1781115963137}"
     },
     {
       "name": "mobile: ensure project group sends inherited thread",
@@ -72,7 +72,7 @@
     {
       "name": "mobile: created card points to same inherited thread",
       "pass": true,
-      "detail": "{\"cardId\":\"project-group-card:issue047-source-message\",\"id\":\"project-group-card:issue047-source-message\",\"status\":\"created\",\"projectName\":\"Issue047项目群\",\"sourceText\":\"项目名叫 Issue047项目群，拉 Codex 和 Reviewer 分工执行\",\"sourceMessageId\":\"issue047-source-message\",\"sourceClientMsgNo\":\"issue047-client\",\"pmDirectChannelId\":\"clowder_cat:coordinator\",\"pmDirectChannelType\":1,\"pmDirectThreadId\":\"thread-pm-project-issue047\",\"coordinator\":{\"id\":\"coordinator\",\"name\":\"暹罗猫（协调者）\",\"avatar\":\"\"},\"targetCatIds\":[\"codex\",\"reviewer\"],\"workerCatIds\":[\"codex\",\"reviewer\"],\"workspaceId\":\"\",\"projectGroupNo\":\"issue047-project-group\",\"projectGroupName\":\"Issue047项目群\",\"projectBindingId\":\"binding-issue047\",\"projectThreadId\":\"thread-pm-project-issue047\",\"projectHandoff\":null,\"reused\":false,\"error\":\"\",\"updatedAt\":1781114347698,\"catMemberIds\":[\"codex\",\"reviewer\"]}"
+      "detail": "{\"cardId\":\"project-group-card:issue047-source-message\",\"id\":\"project-group-card:issue047-source-message\",\"status\":\"created\",\"projectName\":\"Issue047项目群\",\"sourceText\":\"项目名叫 Issue047项目群，拉 Codex 和 Reviewer 分工执行\",\"sourceMessageId\":\"issue047-source-message\",\"sourceClientMsgNo\":\"issue047-client\",\"pmDirectChannelId\":\"clowder_cat:coordinator\",\"pmDirectChannelType\":1,\"pmDirectThreadId\":\"thread-pm-project-issue047\",\"coordinator\":{\"id\":\"coordinator\",\"name\":\"暹罗猫（协调者）\",\"avatar\":\"\"},\"targetCatIds\":[\"codex\",\"reviewer\"],\"workerCatIds\":[\"codex\",\"reviewer\"],\"workspaceId\":\"\",\"projectGroupNo\":\"issue047-project-group\",\"projectGroupName\":\"Issue047项目群\",\"projectBindingId\":\"binding-issue047\",\"projectThreadId\":\"thread-pm-project-issue047\",\"projectHandoff\":null,\"reused\":false,\"error\":\"\",\"updatedAt\":1781115963163,\"catMemberIds\":[\"codex\",\"reviewer\"]}"
     },
     {
       "name": "mobile: group conversation added without stealing active PM chat",
@@ -139,7 +139,7 @@
           "projectHandoff": null,
           "reused": false,
           "error": "",
-          "updatedAt": 1781114346322
+          "updatedAt": 1781115961805
         },
         "confirmedCard": {
           "cardId": "project-group-card:issue047-source-message",
@@ -173,7 +173,7 @@
           "projectHandoff": null,
           "reused": false,
           "error": "",
-          "updatedAt": 1781114346347,
+          "updatedAt": 1781115961827,
           "catMemberIds": [
             "codex",
             "reviewer"
@@ -359,11 +359,6 @@
         },
         {
           "label": "desktop",
-          "path": "/v1/groups/membersync",
-          "method": "GET"
-        },
-        {
-          "label": "desktop",
           "path": "/v1/clowder/conversation/message",
           "body": {
             "channelId": "issue047-project-group",
@@ -376,11 +371,6 @@
             "promptContext": "项目群：Issue047项目群",
             "threadId": "thread-pm-project-issue047"
           }
-        },
-        {
-          "label": "desktop",
-          "path": "/v1/clowder/group/cats",
-          "method": "GET"
         }
       ]
     },
@@ -437,7 +427,7 @@
           "projectHandoff": null,
           "reused": false,
           "error": "",
-          "updatedAt": 1781114347669
+          "updatedAt": 1781115963137
         },
         "confirmedCard": {
           "cardId": "project-group-card:issue047-source-message",
@@ -471,7 +461,7 @@
           "projectHandoff": null,
           "reused": false,
           "error": "",
-          "updatedAt": 1781114347698,
+          "updatedAt": 1781115963163,
           "catMemberIds": [
             "codex",
             "reviewer"
@@ -657,11 +647,6 @@
         },
         {
           "label": "mobile",
-          "path": "/v1/groups/membersync",
-          "method": "GET"
-        },
-        {
-          "label": "mobile",
           "path": "/v1/clowder/conversation/message",
           "body": {
             "channelId": "issue047-project-group",
@@ -674,11 +659,6 @@
             "promptContext": "项目群：Issue047项目群",
             "threadId": "thread-pm-project-issue047"
           }
-        },
-        {
-          "label": "mobile",
-          "path": "/v1/clowder/group/cats",
-          "method": "GET"
         }
       ]
     }

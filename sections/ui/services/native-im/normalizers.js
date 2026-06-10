@@ -719,6 +719,31 @@ export function normalizeConversation(input = {}, channelInfo = {}) {
   const logo = firstNonEmpty(channelInfo.logo, channelInfo.avatar, input.avatar);
   const lastMessage = hasDigestSource(input) ? messageDigestFromInput(input) : '';
   const lastTime = toTimestampMs(lastMessageTimeFromInput(input), lastMessage ? Date.now() : 0);
+  const binding = input.binding || input.raw?.binding || channelInfo.binding || channelInfo.orgData?.binding || {};
+  const threadId = firstText(
+    input.projectThreadId,
+    input.project_thread_id,
+    input.threadId,
+    input.thread_id,
+    input.directThreadId,
+    input.direct_thread_id,
+    input.clowderThreadId,
+    input.clowder_thread_id,
+    channelInfo.projectThreadId,
+    channelInfo.project_thread_id,
+    channelInfo.threadId,
+    channelInfo.thread_id,
+    channelInfo.directThreadId,
+    channelInfo.direct_thread_id,
+    channelInfo.orgData?.projectThreadId,
+    channelInfo.orgData?.project_thread_id,
+    channelInfo.orgData?.threadId,
+    channelInfo.orgData?.thread_id,
+    binding.projectThreadId,
+    binding.project_thread_id,
+    binding.threadId,
+    binding.thread_id
+  );
 
   return {
     id: channelId,
@@ -735,6 +760,10 @@ export function normalizeConversation(input = {}, channelInfo = {}) {
     isPinned: Number(input.top ?? input.stick ?? channelInfo.top ?? channelInfo.stick ?? 0) === 1,
     isMuted: Number(input.mute ?? channelInfo.mute ?? 0) === 1,
     draft: String(firstNonEmpty(input.draft, input.extra?.draft, input.remoteExtra?.draft)),
+    ...(threadId ? {
+      threadId,
+      ...(isGroup ? { projectThreadId: threadId } : { directThreadId: threadId })
+    } : {}),
     raw: input,
     channelInfo
   };

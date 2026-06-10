@@ -1155,6 +1155,7 @@ test('project group confirmation trigger is limited to coordinator direct chats'
     id: 'clowder_cat:coordinator',
     channelId: 'clowder_cat:coordinator',
     channelType: 1,
+    threadId: 'thread-pm-project-1',
     type: 'robot',
     source: 'clowder',
     directCatId: 'coordinator',
@@ -1201,8 +1202,27 @@ test('project group confirmation trigger is limited to coordinator direct chats'
   assert.equal(cardInput.projectName, 'ISSUE-029项目群');
   assert.equal(cardInput.pmDirectChannelId, 'clowder_cat:coordinator');
   assert.equal(cardInput.pmDirectChannelType, 1);
+  assert.equal(cardInput.pmDirectThreadId, 'thread-pm-project-1');
+  assert.equal(cardInput.projectThreadId, 'thread-pm-project-1');
   assert.deepEqual(cardInput.userMemberIds, ['u-owner']);
   assert.deepEqual(cardInput.targetCatIds, ['codex', 'claude']);
+});
+
+test('native conversation normalization preserves clowder binding thread ids', () => {
+  const conversation = normalizeConversation({
+    channel_id: 'clowder_cat:coordinator',
+    channel_type: 1,
+    threadId: 'thread-pm-project-1',
+    binding: {
+      threadId: 'thread-pm-project-1'
+    }
+  }, {
+    category: 'robot',
+    name: 'PM 智能体'
+  });
+
+  assert.equal(conversation.threadId, 'thread-pm-project-1');
+  assert.equal(conversation.directThreadId, 'thread-pm-project-1');
 });
 
 test('project group confirmation builds ensure payload and created patch', async () => {

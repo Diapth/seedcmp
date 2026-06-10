@@ -1,11 +1,11 @@
 ▶ im-web inbound bridge
-  ✔ routes signed IM Web payloads into connector threads (3.621246ms)
-  ✔ preserves IM Web group role metadata for sender attribution (1.034808ms)
-  ✔ forwards explicit IM Web routing targets to the connector router (1.319113ms)
-  ✔ binds IM Web project groups to inherited PM thread ids without creating a new thread (0.431375ms)
-  ✔ skips duplicate IM Web retries by message id (0.434807ms)
-  ✔ rejects unsigned IM Web payloads (0.133653ms)
-✔ im-web inbound bridge (7.82212ms)
+  ✔ routes signed IM Web payloads into connector threads (3.641255ms)
+  ✔ preserves IM Web group role metadata for sender attribution (1.123861ms)
+  ✔ forwards explicit IM Web routing targets to the connector router (1.30155ms)
+  ✔ binds IM Web project groups to inherited PM thread ids without creating a new thread (0.422752ms)
+  ✔ skips duplicate IM Web retries by message id (0.438126ms)
+  ✔ rejects unsigned IM Web payloads (0.135417ms)
+✔ im-web inbound bridge (7.926263ms)
 ℹ tests 6
 ℹ suites 1
 ℹ pass 6
@@ -13,4 +13,4 @@
 ℹ cancelled 0
 ℹ skipped 0
 ℹ todo 0
-ℹ duration_ms 446.848558
+ℹ duration_ms 431.243925
