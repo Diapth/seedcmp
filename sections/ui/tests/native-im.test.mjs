@@ -3103,6 +3103,19 @@ test('agent helpers create direct conversations and group mention members', asyn
   assert.equal(clowderConversation.agentId, 'opus');
   assert.equal(clowderConversation.directCatId, 'opus');
   assert.equal(getClowderCatIdFromContactId('clowder_cat:opus'), 'opus');
+
+  const technicalNameConversation = createAgentConversation({
+    id: 'luoluo',
+    name: 'clowder_cat:luoluo',
+    displayName: '暹罗猫（协调者）',
+    source: 'clowder',
+    alias: '@luoluo',
+    raw: { catId: 'luoluo' },
+    desc: '需求澄清、任务拆分'
+  });
+  assert.equal(technicalNameConversation.id, 'clowder_cat:luoluo');
+  assert.equal(technicalNameConversation.name, '暹罗猫（协调者）');
+
   assert.equal(
     shouldPreserveClowderAgentDisplayName(clowderConversation, {
       id: 'clowder_cat:opus',
@@ -3129,6 +3142,18 @@ test('agent helpers create direct conversations and group mention members', asyn
     }),
     true
   );
+  assert.equal(
+    shouldPreserveClowderAgentDisplayName({
+      ...clowderConversation,
+      name: 'clowder_cat:opus'
+    }, {
+      id: 'clowder_cat:opus',
+      channelId: 'clowder_cat:opus',
+      name: '布偶猫',
+      type: 'single'
+    }),
+    false
+  );
 
   const restoredConversations = applyClowderAgentDirectoryToConversations([
     {
@@ -3153,6 +3178,33 @@ test('agent helpers create direct conversations and group mention members', asyn
   assert.equal(restoredConversations[0].avatar, 'architect.png');
   assert.equal(restoredConversations[0].type, 'robot');
   assert.equal(restoredConversations[0].directCatId, 'architect');
+
+  const restoredAliasConversation = applyClowderAgentDirectoryToConversations([
+    {
+      id: 'clowder_cat:luoluo',
+      channelId: 'clowder_cat:luoluo',
+      channelType: 1,
+      type: 'single',
+      name: 'clowder_cat:luoluo',
+      avatar: ''
+    }
+  ], [
+    {
+      id: 'coordinator',
+      catId: 'coordinator',
+      name: '暹罗猫（协调者）',
+      alias: '@luoluo',
+      aliases: ['@luoluo'],
+      mentionPatterns: ['@luoluo', '罗罗'],
+      avatar: 'keeper.png',
+      source: 'clowder'
+    }
+  ]);
+
+  assert.equal(restoredAliasConversation[0].name, '暹罗猫（协调者）');
+  assert.equal(restoredAliasConversation[0].avatar, 'keeper.png');
+  assert.equal(restoredAliasConversation[0].type, 'robot');
+  assert.equal(restoredAliasConversation[0].directCatId, 'luoluo');
 });
 
 test('clowder direct cat conversations are detected for bridge routing', () => {

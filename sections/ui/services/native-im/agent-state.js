@@ -26,6 +26,19 @@ export function getClowderCatIdFromContactId(contactId = '') {
   return id.slice(CLOWDER_CAT_CONTACT_PREFIX.length);
 }
 
+function isTechnicalClowderName(value = '', channelId = '') {
+  const text = firstNonEmpty(value);
+  if (!text) return false;
+  return text === firstNonEmpty(channelId) || text.startsWith(CLOWDER_CAT_CONTACT_PREFIX);
+}
+
+function normalizeClowderLookupKey(value = '') {
+  return firstNonEmpty(value)
+    .replace(new RegExp(`^${CLOWDER_CAT_CONTACT_PREFIX}`), '')
+    .replace(/^@/, '')
+    .toLowerCase();
+}
+
 function resolveClowderCatId(agent = {}, fallback = '') {
   const id = firstNonEmpty(
     agent.catId,
@@ -56,20 +69,39 @@ export function shouldPreserveClowderAgentDisplayName(existing = {}, incoming = 
   const incomingName = firstNonEmpty(incoming.name, incoming.nickname);
   return hasClowderContact
     && existingName
+    && !isTechnicalClowderName(existingName, channelId)
     && (
-      incomingName === channelId
+      !incomingName
+      || isTechnicalClowderName(incomingName, channelId)
       || existing.source === 'clowder'
       || existing.isAgent
       || existing.type === 'robot'
     );
 }
 
-function clowderAgentDisplayName(agent = {}) {
-  return firstNonEmpty(agent.name, agent.nickname, agent.displayName, agent.display_name, agent.alias);
+function clowderAgentDisplayName(agent = {}, channelId = '') {
+  const candidates = [
+    agent.displayName,
+    agent.display_name,
+    agent.name,
+    agent.nickname,
+    agent.alias
+  ];
+  for (const value of candidates) {
+    const text = firstNonEmpty(value);
+    if (text && !isTechnicalClowderName(text, channelId)) return text;
+  }
+  return firstNonEmpty(agent.displayName, agent.display_name, agent.name, agent.nickname, agent.alias);
 }
 
 function clowderAgentAvatar(agent = {}) {
   return firstNonEmpty(agent.avatar, agent.logo);
+}
+
+function addClowderAgentLookup(agentByCatId, key, agent) {
+  const lookupKey = normalizeClowderLookupKey(key);
+  if (!lookupKey || agentByCatId.has(lookupKey)) return;
+  agentByCatId.set(lookupKey, agent);
 }
 
 export function applyClowderAgentDirectoryToConversations(conversations = [], agents = []) {
@@ -77,8 +109,32 @@ export function applyClowderAgentDirectoryToConversations(conversations = [], ag
   (agents || []).forEach((agent) => {
     const catId = resolveClowderCatId(agent, firstNonEmpty(agent.id, agent.agentId, agent.uid));
     if (!catId) return;
-    agentByCatId.set(catId, agent);
-    agentByCatId.set(buildClowderCatContactId(catId), agent);
+    [
+      catId,
+      buildClowderCatContactId(catId),
+      agent.id,
+      agent.agentId,
+      agent.uid,
+      agent.catId,
+      agent.cat_id,
+      agent.directCatId,
+      agent.direct_cat_id,
+      agent.alias,
+      agent.nickname,
+      agent.raw?.id,
+      agent.raw?.catId,
+      agent.raw?.cat_id,
+      agent.raw?.directCatId,
+      agent.raw?.direct_cat_id,
+      agent.raw?.alias,
+      agent.raw?.nickname,
+      ...(Array.isArray(agent.aliases) ? agent.aliases : []),
+      ...(Array.isArray(agent.mentionPatterns) ? agent.mentionPatterns : []),
+      ...(Array.isArray(agent.mention_patterns) ? agent.mention_patterns : []),
+      ...(Array.isArray(agent.raw?.aliases) ? agent.raw.aliases : []),
+      ...(Array.isArray(agent.raw?.mentionPatterns) ? agent.raw.mentionPatterns : []),
+      ...(Array.isArray(agent.raw?.mention_patterns) ? agent.raw.mention_patterns : [])
+    ].forEach((key) => addClowderAgentLookup(agentByCatId, key, agent));
   });
   if (!agentByCatId.size) return conversations;
 
@@ -86,9 +142,10 @@ export function applyClowderAgentDirectoryToConversations(conversations = [], ag
     const channelId = firstNonEmpty(conversation.channelId, conversation.id);
     const catId = getClowderCatIdFromContactId(channelId);
     if (!catId) return conversation;
-    const agent = agentByCatId.get(catId) || agentByCatId.get(channelId);
+    const agent = agentByCatId.get(normalizeClowderLookupKey(catId))
+      || agentByCatId.get(normalizeClowderLookupKey(channelId));
     if (!agent) return conversation;
-    const displayName = clowderAgentDisplayName(agent);
+    const displayName = clowderAgentDisplayName(agent, channelId);
     return {
       ...conversation,
       name: displayName || conversation.name,
@@ -106,7 +163,9 @@ export function createAgentConversation(agent = {}) {
   const baseId = firstNonEmpty(agent.id, agent.agentId, agent.uid, agent.alias);
   const directCatId = isClowderAgent(agent) ? resolveClowderCatId(agent, baseId) : '';
   const id = directCatId ? buildClowderCatContactId(directCatId) : baseId;
-  const name = firstNonEmpty(agent.name, agent.nickname, agent.alias, '智能体');
+  const name = directCatId
+    ? firstNonEmpty(clowderAgentDisplayName(agent, id), '智能体')
+    : firstNonEmpty(agent.name, agent.nickname, agent.alias, '智能体');
   const threadId = firstNonEmpty(
     agent.threadId,
     agent.thread_id,
