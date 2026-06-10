@@ -96,6 +96,19 @@
             />
           </view>
 
+          <view
+            v-else-if="data.type === 'coordinator_template_cats_request'"
+            class="bubble-template-cats-card"
+          >
+            <CoordinatorTemplateCatsCard
+              :card="data.coordinatorTemplateCatsCard || {}"
+              :message="data"
+              @confirm="$emit('template-cats-confirm', $event)"
+              @cancel="$emit('template-cats-cancel', $event)"
+              @retry="$emit('template-cats-retry', $event)"
+            />
+          </view>
+
           <!-- Text Message -->
           <text
             v-else-if="data.type === 'text' && !isMarkdownText"
@@ -180,6 +193,7 @@ import FileCard from './FileCard.vue';
 import VoiceCard from './VoiceCard.vue';
 import MessageReactions from './MessageReactions.vue';
 import CoordinatorProjectGroupCard from './CoordinatorProjectGroupCard.vue';
+import CoordinatorTemplateCatsCard from './CoordinatorTemplateCatsCard.vue';
 import DeploymentCard from './DeploymentCard.vue';
 import {
   isSelfSender,
@@ -214,6 +228,9 @@ const emit = defineEmits([
   'project-group-cancel',
   'project-group-retry',
   'project-group-open',
+  'template-cats-confirm',
+  'template-cats-cancel',
+  'template-cats-retry',
   'deployment-confirm',
   'deployment-cancel',
   'deployment-retry',

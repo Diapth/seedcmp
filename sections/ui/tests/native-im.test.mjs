@@ -3058,3 +3058,218 @@ test('conversation display unread ignores mock and locally read conversations', 
   assert.equal(conversationDisplayUnread(conversations[3], { readMarkers }), 0);
   assert.equal(totalDisplayUnread(conversations, { activeId: 'active-a', readMarkers }), 4);
 });
+
+test('coordinator capability profile detection covers ppt and review intents', async () => {
+  const {
+    detectRequiredCapabilityProfile,
+    scanExistingCats,
+    findMissingRoles
+  } = await import('../services/native-im/coordinator-capability.js');
+
+  const pptProfile = detectRequiredCapabilityProfile('帮我做一个 PPT 演示成稿');
+  assert.equal(pptProfile?.id, 'ppt-delivery');
+  assert.ok(pptProfile.roleTemplateIds.includes('source-curator'));
+  assert.ok(pptProfile.roleTemplateIds.includes('deck-strategist'));
+
+  const reviewProfile = detectRequiredCapabilityProfile('请评审一下这个架构方案');
+  assert.equal(reviewProfile?.id, 'architecture-review');
+  assert.equal(detectRequiredCapabilityProfile('今天天气怎么样'), null);
+
+  const availableAgents = [
+    { id: 'cat-1', name: '资料官', roleTemplate: 'source-curator', capabilityTags: ['资料整理'] },
+    { id: 'cat-2', name: '架构师', roleTemplate: 'architect', capabilityTags: ['系统设计'] }
+  ];
+  const reusable = scanExistingCats({ requiredProfile: pptProfile, availableAgents });
+  assert.equal(reusable.length, 1);
+  assert.equal(reusable[0].id, 'cat-1');
+
+  const missing = findMissingRoles({ requiredProfile: pptProfile, availableAgents });
+  assert.deepEqual(missing.sort(), ['deck-qa-exporter', 'deck-strategist', 'storyboard-designer', 'svg-executor-guardian'].sort());
+});
+
+test('coordinator template cats request input lists missing role templates and reusable cats', async () => {
+  const {
+    buildCoordinatorTemplateCatsRequestInput,
+    shouldCreateCoordinatorTemplateCatsRequest,
+    resolveCoordinatorCreationProfile,
+    buildAgentPayloadFromTemplate,
+    createCoordinatorTemplateCatsMessage,
+    upsertCoordinatorTemplateCatsMessage,
+    updateCoordinatorTemplateCatsMessage,
+    isCoordinatorTemplateCatsConfirmationMessage
+  } = await import('../services/native-im/coordinator-template-cats.js');
+
+  const coordinatorConversation = {
+    id: 'clowder_cat:coordinator',
+    channelId: 'clowder_cat:coordinator',
+    channelType: 1,
+    type: 'robot',
+    source: 'clowder',
+    directCatId: 'coordinator',
+    name: 'PM 智能体'
+  };
+  const coordinatorAgent = {
+    id: 'coordinator',
+    name: 'PM 智能体',
+    roleTemplate: 'coordinator',
+    alias: '@pm',
+    platform: 'codex',
+    accessMode: 'oauth',
+    accountRef: 'codex',
+    defaultModel: 'gpt-5'
+  };
+
+  assert.equal(shouldCreateCoordinatorTemplateCatsRequest({
+    conversation: coordinatorConversation,
+    agent: coordinatorAgent,
+    text: '帮我做一份 PPT 演示成稿'
+  }), true);
+  assert.equal(shouldCreateCoordinatorTemplateCatsRequest({
+    conversation: { id: 'g1', type: 'group', channelType: 2, name: '项目群' },
+    agent: coordinatorAgent,
+    text: '帮我做一份 PPT 演示'
+  }), false);
+  assert.equal(shouldCreateCoordinatorTemplateCatsRequest({
+    conversation: { id: 'clowder_cat:codex', type: 'robot', source: 'clowder', directCatId: 'codex' },
+    agent: { id: 'codex', name: 'Codex', roleTemplate: 'engineer' },
+    text: '帮我做一份 PPT 演示'
+  }), false);
+
+  const templates = [
+    { id: 'source-curator', name: '资料官', teamStrengths: '资料整理、信息抽取' },
+    { id: 'deck-strategist', name: 'PPT 战略', teamStrengths: '叙事结构与重点' },
+    { id: 'storyboard-designer', name: '分镜设计师', teamStrengths: '页面分镜' },
+    { id: 'svg-executor-guardian', name: 'SVG 执行', teamStrengths: '图形渲染' },
+    { id: 'deck-qa-exporter', name: '导出官', teamStrengths: '校验与导出' }
+  ];
+  const availableAgents = [
+    { id: 'cat-1', name: '资料官', roleTemplate: 'source-curator' }
+  ];
+
+  const cardInput = buildCoordinatorTemplateCatsRequestInput({
+    conversation: coordinatorConversation,
+    coordinator: coordinatorAgent,
+    sourceMessage: { id: 'msg-039', content: '帮我做一份 PPT 演示成稿' },
+    text: '帮我做一份 PPT 演示成稿',
+    availableAgents,
+    templates
+  });
+
+  assert.equal(cardInput.requiredProfile.id, 'ppt-delivery');
+  assert.deepEqual(cardInput.reusableCats.map((cat) => cat.id), ['cat-1']);
+  assert.deepEqual(
+    cardInput.items.map((item) => item.roleTemplateId).sort(),
+    ['deck-qa-exporter', 'deck-strategist', 'storyboard-designer', 'svg-executor-guardian'].sort()
+  );
+  assert.equal(cardInput.coordinatorProfile.platform, 'codex');
+  assert.equal(cardInput.coordinatorProfile.accessMode, 'oauth');
+  assert.equal(cardInput.coordinatorProfile.inheritsFromCoordinator, true);
+
+  const message = createCoordinatorTemplateCatsMessage(cardInput);
+  assert.ok(isCoordinatorTemplateCatsConfirmationMessage(message));
+  assert.equal(message.coordinatorTemplateCatsCard.status, 'pending_confirmation');
+  assert.equal(message.coordinatorTemplateCatsCard.items.length, 4);
+
+  const list = upsertCoordinatorTemplateCatsMessage([], cardInput);
+  assert.equal(list.length, 1);
+  const cardId = list[0].coordinatorTemplateCatsCard.cardId;
+
+  const updated = updateCoordinatorTemplateCatsMessage(list, cardId, {
+    status: 'created',
+    items: list[0].coordinatorTemplateCatsCard.items.map((item) => ({
+      ...item,
+      status: 'created',
+      agentId: `cat-${item.roleTemplateId}`
+    }))
+  });
+  assert.equal(updated[0].coordinatorTemplateCatsCard.status, 'created');
+  assert.ok(updated[0].coordinatorTemplateCatsCard.items.every((item) => item.status === 'created'));
+  assert.match(updated[0].content, /已创建 4\/4/);
+
+  const profile = resolveCoordinatorCreationProfile({
+    id: 'coordinator',
+    platform: 'claude',
+    accessMode: 'api-key',
+    accountRef: 'anthropic-prod',
+    defaultModel: 'claude-sonnet-4-6'
+  });
+  assert.equal(profile.platform, 'claude');
+  assert.equal(profile.clientId, 'anthropic');
+  assert.equal(profile.accessMode, 'api-key');
+  assert.equal(profile.authType, 'api_key');
+  assert.equal(profile.accountRef, 'anthropic-prod');
+  assert.equal(profile.defaultModel, 'claude-sonnet-4-6');
+  assert.equal(profile.inheritsFromCoordinator, true);
+
+  const oauthProfile = resolveCoordinatorCreationProfile({
+    id: 'coordinator',
+    platform: 'codex',
+    accessMode: 'oauth'
+  });
+  assert.equal(oauthProfile.accessMode, 'oauth');
+  assert.equal(oauthProfile.authType, 'oauth');
+  assert.equal(oauthProfile.accountRef, 'codex');
+
+  const payload = buildAgentPayloadFromTemplate(templates[1], profile);
+  assert.equal(payload.platform, 'claude');
+  assert.equal(payload.clientId, 'anthropic');
+  assert.equal(payload.accessMode, 'api-key');
+  assert.equal(payload.accountRef, 'anthropic-prod');
+  assert.equal(payload.defaultModel, 'claude-sonnet-4-6');
+  assert.equal(payload.roleTemplateId, 'deck-strategist');
+  assert.equal(payload.name, 'PPT 战略');
+  assert.ok(!Object.prototype.hasOwnProperty.call(payload, 'apiKey'));
+
+  const oauthPayload = buildAgentPayloadFromTemplate(templates[1], oauthProfile);
+  assert.equal(oauthPayload.accessMode, 'oauth');
+  assert.equal(oauthPayload.authType, 'oauth');
+  assert.ok(!Object.prototype.hasOwnProperty.call(oauthPayload, 'defaultModel'));
+});
+
+test('coordinator template cats card cancel and partial-failure transitions', async () => {
+  const {
+    buildCoordinatorTemplateCatsRequestInput,
+    upsertCoordinatorTemplateCatsMessage,
+    updateCoordinatorTemplateCatsMessage
+  } = await import('../services/native-im/coordinator-template-cats.js');
+
+  const conversation = {
+    id: 'clowder_cat:coordinator',
+    channelId: 'clowder_cat:coordinator',
+    channelType: 1,
+    type: 'robot',
+    source: 'clowder',
+    directCatId: 'coordinator'
+  };
+  const coordinator = { id: 'coordinator', name: 'PM', roleTemplate: 'coordinator', platform: 'codex', accessMode: 'oauth' };
+  const templates = [
+    { id: 'deck-strategist', name: 'PPT 战略' },
+    { id: 'storyboard-designer', name: '分镜设计师' },
+    { id: 'svg-executor-guardian', name: 'SVG 执行' },
+    { id: 'deck-qa-exporter', name: '导出官' },
+    { id: 'source-curator', name: '资料官' }
+  ];
+  const cardInput = buildCoordinatorTemplateCatsRequestInput({
+    conversation,
+    coordinator,
+    sourceMessage: { id: 'msg-x', content: '帮我做 PPT 演示成稿' },
+    text: '帮我做 PPT 演示成稿',
+    availableAgents: [],
+    templates
+  });
+  const list = upsertCoordinatorTemplateCatsMessage([], cardInput);
+  const cardId = list[0].coordinatorTemplateCatsCard.cardId;
+
+  const cancelled = updateCoordinatorTemplateCatsMessage(list, cardId, { status: 'cancelled' });
+  assert.equal(cancelled[0].coordinatorTemplateCatsCard.status, 'cancelled');
+  assert.match(cancelled[0].content, /已取消/);
+
+  const partial = updateCoordinatorTemplateCatsMessage(list, cardId, {
+    status: 'partial',
+    items: list[0].coordinatorTemplateCatsCard.items.map((item, idx) => idx === 0
+      ? { ...item, status: 'created', agentId: 'cat-new-1' }
+      : { ...item, status: 'failed', error: '凭证失败' })
+  });
+  assert.equal(partial[0].coordinatorTemplateCatsCard.status, 'partial');
+  assert.match(partial[0].content, /部分创建：1\/5/);
+});

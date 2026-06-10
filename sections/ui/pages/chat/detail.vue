@@ -58,6 +58,9 @@
             @project-group-cancel="handleProjectGroupCancel"
             @project-group-retry="handleProjectGroupConfirm"
             @project-group-open="handleProjectGroupOpen"
+            @template-cats-confirm="handleTemplateCatsConfirm"
+            @template-cats-cancel="handleTemplateCatsCancel"
+            @template-cats-retry="handleTemplateCatsConfirm"
             @deployment-confirm="handleDeploymentConfirm"
             @deployment-cancel="handleDeploymentCancel"
             @deployment-retry="handleDeploymentConfirm"
@@ -668,6 +671,7 @@ async function handleSendMessage({ type, content, fileName, fileSize, fileSizeBy
   const localMessage = await sendPromise;
   if (type === 'text') {
     maybeStartAgentPendingFeedback(conversation, localMessage, extra.mentions || []);
+    await maybeCreateCoordinatorTemplateCatsCard(conversation, content, localMessage);
     maybeCreateProjectGroupCard(conversation, content, localMessage);
     await maybeCreateDeploymentCard(conversation, content, localMessage);
   }
@@ -691,6 +695,15 @@ function maybeCreateProjectGroupCard(conversation, text, sourceMessage) {
     currentUser: appStore.currentUser || {},
     availableAgents: agentStore.agents
   }));
+}
+
+async function maybeCreateCoordinatorTemplateCatsCard(conversation, text, sourceMessage) {
+  if (!conversation || !text || sourceMessage?.status === 'failed') return null;
+  const agent = resolveAgentForConversation(conversation) || conversation;
+  return messageStore.maybeCreateCoordinatorTemplateCatsRequest(conversation, text, sourceMessage, {
+    agent,
+    availableAgents: agentStore.agents
+  });
 }
 
 async function maybeCreateDeploymentCard(conversation, text, sourceMessage) {
@@ -754,6 +767,32 @@ function handleProjectGroupOpen(payload = {}) {
     uni.redirectTo({ url: `/pages/chat/detail?id=${encodeURIComponent(groupId)}` });
   } else {
     syncActiveMessages({ silent: true });
+  }
+}
+
+function templateCatsCardId(payload = {}) {
+  return payload.message?.id || payload.card?.cardId || payload.message?.coordinatorTemplateCatsCard?.cardId || '';
+}
+
+function handleTemplateCatsCancel(payload = {}) {
+  const cardId = templateCatsCardId(payload);
+  if (!cardId) return;
+  messageStore.cancelCoordinatorTemplateCatsRequest(convStore.activeId, cardId);
+}
+
+async function handleTemplateCatsConfirm(payload = {}) {
+  const cardId = templateCatsCardId(payload);
+  if (!cardId) return;
+  const message = await messageStore.confirmCoordinatorTemplateCatsRequest(convStore.activeId, cardId, {
+    createAgent: async (templatePayload) => agentStore.createAgent(templatePayload)
+  });
+  const card = message?.coordinatorTemplateCatsCard;
+  if (card?.status === 'failed') {
+    uni.showToast({ title: card.error || '缺失模板猫猫创建失败', icon: 'none' });
+  } else if (card?.status === 'partial') {
+    uni.showToast({ title: '部分模板猫猫创建失败，可重试', icon: 'none' });
+  } else if (card?.status === 'created') {
+    uni.showToast({ title: '已创建缺失模板猫猫', icon: 'success' });
   }
 }
 

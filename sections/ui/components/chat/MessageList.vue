@@ -28,6 +28,9 @@
           @project-group-cancel="$emit('project-group-cancel', $event)"
           @project-group-retry="$emit('project-group-retry', $event)"
           @project-group-open="$emit('project-group-open', $event)"
+          @template-cats-confirm="$emit('template-cats-confirm', $event)"
+          @template-cats-cancel="$emit('template-cats-cancel', $event)"
+          @template-cats-retry="$emit('template-cats-retry', $event)"
           @deployment-confirm="$emit('deployment-confirm', $event)"
           @deployment-cancel="$emit('deployment-cancel', $event)"
           @deployment-retry="$emit('deployment-retry', $event)"
@@ -75,6 +78,9 @@ defineEmits([
   'project-group-cancel',
   'project-group-retry',
   'project-group-open',
+  'template-cats-confirm',
+  'template-cats-cancel',
+  'template-cats-retry',
   'deployment-confirm',
   'deployment-cancel',
   'deployment-retry'

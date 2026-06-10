@@ -22,6 +22,14 @@ import {
   upsertProjectGroupConfirmationMessage
 } from '@/services/native-im/project-group';
 import {
+  buildAgentPayloadFromTemplate,
+  buildCoordinatorTemplateCatsRequestInput,
+  isCoordinatorTemplateCatsConfirmationMessage,
+  shouldCreateCoordinatorTemplateCatsRequest,
+  updateCoordinatorTemplateCatsMessage,
+  upsertCoordinatorTemplateCatsMessage
+} from '@/services/native-im/coordinator-template-cats';
+import {
   conversationSummaryForMessage,
   createClowderMarkdownStreamEvents,
   createClientMsgNo,
@@ -59,6 +67,7 @@ function messageSummary(message) {
   if (!isVisibleChatMessage(message)) return '';
   if (isDeploymentCardMessage(message)) return message.content || '部署确认卡';
   if (isProjectGroupConfirmationMessage(message)) return message.content || '项目群确认卡';
+  if (isCoordinatorTemplateCatsConfirmationMessage(message)) return message.content || '缺失模板猫猫确认卡';
   if (message.type === 'system') return message.content || '';
   if (message.type === 'image') return '[图片]';
   if (message.type === 'voice') return '[语音]';
@@ -526,6 +535,104 @@ export const useMessageStore = defineStore('message', {
       return (this.messages[conversationId] || []).find((message) => (
         message.id === cardId || message.projectGroupCard?.cardId === cardId
       )) || null;
+    },
+    createCoordinatorTemplateCatsRequest(conversationId, input = {}) {
+      if (!conversationId) return null;
+      this.messages[conversationId] = upsertCoordinatorTemplateCatsMessage(this.messages[conversationId] || [], input);
+      return (this.messages[conversationId] || []).find(isCoordinatorTemplateCatsConfirmationMessage) || null;
+    },
+    updateCoordinatorTemplateCatsRequest(conversationId, cardId, patch = {}) {
+      if (!conversationId || !cardId) return null;
+      this.messages[conversationId] = updateCoordinatorTemplateCatsMessage(this.messages[conversationId] || [], cardId, patch);
+      return (this.messages[conversationId] || []).find((message) => (
+        message.id === cardId || message.coordinatorTemplateCatsCard?.cardId === cardId
+      )) || null;
+    },
+    async maybeCreateCoordinatorTemplateCatsRequest(conversation = {}, text = '', sourceMessage = {}, options = {}) {
+      const conversationId = conversation?.id || conversation?.conversationId || '';
+      if (!conversationId || sourceMessage?.status === 'failed') return null;
+      const agent = options.agent || conversation;
+      if (!shouldCreateCoordinatorTemplateCatsRequest({ conversation, agent, text })) return null;
+
+      const availableAgents = Array.isArray(options.availableAgents) ? options.availableAgents : [];
+      let templates = Array.isArray(options.templates) ? options.templates : [];
+      if (!templates.length) {
+        try {
+          templates = await nativeImService.fetchClowderCatTemplates();
+        } catch {
+          templates = [];
+        }
+      }
+
+      const cardInput = buildCoordinatorTemplateCatsRequestInput({
+        conversation,
+        coordinator: agent,
+        sourceMessage,
+        text,
+        availableAgents,
+        templates
+      });
+
+      if (!cardInput.items.length) return null;
+      return this.createCoordinatorTemplateCatsRequest(conversationId, cardInput);
+    },
+    async confirmCoordinatorTemplateCatsRequest(conversationId, cardId, options = {}) {
+      const list = this.messages[conversationId] || [];
+      const message = list.find((item) => item.id === cardId || item.coordinatorTemplateCatsCard?.cardId === cardId);
+      const card = message?.coordinatorTemplateCatsCard;
+      if (!card) return null;
+      if (card.status === 'creating' || card.status === 'created') return message;
+
+      const baseItems = (card.items || []).map((item) => ({ ...item, status: 'creating', error: '' }));
+      this.updateCoordinatorTemplateCatsRequest(conversationId, cardId, {
+        status: 'creating',
+        error: '',
+        items: baseItems
+      });
+
+      const profile = card.coordinatorProfile || {};
+      const onCreateAgent = typeof options.createAgent === 'function' ? options.createAgent : null;
+      const results = [];
+      let createdCount = 0;
+      let failedCount = 0;
+
+      for (const item of baseItems) {
+        const template = item.template
+          || item
+          || { id: item.templateId, roleTemplateId: item.roleTemplateId, name: item.name };
+        const payload = buildAgentPayloadFromTemplate(template, profile, options.payloadOverrides || {});
+        try {
+          let createdId = '';
+          if (onCreateAgent) {
+            createdId = await onCreateAgent(payload, template);
+          } else {
+            const created = await nativeImService.createClowderCat(payload);
+            createdId = created?.id || created?.catId || '';
+          }
+          if (!createdId) throw { msg: '未返回猫猫 ID' };
+          createdCount += 1;
+          results.push({ ...item, status: 'created', agentId: String(createdId), error: '' });
+        } catch (error) {
+          failedCount += 1;
+          const errorText = error?.msg || error?.message || error?.error || '创建模板猫猫失败';
+          results.push({ ...item, status: 'failed', agentId: '', error: errorText });
+        }
+      }
+
+      const finalStatus = failedCount === 0
+        ? 'created'
+        : (createdCount === 0 ? 'failed' : 'partial');
+      return this.updateCoordinatorTemplateCatsRequest(conversationId, cardId, {
+        status: finalStatus,
+        items: results,
+        error: failedCount && createdCount === 0 ? '所有缺失模板猫猫创建失败' : ''
+      });
+    },
+    cancelCoordinatorTemplateCatsRequest(conversationId, cardId) {
+      return this.updateCoordinatorTemplateCatsRequest(conversationId, cardId, {
+        status: 'cancelled',
+        error: ''
+      });
     },
     createDeploymentCard(conversationId, input = {}) {
       if (!conversationId) return null;

@@ -1211,8 +1211,18 @@ export function createNativeImService(options = {}) {
     const rawTemplates = firstArray(resp.templates, resp.data?.templates);
     return {
       ...resp,
-      agents: mergeClowderDirectoryAgents(rawAgents, rawTemplates)
+      agents: mergeClowderDirectoryAgents(rawAgents, rawTemplates),
+      templates: rawTemplates
     };
+  }
+
+  async function fetchClowderCatTemplates() {
+    try {
+      const resp = await clowderClient.get('cat-templates');
+      return firstArray(resp.templates, resp.data?.templates);
+    } catch {
+      return [];
+    }
   }
 
   async function fetchDirectClowderCatDirectory(params = {}, nativeError) {
@@ -1458,6 +1468,7 @@ export function createNativeImService(options = {}) {
     deleteDevice,
     deleteClowderCat,
     fetchClowderCatDirectory,
+    fetchClowderCatTemplates,
     fetchClowderConversationAgents,
     fetchSkillSummary,
     fetchUserSkills,
