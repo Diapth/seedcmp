@@ -109,7 +109,7 @@ export function applyRoleTemplateToForm(form = {}, dirty = new Set(), template =
     if (alias) next.aliasRaw = alias;
   }
   if (!dirty.has('desc')) {
-    const desc = firstText(template.description, template.roleDescription);
+    const desc = firstText(template.personality, template.roleDescription, template.description);
     if (desc) next.desc = desc;
   }
   if (!dirty.has('capabilityTags')) {
