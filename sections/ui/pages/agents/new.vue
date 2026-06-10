@@ -43,7 +43,7 @@
                     maxlength="40"
                     class="form-input"
                     placeholder-style="color: var(--color-text-muted)"
-                    @input="onFormChange"
+                    @input="onFormChange('name')"
                   />
                   <text class="input-hint">{{ form.name.length }}/40</text>
                 </view>
@@ -74,7 +74,7 @@
                   maxlength="200"
                   class="form-textarea"
                   placeholder-style="color: var(--color-text-muted)"
-                  @input="onFormChange"
+                  @input="onFormChange('desc')"
                 />
                 <text class="input-hint hint-right">{{ form.desc.length }}/200</text>
               </view>
@@ -213,7 +213,7 @@
                     class="form-input"
                     :class="{ disabled: isOAuthMode }"
                     placeholder-style="color: var(--color-text-muted)"
-                    @input="onFormChange"
+                    @input="onFormChange('accountRef')"
                   />
                   <text v-if="isOAuthMode" class="input-hint">OAuth 模式使用本机 {{ oauthStatus.providerLabel }} CLI 登录态，账号引用由系统自动管理</text>
                 </view>
@@ -236,7 +236,7 @@
                       placeholder="sk-xxxxxxxxxxxxxxxx"
                       class="form-input flex-1 secret-input"
                       placeholder-style="color: var(--color-text-muted)"
-                      @input="onFormChange"
+                      @input="onFormChange('apiKey')"
                     />
                     <view class="secret-toggle" @click="showApiKey = !showApiKey">
                       <AppIcon
@@ -261,7 +261,7 @@
                       placeholder="https://api.openai.com/v1"
                       class="form-input"
                       placeholder-style="color: var(--color-text-muted)"
-                      @input="onFormChange"
+                      @input="onFormChange('apiUrl')"
                     />
                     <text class="input-hint">兼容 OpenAI 协议的端点（Base URL）</text>
                   </view>
@@ -274,7 +274,7 @@
                       placeholder="例如：gpt-4o-mini-2024-07-18"
                       class="form-input"
                       placeholder-style="color: var(--color-text-muted)"
-                      @input="onFormChange"
+                      @input="onFormChange('customModel')"
                     />
                     <text class="input-hint">留空则使用上方选择的模型</text>
                   </view>
@@ -318,7 +318,7 @@
                   maxlength="2000"
                   class="form-textarea tall"
                   placeholder-style="color: var(--color-text-muted)"
-                  @input="onFormChange"
+                  @input="onFormChange('systemPrompt')"
                 />
                 <view class="prompt-actions flex-row gap-2">
                   <view class="action-pill" @click="appendPromptSnippet('cot')">
@@ -622,6 +622,7 @@ import {
   defaultOAuthAccountRef,
   resolveLocalOAuthStatus
 } from '@/services/native-im/oauth';
+import { applyRoleTemplateToForm } from '@/services/native-im/role-template-sync';
 import AppSubpageShell from '@/components/layout/AppSubpageShell.vue';
 import AppIcon from '@/components/common/AppIcon.vue';
 import AppAvatar from '@/components/common/AppAvatar.vue';
@@ -632,11 +633,15 @@ const convStore = useConversationStore();
 const navStore = useNavigationStore();
 const { isDesktop } = useResponsiveLayout();
 
-onMounted(() => {
+onMounted(async () => {
   navStore.setActiveModule('agents');
   loadEditingAgent();
   syncOAuthAccountRef();
   if (isOAuthMode.value) probeLocalOAuth();
+  // Pre-load role templates from backend (silent: no error toast on failure)
+  if (!agentStore.clowderRoleTemplates.length) {
+    try { await agentStore.fetchNativeAgents({ silent: true, clearStatic: false }); } catch { /* fallback to hardcoded */ }
+  }
 });
 
 function createDefaultForm() {
@@ -660,6 +665,7 @@ function createDefaultForm() {
 
 const editingAgentId = ref('');
 const form = ref(createDefaultForm());
+const dirtyFields = ref(new Set());
 
 const tagDraft = ref('');
 const submitting = ref(false);
@@ -683,14 +689,20 @@ const customTemplates = ref([
   }
 ]);
 
-const roleTemplates = [
-  { value: 'general', label: '通用助手', description: '通用助手：知识问答、写作润色、信息整理，适用于日常协作。' },
-  { value: 'reviewer', label: '续闺猫（审查官）', description: '严谨认真，注重细节，会直言不讳地指出问题。' },
-  { value: 'engineer', label: '工程师', description: '专注代码生成、重构与单元测试，适合敏捷开发协作。' },
-  { value: 'analyst', label: '分析师', description: '擅长需求拆解、问题澄清与逻辑推演，适合复杂决策。' },
-  { value: 'creative', label: '创意伙伴', description: '头脑风暴、灵感激发与方案发散，适合产品构思阶段。' },
-  { value: 'coordinator', label: '多智能体协调', description: '负责聚合多个智能体的输出，组织团队协作。' }
+const FALLBACK_ROLES = [
+  { id: 'general', label: '通用助手', description: '通用助手：知识问答、写作润色、信息整理，适用于日常协作。' },
+  { id: 'reviewer', label: '续闺猫（审查官）', description: '严谨认真，注重细节，会直言不讳地指出问题。' },
+  { id: 'engineer', label: '工程师', description: '专注代码生成、重构与单元测试，适合敏捷开发协作。' },
+  { id: 'analyst', label: '分析师', description: '擅长需求拆解、问题澄清与逻辑推演，适合复杂决策。' },
+  { id: 'creative', label: '创意伙伴', description: '头脑风暴、灵感激发与方案发散，适合产品构思阶段。' },
+  { id: 'coordinator', label: '多智能体协调', description: '负责聚合多个智能体的输出，组织团队协作。' }
 ];
+
+const roleTemplates = computed(() => {
+  const remote = agentStore.clowderRoleTemplates || [];
+  if (remote.length) return remote.map((t) => ({ id: t.id, label: t.label || t.name, description: t.description || t.roleDescription || '' }));
+  return FALLBACK_ROLES;
+});
 
 const platforms = [
   { value: 'codex', label: 'Codex' },
@@ -797,7 +809,8 @@ const deleteConfirmMatched = computed(() => {
 });
 
 const currentRole = computed(() => {
-  return roleTemplates.find(r => r.value === form.value.roleTemplate) || roleTemplates[0];
+  const list = roleTemplates.value;
+  return list.find(r => (r.id || r.value) === form.value.roleTemplate) || list[0];
 });
 
 const currentPlatform = computed(() => {
@@ -843,7 +856,7 @@ const canSubmit = computed(() => {
   return checkList.value.every(c => c.passed);
 });
 
-function onFormChange() {}
+function onFormChange(field) { if (field) dirtyFields.value.add(field); }
 
 function syncOAuthAccountRef() {
   if (!isOAuthMode.value) return;
@@ -915,7 +928,7 @@ function hydrateFormFromAgent(agent) {
     apiKey: agent.apiKey || '',
     apiUrl: agent.apiUrl || '',
     customModel: agent.customModel || (modelExists ? '' : agent.model || ''),
-    templateId: agent.templateId || roleToTemplateId[agent.roleTemplate] || 'reviewer',
+    templateId: agent.templateId || roleToTemplateId[agent.roleTemplate] || agent.roleTemplate || 'reviewer',
     systemPrompt: agent.systemPrompt || ''
   };
   tagDraft.value = '';
@@ -926,7 +939,8 @@ function hydrateFormFromAgent(agent) {
 }
 
 function syncSelectorIndexes() {
-  const nextRoleIndex = roleTemplates.findIndex(role => role.value === form.value.roleTemplate);
+  const list = roleTemplates.value;
+  const nextRoleIndex = list.findIndex(role => (role.id || role.value) === form.value.roleTemplate);
   roleIndex.value = nextRoleIndex >= 0 ? nextRoleIndex : 0;
 
   const nextModelIndex = models.findIndex(model => model === form.value.model);
@@ -936,15 +950,29 @@ function syncSelectorIndexes() {
 function onAliasInput(e) {
   const val = (e?.detail?.value || form.value.aliasRaw).replace(/[^a-zA-Z0-9_一-龥]/g, '');
   form.value.aliasRaw = val.toLowerCase();
+  dirtyFields.value.add('alias');
 }
 
 function onRoleChange(e) {
   const idx = e.detail.value;
   roleIndex.value = idx;
-  const role = roleTemplates[idx];
-  form.value.roleTemplate = role.value;
-  const autoTplId = roleToTemplateId[role.value] || 'reviewer';
-  if (form.value.templateId !== 'tpl-custom-product' && !form.value.templateId?.startsWith('tpl-custom-')) {
+  const templateList = roleTemplates.value;
+  const role = templateList[idx];
+  if (!role) return;
+  const roleId = role.id || role.value;
+  form.value.roleTemplate = roleId;
+
+  // Find the full template (from agentStore.clowderRoleTemplates) for sync
+  const fullTemplate = agentStore.clowderRoleTemplates.length
+    ? agentStore.clowderRoleTemplates.find((t) => (t.id || t.value) === roleId) || null
+    : null;
+
+  if (fullTemplate) {
+    form.value = applyRoleTemplateToForm(form.value, dirtyFields.value, fullTemplate);
+  }
+
+  const autoTplId = roleToTemplateId[roleId] || 'reviewer';
+  if (!dirtyFields.value.has('systemPrompt') && form.value.templateId !== 'tpl-custom-product' && !form.value.templateId?.startsWith('tpl-custom-')) {
     form.value.templateId = autoTplId;
     const tpl = templateOptions.value.find(t => t.id === autoTplId);
     if (tpl) form.value.systemPrompt = renderTemplate(tpl.body);

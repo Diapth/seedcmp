@@ -16,6 +16,10 @@ import {
   normalizeSkillCatalogPreview,
   normalizeUserSkillList
 } from '@/services/native-im/skill-state';
+import {
+  buildRoleTemplateOptions,
+  normalizeRoleTemplate
+} from '@/services/native-im/role-template-sync';
 import { useConversationStore } from '@/stores/conversation';
 
 const STATIC_AGENT_IDS = new Set([
@@ -78,6 +82,7 @@ export const useAgentStore = defineStore('agent', {
     localOAuthLoaded: false,
     localOAuthInflight: null,
     deletedAgentRecords: readDeletedAgentCache(),
+    clowderRoleTemplates: [],
     agents: [
       { id: 'pm-agent', name: 'PM 智能体', alias: '@pm', desc: '项目管理专家，辅助拆解计划与里程碑', avatar: '', status: 'active', creator: 'System', platform: 'claude-code', accessMode: 'oauth', model: 'Claude 3.5 Sonnet', accountRef: 'agenthub-default', apiKey: '', apiUrl: '', customModel: '', systemPrompt: '', roleTemplate: 'general', templateId: 'reviewer', capabilityTags: ['计划', '里程碑'] },
       { id: 'codex', name: 'Codex', alias: '@codex', desc: '代码生成专家，适合快速实现与重构', avatar: '', status: 'active', creator: 'System', platform: 'codex', accessMode: 'api-key', model: 'DeepSeek V3', accountRef: 'openai-prod', apiKey: '', apiUrl: 'https://api.deepseek.com/v1', customModel: '', systemPrompt: '', roleTemplate: 'engineer', templateId: 'engineer', capabilityTags: ['代码生成', '重构'] },
@@ -510,6 +515,11 @@ export const useAgentStore = defineStore('agent', {
       this.localSkills = marketplace;
       return marketplace;
     },
+    applyNativeRoleTemplates(templates = []) {
+      if (!Array.isArray(templates) || templates.length === 0) return this.clowderRoleTemplates;
+      this.clowderRoleTemplates = buildRoleTemplateOptions(templates);
+      return this.clowderRoleTemplates;
+    },
     applyUserSkills(skills = []) {
       const normalized = normalizeUserSkillList(skills);
       this.userSkills = normalized;
@@ -672,6 +682,7 @@ export const useAgentStore = defineStore('agent', {
         });
         this.applyNativeAgents(directory.agents || []);
         this.applyNativeSkills(directory.skillCatalog || {});
+        this.applyNativeRoleTemplates(directory.templates || []);
         this.syncState = 'success';
         return directory;
       } catch (error) {
