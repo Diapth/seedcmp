@@ -34,8 +34,8 @@
         <!-- Icons/Badges -->
         <view class="item-badge-section flex-row align-center">
           <AppIcon name="settings" :size="14" color="var(--color-text-muted)" v-if="data.isMuted" class="mute-icon" />
-          <view class="unread-badge" v-if="data.unread > 0">
-            <text class="badge-text">{{ formatUnread(data.unread) }}</text>
+          <view class="unread-badge" v-if="displayUnread > 0">
+            <text class="badge-text">{{ formatUnread(displayUnread) }}</text>
           </view>
         </view>
       </view>
@@ -45,11 +45,14 @@
 </template>
 
 <script setup>
+import { computed } from 'vue';
+import { useConversationStore } from '@/stores/conversation';
+import { conversationDisplayUnread } from '@/services/native-im/conversation-state';
 import { formatConversationPreview, formatTime, formatUnread } from '@/utils/formatConversation';
 import AppAvatar from '../common/AppAvatar.vue';
 import AppIcon from '../common/AppIcon.vue';
 
-defineProps({
+const props = defineProps({
   data: {
     type: Object,
     required: true
@@ -61,6 +64,12 @@ defineProps({
 });
 
 defineEmits(['select', 'contextmenu']);
+
+const convStore = useConversationStore();
+const displayUnread = computed(() => conversationDisplayUnread(props.data, {
+  activeId: convStore.activeId,
+  readMarkers: convStore.readMarkers
+}));
 
 function formatDraftPreview(value) {
   const normalized = String(value || '')

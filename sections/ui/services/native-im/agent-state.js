@@ -64,6 +64,44 @@ export function shouldPreserveClowderAgentDisplayName(existing = {}, incoming = 
     );
 }
 
+function clowderAgentDisplayName(agent = {}) {
+  return firstNonEmpty(agent.name, agent.nickname, agent.displayName, agent.display_name, agent.alias);
+}
+
+function clowderAgentAvatar(agent = {}) {
+  return firstNonEmpty(agent.avatar, agent.logo);
+}
+
+export function applyClowderAgentDirectoryToConversations(conversations = [], agents = []) {
+  const agentByCatId = new Map();
+  (agents || []).forEach((agent) => {
+    const catId = resolveClowderCatId(agent, firstNonEmpty(agent.id, agent.agentId, agent.uid));
+    if (!catId) return;
+    agentByCatId.set(catId, agent);
+    agentByCatId.set(buildClowderCatContactId(catId), agent);
+  });
+  if (!agentByCatId.size) return conversations;
+
+  return conversations.map((conversation) => {
+    const channelId = firstNonEmpty(conversation.channelId, conversation.id);
+    const catId = getClowderCatIdFromContactId(channelId);
+    if (!catId) return conversation;
+    const agent = agentByCatId.get(catId) || agentByCatId.get(channelId);
+    if (!agent) return conversation;
+    const displayName = clowderAgentDisplayName(agent);
+    return {
+      ...conversation,
+      name: displayName || conversation.name,
+      avatar: clowderAgentAvatar(agent) || conversation.avatar,
+      type: 'robot',
+      source: 'clowder',
+      isAgent: true,
+      agentId: catId,
+      directCatId: catId
+    };
+  });
+}
+
 export function createAgentConversation(agent = {}) {
   const baseId = firstNonEmpty(agent.id, agent.agentId, agent.uid, agent.alias);
   const directCatId = isClowderAgent(agent) ? resolveClowderCatId(agent, baseId) : '';

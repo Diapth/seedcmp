@@ -54,6 +54,71 @@ export function conversationDraftKey(channelId, channelType = 1) {
   return `${clean(channelId)}-${Number(channelType || 1)}`;
 }
 
+export function conversationDeleteKey(channelId, channelType = 1) {
+  return `${clean(channelId)}:${Number(channelType || 1)}`;
+}
+
+function conversationSeqTime(conversation = {}) {
+  return {
+    seq: safeNumber(
+      conversation.lastSeq
+      || conversation.last_msg_seq
+      || conversation.lastMsgSeq
+      || conversation.messageSeq
+      || conversation.message_seq,
+      0
+    ),
+    time: safeNumber(
+      conversation.lastTime
+      || conversation.last_msg_time
+      || conversation.lastMsgTime
+      || conversation.timestamp
+      || conversation.updatedAt
+      || conversation.updated_at,
+      0
+    )
+  };
+}
+
+export function createDeletedConversationRecord(conversation = {}, deletedAt = Date.now()) {
+  const { seq, time } = conversationSeqTime(conversation);
+  return {
+    lastSeq: seq,
+    lastTime: time,
+    deletedAt
+  };
+}
+
+function normalizeDeletedConversationRecord(record = {}) {
+  if (!record || typeof record !== 'object') return null;
+  return {
+    lastSeq: safeNumber(record.lastSeq || record.last_msg_seq || record.lastMsgSeq || record.seq, 0),
+    lastTime: safeNumber(record.lastTime || record.last_msg_time || record.lastMsgTime || record.time, 0),
+    deletedAt: safeNumber(record.deletedAt || record.deleted_at, Date.now())
+  };
+}
+
+function incomingIsNewerThanDeletedRecord(conversation = {}, record = {}) {
+  const normalized = normalizeDeletedConversationRecord(record);
+  if (!normalized) return false;
+  const { seq, time } = conversationSeqTime(conversation);
+  if (seq > 0 && seq > normalized.lastSeq) return true;
+  if (time > 0 && time > normalized.lastTime) return true;
+  return false;
+}
+
+export function shouldSuppressDeletedConversation(conversation = {}, deletedRecords = {}) {
+  const identity = conversationIdentity(conversation);
+  if (!identity.channelId) return false;
+  const record = normalizeDeletedConversationRecord(deletedRecords[conversationDeleteKey(identity.channelId, identity.channelType)]);
+  if (!record) return false;
+  return !incomingIsNewerThanDeletedRecord(conversation, record);
+}
+
+export function filterDeletedConversations(conversations = [], deletedRecords = {}) {
+  return conversations.filter((conversation) => !shouldSuppressDeletedConversation(conversation, deletedRecords));
+}
+
 export function resolveGroupPageId(routeOptions = {}, state = {}) {
   return clean(
     routeOptions.id
@@ -93,6 +158,43 @@ function conversationIdentity(conversation = {}) {
     channelId: clean(conversation.channelId || conversation.channel_id || conversation.id),
     channelType: Number(conversation.channelType || conversation.channel_type || (conversation.type === 'group' ? 2 : 1) || 1)
   };
+}
+
+export function conversationReadKey(channelId, channelType = 1) {
+  return `${clean(channelId)}:${Number(channelType || 1)}`;
+}
+
+function markerCoversConversation(conversation = {}, marker = {}) {
+  if (!marker) return false;
+  const lastSeq = safeNumber(conversation.lastSeq || conversation.last_msg_seq || conversation.lastMsgSeq, 0);
+  const markerSeq = safeNumber(marker.seq || marker.messageSeq || marker.lastSeq, 0);
+  if (lastSeq && markerSeq && markerSeq >= lastSeq) return true;
+
+  const lastTime = safeNumber(conversation.lastTime || conversation.timestamp || conversation.updatedAt || conversation.updated_at, 0);
+  const markerTime = safeNumber(marker.time || marker.readAt || marker.timestamp, 0);
+  if (markerTime && (!lastTime || markerTime >= lastTime)) return true;
+
+  return Boolean(markerTime && !lastSeq && !lastTime);
+}
+
+export function conversationDisplayUnread(conversation = {}, options = {}) {
+  const unread = safeNumber(conversation.unread, 0);
+  if (unread <= 0) return 0;
+  if (conversation.source === 'mock') return 0;
+
+  const identity = conversationIdentity(conversation);
+  const activeId = clean(options.activeId);
+  if (activeId && (activeId === clean(conversation.id) || activeId === identity.channelId)) return 0;
+
+  const marker = options.readMarkers?.[conversationReadKey(identity.channelId, identity.channelType)];
+  if (markerCoversConversation(conversation, marker)) return 0;
+  return unread;
+}
+
+export function totalDisplayUnread(conversations = [], options = {}) {
+  return conversations.reduce((total, conversation) => (
+    total + conversationDisplayUnread(conversation, options)
+  ), 0);
 }
 
 export function applyDraftToConversationList(conversations = [], channelId, channelType = 1, draft = '') {

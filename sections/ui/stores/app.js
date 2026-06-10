@@ -4,6 +4,7 @@ import { nativeImService } from '@/services/native-im/service';
 import { useContactStore } from '@/stores/contact';
 import { useConversationStore } from '@/stores/conversation';
 import { useMessageStore } from '@/stores/message';
+import { useAgentStore } from '@/stores/agent';
 import { resolveSelfId } from '@/services/native-im/message-state';
 
 function parseStorageJSON(key) {
@@ -165,6 +166,7 @@ export const useAppStore = defineStore('app', {
         conversationStore.activeId
           ? useMessageStore().syncNativeMessages(conversationStore.activeId, { silent: true })
           : Promise.resolve(),
+        useAgentStore().fetchNativeAgents({ silent: true, clearStatic: false }),
         contactStore.syncNativeContacts({ silent: true }),
         contactStore.fetchNativeFriendRequests({ silent: true })
       ]);

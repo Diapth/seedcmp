@@ -72,6 +72,27 @@ export function isAgentMatch(candidate = {}, identity = {}) {
   return candidateIds.some((id) => ids.has(id));
 }
 
+export function markAgentDeleted(records = {}, agent = {}, deletedAt = Date.now()) {
+  const identity = resolveAgentDeleteIdentity(agent);
+  if (!identity.catId) return records;
+  records[identity.catId] = {
+    catId: identity.catId,
+    deletedAt,
+    directConversationIds: identity.directConversationIds
+  };
+  return records;
+}
+
+export function isAgentDeleted(agent = {}, records = {}) {
+  const identity = resolveAgentDeleteIdentity(agent);
+  if (!identity.catId) return false;
+  return Boolean(records[identity.catId]);
+}
+
+export function filterDeletedAgents(agents = [], records = {}) {
+  return (agents || []).filter((agent) => !isAgentDeleted(agent, records));
+}
+
 export function cleanupAgentFromLocalState(state = {}, agent = {}, options = {}) {
   const identity = resolveAgentDeleteIdentity(agent);
   const directIds = new Set(identity.directConversationIds);
@@ -99,6 +120,7 @@ export function cleanupAgentFromLocalState(state = {}, agent = {}, options = {})
     members,
     messages,
     activeId,
+    directConversationIds: identity.directConversationIds,
     removedConversationIds: [...identity.directConversationIds].filter((id) => (
       (state.conversations || []).some((conversation) => conversation.id === id || conversation.channelId === id)
     ))

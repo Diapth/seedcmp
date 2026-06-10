@@ -453,7 +453,7 @@
         <view class="delete-dialog flex-column gap-3">
           <view class="delete-warning flex-column gap-1">
             <text class="delete-warning-title">此操作会删除 {{ editingAgent?.name || '该智能体' }}</text>
-            <text class="delete-warning-text">远端删除成功后，智能体将从列表、建群候选、群成员与 @ 候选中移除。</text>
+            <text class="delete-warning-text">远端删除成功后，智能体将从列表、直聊会话、建群候选、群成员与 @ 候选中移除。</text>
             <text class="delete-warning-text">群聊历史发言会保留，避免破坏多人上下文。</text>
           </view>
 
@@ -477,8 +477,8 @@
               <AppIcon v-if="deleteDirectMessages" name="check" :size="12" color="#ffffff" />
             </view>
             <view class="flex-column flex-1">
-              <text class="delete-option-title">同时删除直聊会话和聊天记录</text>
-              <text class="delete-option-desc">仅清理与该智能体的一对一直聊，不删除群聊中的历史发言。</text>
+              <text class="delete-option-title">同时清空本地直聊聊天记录</text>
+              <text class="delete-option-desc">直聊会话入口会随智能体删除；此选项只影响本机缓存，不删除群聊历史发言。</text>
             </view>
           </view>
 
@@ -1055,7 +1055,7 @@ function openHelp() {
 function openDeleteAgentDialog() {
   if (!canDeleteEditingAgent.value) return;
   deleteConfirmText.value = '';
-  deleteDirectMessages.value = false;
+  deleteDirectMessages.value = true;
   deleteError.value = '';
   deleteDialogVisible.value = true;
 }

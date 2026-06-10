@@ -36,7 +36,7 @@ const convStore = useConversationStore();
 const { safeAreaInsets } = useSafeArea();
 
 const totalUnread = computed(() => {
-  return convStore.conversations.reduce((acc, c) => acc + (c.unread || 0), 0);
+  return convStore.totalUnread;
 });
 
 const tabItems = computed(() => {

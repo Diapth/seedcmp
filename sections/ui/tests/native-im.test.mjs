@@ -13,11 +13,16 @@ import {
 import {
   applyDraftToConversationList,
   buildGroupScopedRoute,
+  conversationDeleteKey,
+  conversationDisplayUnread,
+  filterDeletedConversations,
   mergeRemoteDrafts,
   mergeNativeConversationTimeline,
   normalizeNativeGroup,
+  shouldSuppressDeletedConversation,
   resolveGroupPageId,
   shouldPersistConversationDraft,
+  totalDisplayUnread,
   upsertGroupConversation
 } from '../services/native-im/conversation-state.js';
 import {
@@ -43,6 +48,8 @@ import {
 } from '../services/native-im/project-board.js';
 import {
   cleanupAgentFromLocalState,
+  filterDeletedAgents,
+  markAgentDeleted,
   resolveAgentDeleteIdentity
 } from '../services/native-im/agent-cleanup.js';
 import {
@@ -67,8 +74,23 @@ function makeRequestStub(responses = {}) {
     calls.push(options);
     const path = String(options.url).replace(/^https?:\/\/[^/]+\//, '').replace(/^\/v1\//, '');
     const key = `${options.method} ${path}`;
-    const data = responses[key] ?? {};
-    return { statusCode: 200, data };
+    const matched = Object.prototype.hasOwnProperty.call(responses, key) ? responses[key] : {};
+    const explicitHttpStatus = matched && typeof matched === 'object'
+      && (
+        Object.prototype.hasOwnProperty.call(matched, 'statusCode')
+        || (
+          Object.prototype.hasOwnProperty.call(matched, 'data')
+          && Object.prototype.hasOwnProperty.call(matched, 'status')
+          && Number.isFinite(Number(matched.status))
+        )
+      );
+    if (explicitHttpStatus) {
+      return {
+        statusCode: matched.statusCode ?? matched.status ?? 200,
+        data: Object.prototype.hasOwnProperty.call(matched, 'data') ? matched.data : matched
+      };
+    }
+    return { statusCode: 200, data: matched };
   };
   request.calls = calls;
   return request;
@@ -118,6 +140,23 @@ test('native service clears remote conversation unread count', async () => {
     unread: 0,
     message_seq: 0
   });
+});
+
+test('native service deletes remote conversation through TangSeng recent conversation API', async () => {
+  const request = makeRequestStub();
+  const service = createNativeImService({
+    baseUrl: '/v1/',
+    request,
+    getToken: () => 'token'
+  });
+
+  await service.deleteConversation({
+    channelId: 'clowder_cat:architect',
+    channelType: 1
+  });
+
+  assert.equal(request.calls[0].method, 'DELETE');
+  assert.equal(request.calls[0].url, '/v1/conversations/clowder_cat%3Aarchitect/1');
 });
 
 test('native service exposes group creation and member sync APIs', async () => {
@@ -343,6 +382,8 @@ test('native service fetches clowder cat directory as agent cards', async () => 
   assert.deepEqual(directory.agents[0], {
     id: 'xtz',
     uid: 'xtz',
+    catId: 'xtz',
+    directCatId: 'xtz',
     name: '协调者',
     nickname: '协调者',
     alias: '@xtz',
@@ -1268,6 +1309,35 @@ test('native service can prefer direct clowder api for global official directory
   assert.equal(directory.agents[0].creator, 'System');
 });
 
+test('native service keeps normalized clowder cat ids for deletion and direct routing', async () => {
+  const request = makeRequestStub({
+    'GET clowder/cats?includeUnavailable=true': {
+      agents: [{
+        catId: 'qqqa',
+        id: 'display-card-id',
+        displayName: 'QQQA',
+        mentionPatterns: ['@QQQA'],
+        source: 'runtime-created',
+        available: true,
+        connected: true
+      }]
+    }
+  });
+  const service = createNativeImService({
+    baseUrl: '/v1/',
+    request,
+    getToken: () => 'token'
+  });
+
+  const directory = await service.fetchClowderCatDirectory();
+
+  assert.equal(directory.agents.length, 1);
+  assert.equal(directory.agents[0].id, 'qqqa');
+  assert.equal(directory.agents[0].catId, 'qqqa');
+  assert.equal(directory.agents[0].directCatId, 'qqqa');
+  assert.equal(resolveAgentDeleteIdentity(directory.agents[0]).catId, 'qqqa');
+});
+
 test('native service sends direct clowder cat messages through conversation bridge', async () => {
   const request = makeRequestStub({
     'POST clowder/conversation/message': {
@@ -1462,6 +1532,31 @@ test('native service deletes clowder cats through contact lifecycle API', async 
   assert.deepEqual(result, { deleted: true, id: 'codex' });
 });
 
+test('native service treats missing clowder cats as idempotent deletes', async () => {
+  const request = makeRequestStub({
+    'DELETE clowder/cats/qqqa': {
+      statusCode: 404,
+      data: { error: 'Cat "qqqa" not found' }
+    }
+  });
+  const service = createNativeImService({
+    baseUrl: '/v1/',
+    request,
+    getToken: () => 'token'
+  });
+
+  const result = await service.deleteClowderCat('qqqa');
+
+  assert.equal(request.calls[0].method, 'DELETE');
+  assert.equal(request.calls[0].url, '/v1/clowder/cats/qqqa');
+  assert.deepEqual(result, {
+    deleted: true,
+    id: 'qqqa',
+    alreadyDeleted: true,
+    status: 404
+  });
+});
+
 test('native service syncs clowder group cats without sending agents as native members', async () => {
   const request = makeRequestStub({
     'POST clowder/group/cats/sync': {
@@ -1521,6 +1616,24 @@ test('agent cleanup identity resolves clowder contact and raw cat ids', () => {
   });
 });
 
+test('deleted agent records suppress stale directory agents', () => {
+  const deletedRecords = {};
+  markAgentDeleted(deletedRecords, {
+    id: 'qqqa',
+    catId: 'qqqa',
+    name: 'QQQA',
+    source: 'clowder'
+  }, 1781067000000);
+
+  const filtered = filterDeletedAgents([
+    { id: 'qqqa', catId: 'qqqa', name: 'QQQA', source: 'clowder' },
+    { id: 'architect', catId: 'architect', name: '布偶猫（架构师）', source: 'clowder' }
+  ], deletedRecords);
+
+  assert.deepEqual(Object.keys(deletedRecords), ['qqqa']);
+  assert.deepEqual(filtered.map((agent) => agent.id), ['architect']);
+});
+
 test('agent cleanup prunes agents conversations group members and optional direct messages', () => {
   const state = {
     agents: [
@@ -1560,6 +1673,49 @@ test('agent cleanup prunes agents conversations group members and optional direc
   assert.equal(Object.prototype.hasOwnProperty.call(next.messages, 'clowder_cat:codex'), false);
   assert.deepEqual(next.messages.g1, [{ id: 'g-msg', senderId: 'codex' }]);
   assert.equal(next.activeId, '');
+  assert.deepEqual(next.removedConversationIds, ['clowder_cat:codex']);
+  assert.deepEqual(next.directConversationIds, ['clowder_cat:codex', 'codex']);
+});
+
+test('deleted conversation records suppress stale sync entries but allow newer messages', () => {
+  const deletedAtSeq12 = {
+    [conversationDeleteKey('clowder_cat:architect', 1)]: {
+      lastSeq: 12,
+      lastTime: 1781065600000,
+      deletedAt: 1781065700000
+    }
+  };
+
+  assert.equal(
+    shouldSuppressDeletedConversation({
+      channelId: 'clowder_cat:architect',
+      channelType: 1,
+      lastSeq: 12,
+      lastTime: 1781065600000
+    }, deletedAtSeq12),
+    true
+  );
+
+  assert.equal(
+    shouldSuppressDeletedConversation({
+      channelId: 'clowder_cat:architect',
+      channelType: 1,
+      lastSeq: 13,
+      lastTime: 1781065800000
+    }, deletedAtSeq12),
+    false
+  );
+
+  const filtered = filterDeletedConversations([
+    { id: 'clowder_cat:architect', channelId: 'clowder_cat:architect', channelType: 1, lastSeq: 12, lastTime: 1781065600000 },
+    { id: 'clowder_cat:cs', channelId: 'clowder_cat:cs', channelType: 1, lastSeq: 2, lastTime: 1781065900000 },
+    { id: 'clowder_cat:architect', channelId: 'clowder_cat:architect', channelType: 1, lastSeq: 13, lastTime: 1781065800000 }
+  ], deletedAtSeq12);
+
+  assert.deepEqual(filtered.map((item) => `${item.channelId}:${item.lastSeq}`), [
+    'clowder_cat:cs:2',
+    'clowder_cat:architect:13'
+  ]);
 });
 
 test('group creation candidates include existing agents and split native contacts from agents', () => {
@@ -2763,6 +2919,7 @@ test('message sender helpers tolerate empty current user during anonymous visual
 
 test('agent helpers create direct conversations and group mention members', async () => {
   const {
+    applyClowderAgentDirectoryToConversations,
     createAgentConversation,
     createAgentMember,
     getClowderCatIdFromContactId,
@@ -2820,6 +2977,39 @@ test('agent helpers create direct conversations and group mention members', asyn
     }),
     true
   );
+  assert.equal(
+    shouldPreserveClowderAgentDisplayName(clowderConversation, {
+      id: 'clowder_cat:opus',
+      channelId: 'clowder_cat:opus',
+      name: 'clowder_cat:opus',
+      type: 'single'
+    }),
+    true
+  );
+
+  const restoredConversations = applyClowderAgentDirectoryToConversations([
+    {
+      id: 'clowder_cat:architect',
+      channelId: 'clowder_cat:architect',
+      channelType: 1,
+      type: 'single',
+      name: 'clowder_cat:architect',
+      avatar: ''
+    }
+  ], [
+    {
+      id: 'architect',
+      catId: 'architect',
+      name: '布偶猫（架构师）',
+      avatar: 'architect.png',
+      source: 'clowder'
+    }
+  ]);
+
+  assert.equal(restoredConversations[0].name, '布偶猫（架构师）');
+  assert.equal(restoredConversations[0].avatar, 'architect.png');
+  assert.equal(restoredConversations[0].type, 'robot');
+  assert.equal(restoredConversations[0].directCatId, 'architect');
 });
 
 test('clowder direct cat conversations are detected for bridge routing', () => {
@@ -2850,4 +3040,21 @@ test('clowder direct cat conversations are detected for bridge routing', () => {
     }),
     false
   );
+});
+
+test('conversation display unread ignores mock and locally read conversations', () => {
+  const conversations = [
+    { id: 'mock-a', channelId: 'mock-a', channelType: 1, source: 'mock', unread: 3 },
+    { id: 'active-a', channelId: 'active-a', channelType: 1, unread: 2 },
+    { id: 'fresh-a', channelId: 'fresh-a', channelType: 1, unread: 4, lastSeq: 9 },
+    { id: 'read-a', channelId: 'read-a', channelType: 1, unread: 5, lastSeq: 7 }
+  ];
+  const readMarkers = {
+    'read-a:1': { seq: 7, time: 1781000000000 }
+  };
+
+  assert.equal(conversationDisplayUnread(conversations[0]), 0);
+  assert.equal(conversationDisplayUnread(conversations[1], { activeId: 'active-a' }), 0);
+  assert.equal(conversationDisplayUnread(conversations[3], { readMarkers }), 0);
+  assert.equal(totalDisplayUnread(conversations, { activeId: 'active-a', readMarkers }), 4);
 });

@@ -72,7 +72,7 @@ const convStore = useConversationStore();
 const currentUser = computed(() => appStore.currentUser || { nickname: '我' });
 
 const totalUnread = computed(() => {
-  return convStore.conversations.reduce((acc, c) => acc + (c.unread || 0), 0);
+  return convStore.totalUnread;
 });
 
 const primaryNavItems = computed(() => {

@@ -79,7 +79,7 @@
       <AppDialog
         v-model:visible="editVisible"
         title="编辑资料"
-        variant="bottom-sheet"
+        variant="confirm"
         width="md"
         confirm-text="保存"
         cancel-text="取消"

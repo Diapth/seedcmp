@@ -404,6 +404,8 @@ function normalizeClowderAgent(agent = {}) {
   return {
     id,
     uid: id,
+    catId: id,
+    directCatId: id,
     name,
     nickname: name,
     alias,
@@ -428,6 +430,12 @@ function normalizeClowderAgent(agent = {}) {
     preferred: Boolean(agent.preferred),
     raw: agent
   };
+}
+
+function isNotFoundError(error = {}) {
+  const status = Number(error.status || error.statusCode || error.error?.status || error.error?.statusCode || 0);
+  const message = String(error.msg || error.message || error.error?.data?.error || error.error?.data?.message || '');
+  return status === 404 || /not found|不存在|未找到/i.test(message);
 }
 
 function normalizeCreatedClowderCat(resp = {}) {
@@ -1014,6 +1022,11 @@ export function createNativeImService(options = {}) {
     });
   }
 
+  async function deleteConversation({ channelId, channelType = CHANNEL_TYPE_PERSON } = {}) {
+    if (!channelId) throw { msg: 'channelId不能为空' };
+    return client.delete(`conversations/${encodeURIComponent(String(channelId))}/${Number(channelType)}`);
+  }
+
   async function uploadChatFile({ channelId, channelType = CHANNEL_TYPE_PERSON, file, type = 'chat' } = {}) {
     if (!channelId) throw { msg: 'channelId不能为空' };
     if (!file) throw { msg: '请选择文件' };
@@ -1167,7 +1180,19 @@ export function createNativeImService(options = {}) {
   async function deleteClowderCat(catId) {
     const id = String(catId || '').trim();
     if (!id) throw { msg: 'catId不能为空' };
-    return client.delete(`clowder/cats/${encodeURIComponent(id)}`);
+    try {
+      return await client.delete(`clowder/cats/${encodeURIComponent(id)}`);
+    } catch (error) {
+      if (isNotFoundError(error)) {
+        return {
+          deleted: true,
+          id,
+          alreadyDeleted: true,
+          status: Number(error.status || error.statusCode || 404)
+        };
+      }
+      throw error;
+    }
   }
 
   async function fetchClowderCatDirectory(params = {}) {
@@ -1419,6 +1444,7 @@ export function createNativeImService(options = {}) {
     updateConversationSettings,
     updateConversationExtra,
     clearConversationUnread,
+    deleteConversation,
     syncFriends,
     searchUser,
     applyFriend,

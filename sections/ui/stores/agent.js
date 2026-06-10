@@ -6,6 +6,8 @@ import {
   oauthProviderForPlatform
 } from '@/services/native-im/oauth';
 import {
+  filterDeletedAgents,
+  markAgentDeleted,
   resolveAgentDeleteIdentity,
   isAgentMatch
 } from '@/services/native-im/agent-cleanup';
@@ -14,6 +16,7 @@ import {
   normalizeSkillCatalogPreview,
   normalizeUserSkillList
 } from '@/services/native-im/skill-state';
+import { useConversationStore } from '@/stores/conversation';
 
 const STATIC_AGENT_IDS = new Set([
   'pm-agent',
@@ -29,6 +32,40 @@ function agentErrorText(error) {
   return error?.msg || error?.message || '智能体目录同步失败';
 }
 
+function readCurrentUserId() {
+  if (typeof uni === 'undefined' || typeof uni.getStorageSync !== 'function') return 'anonymous';
+  try {
+    const raw = uni.getStorageSync('app_user');
+    const user = raw ? JSON.parse(raw) : {};
+    return String(user.id || user.uid || user.raw?.uid || uni.getStorageSync('app_user_uid') || 'anonymous');
+  } catch {
+    return 'anonymous';
+  }
+}
+
+function deletedAgentStorageKey() {
+  return `agenthub:deleted-agents:${readCurrentUserId()}`;
+}
+
+function readDeletedAgentCache() {
+  if (typeof uni === 'undefined' || typeof uni.getStorageSync !== 'function') return {};
+  try {
+    const raw = uni.getStorageSync(deletedAgentStorageKey());
+    return raw ? JSON.parse(raw) : {};
+  } catch {
+    return {};
+  }
+}
+
+function writeDeletedAgentCache(cache) {
+  if (typeof uni === 'undefined' || typeof uni.setStorageSync !== 'function') return;
+  try {
+    uni.setStorageSync(deletedAgentStorageKey(), JSON.stringify(cache || {}));
+  } catch {
+    // local delete barriers should not block agent catalog rendering
+  }
+}
+
 export const useAgentStore = defineStore('agent', {
   state: () => ({
     syncState: 'idle',
@@ -40,6 +77,7 @@ export const useAgentStore = defineStore('agent', {
     localOAuthError: '',
     localOAuthLoaded: false,
     localOAuthInflight: null,
+    deletedAgentRecords: readDeletedAgentCache(),
     agents: [
       { id: 'pm-agent', name: 'PM 智能体', alias: '@pm', desc: '项目管理专家，辅助拆解计划与里程碑', avatar: '', status: 'active', creator: 'System', platform: 'claude-code', accessMode: 'oauth', model: 'Claude 3.5 Sonnet', accountRef: 'agenthub-default', apiKey: '', apiUrl: '', customModel: '', systemPrompt: '', roleTemplate: 'general', templateId: 'reviewer', capabilityTags: ['计划', '里程碑'] },
       { id: 'codex', name: 'Codex', alias: '@codex', desc: '代码生成专家，适合快速实现与重构', avatar: '', status: 'active', creator: 'System', platform: 'codex', accessMode: 'api-key', model: 'DeepSeek V3', accountRef: 'openai-prod', apiKey: '', apiUrl: 'https://api.deepseek.com/v1', customModel: '', systemPrompt: '', roleTemplate: 'engineer', templateId: 'engineer', capabilityTags: ['代码生成', '重构'] },
@@ -451,13 +489,19 @@ export const useAgentStore = defineStore('agent', {
     },
     applyNativeAgents(agents = []) {
       if (!Array.isArray(agents) || agents.length === 0) return [];
-      const backendIds = new Set(agents.map((agent) => agent.id).filter(Boolean));
+      this.deletedAgentRecords = {
+        ...readDeletedAgentCache(),
+        ...this.deletedAgentRecords
+      };
+      const activeAgents = filterDeletedAgents(agents, this.deletedAgentRecords);
+      const backendIds = new Set(activeAgents.map((agent) => agent.id).filter(Boolean));
       const retainedLocalAgents = this.agents.filter((agent) => {
         if (agent.source === 'clowder') return false;
         if (STATIC_AGENT_IDS.has(agent.id)) return false;
         return agent.source === 'user' && !backendIds.has(agent.id);
       });
-      this.agents = [...agents, ...retainedLocalAgents];
+      this.agents = [...activeAgents, ...retainedLocalAgents];
+      useConversationStore().applyAgentDirectory(this.agents);
       return this.agents;
     },
     applyNativeSkills(skillCatalog = {}) {
@@ -736,14 +780,22 @@ export const useAgentStore = defineStore('agent', {
       if (!identity.catId) throw { msg: '无法识别智能体 catId' };
       try {
         const remote = await nativeImService.deleteClowderCat(identity.catId);
+        markAgentDeleted(this.deletedAgentRecords, agent);
+        writeDeletedAgentCache(this.deletedAgentRecords);
         this.agents = this.agents.filter((item) => !isAgentMatch(item, identity));
 
         let cleanup = null;
-        const { useConversationStore } = await import('@/stores/conversation');
         const convStore = useConversationStore();
         cleanup = convStore.cleanupAgentReferences(agent, options);
+        const deleteRecentTasks = cleanup.directConversationIds.map((conversationId) => (
+          nativeImService.deleteConversation({
+            channelId: conversationId,
+            channelType: 1
+          }).catch((error) => ({ error, conversationId }))
+        ));
+        await Promise.all(deleteRecentTasks);
 
-        if (options.deleteDirectMessages) {
+        if (options.deleteDirectMessages !== false) {
           const { useMessageStore } = await import('@/stores/message');
           const messageStore = useMessageStore();
           identity.directConversationIds.forEach((conversationId) => {

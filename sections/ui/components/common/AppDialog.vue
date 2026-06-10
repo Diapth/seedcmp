@@ -2,12 +2,12 @@
   <Teleport to="body" v-if="isClient && visible">
     <view
       class="app-dialog-mask"
-      :class="['variant-' + variant, 'width-' + width]"
+      :class="'variant-' + variant"
       @click.self="handleMaskClick"
       @touchmove.stop.prevent="noop"
     >
       <!-- Action Sheet: 列表式选项，点选即关闭 -->
-      <view v-if="variant === 'action-sheet'" class="app-dialog-container glass-panel sheet-action">
+      <view v-if="variant === 'action-sheet'" class="app-dialog-container glass-panel sheet-action" :class="'width-' + width">
         <scroll-view scroll-y class="sheet-action-list">
           <view
             v-for="(item, idx) in actionItems"
@@ -28,6 +28,7 @@
       <view
         v-else-if="variant === 'bottom-sheet'"
         class="app-dialog-container glass-panel sheet-bottom"
+        :class="'width-' + width"
       >
         <view v-if="$slots.header || title" class="dialog-header">
           <slot name="header">
@@ -67,6 +68,7 @@
       <view
         v-else-if="variant === 'popover'"
         class="app-dialog-container glass-panel popover"
+        :class="'width-' + width"
         :style="popoverStyle"
       >
         <view v-if="$slots.header || title" class="dialog-header">
@@ -102,7 +104,7 @@
       </view>
 
       <!-- Confirm (default) -->
-      <view v-else class="app-dialog-container glass-panel confirm">
+      <view v-else class="app-dialog-container glass-panel confirm" :class="'width-' + width">
         <view v-if="$slots.header || title" class="dialog-header">
           <slot name="header">
             <text class="dialog-title">{{ title }}</text>

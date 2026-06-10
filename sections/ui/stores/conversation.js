@@ -3,14 +3,21 @@ import { nativeImService } from '@/services/native-im/service';
 import { isAuthExpiredError } from '@/services/native-im/api-client';
 import {
   applyDraftToConversationList,
+  createDeletedConversationRecord,
+  conversationDeleteKey,
   conversationDraftKey,
+  conversationReadKey,
   dropMockConversations,
+  filterDeletedConversations,
   mergeNativeConversationTimeline,
   mergeRemoteDrafts,
   shouldPersistConversationDraft,
+  shouldSuppressDeletedConversation,
+  totalDisplayUnread,
   upsertGroupConversation
 } from '@/services/native-im/conversation-state';
 import {
+  applyClowderAgentDirectoryToConversations,
   createAgentConversation,
   createAgentMember,
   shouldPreserveClowderAgentDisplayName
@@ -54,6 +61,10 @@ function draftStorageKey() {
 
 function draftClearStorageKey() {
   return `agenthub:conversation-draft-clears:${readCurrentUserId()}`;
+}
+
+function deletedConversationStorageKey() {
+  return `agenthub:deleted-conversations:${readCurrentUserId()}`;
 }
 
 function readDraftCache() {
@@ -127,6 +138,25 @@ function readDraftClearedKeys() {
   return new Set(Object.keys(readDraftClearCache()));
 }
 
+function readDeletedConversationCache() {
+  if (typeof uni === 'undefined' || typeof uni.getStorageSync !== 'function') return {};
+  try {
+    const raw = uni.getStorageSync(deletedConversationStorageKey());
+    return raw ? JSON.parse(raw) : {};
+  } catch {
+    return {};
+  }
+}
+
+function writeDeletedConversationCache(cache) {
+  if (typeof uni === 'undefined' || typeof uni.setStorageSync !== 'function') return;
+  try {
+    uni.setStorageSync(deletedConversationStorageKey(), JSON.stringify(cache || {}));
+  } catch {
+    // local delete barriers should not block conversation rendering
+  }
+}
+
 export const useConversationStore = defineStore('conversation', {
   state: () => ({
     activeId: '',
@@ -135,6 +165,8 @@ export const useConversationStore = defineStore('conversation', {
     lastNativeSyncAt: 0,
     draftDirtyKeys: {},
     draftSyncTimers: {},
+    readMarkers: {},
+    deletedRecords: readDeletedConversationCache(),
     conversations: [
       {
         id: '1',
@@ -233,6 +265,12 @@ export const useConversationStore = defineStore('conversation', {
     hiddenConversations(state) {
       return state.conversations.filter((c) => state.isHidden.includes(c.id));
     },
+    totalUnread(state) {
+      return totalDisplayUnread(state.conversations, {
+        activeId: state.activeId,
+        readMarkers: state.readMarkers
+      });
+    },
     groupMembers(state) {
       return (convId) => state.members[convId] || [];
     },
@@ -249,6 +287,11 @@ export const useConversationStore = defineStore('conversation', {
       const conv = this.conversations.find((c) => c.id === id);
       if (conv) {
         conv.unread = 0;
+        const identity = this.getConversationIdentity(conv);
+        this.readMarkers[conversationReadKey(identity.channelId, identity.channelType)] = {
+          seq: conv.lastSeq || 0,
+          time: Math.max(Date.now(), Number(conv.lastTime || 0))
+        };
       }
     },
     async markConversationRead(conversationOrId, options = {}) {
@@ -388,12 +431,51 @@ export const useConversationStore = defineStore('conversation', {
     unhideConversation(id) {
       this.isHidden = this.isHidden.filter((x) => x !== id);
     },
-    deleteConversation(id) {
-      this.conversations = this.conversations.filter((c) => c.id !== id);
-      this.isHidden = this.isHidden.filter((x) => x !== id);
-      if (this.activeId === id) this.activeId = '';
+    markConversationDeleted(conversationOrId) {
+      const conversation = typeof conversationOrId === 'string'
+        ? this.conversations.find((item) => item.id === conversationOrId || item.channelId === conversationOrId)
+        : conversationOrId;
+      const identity = this.getConversationIdentity(conversation || conversationOrId);
+      if (!identity.channelId) return '';
+      const key = conversationDeleteKey(identity.channelId, identity.channelType);
+      this.deletedRecords[key] = createDeletedConversationRecord(conversation || {
+        id: identity.channelId,
+        channelId: identity.channelId,
+        channelType: identity.channelType
+      });
+      writeDeletedConversationCache(this.deletedRecords);
+      return key;
+    },
+    forgetDeletedConversation(conversationOrId) {
+      const identity = this.getConversationIdentity(conversationOrId);
+      const key = conversationDeleteKey(identity.channelId, identity.channelType);
+      if (!Object.prototype.hasOwnProperty.call(this.deletedRecords, key)) return;
+      delete this.deletedRecords[key];
+      writeDeletedConversationCache(this.deletedRecords);
+    },
+    async deleteConversation(id, options = {}) {
+      const conversation = this.conversations.find((c) => c.id === id || c.channelId === id);
+      const identity = this.getConversationIdentity(conversation || id);
+      const conversationId = conversation?.id || identity.conversationId || id;
+      this.markConversationDeleted(conversation || identity);
+      this.conversations = this.conversations.filter((c) => c.id !== conversationId && c.channelId !== identity.channelId);
+      this.isHidden = this.isHidden.filter((x) => x !== conversationId && x !== identity.channelId);
+      if (this.activeId === conversationId || this.activeId === identity.channelId) this.activeId = '';
+      if (options.persist === false || !identity.channelId) return { deleted: true, localOnly: true };
+      try {
+        await nativeImService.deleteConversation({
+          channelId: identity.channelId,
+          channelType: identity.channelType
+        });
+        return { deleted: true, localOnly: false };
+      } catch (error) {
+        this.syncError = errorText(error);
+        if (options.throwOnError) throw error;
+        return { deleted: true, localOnly: true, error };
+      }
     },
     cleanupAgentReferences(agent, options = {}) {
+      const previousConversations = [...this.conversations];
       const next = cleanupAgentFromLocalState({
         conversations: this.conversations,
         members: this.members,
@@ -404,6 +486,17 @@ export const useConversationStore = defineStore('conversation', {
       this.members = next.members;
       this.activeId = next.activeId;
       this.isHidden = this.isHidden.filter((id) => !next.removedConversationIds.includes(id));
+      next.directConversationIds.forEach((id) => {
+        const previous = previousConversations.find((conversation) => conversation.id === id || conversation.channelId === id);
+        const tombstoneConversation = previous || {
+          id,
+          channelId: id,
+          channelType: 1,
+          lastSeq: Number.MAX_SAFE_INTEGER,
+          lastTime: Date.now()
+        };
+        this.markConversationDeleted(tombstoneConversation);
+      });
       return {
         ...next,
         identity: resolveAgentDeleteIdentity(agent)
@@ -513,12 +606,21 @@ export const useConversationStore = defineStore('conversation', {
       if (creatorId) this.creatorIds[convId] = creatorId;
     },
     applyNativeConversations(list = [], options = {}) {
+      this.deletedRecords = {
+        ...readDeletedConversationCache(),
+        ...this.deletedRecords
+      };
       if (options.replaceMock || list.length > 0) {
         this.conversations = dropMockConversations(this.conversations);
       }
       const draftCache = readDraftCache();
       const clearedDraftKeys = readDraftClearedKeys();
+      const activeList = filterDeletedConversations(list, this.deletedRecords);
       list.forEach((nativeConversation) => {
+        if (shouldSuppressDeletedConversation(nativeConversation, this.deletedRecords)) return;
+        this.forgetDeletedConversation(nativeConversation);
+      });
+      activeList.forEach((nativeConversation) => {
         const existing = this.conversations.find((item) => {
           if (nativeConversation.key && item.key === nativeConversation.key) return true;
           return item.id === nativeConversation.id && channelTypeFromConversation(item) === nativeConversation.channelType;
@@ -564,6 +666,11 @@ export const useConversationStore = defineStore('conversation', {
           });
           if (existing.id === this.activeId) {
             existing.unread = 0;
+            const activeIdentity = this.getConversationIdentity(existing);
+            this.readMarkers[conversationReadKey(activeIdentity.channelId, activeIdentity.channelType)] = {
+              seq: existing.lastSeq || 0,
+              time: Math.max(Date.now(), Number(existing.lastTime || 0))
+            };
           }
           if (localHidden && !this.isHidden.includes(existing.id)) this.isHidden.push(existing.id);
         } else {
@@ -577,7 +684,7 @@ export const useConversationStore = defineStore('conversation', {
           });
         }
       });
-      this.conversations = mergeRemoteDrafts(this.conversations, list, {
+      this.conversations = mergeRemoteDrafts(this.conversations, activeList, {
         dirtyKeys: new Set(Object.keys(this.draftDirtyKeys)),
         clearedKeys: readDraftClearedKeys()
       });
@@ -607,7 +714,7 @@ export const useConversationStore = defineStore('conversation', {
         channelId: conversation.channelId || conversation.id,
         channelType: conversation.channelType || channelTypeFromConversation(conversation),
         type: conversation.type || (conversation.channelType === 2 ? 'group' : 'single'),
-        unread: 0,
+        unread: conversation.unread || 0,
         lastTime: Date.now(),
         isPinned: false,
         isMuted: false,
@@ -624,6 +731,7 @@ export const useConversationStore = defineStore('conversation', {
     upsertAgentConversation(agent) {
       const nextConversation = createAgentConversation(agent);
       if (!nextConversation.id) return null;
+      this.forgetDeletedConversation(nextConversation);
       const existing = this.conversations.find((item) => item.id === nextConversation.id);
       if (existing) {
         Object.assign(existing, {
@@ -637,6 +745,10 @@ export const useConversationStore = defineStore('conversation', {
         this.conversations.unshift(nextConversation);
       }
       return this.conversations.find((item) => item.id === nextConversation.id) || null;
+    },
+    applyAgentDirectory(agents = []) {
+      this.conversations = applyClowderAgentDirectoryToConversations(this.conversations, agents);
+      this.conversations = sortConversations(this.conversations);
     },
     applyNativeGroups(groups = []) {
       groups.forEach((group) => {
