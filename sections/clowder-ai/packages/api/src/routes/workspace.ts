@@ -37,7 +37,7 @@ import {
 
 const execFileAsync = promisify(execFile);
 const MAX_FILE_SIZE = 1024 * 1024; // 1 MB text preview
-const MAX_IMAGE_SIZE = 10 * 1024 * 1024; // 10 MB image preview
+const MAX_RAW_PREVIEW_SIZE = 50 * 1024 * 1024; // 50 MB preview/download source
 const MAX_SEARCH_RESULTS = 100;
 const MAX_TREE_DEPTH = 5;
 const MAX_CONTENT_SEARCH_FILE_SIZE = 10 * 1024 * 1024; // 10 MB per searchable text file
@@ -67,8 +67,11 @@ const MIME_MAP: Record<string, string> = {
   '.jsx': 'text/jsx',
   '.json': 'application/json',
   '.md': 'text/markdown',
+  '.markdown': 'text/markdown',
+  '.txt': 'text/plain',
   '.css': 'text/css',
   '.html': 'text/html',
+  '.htm': 'text/html',
   '.svg': 'image/svg+xml',
   '.png': 'image/png',
   '.jpg': 'image/jpeg',
@@ -81,6 +84,14 @@ const MIME_MAP: Record<string, string> = {
   '.toml': 'text/toml',
   '.sh': 'text/x-shellscript',
   '.py': 'text/x-python',
+  '.pdf': 'application/pdf',
+  '.doc': 'application/msword',
+  '.docx': 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+  '.ppt': 'application/vnd.ms-powerpoint',
+  '.pptx': 'application/vnd.openxmlformats-officedocument.presentationml.presentation',
+  '.xls': 'application/vnd.ms-excel',
+  '.xlsx': 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+  '.csv': 'text/csv',
   // Audio
   '.mp3': 'audio/mpeg',
   '.wav': 'audio/wav',
@@ -93,8 +104,62 @@ const MIME_MAP: Record<string, string> = {
   '.mov': 'video/quicktime',
 };
 
+const RAW_PREVIEW_EXTENSIONS = new Set([
+  '.md',
+  '.markdown',
+  '.txt',
+  '.json',
+  '.js',
+  '.ts',
+  '.jsx',
+  '.tsx',
+  '.css',
+  '.less',
+  '.scss',
+  '.vue',
+  '.py',
+  '.java',
+  '.cpp',
+  '.c',
+  '.go',
+  '.sql',
+  '.sh',
+  '.xml',
+  '.yaml',
+  '.yml',
+  '.html',
+  '.htm',
+  '.csv',
+  '.pdf',
+  '.doc',
+  '.docx',
+  '.ppt',
+  '.pptx',
+  '.xls',
+  '.xlsx',
+  '.svg',
+  '.png',
+  '.jpg',
+  '.jpeg',
+  '.gif',
+  '.webp',
+  '.ico',
+  '.mp3',
+  '.wav',
+  '.m4a',
+  '.ogg',
+  '.flac',
+  '.mp4',
+  '.webm',
+  '.mov',
+]);
+
 function guessMime(filepath: string): string {
   return MIME_MAP[extname(filepath)] ?? 'text/plain';
+}
+
+function canServeRawPreview(filepath: string): boolean {
+  return RAW_PREVIEW_EXTENSIONS.has(extname(filepath).toLowerCase());
 }
 
 function sha256(content: string): string {
@@ -413,16 +478,15 @@ export const workspaceRoutes: FastifyPluginAsync<WorkspaceRouteOpts> = async (ap
         return { error: 'Path is a directory' };
       }
 
-      const mime = guessMime(resolved);
-      const isMedia = mime.startsWith('image/') || mime.startsWith('audio/') || mime.startsWith('video/');
-      if (!isMedia) {
+      if (!canServeRawPreview(resolved)) {
         reply.status(400);
-        return { error: 'Raw endpoint only serves image, audio, and video files' };
+        return { error: 'Raw endpoint only serves preview-safe workspace files' };
       }
-      if (fileStat.size > MAX_IMAGE_SIZE) {
+      if (fileStat.size > MAX_RAW_PREVIEW_SIZE) {
         reply.status(413);
-        return { error: `File too large (${Math.round(fileStat.size / 1024 / 1024)}MB, max 10MB)` };
+        return { error: `File too large (${Math.round(fileStat.size / 1024 / 1024)}MB, max 50MB)` };
       }
+      const mime = guessMime(resolved);
       reply.header('Content-Type', mime);
       reply.header('Content-Length', fileStat.size);
       reply.header('Cache-Control', 'private, max-age=60');

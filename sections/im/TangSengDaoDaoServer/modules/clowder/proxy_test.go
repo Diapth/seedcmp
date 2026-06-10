@@ -9,6 +9,9 @@ import (
 	"time"
 
 	commonmodule "github.com/TangSengDaoDao/TangSengDaoDaoServer/modules/common"
+	"github.com/TangSengDaoDao/TangSengDaoDaoServerLib/config"
+	"github.com/TangSengDaoDao/TangSengDaoDaoServerLib/pkg/wkhttp"
+	"github.com/TangSengDaoDao/TangSengDaoDaoServerLib/server"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -202,6 +205,56 @@ func TestFetchCatDirectoryUsesDirectHubAndKeepsExistingRagdoll(t *testing.T) {
 	assert.NotContains(t, gotPaths[0], "externalChatId=1%3Aclowder_ai&")
 	assert.Equal(t, "/api/cat-templates", gotPaths[1])
 	assert.Equal(t, []string{"owner-1", "owner-1"}, gotUsers)
+}
+
+func TestWorkspaceRawProxyPreservesContentTypeAndQuery(t *testing.T) {
+	var gotUser string
+	upstream := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		gotUser = r.Header.Get("x-cat-cafe-user")
+		require.Equal(t, http.MethodGet, r.Method)
+		require.Equal(t, "/api/workspace/file/raw", r.URL.Path)
+		require.Equal(t, "main", r.URL.Query().Get("worktreeId"))
+		require.Equal(t, "slides/presentation.pptx", r.URL.Query().Get("path"))
+		w.Header().Set("Content-Type", "application/vnd.openxmlformats-officedocument.presentationml.presentation")
+		w.Header().Set("Cache-Control", "private, max-age=60")
+		_, _ = w.Write([]byte{0x50, 0x4b, 0x03, 0x04})
+	}))
+	defer upstream.Close()
+
+	cfg := config.New()
+	cfg.Test = true
+	appCtx := config.NewContext(cfg)
+	require.NoError(t, appCtx.Cache().Set(cfg.Cache.TokenCachePrefix+"workspace-token", wkhttp.EncodeTokenCacheInfo("im-user-1", "Workspace User", "")))
+
+	c := New(appCtx)
+	c.SetConfig(commonmodule.ClowderBridgeConfig{
+		Enabled:            true,
+		APIBaseURL:         upstream.URL,
+		ConnectorID:        "im-web",
+		ConnectorSecret:    "secret",
+		DefaultOwnerUserID: "owner-1",
+		RequestTimeout:     time.Second,
+		SignatureTolerance: time.Minute,
+	})
+	s := server.New(appCtx)
+	c.Route(s.GetRoute())
+
+	recorder := httptest.NewRecorder()
+	req, err := http.NewRequest(
+		http.MethodGet,
+		"/v1/clowder/workspace/file/raw?worktreeId=main&path=slides%2Fpresentation.pptx",
+		nil,
+	)
+	require.NoError(t, err)
+	req.Header.Set("token", "workspace-token")
+
+	s.GetRoute().ServeHTTP(recorder, req)
+
+	require.Equal(t, http.StatusOK, recorder.Code)
+	assert.Equal(t, "owner-1", gotUser)
+	assert.Equal(t, "application/vnd.openxmlformats-officedocument.presentationml.presentation", recorder.Header().Get("Content-Type"))
+	assert.Equal(t, "private, max-age=60", recorder.Header().Get("Cache-Control"))
+	assert.Equal(t, []byte{0x50, 0x4b, 0x03, 0x04}, recorder.Body.Bytes())
 }
 
 func TestFetchCatDirectoryFallsBackToTemplateCandidatesWhenAgentDirectoryFails(t *testing.T) {

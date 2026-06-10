@@ -74,6 +74,9 @@ import {
   updateDeploymentCardMessage,
   upsertDeploymentCardMessage
 } from '../services/native-im/deployment.js';
+import {
+  buildPreviewFilePayload
+} from '../services/native-im/file-preview.js';
 
 function makeRequestStub(responses = {}) {
   const calls = [];
@@ -2923,6 +2926,60 @@ test('native clowder duplicate durable replies with different ids collapse', () 
   assert.equal(merged.length, 1);
   assert.equal(merged[0].content, first.content);
   assert.equal(merged[0].senderId, 'clowder_cat:luoluo');
+});
+
+test('native clowder generated workspace files resolve through clowder workspace raw proxy', () => {
+  const normalized = messageState.normalizeAgentReplyEvent({
+    streamKey: 'ppt-artifact-stream',
+    phase: 'final',
+    content: 'PPTX 已生成：slides/presentation.pptx',
+    generatedFiles: [
+      {
+        fileName: 'presentation.pptx',
+        fileType: 'pptx',
+        path: 'slides/presentation.pptx',
+        worktreeId: 'main'
+      }
+    ]
+  });
+
+  assert.equal(normalized.files.length, 1);
+  const file = normalized.files[0];
+  assert.equal(file.fileName, 'presentation.pptx');
+  assert.equal(file.path, 'slides/presentation.pptx');
+  assert.equal(file.worktreeId, 'main');
+  assert.equal(
+    file.url,
+    '/v1/clowder/workspace/file/raw?worktreeId=main&path=slides%2Fpresentation.pptx'
+  );
+  assert.notEqual(file.url, 'slides/presentation.pptx');
+  assert.equal(file.sourceUrl, file.url);
+  assert.equal(file.contentUrl, file.url);
+});
+
+test('mobile preview payload keeps workspace path without treating file name as inline content', () => {
+  const payload = buildPreviewFilePayload({
+    id: 'issue044-file',
+    fileName: 'lesson.md',
+    content: 'lesson.md',
+    fileType: 'md',
+    url: '/v1/clowder/workspace/file/raw?worktreeId=seedcmp&path=slides%2Flesson.md',
+    sourceUrl: '/v1/clowder/workspace/file/raw?worktreeId=seedcmp&path=slides%2Flesson.md',
+    contentUrl: '/v1/clowder/workspace/file/raw?worktreeId=seedcmp&path=slides%2Flesson.md',
+    path: 'slides/lesson.md',
+    workspacePath: 'slides/lesson.md',
+    worktreeId: 'seedcmp',
+    source: 'clowder',
+    generatedByAgent: true
+  });
+
+  assert.equal(payload.name, 'lesson.md');
+  assert.equal(payload.content, 'lesson.md');
+  assert.equal(payload.previewContent, '');
+  assert.equal(payload.path, 'slides/lesson.md');
+  assert.equal(payload.workspacePath, 'slides/lesson.md');
+  assert.equal(payload.worktreeId, 'seedcmp');
+  assert.equal(payload.generatedByAgent, true);
 });
 
 test('conversation summary turns long clowder markdown into one line preview', () => {

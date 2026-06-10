@@ -1,12 +1,13 @@
 /**
- * Integration tests for GET /api/workspace/file/raw — F063 AC-8 image preview + Gap 5 media
+ * Integration tests for GET /api/workspace/file/raw — F063 AC-8 image/media
+ * preview plus Clowder generated workspace artifacts.
  *
  * Uses the REAL workspaceRoutes plugin (not a mirror), injecting against
  * the actual production route handler. Test files are created in a temp
  * subdirectory of this worktree and cleaned up after.
  *
  * Security properties verified:
- * 1. Only media MIME types served (image/audio/video; others → 400)
+ * 1. Only preview-safe MIME/extensions are served
  * 2. Path traversal/denylist inherited from resolveWorkspacePath
  * 3. Correct Content-Type / Content-Length headers
  * 4. Missing params → 400, nonexistent file → 404
@@ -47,6 +48,7 @@ describe('workspace file/raw endpoint (integration)', () => {
     await writeFile(join(testBase, 'logo.png'), TINY_PNG);
     await writeFile(join(testBase, 'photo.jpg'), TINY_PNG); // fake jpg
     await writeFile(join(testBase, 'code.ts'), 'export {}');
+    await writeFile(join(testBase, 'presentation.pptx'), Buffer.from([0x50, 0x4b, 0x03, 0x04]));
     // Fake audio/video files (content doesn't matter for MIME routing)
     await writeFile(join(testBase, 'clip.mp3'), Buffer.from([0xff, 0xfb, 0x90, 0x00]));
     await writeFile(join(testBase, 'demo.mp4'), Buffer.from([0x00, 0x00, 0x00, 0x1c]));
@@ -110,16 +112,29 @@ describe('workspace file/raw endpoint (integration)', () => {
     assert.equal(res.headers['content-type'], 'video/mp4');
   });
 
-  // ── Non-media files rejected ──
+  // ── Preview-safe text and Office artifacts served ──
 
-  it('rejects non-media files with 400', async () => {
+  it('serves source text files with correct Content-Type', async () => {
     const res = await app.inject({
       method: 'GET',
       url: `/api/workspace/file/raw?worktreeId=${worktreeId}&path=${TEST_DIR}/code.ts`,
     });
-    assert.equal(res.statusCode, 400);
-    const body = JSON.parse(res.payload);
-    assert.ok(body.error.includes('image'));
+    assert.equal(res.statusCode, 200);
+    assert.equal(res.headers['content-type'], 'text/typescript');
+    assert.equal(res.payload, 'export {}');
+  });
+
+  it('serves PPTX artifacts with correct Content-Type', async () => {
+    const res = await app.inject({
+      method: 'GET',
+      url: `/api/workspace/file/raw?worktreeId=${worktreeId}&path=${TEST_DIR}/presentation.pptx`,
+    });
+    assert.equal(res.statusCode, 200);
+    assert.equal(
+      res.headers['content-type'],
+      'application/vnd.openxmlformats-officedocument.presentationml.presentation',
+    );
+    assert.ok(Number(res.headers['content-length']) > 0);
   });
 
   // ── Security inheritance from resolveWorkspacePath ──

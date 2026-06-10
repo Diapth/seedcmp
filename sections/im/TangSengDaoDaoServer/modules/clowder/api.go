@@ -110,6 +110,8 @@ func (c *Clowder) Route(r *wkhttp.WKHttp) {
 		// Phase 4.2: Workspace path validation — read-only preview of the
 		// rules enforced by `POST /api/threads` in Clowder 3004.
 		auth.GET("/workspace/validate", c.validateWorkspacePath)
+		auth.GET("/workspace/file", c.proxyWorkspaceFile)
+		auth.GET("/workspace/file/raw", c.proxyWorkspaceFileRaw)
 		// Phase 4.5 + 5.2: thread tasks + artifacts REST.
 		// We don't know the threadId prefix here, so we proxy the
 		// `/v1/clowder/thread/...` shape to `/api/threads/...` upstream.
@@ -528,6 +530,47 @@ func (c *Clowder) validateWorkspacePath(ctx *wkhttp.Context) {
 
 	body, _ := io.ReadAll(res.Body)
 	ctx.Data(res.StatusCode, "application/json; charset=utf-8", body)
+}
+
+func (c *Clowder) proxyWorkspaceFile(ctx *wkhttp.Context) {
+	c.proxyToClowder(ctx, http.MethodGet, "/api/workspace/file", nil, "workspace_file_unavailable")
+}
+
+func (c *Clowder) proxyWorkspaceFileRaw(ctx *wkhttp.Context) {
+	if !c.config.IsConfigured() {
+		ctx.JSON(http.StatusBadGateway, map[string]string{"error": "clowder_bridge_not_configured"})
+		return
+	}
+	endpoint := strings.TrimRight(c.config.APIBaseURL, "/") + "/api/workspace/file/raw"
+	if rawQuery := strings.TrimSpace(ctx.Request.URL.RawQuery); rawQuery != "" {
+		endpoint += "?" + rawQuery
+	}
+	req, err := http.NewRequest(http.MethodGet, endpoint, nil)
+	if err != nil {
+		ctx.JSON(http.StatusInternalServerError, map[string]string{"error": "build_request_failed", "message": err.Error()})
+		return
+	}
+	c.applyDirectoryUserHeader(req, ctx.GetLoginUID())
+
+	res, err := c.httpClient().Do(req)
+	if err != nil {
+		ctx.JSON(http.StatusBadGateway, map[string]string{"error": "workspace_file_raw_unavailable", "message": err.Error()})
+		return
+	}
+	defer res.Body.Close()
+
+	contentType := strings.TrimSpace(res.Header.Get("Content-Type"))
+	if contentType == "" {
+		contentType = "application/octet-stream"
+	}
+	if cacheControl := strings.TrimSpace(res.Header.Get("Cache-Control")); cacheControl != "" {
+		ctx.Header("Cache-Control", cacheControl)
+	}
+	if disposition := strings.TrimSpace(res.Header.Get("Content-Disposition")); disposition != "" {
+		ctx.Header("Content-Disposition", disposition)
+	}
+	body, _ := io.ReadAll(res.Body)
+	ctx.Data(res.StatusCode, contentType, body)
 }
 
 // proxyThreadTasks proxies `GET /api/threads/:threadId/tasks` (Phase 5) to

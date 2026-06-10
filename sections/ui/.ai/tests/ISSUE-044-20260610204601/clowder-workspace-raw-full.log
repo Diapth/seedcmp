@@ -1,0 +1,26 @@
+▶ workspace file/raw endpoint (integration)
+  ✔ serves PNG with correct Content-Type (15.912636ms)
+  ✔ serves JPG with correct Content-Type (5.596799ms)
+  ✔ serves MP3 with correct Content-Type (6.415238ms)
+  ✔ serves MP4 with correct Content-Type (4.454797ms)
+  ✔ serves source text files with correct Content-Type (4.280064ms)
+  ✔ serves PPTX artifacts with correct Content-Type (4.219344ms)
+  ✔ rejects path traversal (../) with 403 (4.097666ms)
+  ✔ rejects denylist files (.env) with 403 (4.211036ms)
+  ✔ rejects missing worktreeId with 400 (1.08136ms)
+  ✔ rejects missing path with 400 (0.931088ms)
+  ✔ returns 404 for nonexistent image (4.521955ms)
+✔ workspace file/raw endpoint (integration) (116.109302ms)
+▶ workspace reveal endpoint
+  ✔ rejects missing worktreeId (2.428388ms)
+  ✔ rejects missing path (1.259533ms)
+  ✔ rejects path traversal (5.180584ms)
+✔ workspace reveal endpoint (19.371351ms)
+ℹ tests 14
+ℹ suites 2
+ℹ pass 14
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 296.245204

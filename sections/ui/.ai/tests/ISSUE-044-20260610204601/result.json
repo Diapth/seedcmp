@@ -1,0 +1,163 @@
+{
+  "issue": "ISSUE-044",
+  "generatedAt": "2026-06-10T13:20:51.659Z",
+  "pass": true,
+  "results": [
+    {
+      "name": "desktop: generated file keeps workspace metadata",
+      "pass": true,
+      "detail": "{\"id\":\"issue044-file\",\"fileName\":\"lesson.md\",\"url\":\"/v1/clowder/workspace/file/raw?worktreeId=seedcmp&path=slides%2Flesson.md\",\"path\":\"slides/lesson.md\",\"workspacePath\":\"slides/lesson.md\",\"worktreeId\":\"seedcmp\",\"source\":\"clowder\",\"generatedByAgent\":true}"
+    },
+    {
+      "name": "desktop: preview title matches clicked file",
+      "pass": true,
+      "detail": "{\"previewTitle\":\"lesson.md\",\"markdownText\":\"Workspace Artifact Rendered 来自 Clowder workspace raw。\",\"hasWorkspaceText\":true,\"hasOldFastSlowTitle\":false,\"urlHash\":\"#/pages/chat/index\",\"previewWidth\":420,\"bodySample\":\"I\\n聊天\\n通讯录\\n智能体\\n文件\\n设置\\n开启新消息通知，不再遗漏任何消息\\n开启\\n搜索会话...\\n暹\\n暹罗猫（协调者）\\n21:20\\n[文件] lesson.md\\n暹罗猫（协调者）\\n智能体会话\\n21:20\\n暹\\n\\n产物已生成：slides/lesson.md\\n\\n暹\\nMD\\nlesson.md\\n未知大小\\n下载\\n预览\\n输入消息...\\nlesson.md\\n未知大小 · Markdown\\n源码\\n下载\\nWorkspace Artifact Rendered\\n\\n来自 Clowder workspace raw。\"}"
+    },
+    {
+      "name": "desktop: preview renders workspace raw markdown",
+      "pass": true,
+      "detail": "{\"visible\":{\"previewTitle\":\"lesson.md\",\"markdownText\":\"Workspace Artifact Rendered 来自 Clowder workspace raw。\",\"hasWorkspaceText\":true,\"hasOldFastSlowTitle\":false,\"urlHash\":\"#/pages/chat/index\",\"previewWidth\":420,\"bodySample\":\"I\\n聊天\\n通讯录\\n智能体\\n文件\\n设置\\n开启新消息通知，不再遗漏任何消息\\n开启\\n搜索会话...\\n暹\\n暹罗猫（协调者）\\n21:20\\n[文件] lesson.md\\n暹罗猫（协调者）\\n智能体会话\\n21:20\\n暹\\n\\n产物已生成：slides/lesson.md\\n\\n暹\\nMD\\nlesson.md\\n未知大小\\n下载\\n预览\\n输入消息...\\nlesson.md\\n未知大小 · Markdown\\n源码\\n下载\\nWorkspace Artifact Rendered\\n\\n来自 Clowder workspace raw。\"},\"rawRequests\":[{\"worktreeId\":\"seedcmp\",\"path\":\"slides/lesson.md\",\"href\":\"http://localhost:5173/v1/clowder/workspace/file/raw?worktreeId=seedcmp&path=slides%2Flesson.md\"}]}"
+    },
+    {
+      "name": "desktop: workspace raw API receives exact path",
+      "pass": true,
+      "detail": "[{\"worktreeId\":\"seedcmp\",\"path\":\"slides/lesson.md\",\"href\":\"http://localhost:5173/v1/clowder/workspace/file/raw?worktreeId=seedcmp&path=slides%2Flesson.md\"}]"
+    },
+    {
+      "name": "desktop: no frontend static fallback request",
+      "pass": true,
+      "detail": "[]"
+    },
+    {
+      "name": "desktop: stale preview is absent",
+      "pass": true,
+      "detail": "{\"previewTitle\":\"lesson.md\",\"markdownText\":\"Workspace Artifact Rendered 来自 Clowder workspace raw。\",\"hasWorkspaceText\":true,\"hasOldFastSlowTitle\":false,\"urlHash\":\"#/pages/chat/index\",\"previewWidth\":420,\"bodySample\":\"I\\n聊天\\n通讯录\\n智能体\\n文件\\n设置\\n开启新消息通知，不再遗漏任何消息\\n开启\\n搜索会话...\\n暹\\n暹罗猫（协调者）\\n21:20\\n[文件] lesson.md\\n暹罗猫（协调者）\\n智能体会话\\n21:20\\n暹\\n\\n产物已生成：slides/lesson.md\\n\\n暹\\nMD\\nlesson.md\\n未知大小\\n下载\\n预览\\n输入消息...\\nlesson.md\\n未知大小 · Markdown\\n源码\\n下载\\nWorkspace Artifact Rendered\\n\\n来自 Clowder workspace raw。\"}"
+    },
+    {
+      "name": "desktop: preview panel has usable width",
+      "pass": true,
+      "detail": "{\"previewTitle\":\"lesson.md\",\"markdownText\":\"Workspace Artifact Rendered 来自 Clowder workspace raw。\",\"hasWorkspaceText\":true,\"hasOldFastSlowTitle\":false,\"urlHash\":\"#/pages/chat/index\",\"previewWidth\":420,\"bodySample\":\"I\\n聊天\\n通讯录\\n智能体\\n文件\\n设置\\n开启新消息通知，不再遗漏任何消息\\n开启\\n搜索会话...\\n暹\\n暹罗猫（协调者）\\n21:20\\n[文件] lesson.md\\n暹罗猫（协调者）\\n智能体会话\\n21:20\\n暹\\n\\n产物已生成：slides/lesson.md\\n\\n暹\\nMD\\nlesson.md\\n未知大小\\n下载\\n预览\\n输入消息...\\nlesson.md\\n未知大小 · Markdown\\n源码\\n下载\\nWorkspace Artifact Rendered\\n\\n来自 Clowder workspace raw。\"}"
+    },
+    {
+      "name": "mobile: generated file keeps workspace metadata",
+      "pass": true,
+      "detail": "{\"id\":\"issue044-file\",\"fileName\":\"lesson.md\",\"url\":\"/v1/clowder/workspace/file/raw?worktreeId=seedcmp&path=slides%2Flesson.md\",\"path\":\"slides/lesson.md\",\"workspacePath\":\"slides/lesson.md\",\"worktreeId\":\"seedcmp\",\"source\":\"clowder\",\"generatedByAgent\":true}"
+    },
+    {
+      "name": "mobile: preview title matches clicked file",
+      "pass": true,
+      "detail": "{\"previewTitle\":\"lesson.md\",\"markdownText\":\"Workspace Artifact Rendered 来自 Clowder workspace raw。\",\"hasWorkspaceText\":true,\"hasOldFastSlowTitle\":false,\"urlHash\":\"#/pages/files/preview?file=%257B%2522id%2522%253A%2522issue044-file%2522%252C%2522conversationId%2522%253A%2522clowder_cat%253Aluoluo%2522%252C%2522name%2522%253A%2522lesson.md%2522%252C%2522fileName%2522%253A%2522lesson.md%2522%252C%2522content%2522%253A%2522lesson.md%2522%252C%2522fileSize%2522%253A%2522%2522%252C%2522size%2522%253A%2522%2522%252C%2522fileType%2522%253A%2522md%2522%252C%2522ext%2522%253A%2522md%2522%252C%2522url%2522%253A%2522%252Fv1%252Fclowder%252Fworkspace%252Ffile%252Fraw%253FworktreeId%253Dseedcmp%2526path%253Dslides%25252Flesson.md%2522%252C%2522sourceUrl%2522%253A%2522%252Fv1%252Fclowder%252Fworkspace%252Ffile%252Fraw%253FworktreeId%253Dseedcmp%2526path%253Dslides%25252Flesson.md%2522%252C%2522contentUrl%2522%253A%2522%252Fv1%252Fclowder%252Fworkspace%252Ffile%252Fraw%253FworktreeId%253Dseedcmp%2526path%253Dslides%25252Flesson.md%2522%252C%2522previewUrl%2522%253A%2522%2522%252C%2522downloadUrl%2522%253A%2522%2522%252C%2522path%2522%253A%2522slides%252Flesson.md%2522%252C%2522workspacePath%2522%253A%2522slides%252Flesson.md%2522%252C%2522worktreeId%2522%253A%2522seedcmp%2522%252C%2522source%2522%253A%2522clowder%2522%252C%2522generatedByAgent%2522%253Atrue%252C%2522previewContent%2522%253A%2522%2522%252C%2522contentText%2522%253A%2522%2522%252C%2522markdown%2522%253A%2522%2522%252C%2522text%2522%253A%2522%2522%257D\",\"previewWidth\":390,\"bodySample\":\"文件预览\\nlesson.md\\n未知大小 · Markdown\\nWorkspace Artifact Rendered\\n\\n来自 Clowder workspace raw。\"}"
+    },
+    {
+      "name": "mobile: preview renders workspace raw markdown",
+      "pass": true,
+      "detail": "{\"visible\":{\"previewTitle\":\"lesson.md\",\"markdownText\":\"Workspace Artifact Rendered 来自 Clowder workspace raw。\",\"hasWorkspaceText\":true,\"hasOldFastSlowTitle\":false,\"urlHash\":\"#/pages/files/preview?file=%257B%2522id%2522%253A%2522issue044-file%2522%252C%2522conversationId%2522%253A%2522clowder_cat%253Aluoluo%2522%252C%2522name%2522%253A%2522lesson.md%2522%252C%2522fileName%2522%253A%2522lesson.md%2522%252C%2522content%2522%253A%2522lesson.md%2522%252C%2522fileSize%2522%253A%2522%2522%252C%2522size%2522%253A%2522%2522%252C%2522fileType%2522%253A%2522md%2522%252C%2522ext%2522%253A%2522md%2522%252C%2522url%2522%253A%2522%252Fv1%252Fclowder%252Fworkspace%252Ffile%252Fraw%253FworktreeId%253Dseedcmp%2526path%253Dslides%25252Flesson.md%2522%252C%2522sourceUrl%2522%253A%2522%252Fv1%252Fclowder%252Fworkspace%252Ffile%252Fraw%253FworktreeId%253Dseedcmp%2526path%253Dslides%25252Flesson.md%2522%252C%2522contentUrl%2522%253A%2522%252Fv1%252Fclowder%252Fworkspace%252Ffile%252Fraw%253FworktreeId%253Dseedcmp%2526path%253Dslides%25252Flesson.md%2522%252C%2522previewUrl%2522%253A%2522%2522%252C%2522downloadUrl%2522%253A%2522%2522%252C%2522path%2522%253A%2522slides%252Flesson.md%2522%252C%2522workspacePath%2522%253A%2522slides%252Flesson.md%2522%252C%2522worktreeId%2522%253A%2522seedcmp%2522%252C%2522source%2522%253A%2522clowder%2522%252C%2522generatedByAgent%2522%253Atrue%252C%2522previewContent%2522%253A%2522%2522%252C%2522contentText%2522%253A%2522%2522%252C%2522markdown%2522%253A%2522%2522%252C%2522text%2522%253A%2522%2522%257D\",\"previewWidth\":390,\"bodySample\":\"文件预览\\nlesson.md\\n未知大小 · Markdown\\nWorkspace Artifact Rendered\\n\\n来自 Clowder workspace raw。\"},\"rawRequests\":[{\"worktreeId\":\"seedcmp\",\"path\":\"slides/lesson.md\",\"href\":\"http://localhost:5173/v1/clowder/workspace/file/raw?worktreeId=seedcmp&path=slides/lesson.md\"}]}"
+    },
+    {
+      "name": "mobile: workspace raw API receives exact path",
+      "pass": true,
+      "detail": "[{\"worktreeId\":\"seedcmp\",\"path\":\"slides/lesson.md\",\"href\":\"http://localhost:5173/v1/clowder/workspace/file/raw?worktreeId=seedcmp&path=slides/lesson.md\"}]"
+    },
+    {
+      "name": "mobile: no frontend static fallback request",
+      "pass": true,
+      "detail": "[]"
+    },
+    {
+      "name": "mobile: stale preview is absent",
+      "pass": true,
+      "detail": "{\"previewTitle\":\"lesson.md\",\"markdownText\":\"Workspace Artifact Rendered 来自 Clowder workspace raw。\",\"hasWorkspaceText\":true,\"hasOldFastSlowTitle\":false,\"urlHash\":\"#/pages/files/preview?file=%257B%2522id%2522%253A%2522issue044-file%2522%252C%2522conversationId%2522%253A%2522clowder_cat%253Aluoluo%2522%252C%2522name%2522%253A%2522lesson.md%2522%252C%2522fileName%2522%253A%2522lesson.md%2522%252C%2522content%2522%253A%2522lesson.md%2522%252C%2522fileSize%2522%253A%2522%2522%252C%2522size%2522%253A%2522%2522%252C%2522fileType%2522%253A%2522md%2522%252C%2522ext%2522%253A%2522md%2522%252C%2522url%2522%253A%2522%252Fv1%252Fclowder%252Fworkspace%252Ffile%252Fraw%253FworktreeId%253Dseedcmp%2526path%253Dslides%25252Flesson.md%2522%252C%2522sourceUrl%2522%253A%2522%252Fv1%252Fclowder%252Fworkspace%252Ffile%252Fraw%253FworktreeId%253Dseedcmp%2526path%253Dslides%25252Flesson.md%2522%252C%2522contentUrl%2522%253A%2522%252Fv1%252Fclowder%252Fworkspace%252Ffile%252Fraw%253FworktreeId%253Dseedcmp%2526path%253Dslides%25252Flesson.md%2522%252C%2522previewUrl%2522%253A%2522%2522%252C%2522downloadUrl%2522%253A%2522%2522%252C%2522path%2522%253A%2522slides%252Flesson.md%2522%252C%2522workspacePath%2522%253A%2522slides%252Flesson.md%2522%252C%2522worktreeId%2522%253A%2522seedcmp%2522%252C%2522source%2522%253A%2522clowder%2522%252C%2522generatedByAgent%2522%253Atrue%252C%2522previewContent%2522%253A%2522%2522%252C%2522contentText%2522%253A%2522%2522%252C%2522markdown%2522%253A%2522%2522%252C%2522text%2522%253A%2522%2522%257D\",\"previewWidth\":390,\"bodySample\":\"文件预览\\nlesson.md\\n未知大小 · Markdown\\nWorkspace Artifact Rendered\\n\\n来自 Clowder workspace raw。\"}"
+    },
+    {
+      "name": "mobile: preview panel has usable width",
+      "pass": true,
+      "detail": "{\"previewTitle\":\"lesson.md\",\"markdownText\":\"Workspace Artifact Rendered 来自 Clowder workspace raw。\",\"hasWorkspaceText\":true,\"hasOldFastSlowTitle\":false,\"urlHash\":\"#/pages/files/preview?file=%257B%2522id%2522%253A%2522issue044-file%2522%252C%2522conversationId%2522%253A%2522clowder_cat%253Aluoluo%2522%252C%2522name%2522%253A%2522lesson.md%2522%252C%2522fileName%2522%253A%2522lesson.md%2522%252C%2522content%2522%253A%2522lesson.md%2522%252C%2522fileSize%2522%253A%2522%2522%252C%2522size%2522%253A%2522%2522%252C%2522fileType%2522%253A%2522md%2522%252C%2522ext%2522%253A%2522md%2522%252C%2522url%2522%253A%2522%252Fv1%252Fclowder%252Fworkspace%252Ffile%252Fraw%253FworktreeId%253Dseedcmp%2526path%253Dslides%25252Flesson.md%2522%252C%2522sourceUrl%2522%253A%2522%252Fv1%252Fclowder%252Fworkspace%252Ffile%252Fraw%253FworktreeId%253Dseedcmp%2526path%253Dslides%25252Flesson.md%2522%252C%2522contentUrl%2522%253A%2522%252Fv1%252Fclowder%252Fworkspace%252Ffile%252Fraw%253FworktreeId%253Dseedcmp%2526path%253Dslides%25252Flesson.md%2522%252C%2522previewUrl%2522%253A%2522%2522%252C%2522downloadUrl%2522%253A%2522%2522%252C%2522path%2522%253A%2522slides%252Flesson.md%2522%252C%2522workspacePath%2522%253A%2522slides%252Flesson.md%2522%252C%2522worktreeId%2522%253A%2522seedcmp%2522%252C%2522source%2522%253A%2522clowder%2522%252C%2522generatedByAgent%2522%253Atrue%252C%2522previewContent%2522%253A%2522%2522%252C%2522contentText%2522%253A%2522%2522%252C%2522markdown%2522%253A%2522%2522%252C%2522text%2522%253A%2522%2522%257D\",\"previewWidth\":390,\"bodySample\":\"文件预览\\nlesson.md\\n未知大小 · Markdown\\nWorkspace Artifact Rendered\\n\\n来自 Clowder workspace raw。\"}"
+    }
+  ],
+  "details": [
+    {
+      "label": "desktop",
+      "session": {
+        "uid": "920939bd1d644f8ab7bc9e3a1b994e03"
+      },
+      "seeded": {
+        "conversation": {
+          "id": "clowder_cat:luoluo",
+          "name": "暹罗猫（协调者）",
+          "type": "robot",
+          "source": "clowder",
+          "directCatId": "luoluo"
+        },
+        "fileMessage": {
+          "id": "issue044-file",
+          "fileName": "lesson.md",
+          "url": "/v1/clowder/workspace/file/raw?worktreeId=seedcmp&path=slides%2Flesson.md",
+          "path": "slides/lesson.md",
+          "workspacePath": "slides/lesson.md",
+          "worktreeId": "seedcmp",
+          "source": "clowder",
+          "generatedByAgent": true
+        }
+      },
+      "visible": {
+        "previewTitle": "lesson.md",
+        "markdownText": "Workspace Artifact Rendered 来自 Clowder workspace raw。",
+        "hasWorkspaceText": true,
+        "hasOldFastSlowTitle": false,
+        "urlHash": "#/pages/chat/index",
+        "previewWidth": 420,
+        "bodySample": "I\n聊天\n通讯录\n智能体\n文件\n设置\n开启新消息通知，不再遗漏任何消息\n开启\n搜索会话...\n暹\n暹罗猫（协调者）\n21:20\n[文件] lesson.md\n暹罗猫（协调者）\n智能体会话\n21:20\n暹\n\n产物已生成：slides/lesson.md\n\n暹\nMD\nlesson.md\n未知大小\n下载\n预览\n输入消息...\nlesson.md\n未知大小 · Markdown\n源码\n下载\nWorkspace Artifact Rendered\n\n来自 Clowder workspace raw。"
+      },
+      "rawRequests": [
+        {
+          "worktreeId": "seedcmp",
+          "path": "slides/lesson.md",
+          "href": "http://localhost:5173/v1/clowder/workspace/file/raw?worktreeId=seedcmp&path=slides%2Flesson.md"
+        }
+      ],
+      "badStaticRequests": []
+    },
+    {
+      "label": "mobile",
+      "session": {
+        "uid": "6bbe51bd83bb480c8ce99d197d042b45"
+      },
+      "seeded": {
+        "conversation": {
+          "id": "clowder_cat:luoluo",
+          "name": "暹罗猫（协调者）",
+          "type": "robot",
+          "source": "clowder",
+          "directCatId": "luoluo"
+        },
+        "fileMessage": {
+          "id": "issue044-file",
+          "fileName": "lesson.md",
+          "url": "/v1/clowder/workspace/file/raw?worktreeId=seedcmp&path=slides%2Flesson.md",
+          "path": "slides/lesson.md",
+          "workspacePath": "slides/lesson.md",
+          "worktreeId": "seedcmp",
+          "source": "clowder",
+          "generatedByAgent": true
+        }
+      },
+      "visible": {
+        "previewTitle": "lesson.md",
+        "markdownText": "Workspace Artifact Rendered 来自 Clowder workspace raw。",
+        "hasWorkspaceText": true,
+        "hasOldFastSlowTitle": false,
+        "urlHash": "#/pages/files/preview?file=%257B%2522id%2522%253A%2522issue044-file%2522%252C%2522conversationId%2522%253A%2522clowder_cat%253Aluoluo%2522%252C%2522name%2522%253A%2522lesson.md%2522%252C%2522fileName%2522%253A%2522lesson.md%2522%252C%2522content%2522%253A%2522lesson.md%2522%252C%2522fileSize%2522%253A%2522%2522%252C%2522size%2522%253A%2522%2522%252C%2522fileType%2522%253A%2522md%2522%252C%2522ext%2522%253A%2522md%2522%252C%2522url%2522%253A%2522%252Fv1%252Fclowder%252Fworkspace%252Ffile%252Fraw%253FworktreeId%253Dseedcmp%2526path%253Dslides%25252Flesson.md%2522%252C%2522sourceUrl%2522%253A%2522%252Fv1%252Fclowder%252Fworkspace%252Ffile%252Fraw%253FworktreeId%253Dseedcmp%2526path%253Dslides%25252Flesson.md%2522%252C%2522contentUrl%2522%253A%2522%252Fv1%252Fclowder%252Fworkspace%252Ffile%252Fraw%253FworktreeId%253Dseedcmp%2526path%253Dslides%25252Flesson.md%2522%252C%2522previewUrl%2522%253A%2522%2522%252C%2522downloadUrl%2522%253A%2522%2522%252C%2522path%2522%253A%2522slides%252Flesson.md%2522%252C%2522workspacePath%2522%253A%2522slides%252Flesson.md%2522%252C%2522worktreeId%2522%253A%2522seedcmp%2522%252C%2522source%2522%253A%2522clowder%2522%252C%2522generatedByAgent%2522%253Atrue%252C%2522previewContent%2522%253A%2522%2522%252C%2522contentText%2522%253A%2522%2522%252C%2522markdown%2522%253A%2522%2522%252C%2522text%2522%253A%2522%2522%257D",
+        "previewWidth": 390,
+        "bodySample": "文件预览\nlesson.md\n未知大小 · Markdown\nWorkspace Artifact Rendered\n\n来自 Clowder workspace raw。"
+      },
+      "rawRequests": [
+        {
+          "worktreeId": "seedcmp",
+          "path": "slides/lesson.md",
+          "href": "http://localhost:5173/v1/clowder/workspace/file/raw?worktreeId=seedcmp&path=slides/lesson.md"
+        }
+      ],
+      "badStaticRequests": []
+    }
+  ]
+}

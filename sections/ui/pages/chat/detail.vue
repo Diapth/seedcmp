@@ -313,6 +313,9 @@ import {
 import {
   shouldCreateDeploymentCard as shouldCreateDeploymentCardMessage
 } from '@/services/native-im/deployment';
+import {
+  encodePreviewFile
+} from '@/services/native-im/file-preview';
 
 const { isDesktop } = useResponsiveLayout();
 const convStore = useConversationStore();
@@ -913,28 +916,6 @@ function openFileExternally(file) {
 
 function isArchiveFile(name) {
   return /\.(zip|rar|7z|tar|gz|bz2|xz)$/i.test(String(name || ''));
-}
-
-function encodePreviewFile(file) {
-  const payload = {
-    id: file?.id || '',
-    conversationId: file?.conversationId || '',
-    name: file?.name || file?.fileName || file?.content || '',
-    fileName: file?.fileName || file?.name || file?.content || '',
-    content: file?.content || '',
-    fileSize: file?.fileSize || file?.size || '',
-    size: file?.size || file?.fileSize || '',
-    fileType: file?.fileType || file?.ext || '',
-    ext: file?.ext || file?.fileType || '',
-    url: file?.url || '',
-    sourceUrl: file?.sourceUrl || '',
-    contentUrl: file?.contentUrl || '',
-    previewContent: file?.previewContent || file?.contentText || file?.markdown || file?.text || file?.content || '',
-    contentText: file?.contentText || '',
-    markdown: file?.markdown || '',
-    text: file?.text || ''
-  };
-  return encodeURIComponent(JSON.stringify(payload));
 }
 
 function resolveName(uid) {

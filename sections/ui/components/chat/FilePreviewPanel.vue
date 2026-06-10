@@ -666,6 +666,10 @@ const normalizedFile = computed(() => {
   const name = source.name || source.fileName || source.content || '未命名文件';
   const rawType = source.fileType || source.ext || source.type || getTypeFromName(name);
   const detectedType = String(rawType || 'file').toLowerCase();
+  const workspacePath = normalizeWorkspaceArtifactPath(source.workspacePath || source.workspace_path || source.relativePath || source.relative_path || source.path);
+  const worktreeId = source.worktreeId || source.worktree_id || source.workspaceWorktreeId || source.workspace_worktree_id || source.worktree?.id || source.workspace?.worktreeId || source.workspace?.worktree_id || '';
+  const explicitUrl = firstFetchableFileUrl(source.url, source.sourceUrl, source.contentUrl, source.previewUrl, source.downloadUrl);
+  const workspaceUrl = explicitUrl ? '' : workspaceRawFileUrl(worktreeId, workspacePath || source.url || source.sourceUrl || source.contentUrl);
 
   return {
     id: source.id || '',
@@ -673,7 +677,9 @@ const normalizedFile = computed(() => {
     name,
     size: source.size || source.fileSize || '未知大小',
     type: detectedType === 'file' ? getTypeFromName(name) : detectedType,
-    url: source.url || source.sourceUrl || source.contentUrl || '',
+    url: explicitUrl || workspaceUrl,
+    path: workspacePath,
+    worktreeId,
     content: source.previewContent || source.contentText || source.markdown || source.text || ''
   };
 });
@@ -1122,12 +1128,53 @@ function resolveFileUrl(name) {
     return normalizedFile.value.url;
   }
 
+  if (isWorkspaceBackedFile(props.file || {})) {
+    return '';
+  }
+
   const bundledUrl = getBundledAssetUrl(name);
   if (bundledUrl) {
     return bundledUrl;
   }
 
   return `/assets/${encodeURIComponent(name)}`;
+}
+
+function isFetchableFileUrl(value = '') {
+  const url = String(value || '').trim();
+  return /^(https?:|blob:|data:)/i.test(url)
+    || /^\/(uploads|v1|clowder-api|api|static|assets)\//i.test(url);
+}
+
+function firstFetchableFileUrl(...values) {
+  return values.map((value) => String(value || '').trim()).find(isFetchableFileUrl) || '';
+}
+
+function normalizeWorkspaceArtifactPath(value = '') {
+  const raw = String(value || '').trim();
+  if (!raw || isFetchableFileUrl(raw) || /^javascript:/i.test(raw)) return '';
+  return raw.replace(/^\.?\//, '').replace(/\\/g, '/');
+}
+
+function workspaceRawFileUrl(worktreeId = '', workspacePath = '') {
+  const tree = String(worktreeId || '').trim();
+  const path = normalizeWorkspaceArtifactPath(workspacePath);
+  if (!tree || !path) return '';
+  return `/v1/clowder/workspace/file/raw?worktreeId=${encodeURIComponent(tree)}&path=${encodeURIComponent(path)}`;
+}
+
+function isWorkspaceBackedFile(file = {}) {
+  return Boolean(
+    file.generatedByAgent
+    || file.source === 'clowder'
+    || file.worktreeId
+    || file.worktree_id
+    || file.workspacePath
+    || file.workspace_path
+    || file.relativePath
+    || file.relative_path
+    || normalizeWorkspaceArtifactPath(file.path)
+  );
 }
 
 function resolveImagePreviewUrl() {

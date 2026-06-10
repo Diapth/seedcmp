@@ -87,9 +87,48 @@ function normalizeStreamPhase(event = {}) {
   return event.delta ? 'chunk' : 'final';
 }
 
+function isFetchableFileUrl(value = '') {
+  const url = clean(value);
+  return /^(https?:|blob:|data:)/i.test(url)
+    || /^\/(uploads|v1|clowder-api|api|static|assets)\//i.test(url);
+}
+
+function normalizeWorkspaceArtifactPath(value = '') {
+  const raw = clean(value);
+  if (!raw || isFetchableFileUrl(raw) || /^javascript:/i.test(raw)) return '';
+  return raw.replace(/^\.?\//, '').replace(/\\/g, '/');
+}
+
+function workspaceRawFileUrl(worktreeId = '', workspacePath = '') {
+  const tree = clean(worktreeId);
+  const path = normalizeWorkspaceArtifactPath(workspacePath);
+  if (!tree || !path) return '';
+  return `/v1/clowder/workspace/file/raw?worktreeId=${encodeURIComponent(tree)}&path=${encodeURIComponent(path)}`;
+}
+
 function normalizeAgentFile(file = {}, streamKey = '', index = 0) {
   const name = firstNonEmpty(file.fileName, file.name, file.title, `智能体文件-${index + 1}`);
-  const url = firstNonEmpty(file.url, file.sourceUrl, file.contentUrl, file.path);
+  const explicitUrlCandidates = [file.url, file.sourceUrl, file.contentUrl, file.previewUrl, file.downloadUrl];
+  const explicitUrl = firstNonEmpty(...explicitUrlCandidates);
+  const fetchableUrl = explicitUrlCandidates.map(clean).find(isFetchableFileUrl) || '';
+  const workspacePath = firstNonEmpty(
+    file.workspacePath,
+    file.workspace_path,
+    file.relativePath,
+    file.relative_path,
+    file.path,
+    fetchableUrl ? '' : explicitUrl
+  );
+  const worktreeId = firstNonEmpty(
+    file.worktreeId,
+    file.worktree_id,
+    file.workspaceWorktreeId,
+    file.workspace_worktree_id,
+    file.worktree?.id,
+    file.workspace?.worktreeId,
+    file.workspace?.worktree_id
+  );
+  const url = firstNonEmpty(fetchableUrl, workspaceRawFileUrl(worktreeId, workspacePath));
   const extension = clean(file.fileType || file.ext || name.split('.').pop()).toLowerCase();
   const inlineTextTypes = new Set([
     'md', 'markdown', 'html', 'htm', 'txt', 'text', 'json',
@@ -114,8 +153,11 @@ function normalizeAgentFile(file = {}, streamKey = '', index = 0) {
     fileType: firstNonEmpty(file.fileType, file.ext, extension),
     mimeType: firstNonEmpty(file.mimeType, file.type),
     url,
-    sourceUrl: firstNonEmpty(file.sourceUrl, url),
-    contentUrl: firstNonEmpty(file.contentUrl, url),
+    path: normalizeWorkspaceArtifactPath(workspacePath),
+    workspacePath: normalizeWorkspaceArtifactPath(workspacePath),
+    worktreeId,
+    sourceUrl: firstNonEmpty(isFetchableFileUrl(file.sourceUrl) ? file.sourceUrl : '', url),
+    contentUrl: firstNonEmpty(isFetchableFileUrl(file.contentUrl) ? file.contentUrl : '', url),
     previewContent: inlineContent,
     generatedByAgent: true,
     source: 'clowder',

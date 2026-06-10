@@ -1,0 +1,7 @@
+
+> @cat-cafe/api@0.1.0 build /home/yunyi/Desktop/Bytedance_cmp/seedcmp/sections/clowder-ai/packages/api
+> pnpm --dir ../shared build && tsc && node ./scripts/copy-marketplace-catalog-data.mjs
+
+
+> @cat-cafe/shared@0.1.0 build /home/yunyi/Desktop/Bytedance_cmp/seedcmp/sections/clowder-ai/packages/shared
+> tsc

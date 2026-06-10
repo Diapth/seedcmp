@@ -1,0 +1,12 @@
+▶ workspace file/raw endpoint (integration)
+  ✔ serves source text files with correct Content-Type (13.483685ms)
+  ✔ serves PPTX artifacts with correct Content-Type (4.407702ms)
+✔ workspace file/raw endpoint (integration) (76.087041ms)
+ℹ tests 2
+ℹ suites 1
+ℹ pass 2
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 205.405026

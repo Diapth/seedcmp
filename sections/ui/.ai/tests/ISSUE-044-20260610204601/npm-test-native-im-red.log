@@ -1,0 +1,135 @@
+
+> agenthub-im@1.0.0 test:native-im
+> node --test tests/native-im.test.mjs --test-name-pattern=generated workspace files
+
+✔ native service updates remote conversation draft extra (2.403729ms)
+✔ native service clears remote conversation unread count (0.39595ms)
+✔ native service deletes remote conversation through TangSeng recent conversation API (0.257159ms)
+✔ native service exposes group creation and member sync APIs (1.213363ms)
+✔ native service updates group notice through real group profile API (0.269819ms)
+✔ native service fetches and deletes real user devices (0.797594ms)
+✔ native service sends register code and creates a real account session (0.551103ms)
+✔ native service updates the current user profile through real profile API (0.32495ms)
+✔ native service fetches clowder cat directory as agent cards (0.690779ms)
+✔ native service uses TangSeng clowder directory unless direct mode is explicit (0.172316ms)
+✔ native service marks user-scoped clowder contacts as custom agent cards (0.359514ms)
+✔ native service scans clowder templates as official agent cards (0.233264ms)
+✔ native service fetches user skills separately from marketplace skills (0.899976ms)
+✔ native service mutates user skill ownership and assignments by explicit ids (0.566816ms)
+✔ native service uploads skill packages through multipart upload runtime (14.360266ms)
+✔ deployment helper detects deployment intent only in clowder direct chats (0.331862ms)
+✔ native service uses conversation deployment request endpoints (1.68801ms)
+✔ deployment card helper upserts state and keeps preview urls (0.717183ms)
+✔ deployment card helper updates running and terminal states by card id (0.279468ms)
+✔ skill catalog preview does not assign every catalog skill to every agent (0.278562ms)
+✔ native service fetches active project group, thread tasks, and creates coordination (0.335617ms)
+✔ project group helper detects coordinator kickoff intent and resolves project names (1.32841ms)
+✔ native service posts ensure project group and updates binding thread (0.551917ms)
+✔ project group confirmation card upserts and updates idempotently (0.806909ms)
+✔ project group confirmation card keeps one retryable failed state (0.195676ms)
+✔ project group confirmation trigger is limited to coordinator direct chats (0.802255ms)
+✔ project group confirmation builds ensure payload and created patch (0.388782ms)
+✔ clowder project binding and thread tasks normalize into a group board (0.53994ms)
+✔ native service falls back to direct clowder api when tangseng cat proxy fails (0.478896ms)
+✔ native service can prefer direct clowder api for global official directory (0.242635ms)
+✔ role template options use cat-template roles without virtual defaults (0.590767ms)
+✔ role template options normalize TangSeng bridged cat template fields (0.227212ms)
+✔ role template selection syncs basic info from cat-template without overwriting dirty fields (0.174002ms)
+✔ native service keeps normalized clowder cat ids for deletion and direct routing (0.365468ms)
+✔ native service sends direct clowder cat messages through conversation bridge (0.492719ms)
+✔ native service creates custom clowder cats as routable direct agents (0.549401ms)
+✔ native service fetches local oauth capabilities by provider (0.305837ms)
+✔ native service creates oauth clowder cats with local cli account refs (0.257742ms)
+✔ native service deletes clowder cats through contact lifecycle API (0.151475ms)
+✔ native service treats missing clowder cats as idempotent deletes (0.224377ms)
+✔ native service syncs clowder group cats without sending agents as native members (0.350708ms)
+✔ agent cleanup identity resolves clowder contact and raw cat ids (0.11251ms)
+✔ deleted agent records suppress stale directory agents (0.196537ms)
+✔ agent cleanup prunes agents conversations group members and optional direct messages (0.452941ms)
+✔ deleted conversation records suppress stale sync entries but allow newer messages (0.370851ms)
+✔ group creation candidates include existing agents and split native contacts from agents (0.461682ms)
+✔ local oauth capability loader dedupes concurrent probes and force refreshes (0.293005ms)
+✔ local oauth status resolves ready missing error and idle states (0.19569ms)
+✔ native service uploads files before returning a public media url (0.430966ms)
+✔ conversation helpers merge local and remote drafts predictably (0.25662ms)
+✔ conversation helpers keep locally cleared drafts from stale remote restore (0.082936ms)
+✔ conversation preview normalizes long multiline text to a single line (0.081842ms)
+✔ conversation draft persistence skips local robot and mock conversations (0.120657ms)
+✔ websocket address selection prefers ws for local http h5 sessions (0.340559ms)
+✔ conversation helpers normalize groups and upsert channelType 2 conversations (0.206773ms)
+✔ group member page helpers keep routing scoped to the current group (0.179711ms)
+✔ conversation normalizer uses last message timestamp instead of sync time fallback (0.289164ms)
+✔ conversation normalizer gives message-bearing conversations a visible fallback time (0.167217ms)
+✔ group upsert uses group last message time and does not invent current time (0.167831ms)
+✔ group upsert gives groups with a real last message a visible fallback time (0.135161ms)
+✔ conversation normalizer does not invent current time for empty remote group rows (0.081015ms)
+✔ conversation merge preserves group create time fallback when remote sync has no time (0.168194ms)
+✔ native group mention messages preserve highlight metadata from synced payloads (0.389479ms)
+✔ conversation summary marks group messages that mention the current user (0.801846ms)
+✔ reply targets are scoped to the conversation that created them (0.174059ms)
+✔ time helpers accept second and millisecond timestamps with five minute message dividers (0.222301ms)
+✔ clowder stream events merge placeholder chunks final markdown and generated files (0.647093ms)
+✔ clowder generated html files preserve inline preview content (0.138131ms)
+✔ native file message payloads normalize sender and receiver file cards (0.173106ms)
+✔ clowder helper creates markdown placeholder chunks and final event (1.377119ms)
+✔ native clowder stream messages normalize and merge as one markdown message (0.613678ms)
+✔ native clowder reaction event adds an idempotent emoji to the target user message (0.422138ms)
+✔ synced clowder history preserves local successful user prompt until backend echo arrives (0.38394ms)
+✔ agent placeholder ack adds reaction to user prompt instead of visible thinking message (0.146105ms)
+✔ local agent pending feedback is scoped and cleared by first reply chunk (0.39238ms)
+✔ native clowder reply chunk clears local pending feedback by target message id (0.250258ms)
+✔ native clowder placeholder without target reacts to latest self prompt and stays hidden (0.299398ms)
+✔ synced clowder history restores cached prompt after refresh and filters standalone thinking placeholders (0.477955ms)
+✔ clowder prompt context cache survives refresh and deduplicates prompts per account conversation (0.496127ms)
+✔ native clowder stream system events normalize as mergeable markdown deltas (0.26674ms)
+✔ native clowder stream chunk deltas append until final replaces content (0.282304ms)
+✔ durable clowder stream messages without phase stay completed during history merge (0.106687ms)
+✔ native clowder duplicate durable replies with different ids collapse (0.254421ms)
+✖ native clowder generated workspace files resolve through clowder workspace raw proxy (1.050782ms)
+✔ conversation summary turns long clowder markdown into one line preview (0.262093ms)
+✔ native normalizer hides empty time-only system messages from chat and digest (0.299056ms)
+✔ native normalizer renders group system event messages with concrete text (0.205713ms)
+✔ self id resolver accepts backend userId user_id and raw id shapes (0.114358ms)
+✔ outbound sender prefers real current user over page fallback sender (0.16755ms)
+✔ sdk unavailable send errors keep local h5 demo messages successful (0.23268ms)
+✔ mock h5 native send results do not leave local messages sending forever (0.158453ms)
+✔ mock h5 media messages stay local successful when no upload backend exists (0.250155ms)
+✔ message sender helpers tolerate empty current user during anonymous visual smoke (0.100052ms)
+✔ agent helpers create direct conversations and group mention members (0.737991ms)
+✔ clowder direct cat conversations are detected for bridge routing (0.126075ms)
+✔ conversation display unread ignores mock and locally read conversations (0.240243ms)
+✔ coordinator capability profile detection covers ppt and review intents (1.314183ms)
+✔ coordinator template cats request input lists missing role templates and reusable cats (2.603139ms)
+✔ coordinator template cats card cancel and partial-failure transitions (0.474125ms)
+ℹ tests 99
+ℹ suites 0
+ℹ pass 98
+ℹ fail 1
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 162.170712
+
+✖ failing tests:
+
+test at tests/native-im.test.mjs:2928:1
+✖ native clowder generated workspace files resolve through clowder workspace raw proxy (1.050782ms)
+  AssertionError [ERR_ASSERTION]: Expected values to be strictly equal:
+  + actual - expected
+
+  + undefined
+  - 'slides/presentation.pptx'
+
+      at TestContext.<anonymous> (file:///home/yunyi/Desktop/Bytedance_cmp/seedcmp/sections/ui/tests/native-im.test.mjs:2946:10)
+      at Test.runInAsyncScope (node:async_hooks:214:14)
+      at Test.run (node:internal/test_runner/test:1062:25)
+      at Test.processPendingSubtests (node:internal/test_runner/test:752:18)
+      at Test.postRun (node:internal/test_runner/test:1191:19)
+      at Test.run (node:internal/test_runner/test:1119:12)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:752:7) {
+    generatedMessage: true,
+    code: 'ERR_ASSERTION',
+    actual: undefined,
+    expected: 'slides/presentation.pptx',
+    operator: 'strictEqual'
+  }

@@ -1,0 +1,32 @@
+{
+  "error": "page.waitForFunction: Timeout 10000ms exceeded.",
+  "seeded": {
+    "conversation": {
+      "id": "clowder_cat:luoluo",
+      "name": "暹罗猫（协调者）",
+      "type": "robot",
+      "source": "clowder",
+      "directCatId": "luoluo"
+    },
+    "fileMessage": {
+      "id": "issue044-file",
+      "fileName": "lesson.md",
+      "url": "/v1/clowder/workspace/file/raw?worktreeId=seedcmp&path=slides%2Flesson.md",
+      "path": "slides/lesson.md",
+      "workspacePath": "slides/lesson.md",
+      "worktreeId": "seedcmp",
+      "source": "clowder",
+      "generatedByAgent": true
+    }
+  },
+  "rawRequests": [],
+  "badStaticRequests": [],
+  "failureState": {
+    "hash": "#/pages/files/preview?file=%257B%2522id%2522%253A%2522issue044-file%2522%252C%2522conversationId%2522%253A%2522clowder_cat%253Aluoluo%2522%252C%2522name%2522%253A%2522lesson.md%2522%252C%2522fileName%2522%253A%2522lesson.md%2522%252C%2522content%2522%253A%2522lesson.md%2522%252C%2522fileSize%2522%253A%2522%2522%252C%2522size%2522%253A%2522%2522%252C%2522fileType%2522%253A%2522md%2522%252C%2522ext%2522%253A%2522md%2522%252C%2522url%2522%253A%2522%252Fv1%252Fclowder%252Fworkspace%252Ffile%252Fraw%253FworktreeId%253Dseedcmp%2526path%253Dslides%25252Flesson.md%2522%252C%2522sourceUrl%2522%253A%2522%252Fv1%252Fclowder%252Fworkspace%252Ffile%252Fraw%253FworktreeId%253Dseedcmp%2526path%253Dslides%25252Flesson.md%2522%252C%2522contentUrl%2522%253A%2522%252Fv1%252Fclowder%252Fworkspace%252Ffile%252Fraw%253FworktreeId%253Dseedcmp%2526path%253Dslides%25252Flesson.md%2522%252C%2522previewUrl%2522%253A%2522%2522%252C%2522downloadUrl%2522%253A%2522%2522%252C%2522path%2522%253A%2522slides%252Flesson.md%2522%252C%2522workspacePath%2522%253A%2522slides%252Flesson.md%2522%252C%2522worktreeId%2522%253A%2522seedcmp%2522%252C%2522source%2522%253A%2522clowder%2522%252C%2522generatedByAgent%2522%253Atrue%252C%2522previewContent%2522%253A%2522lesson.md%2522%252C%2522contentText%2522%253A%2522%2522%252C%2522markdown%2522%253A%2522%2522%252C%2522text%2522%253A%2522%2522%257D",
+    "bodyText": "文件预览\nlesson.md\n未知大小 · Markdown\n\nlesson.md",
+    "previewTitle": "lesson.md",
+    "markdownText": "lesson.md",
+    "fileCards": [],
+    "buttons": []
+  }
+}
