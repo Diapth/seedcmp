@@ -202,6 +202,116 @@ export function createAgentConversation(agent = {}) {
   };
 }
 
+function normalizeDisplayLookup(value = '') {
+  return firstNonEmpty(value)
+    .replace(new RegExp(`^${CLOWDER_CAT_CONTACT_PREFIX}`), '')
+    .replace(/^@/, '')
+    .toLowerCase()
+    .replace(/\s+/g, '')
+    .replace(/智能体|ai/g, '');
+}
+
+function agentConversationLookupValues(entity = {}) {
+  const raw = entity.raw || {};
+  const values = [
+    entity.id,
+    entity.channelId,
+    entity.uid,
+    entity.agentId,
+    entity.agent_id,
+    entity.catId,
+    entity.cat_id,
+    entity.directCatId,
+    entity.direct_cat_id,
+    raw.id,
+    raw.uid,
+    raw.agentId,
+    raw.agent_id,
+    raw.catId,
+    raw.cat_id,
+    raw.directCatId,
+    raw.direct_cat_id
+  ].map((value) => firstNonEmpty(value)).filter(Boolean);
+  const expanded = new Set();
+  values.forEach((value) => {
+    expanded.add(value);
+    if (value.startsWith(CLOWDER_CAT_CONTACT_PREFIX)) {
+      expanded.add(value.slice(CLOWDER_CAT_CONTACT_PREFIX.length));
+    } else {
+      expanded.add(`${CLOWDER_CAT_CONTACT_PREFIX}${value}`);
+    }
+  });
+  return [...expanded].map((value) => normalizeClowderLookupKey(value)).filter(Boolean);
+}
+
+export function findAgentForConversation(conversation = {}, agents = []) {
+  if (!conversation || conversation.type !== 'robot') return null;
+  const conversationKeys = new Set(agentConversationLookupValues(conversation));
+  if (conversationKeys.size) {
+    const direct = (agents || []).find((agent) =>
+      agentConversationLookupValues(agent).some((key) => conversationKeys.has(key))
+    );
+    if (direct) return direct;
+  }
+
+  const conversationName = normalizeDisplayLookup(firstNonEmpty(conversation.name, conversation.nickname));
+  if (!conversationName) return null;
+  return (agents || []).find((agent) => {
+    const agentName = normalizeDisplayLookup(firstNonEmpty(agent.name, agent.nickname, agent.displayName));
+    const agentAlias = normalizeDisplayLookup(agent.alias);
+    return (agentName && (conversationName.includes(agentName) || agentName.includes(conversationName)))
+      || (agentAlias && (conversationName.includes(agentAlias) || agentAlias.includes(conversationName)));
+  }) || null;
+}
+
+function isRuntimeAccessMode(value = '') {
+  return ['oauth', 'api-key', 'api_key'].includes(firstNonEmpty(value).toLowerCase());
+}
+
+function isBackendPlaceholderAccessMode(value = '') {
+  const mode = firstNonEmpty(value).toLowerCase();
+  return !mode || mode === 'backend' || mode === 'clowder';
+}
+
+function isBackendPlaceholderPlatform(value = '') {
+  const platform = firstNonEmpty(value).toLowerCase();
+  return !platform || platform === 'clowder' || platform === 'backend';
+}
+
+function isGenericTemplate(value = '') {
+  const template = firstNonEmpty(value).toLowerCase();
+  return !template || template === 'general';
+}
+
+export function mergeClowderAgentRuntimeConfig(incoming = {}, existing = {}) {
+  if (!incoming || !existing) return incoming;
+  if (!isRuntimeAccessMode(existing.accessMode || existing.authType)) return incoming;
+  const next = { ...incoming };
+  if (isBackendPlaceholderAccessMode(incoming.accessMode || incoming.authType)) {
+    next.accessMode = existing.accessMode;
+    next.authType = existing.authType || existing.accessMode;
+  }
+  if (isBackendPlaceholderPlatform(incoming.platform)) {
+    next.platform = existing.platform;
+  }
+  if (!firstNonEmpty(incoming.accountRef, incoming.account_ref) && firstNonEmpty(existing.accountRef, existing.account_ref)) {
+    next.accountRef = firstNonEmpty(existing.accountRef, existing.account_ref);
+  }
+  if (isGenericTemplate(incoming.roleTemplate) && !isGenericTemplate(existing.roleTemplate)) {
+    next.roleTemplate = existing.roleTemplate;
+  }
+  if (isGenericTemplate(incoming.templateId) && !isGenericTemplate(existing.templateId || existing.roleTemplate)) {
+    next.templateId = firstNonEmpty(existing.templateId, existing.roleTemplate);
+  }
+  if (!firstNonEmpty(incoming.model, incoming.defaultModel, incoming.customModel)) {
+    next.model = existing.model;
+    next.defaultModel = existing.defaultModel;
+    next.customModel = existing.customModel;
+  }
+  next.runtimeConfigPreserved = true;
+  return next;
+}
+
 export function createAgentMember(agent = {}) {
   const id = firstNonEmpty(agent.id, agent.agentId, agent.uid, agent.catId, agent.cat_id, agent.directCatId, agent.direct_cat_id, agent.alias);
   const name = firstNonEmpty(agent.displayName, agent.display_name, agent.name, agent.nickname, agent.alias, '智能体');

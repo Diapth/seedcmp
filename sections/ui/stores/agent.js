@@ -1,6 +1,9 @@
 import { defineStore } from 'pinia';
 import { nativeImService } from '@/services/native-im/service';
-import { normalizeClowderProjectBoard } from '@/services/native-im/project-board';
+import {
+  normalizeClowderProjectBoard,
+  shouldSyncRemoteProjectBoard
+} from '@/services/native-im/project-board';
 import {
   createLocalOAuthCapabilityLoader,
   oauthProviderForPlatform
@@ -21,6 +24,7 @@ import {
   normalizeRoleTemplate
 } from '@/services/native-im/role-template-sync';
 import { useConversationStore } from '@/stores/conversation';
+import { mergeClowderAgentRuntimeConfig } from '@/services/native-im/agent-state';
 
 const STATIC_AGENT_IDS = new Set([
   'pm-agent',
@@ -68,6 +72,33 @@ function writeDeletedAgentCache(cache) {
   } catch {
     // local delete barriers should not block agent catalog rendering
   }
+}
+
+function agentIdentityKeys(agent = {}) {
+  const raw = agent.raw || {};
+  return [
+    agent.id,
+    agent.uid,
+    agent.catId,
+    agent.cat_id,
+    agent.directCatId,
+    agent.direct_cat_id,
+    raw.id,
+    raw.uid,
+    raw.catId,
+    raw.cat_id,
+    raw.directCatId,
+    raw.direct_cat_id
+  ].map((value) => String(value || '').trim()).filter(Boolean).flatMap((value) => {
+    const clean = value.replace(/^clowder_cat:/, '');
+    return [value, clean, `clowder_cat:${clean}`];
+  });
+}
+
+function findExistingAgentForDirectoryAgent(incoming = {}, existingAgents = []) {
+  const keys = new Set(agentIdentityKeys(incoming));
+  if (!keys.size) return null;
+  return existingAgents.find((agent) => agentIdentityKeys(agent).some((key) => keys.has(key))) || null;
 }
 
 export const useAgentStore = defineStore('agent', {
@@ -498,7 +529,12 @@ export const useAgentStore = defineStore('agent', {
         ...readDeletedAgentCache(),
         ...this.deletedAgentRecords
       };
-      const activeAgents = filterDeletedAgents(agents, this.deletedAgentRecords);
+      const previousAgents = this.agents || [];
+      const activeAgents = filterDeletedAgents(agents, this.deletedAgentRecords)
+        .map((agent) => mergeClowderAgentRuntimeConfig(
+          agent,
+          findExistingAgentForDirectoryAgent(agent, previousAgents)
+        ));
       const backendIds = new Set(activeAgents.map((agent) => agent.id).filter(Boolean));
       const retainedLocalAgents = this.agents.filter((agent) => {
         if (agent.source === 'clowder') return false;
@@ -640,6 +676,11 @@ export const useAgentStore = defineStore('agent', {
     async syncProjectBoardForGroup(groupId, options = {}) {
       const id = String(groupId || '').trim();
       if (!id) return null;
+      const convStore = useConversationStore();
+      const group = convStore.conversations.find((item) => item.id === id || item.channelId === id) || { id };
+      if (!shouldSyncRemoteProjectBoard(group)) {
+        return this.boards.find((board) => board.groupId === id) || null;
+      }
       try {
         const binding = await nativeImService.fetchActiveProjectGroup({
           projectGroupNo: id,
@@ -768,16 +809,17 @@ export const useAgentStore = defineStore('agent', {
           personality: agent.systemPrompt || agent.desc,
           capabilities: agent.capabilityTags || agent.capabilities || []
         });
+        const createdWithRuntimeConfig = mergeClowderAgentRuntimeConfig(created, agent);
         const next = {
           ...agent,
-          ...created,
+          ...createdWithRuntimeConfig,
           id: created.id,
-          alias: created.alias || agent.alias,
-          desc: created.desc || agent.desc,
+          alias: createdWithRuntimeConfig.alias || agent.alias,
+          desc: createdWithRuntimeConfig.desc || agent.desc,
           isAgent: true,
           source: 'clowder',
-          connected: created.connected !== false,
-          status: created.status || 'active',
+          connected: createdWithRuntimeConfig.connected !== false,
+          status: createdWithRuntimeConfig.status || 'active',
           creator: 'User',
           apiKey: ''
         };

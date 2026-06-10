@@ -2,10 +2,30 @@
 
 const CAPABILITY_PROFILES = [
  {
+ id: 'riverwatch-delivery',
+ label: 'RiverWatch 多交付项目',
+ keywords: ['riverwatch', '水质', 'prd', '预算', '排期', 'vue', 'readme', 'preview 部署链接', '多智能体分工'],
+ roleTemplateIds: ['source-curator', 'deck-strategist', 'storyboard-designer', 'frontend', 'devops'],
+ roleHints: {
+ 'source-curator': ['source-curator', '资料整理', '源材料', '资料清洗', '素材盘点', 'source processing'],
+ 'deck-strategist': ['deck-strategist', 'ppt 战略', '叙事策略', '汇报结构', 'presentation'],
+ 'storyboard-designer': ['storyboard-designer', '分镜', '页面叙事', '视觉分镜'],
+ frontend: ['frontend', '前端', 'vue', 'ui 实现', '页面实现'],
+ devops: ['devops', '部署', 'preview', 'ci/cd', 'sre']
+ }
+ },
+ {
  id: 'ppt-delivery',
  label: 'PPT / 文档成稿',
  keywords: ['ppt', 'deck', '演示', '幻灯片', '幻灯', '汇报材料', '成稿', 'presentation'],
- roleTemplateIds: ['source-curator', 'deck-strategist', 'storyboard-designer', 'svg-executor-guardian', 'deck-qa-exporter']
+ roleTemplateIds: ['source-curator', 'deck-strategist', 'storyboard-designer', 'svg-executor-guardian', 'deck-qa-exporter'],
+ roleHints: {
+ 'source-curator': ['source-curator', '资料整理', '源材料', '资料清洗', '素材盘点', 'source processing'],
+ 'deck-strategist': ['deck-strategist', 'ppt 战略', '叙事策略', '汇报结构', 'presentation'],
+ 'storyboard-designer': ['storyboard-designer', '分镜', '视觉分镜', 'storyboard'],
+ 'svg-executor-guardian': ['svg-executor-guardian', 'svg', '图形渲染'],
+ 'deck-qa-exporter': ['deck-qa-exporter', '导出', 'qa', '校验']
+ }
  },
  {
  id: 'document-writing',
@@ -70,7 +90,9 @@ export function detectRequiredCapabilityProfile(text = '') {
  return {
  id: profile.id,
  label: profile.label,
- roleTemplateIds: [...profile.roleTemplateIds]
+ keywords: [...profile.keywords],
+ roleTemplateIds: [...profile.roleTemplateIds],
+ roleHints: Object.fromEntries(Object.entries(profile.roleHints || {}).map(([roleId, hints]) => [roleId, [...hints]]))
  };
 }
 
@@ -81,14 +103,61 @@ export function normalizeAgentForScan(agent = {}) {
  name: firstText(agent.name, agent.nickname, agent.displayName, agent.alias, agent.id, '智能体'),
  roleTemplate: firstText(agent.roleTemplate, agent.templateId, agent.roleTemplateId, raw.roleTemplate, raw.templateId, raw.roleTemplateId, '').toLowerCase(),
  templateId: firstText(agent.templateId, agent.roleTemplateId, agent.roleTemplate, raw.templateId, raw.roleTemplateId).toLowerCase(),
+ source: firstText(agent.source, raw.source, raw.kind).toLowerCase(),
+ rawSource: firstText(raw.source, raw.kind).toLowerCase(),
  capabilityTags: uniqueStrings([
  ...(Array.isArray(agent.capabilityTags) ? agent.capabilityTags : []),
  ...(Array.isArray(raw.capabilityTags) ? raw.capabilityTags : []),
  ...(Array.isArray(agent.capabilities) ? agent.capabilities : []),
  ...(Array.isArray(raw.capabilities) ? raw.capabilities : [])
  ]).map((tag) => String(tag || '').toLowerCase()).filter(Boolean),
+ searchableText: uniqueStrings([
+ agent.name,
+ agent.nickname,
+ agent.displayName,
+ agent.alias,
+ agent.desc,
+ agent.description,
+ agent.systemPrompt,
+ agent.personality,
+ agent.teamStrengths,
+ agent.roleDescription,
+ raw.name,
+ raw.nickname,
+ raw.displayName,
+ raw.display_name,
+ raw.desc,
+ raw.description,
+ raw.systemPrompt,
+ raw.system_prompt,
+ raw.personality,
+ raw.teamStrengths,
+ raw.team_strengths,
+ raw.roleDescription,
+ raw.role_description
+ ]).map((value) => lowerText(value)).join(' '),
  raw
  };
+}
+
+function isNonReusableDirectoryEntry(agent = {}) {
+ return agent.source === 'role-template'
+ || agent.rawSource === 'role-template'
+ || agent.source === 'cat-template'
+ || agent.rawSource === 'cat-template'
+ || agent.source === 'disconnected'
+ || agent.rawSource === 'disconnected';
+}
+
+function isCoordinatorLikeAgent(agent = {}) {
+ const haystack = uniqueStrings([
+ agent.id,
+ agent.name,
+ agent.roleTemplate,
+ agent.templateId,
+ ...agent.capabilityTags
+ ]).map((value) => lowerText(value)).join(' ');
+ return /\bpm\b|coordinator|协调|协同|项目经理|产品经理/.test(haystack);
 }
 
 function agentMatchesRoleTemplate(agent = {}, roleTemplateId = '') {
@@ -96,19 +165,24 @@ function agentMatchesRoleTemplate(agent = {}, roleTemplateId = '') {
  if (!target) return false;
  if (agent.roleTemplate && agent.roleTemplate === target) return true;
  if (agent.templateId && agent.templateId === target) return true;
- return agent.capabilityTags.some((tag) => tag.toLowerCase() === target);
+ if (agent.capabilityTags.some((tag) => tag.toLowerCase() === target)) return true;
+ const hints = CAPABILITY_PROFILES.flatMap((profile) => profile.roleHints?.[target] || []);
+ return hints.some((hint) => agent.searchableText.includes(lowerText(hint)));
 }
 
 function agentMatchesProfileKeywords(agent = {}, profile = null) {
  if (!profile) return false;
+ const keywords = Array.isArray(profile.keywords) ? profile.keywords : [];
+ if (!keywords.length) return false;
  const haystack = uniqueStrings([
  agent.name,
  ...agent.capabilityTags,
  agent.roleTemplate,
- agent.templateId
+ agent.templateId,
+ agent.searchableText
  ]).map((value) => lowerText(value)).filter(Boolean);
  if (!haystack.length) return false;
- return profile.keywords.some((keyword) =>
+ return keywords.some((keyword) =>
  haystack.some((value) => value.includes(lowerText(keyword)))
  );
 }
@@ -116,6 +190,7 @@ function agentMatchesProfileKeywords(agent = {}, profile = null) {
 export function scanExistingCats({ requiredProfile = null, availableAgents = [] } = {}) {
  const normalizedAgents = availableAgents
  .map(normalizeAgentForScan)
+ .filter((agent) => !isNonReusableDirectoryEntry(agent))
  .filter((agent) => agent.id);
  const reusable = [];
  const seen = new Set();
@@ -137,6 +212,7 @@ export function scanExistingCats({ requiredProfile = null, availableAgents = [] 
  if (reusable.length === 0 && requiredProfile) {
  normalizedAgents.forEach((agent) => {
  if (seen.has(agent.id)) return;
+ if (isCoordinatorLikeAgent(agent)) return;
  if (!agentMatchesProfileKeywords(agent, requiredProfile)) return;
  seen.add(agent.id);
  reusable.push({
@@ -156,6 +232,7 @@ export function findMissingRoles({ requiredProfile = null, availableAgents = [] 
  if (!requiredRoles.length) return [];
  const normalizedAgents = availableAgents
  .map(normalizeAgentForScan)
+ .filter((agent) => !isNonReusableDirectoryEntry(agent))
  .filter((agent) => agent.id);
  return requiredRoles.filter((roleId) =>
  !normalizedAgents.some((agent) => agentMatchesRoleTemplate(agent, roleId))

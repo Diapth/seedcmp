@@ -131,3 +131,11 @@ export function normalizeClowderProjectBoard({ binding = {}, tasks = [], agents 
     tasks: normalizedTasks
   };
 }
+
+export function shouldSyncRemoteProjectBoard(group = {}) {
+  if (!group || !firstText(group.id, group.groupId, group.groupNo, group.group_no, group.channelId)) return false;
+  if (group.remoteBoardSync === false) return false;
+  const source = firstText(group.source).toLowerCase();
+  if (['mock', 'local', 'demo', 'static'].includes(source)) return false;
+  return true;
+}

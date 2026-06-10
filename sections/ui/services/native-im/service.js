@@ -1001,7 +1001,9 @@ export function createNativeImService(options = {}) {
       clientId,
       authType,
       accountRef: authType === 'oauth'
-        ? defaultOAuthAccountRef(clientId)
+        ? (agent.inheritCoordinatorAuth === true
+          ? firstNonEmpty(agent.accountRef, agent.account_ref, defaultOAuthAccountRef(clientId))
+          : defaultOAuthAccountRef(clientId))
         : firstNonEmpty(agent.accountRef, agent.account_ref, 'default'),
       personality: firstNonEmpty(agent.personality, agent.systemPrompt, agent.desc),
       capabilities: firstList(agent.capabilities, agent.capabilityTags).map(String).filter(Boolean)

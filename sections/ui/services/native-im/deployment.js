@@ -1,5 +1,7 @@
 const DEPLOYMENT_INTENT_RE = /(部署|发布|上线|预览环境|preview|deploy|deployment)/i;
 const DEPLOYMENT_NEGATIVE_RE = /(不部署|先不部署|别部署|不要部署|取消部署|暂不部署|不用部署)/i;
+const PROJECT_KICKOFF_RE = /(项目群|创建项目|组织多智能体|多智能体分工|交付物|需求|约束|prd|预算|排期|readme)/i;
+const ACTIONABLE_DEPLOYMENT_RE = /^(?:请|帮我|麻烦|开始|执行|现在|立即|同意|确认)?\s*(?:把|将)?[\s\S]{0,80}(?:部署|发布|上线|deploy)[\s\S]{0,80}(?:到|至|为|成|preview|预览环境|环境|线上)/i;
 const CLOWDER_CAT_CONTACT_PREFIX = 'clowder_cat:';
 
 function firstText(...values) {
@@ -117,7 +119,10 @@ export function deploymentCardId(deploymentRequestId = '') {
 
 export function isDeploymentIntent(text = '') {
   const source = String(text || '').trim();
-  return source.length >= 3 && DEPLOYMENT_INTENT_RE.test(source) && !DEPLOYMENT_NEGATIVE_RE.test(source);
+  if (source.length < 3 || !DEPLOYMENT_INTENT_RE.test(source) || DEPLOYMENT_NEGATIVE_RE.test(source)) return false;
+  if (!ACTIONABLE_DEPLOYMENT_RE.test(source)) return false;
+  if (PROJECT_KICKOFF_RE.test(source) && !/^(?:请|帮我|麻烦|开始|执行|现在|立即|把|将|部署|发布|上线|deploy)/i.test(source)) return false;
+  return true;
 }
 
 export function shouldCreateDeploymentCard({ conversation = {}, text = '' } = {}) {

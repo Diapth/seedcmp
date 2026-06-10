@@ -135,6 +135,19 @@ function firstText(...values) {
   return '';
 }
 
+function uniqueStrings(values = []) {
+  return [...new Set((values || []).map((value) => firstText(value)).filter(Boolean))];
+}
+
+function projectGroupCardSharesTemplateSource(projectCard = {}, templateCard = {}) {
+  const projectSourceId = firstText(projectCard.sourceMessageId, projectCard.sourceClientMsgNo);
+  const templateSourceId = firstText(templateCard.sourceMessageId, templateCard.sourceClientMsgNo);
+  if (projectSourceId && templateSourceId && projectSourceId === templateSourceId) return true;
+  const projectText = firstText(projectCard.sourceText);
+  const templateText = firstText(templateCard.sourceText);
+  return Boolean(projectText && templateText && projectText === templateText);
+}
+
 function matchingAgentsForCatIds(agents = [], catIds = []) {
   const wanted = new Set((catIds || []).map(cleanCatId).filter(Boolean));
   if (!wanted.size) return [];
@@ -697,6 +710,28 @@ export const useMessageStore = defineStore('message', {
         message.id === cardId || message.coordinatorTemplateCatsCard?.cardId === cardId
       )) || null;
     },
+    syncCreatedTemplateCatsToProjectGroup(conversationId, templateCard = {}, items = []) {
+      const createdCatIds = uniqueStrings((items || [])
+        .filter((item) => item.status === 'created')
+        .map((item) => item.agentId));
+      if (!conversationId || !createdCatIds.length) return [];
+      const list = this.messages[conversationId] || [];
+      const projectMessages = list.filter((message) => {
+        const projectCard = message.projectGroupCard;
+        if (!projectCard) return false;
+        if (!['', 'pending', 'pending_confirmation'].includes(String(projectCard.status || '').toLowerCase())) return false;
+        return projectGroupCardSharesTemplateSource(projectCard, templateCard);
+      });
+      projectMessages.forEach((message) => {
+        const projectCard = message.projectGroupCard || {};
+        this.updateProjectGroupConfirmation(conversationId, projectCard.cardId || message.id, {
+          targetCatIds: createdCatIds,
+          workerCatIds: createdCatIds,
+          catMemberIds: createdCatIds
+        });
+      });
+      return projectMessages;
+    },
     async maybeCreateCoordinatorTemplateCatsRequest(conversation = {}, text = '', sourceMessage = {}, options = {}) {
       const conversationId = conversation?.id || conversation?.conversationId || '';
       if (!conversationId || sourceMessage?.status === 'failed') return null;
@@ -771,11 +806,15 @@ export const useMessageStore = defineStore('message', {
       const finalStatus = failedCount === 0
         ? 'created'
         : (createdCount === 0 ? 'failed' : 'partial');
-      return this.updateCoordinatorTemplateCatsRequest(conversationId, cardId, {
+      const updated = this.updateCoordinatorTemplateCatsRequest(conversationId, cardId, {
         status: finalStatus,
         items: results,
         error: failedCount && createdCount === 0 ? '所有缺失模板猫猫创建失败' : ''
       });
+      if (createdCount > 0) {
+        this.syncCreatedTemplateCatsToProjectGroup(conversationId, card, results);
+      }
+      return updated;
     },
     cancelCoordinatorTemplateCatsRequest(conversationId, cardId) {
       return this.updateCoordinatorTemplateCatsRequest(conversationId, cardId, {

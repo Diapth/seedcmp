@@ -1,3 +1,5 @@
+import { detectRequiredCapabilityProfile } from './coordinator-capability.js';
+
 const PROJECT_START_RE = /(项目群|创建.*群|拉.*(?:猫|智能体|agent|codex|claude)|拆解.*任务|分工执行|协调.*(?:智能体|agent|codex|claude)|PM|pm|coordinator)/i;
 
 const PROJECT_NAME_PATTERNS = [
@@ -208,6 +210,9 @@ function agentCatId(agent = {}) {
 }
 
 function isAvailableWorkerAgent(agent = {}) {
+  const raw = agent.raw || {};
+  const source = firstText(agent.source, raw.source, raw.kind).replace(/_/g, '-').toLowerCase();
+  if (['role-template', 'cat-template', 'disconnected'].includes(source)) return false;
   if (!agentCatId(agent)) return false;
   if (isCoordinatorEntity(agent)) return false;
   if (agent.available === false || agent.connected === false) return false;
@@ -226,6 +231,11 @@ function mentionedWorkerIds(text = '', agents = []) {
 
 function defaultWorkerIds(agents = []) {
   return uniqueStrings(agents.filter(isAvailableWorkerAgent).map(agentCatId)).slice(0, 3);
+}
+
+function profileWorkerIds(text = '') {
+  const profile = detectRequiredCapabilityProfile(text);
+  return uniqueStrings(profile?.roleTemplateIds || []);
 }
 
 export function isProjectStartRequest(text = '') {
@@ -273,7 +283,10 @@ export function buildProjectGroupConfirmationInput({
   const pmDirectChannelId = firstText(conversation.channelId, conversation.id);
   const coordinatorId = agentCatId(agent) || agentCatId(conversation) || 'coordinator';
   const targetCatIds = mentionedWorkerIds(text || sourceMessage.content, availableAgents);
-  const workerCatIds = targetCatIds.length ? targetCatIds : defaultWorkerIds(availableAgents);
+  const profileCatIds = profileWorkerIds(text || sourceMessage.content).filter((id) => id !== coordinatorId);
+  const workerCatIds = targetCatIds.length
+    ? targetCatIds
+    : (profileCatIds.length ? profileCatIds : defaultWorkerIds(availableAgents));
   const userId = firstText(currentUser.id, currentUser.uid, currentUser.userId, currentUser.raw?.uid, currentUser.raw?.id);
   const threadId = resolveThreadId(conversation) || resolveThreadId(agent);
   return {

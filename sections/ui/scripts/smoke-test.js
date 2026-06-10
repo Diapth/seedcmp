@@ -34,4 +34,11 @@ assert.match(nativeService, /updateConversationExtra/, 'draft sync API should ex
 assert.match(nativeService, /uploadChatFile/, 'upload API should exist');
 assert.match(nativeService, /createGroup/, 'group creation API should exist');
 
+const registerPage = readFileSync('pages/login/register.vue', 'utf8');
+assert.match(registerPage, /不少于8位/, 'register password hint should match backend 8-character minimum');
+assert.doesNotMatch(registerPage, /不少于6位|length < 6/, 'register page should not allow 6-character passwords before backend validation');
+
+const deploymentCard = readFileSync('components/chat/DeploymentCard.vue', 'utf8');
+assert.doesNotMatch(deploymentCard, /v-if="isSucceeded"[\s\S]{0,160}>取消部署<\/button>/, 'terminal deployment cards should not render cancel actions');
+
 console.log('sections/ui smoke test passed');

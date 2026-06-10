@@ -315,6 +315,7 @@ import AppAvatar from '@/components/common/AppAvatar.vue';
 import AppContextMenu from '@/components/common/AppContextMenu.vue';
 import ContactCard from '@/components/contacts/ContactCard.vue';
 import AgentProfilePanel from '@/components/agents/AgentProfilePanel.vue';
+import { findAgentForConversation } from '@/services/native-im/agent-state';
 import {
   isClowderConversation,
   isVisibleChatMessage,
@@ -577,10 +578,7 @@ function openAgentConfigFromConversation(conversation) {
 }
 
 function resolveAgentForConversation(conversation) {
-  if (!conversation || conversation.type !== 'robot') return null;
-  return agentStore.agents.find(agent => agent.id === conversation.id)
-    || agentStore.agents.find(agent => normalizeAgentName(conversation.name).includes(normalizeAgentName(agent.name))
-      || normalizeAgentName(agent.name).includes(normalizeAgentName(conversation.name)));
+  return findAgentForConversation(conversation, agentStore.agents);
 }
 
 function resolveAgentForMember(member) {

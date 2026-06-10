@@ -81,7 +81,7 @@
               <input 
                 type="password" 
                 v-model="password" 
-                placeholder="密码 (不少于6位)" 
+                placeholder="密码 (不少于8位)"
                 class="form-input" 
                 placeholder-style="color: var(--color-text-muted)"
               />
@@ -154,8 +154,8 @@ async function handleRegister() {
     return;
   }
   
-  if (password.value.length < 6) {
-    errorMessage.value = '密码长度不能少于6位';
+  if (password.value.length < 8) {
+    errorMessage.value = '密码长度不能少于8位';
     return;
   }
   

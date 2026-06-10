@@ -432,6 +432,11 @@ async function handleLogin() {
   transition: background-color 0.2s ease;
   box-shadow: 0 4px 12px rgba(79, 70, 229, 0.2);
   margin-top: 8px;
+  position: relative;
+  z-index: 0;
+}
+.btn-submit::after {
+  pointer-events: none;
 }
 .btn-submit:hover {
   background-color: var(--color-primary-hover);
@@ -501,6 +506,9 @@ async function handleLogin() {
   align-items: center;
   justify-content: center;
   gap: 4px;
+  min-height: 44px;
+  position: relative;
+  z-index: 2;
 }
 
 .footer-text {
@@ -511,6 +519,11 @@ async function handleLogin() {
   color: var(--color-primary);
   font-weight: 600;
   cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  min-height: 36px;
+  position: relative;
+  z-index: 2;
 }
 
 .footer-link-muted {

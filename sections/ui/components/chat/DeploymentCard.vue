@@ -47,11 +47,6 @@
       >取消部署</button>
       <button
         v-if="isSucceeded"
-        class="deployment-btn secondary"
-        @click.stop="$emit('cancel', { card, message })"
-      >取消部署</button>
-      <button
-        v-if="isSucceeded"
         class="deployment-btn primary"
         @click.stop="openUrl(previewUrl)"
       >打开预览</button>

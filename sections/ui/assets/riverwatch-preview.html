@@ -1,0 +1,179 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>RiverWatch Preview</title>
+  <style>
+    :root {
+      color-scheme: light;
+      font-family: Inter, "PingFang SC", "Microsoft YaHei", system-ui, sans-serif;
+      background: #f6f8fb;
+      color: #172033;
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      min-height: 100vh;
+      background: linear-gradient(180deg, #eaf4ff 0%, #f6f8fb 42%, #edf7f2 100%);
+    }
+    .page {
+      width: min(1180px, calc(100vw - 32px));
+      margin: 0 auto;
+      padding: 32px 0;
+    }
+    header {
+      display: flex;
+      align-items: flex-end;
+      justify-content: space-between;
+      gap: 24px;
+      padding-bottom: 22px;
+    }
+    h1 {
+      margin: 0 0 8px;
+      font-size: clamp(28px, 4vw, 48px);
+      letter-spacing: 0;
+    }
+    .subtitle {
+      margin: 0;
+      color: #526071;
+      line-height: 1.7;
+    }
+    .status {
+      border-radius: 999px;
+      padding: 10px 16px;
+      background: #dcfce7;
+      color: #166534;
+      font-weight: 700;
+      white-space: nowrap;
+    }
+    .grid {
+      display: grid;
+      grid-template-columns: repeat(5, minmax(0, 1fr));
+      gap: 14px;
+    }
+    .metric, .panel {
+      border: 1px solid #d9e2ec;
+      border-radius: 8px;
+      background: rgba(255, 255, 255, 0.88);
+      box-shadow: 0 12px 28px rgba(31, 56, 88, 0.08);
+    }
+    .metric {
+      padding: 18px;
+      min-height: 118px;
+    }
+    .label { color: #607086; font-size: 13px; }
+    .value { display: block; margin-top: 10px; font-size: 30px; font-weight: 800; }
+    .unit { color: #607086; font-size: 13px; }
+    .ok { color: #047857; }
+    .warn { color: #b45309; }
+    .critical { color: #b91c1c; }
+    .panels {
+      display: grid;
+      grid-template-columns: 1.35fr 1fr;
+      gap: 16px;
+      margin-top: 16px;
+    }
+    .panel {
+      padding: 20px;
+      min-height: 310px;
+    }
+    .panel h2 {
+      margin: 0 0 16px;
+      font-size: 18px;
+    }
+    .bars {
+      display: grid;
+      gap: 14px;
+    }
+    .bar-row {
+      display: grid;
+      grid-template-columns: 90px 1fr 58px;
+      align-items: center;
+      gap: 12px;
+      color: #3c4a5c;
+      font-size: 13px;
+    }
+    .bar {
+      height: 12px;
+      border-radius: 999px;
+      background: #e5edf6;
+      overflow: hidden;
+    }
+    .bar > span {
+      display: block;
+      height: 100%;
+      border-radius: inherit;
+      background: linear-gradient(90deg, #0ea5e9, #22c55e);
+    }
+    .site {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+      padding: 12px 0;
+      border-bottom: 1px solid #e5edf6;
+    }
+    .site:last-child { border-bottom: 0; }
+    .site-name { font-weight: 700; }
+    .pill {
+      border-radius: 999px;
+      padding: 6px 10px;
+      font-size: 12px;
+      font-weight: 700;
+      background: #ecfdf5;
+      color: #047857;
+    }
+    .pill.warn {
+      background: #fff7ed;
+      color: #c2410c;
+    }
+    @media (max-width: 760px) {
+      header { display: block; }
+      .status { display: inline-block; margin-top: 16px; }
+      .grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+      .panels { grid-template-columns: 1fr; }
+      .bar-row { grid-template-columns: 78px 1fr 46px; }
+    }
+  </style>
+</head>
+<body>
+  <main class="page">
+    <header>
+      <div>
+        <h1>RiverWatch</h1>
+        <p class="subtitle">河流水质数据看板 · 静态模拟数据 · 移动端优先 · 每 10 秒刷新一次</p>
+      </div>
+      <div class="status">4 个站点正常 · 1 个站点需关注</div>
+    </header>
+    <section class="grid" aria-label="核心指标">
+      <article class="metric"><span class="label">pH</span><span class="value ok">7.4</span><span class="unit">中性偏弱碱</span></article>
+      <article class="metric"><span class="label">溶解氧</span><span class="value ok">8.1</span><span class="unit">mg/L</span></article>
+      <article class="metric"><span class="label">浊度</span><span class="value warn">18</span><span class="unit">NTU</span></article>
+      <article class="metric"><span class="label">氨氮</span><span class="value ok">0.32</span><span class="unit">mg/L</span></article>
+      <article class="metric"><span class="label">异常站点</span><span class="value critical">1</span><span class="unit">东湾闸口</span></article>
+    </section>
+    <section class="panels">
+      <article class="panel">
+        <h2>近 24 小时指标趋势</h2>
+        <div class="bars">
+          <div class="bar-row"><span>00:00</span><div class="bar"><span style="width: 72%"></span></div><span>良好</span></div>
+          <div class="bar-row"><span>04:00</span><div class="bar"><span style="width: 78%"></span></div><span>良好</span></div>
+          <div class="bar-row"><span>08:00</span><div class="bar"><span style="width: 67%"></span></div><span>关注</span></div>
+          <div class="bar-row"><span>12:00</span><div class="bar"><span style="width: 83%"></span></div><span>良好</span></div>
+          <div class="bar-row"><span>16:00</span><div class="bar"><span style="width: 75%"></span></div><span>良好</span></div>
+          <div class="bar-row"><span>20:00</span><div class="bar"><span style="width: 81%"></span></div><span>良好</span></div>
+        </div>
+      </article>
+      <article class="panel">
+        <h2>站点状态</h2>
+        <div class="site"><span class="site-name">上游入境口</span><span class="pill">正常</span></div>
+        <div class="site"><span class="site-name">中心桥断面</span><span class="pill">正常</span></div>
+        <div class="site"><span class="site-name">东湾闸口</span><span class="pill warn">浊度偏高</span></div>
+        <div class="site"><span class="site-name">湿地缓冲区</span><span class="pill">正常</span></div>
+        <div class="site"><span class="site-name">下游出境口</span><span class="pill">正常</span></div>
+      </article>
+    </section>
+  </main>
+</body>
+</html>

@@ -72,6 +72,8 @@ function buildRequestItems({ missingRoleTemplateIds = [], templates = [] } = {})
  roleTemplateId,
  name: firstText(template?.name, template?.nickname, roleTemplateId),
  nickname: firstText(template?.nickname),
+ alias: firstText(template?.alias),
+ aliases: Array.isArray(template?.aliases) ? uniqueStrings(template.aliases) : [],
  avatar: firstText(template?.avatar),
  reason: summarizeReason(template, roleTemplateId),
  capabilities: uniqueStrings([
@@ -114,6 +116,8 @@ function normalizeCard(input = {}) {
  roleTemplateId: firstText(item.roleTemplateId, item.templateId),
  name: firstText(item.name, item.roleTemplateId, item.templateId),
  nickname: firstText(item.nickname),
+ alias: firstText(item.alias),
+ aliases: Array.isArray(item.aliases) ? uniqueStrings(item.aliases) : [],
  avatar: firstText(item.avatar),
  reason: firstText(item.reason),
  capabilities: Array.isArray(item.capabilities) ? [...item.capabilities] : [],
@@ -233,6 +237,7 @@ export function buildAgentPayloadFromTemplate(template = {}, coordinatorProfile 
  if (profile.accessMode === 'oauth') {
  base.accessMode = 'oauth';
  base.authType = 'oauth';
+ base.inheritCoordinatorAuth = true;
  } else if (profile.accessMode === 'api-key') {
  base.accessMode = 'api-key';
  base.authType = 'api_key';
@@ -258,8 +263,17 @@ export function shouldCreateCoordinatorTemplateCatsRequest({ conversation = {}, 
  || Boolean(conversation.directCatId || conversation.direct_cat_id)
  || String(conversation.id || conversation.channelId || '').startsWith(CLOWDER_CAT_CONTACT_PREFIX);
  if (!isClowderConversation) return false;
- const haystack = firstText(agent.roleTemplate, agent.templateId, agent.roleTemplateId, agent.alias, agent.name).toLowerCase();
- if (!haystack) return false;
+ const haystack = uniqueStrings([
+ agent.roleTemplate,
+ agent.templateId,
+ agent.roleTemplateId,
+ agent.alias,
+ agent.name,
+ conversation.directCatId,
+ conversation.direct_cat_id,
+ conversation.name
+ ]).join(' ').toLowerCase();
+ if (!haystack.trim()) return false;
  const coordinatorKeywords = ['coordinator', 'pm', 'projectmanager', 'productmanager', 'clowder', '协调', '协同', '项目经理', '产品经理'];
  return coordinatorKeywords.some((keyword) => haystack.includes(keyword));
 }
