@@ -1,0 +1,34 @@
+[seedcmp] stopping agenthub-ui (PID 1199560)
+[seedcmp] im-web not running
+[seedcmp] stopping tangseng (PID 1199316)
+[seedcmp] clowder-web not running
+[seedcmp] stopping clowder-api (PID 1199089)
+[seedcmp] clowder not running
+[seedcmp] stopping wukongim (PID 1198511)
+[seedcmp] stopping stale AgentHub UI listener on port 5173 (PID 1199611)
+[seedcmp] stopping stale Clowder API listener on port 3004 (PID 1199129)
+[seedcmp] stopping container: seedcmp-minio
+[seedcmp] stopping container: seedcmp-mysql
+[seedcmp] cleaning old seedcmp/worktree listeners on known ports...
+[seedcmp] starting existing container: seedcmp-mysql
+[seedcmp] detected existing Redis on 127.0.0.1:6379
+[seedcmp] starting existing container: seedcmp-minio
+[seedcmp] waiting for MySQL...
+mysql: [Warning] Using a password on the command line interface can be insecure.
+[seedcmp] waiting for Redis...
+[seedcmp] waiting for Redis on 127.0.0.1:6379...
+[seedcmp] building TangSengDaoDaoServer...
+[seedcmp] starting wukongim (log: /home/yunyi/Desktop/Bytedance_cmp/seedcmp/.seedcmp-run/logs/wukongim.log)
+[seedcmp] waiting for WuKongIM API on 127.0.0.1:5001...
+[seedcmp] starting Clowder API only (port 3004, no web at 3003)...
+[seedcmp] starting clowder-api (log: /home/yunyi/Desktop/Bytedance_cmp/seedcmp/.seedcmp-run/logs/clowder-api.log)
+[seedcmp] waiting for Clowder API on 127.0.0.1:3004...
+[seedcmp] starting tangseng (log: /home/yunyi/Desktop/Bytedance_cmp/seedcmp/.seedcmp-run/logs/tangseng.log)
+[seedcmp] waiting for TangSeng API on 127.0.0.1:8090...
+[seedcmp] im-web not running
+[seedcmp] starting agenthub-ui (log: /home/yunyi/Desktop/Bytedance_cmp/seedcmp/.seedcmp-run/logs/agenthub-ui.log)
+[seedcmp] waiting for AgentHub UI on 127.0.0.1:5173...
+[seedcmp] ready:
+[seedcmp]   AgentHub UI: http://localhost:5173
+[seedcmp]   Clowder API: http://localhost:3004
+[seedcmp]   Logs:    /home/yunyi/Desktop/Bytedance_cmp/seedcmp/.seedcmp-run/logs

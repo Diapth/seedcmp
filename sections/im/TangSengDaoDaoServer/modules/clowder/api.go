@@ -195,6 +195,7 @@ type ClowderCatTemplate struct {
 	RoleDescription    string   `json:"roleDescription,omitempty"`
 	Personality        string   `json:"personality,omitempty"`
 	TeamStrengths      string   `json:"teamStrengths,omitempty"`
+	Restrictions       []string `json:"restrictions,omitempty"`
 	PersonalitySummary string   `json:"personalitySummary,omitempty"`
 	CapabilitySummary  string   `json:"capabilitySummary,omitempty"`
 	Cloneable          bool     `json:"cloneable"`
@@ -228,13 +229,14 @@ type ClowderSkillMCPDependency struct {
 }
 
 type catTemplate struct {
-	ID              string `json:"id"`
-	Name            string `json:"name"`
-	Nickname        string `json:"nickname,omitempty"`
-	Avatar          string `json:"avatar,omitempty"`
-	RoleDescription string `json:"roleDescription,omitempty"`
-	Personality     string `json:"personality,omitempty"`
-	TeamStrengths   string `json:"teamStrengths,omitempty"`
+	ID              string   `json:"id"`
+	Name            string   `json:"name"`
+	Nickname        string   `json:"nickname,omitempty"`
+	Avatar          string   `json:"avatar,omitempty"`
+	RoleDescription string   `json:"roleDescription,omitempty"`
+	Personality     string   `json:"personality,omitempty"`
+	TeamStrengths   string   `json:"teamStrengths,omitempty"`
+	Restrictions    []string `json:"restrictions,omitempty"`
 }
 
 type conversationRefRequest struct {
@@ -2259,6 +2261,7 @@ func catRoleTemplateCandidate(template catTemplate) (ClowderCatTemplate, bool) {
 		RoleDescription:    strings.TrimSpace(template.RoleDescription),
 		Personality:        strings.TrimSpace(template.Personality),
 		TeamStrengths:      strings.TrimSpace(template.TeamStrengths),
+		Restrictions:       cleanStringList(template.Restrictions),
 		PersonalitySummary: agent.PersonalitySummary,
 		CapabilitySummary:  agent.CapabilitySummary,
 		Cloneable:          true,
@@ -2503,21 +2506,26 @@ func (c *Clowder) createCatViaUpstream(req createCatRequest, alias string, userI
 	name := strings.TrimSpace(req.Name)
 	catID := runtimeCatID(name, alias)
 	mentions := []string{normalizeCatAlias(alias, name)}
+	template := c.lookupCreateCatTemplate(req.RoleTemplateID, userID)
+	capabilitySummary := strings.Join(cleanStringList(req.Capabilities), "、")
 	payload := map[string]interface{}{
 		"catId":           catID,
 		"name":            name,
 		"displayName":     name,
-		"nickname":        strings.TrimPrefix(strings.TrimSpace(alias), "@"),
-		"avatar":          "/avatars/default.png",
+		"nickname":        firstTrimmed(template.Nickname, strings.TrimPrefix(strings.TrimSpace(alias), "@")),
+		"avatar":          firstTrimmed(template.Avatar, "/avatars/default.png"),
 		"color":           map[string]string{"primary": "#3B82F6", "secondary": "#DBEAFE"},
 		"mentionPatterns": mentions,
 		"accountRef":      strings.TrimSpace(req.AccountRef),
-		"roleDescription": firstTrimmed(req.Personality, name+"，由 TangSeng IM 通过 Clowder 新增。"),
-		"personality":     strings.TrimSpace(req.Personality),
-		"teamStrengths":   strings.Join(cleanStringList(req.Capabilities), "、"),
+		"roleDescription": firstTrimmed(template.RoleDescription, req.Personality, name+"，由 TangSeng IM 通过 Clowder 新增。"),
+		"personality":     firstTrimmed(template.Personality, req.Personality),
+		"teamStrengths":   firstTrimmed(template.TeamStrengths, capabilitySummary),
 		"clientId":        upstreamCatClientID(req),
 		"defaultModel":    strings.TrimSpace(req.DefaultModel),
 		"mcpSupport":      true,
+	}
+	if restrictions := cleanStringList(template.Restrictions); len(restrictions) > 0 {
+		payload["restrictions"] = restrictions
 	}
 
 	body, err := json.Marshal(payload)
@@ -2552,7 +2560,7 @@ func (c *Clowder) createCatViaUpstream(req createCatRequest, alias string, userI
 	if len(mentionPatterns) == 0 {
 		mentionPatterns = mentions
 	}
-	capabilitySummary := firstTrimmed(cat.TeamStrengths, strings.Join(cleanStringList(req.Capabilities), "、"), cat.RoleDescription)
+	capabilitySummary = firstTrimmed(cat.TeamStrengths, strings.Join(cleanStringList(req.Capabilities), "、"), cat.RoleDescription)
 	return ClowderAgent{
 		CatID:              createdCatID,
 		DisplayName:        displayName,
@@ -2566,6 +2574,26 @@ func (c *Clowder) createCatViaUpstream(req createCatRequest, alias string, userI
 		Source:             "runtime-created",
 		Connected:          true,
 	}, nil
+}
+
+func (c *Clowder) lookupCreateCatTemplate(roleTemplateID string, userID string) catTemplate {
+	needle := normalizeCatLookup(roleTemplateID)
+	if needle == "" {
+		return catTemplate{}
+	}
+	response, err := c.fetchCatTemplates(userID)
+	if err != nil {
+		return catTemplate{}
+	}
+	for _, template := range response.Templates {
+		keys := []string{template.ID, template.Name, template.Nickname}
+		for _, key := range keys {
+			if normalizeCatLookup(key) == needle {
+				return template
+			}
+		}
+	}
+	return catTemplate{}
 }
 
 func routeTextForCatRequest(req conversationRefRequest) string {

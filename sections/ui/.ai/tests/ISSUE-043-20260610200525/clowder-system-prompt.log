@@ -1,0 +1,275 @@
+▶ SystemPromptBuilder
+  ✔ contains display name for opus (30.371093ms)
+  ✔ contains display name for codex (0.397361ms)
+  ✔ contains display name for gemini (0.364308ms)
+  ✔ contains teammate info only for cats in context.teammates (0.235879ms)
+  ✔ omits dynamic teammate listing when teammates is empty (0.228673ms)
+  ✔ contains 铲屎官 reference (0.216711ms)
+  ✔ contains serial chain context when mode is serial (0.248449ms)
+  ✔ contains independent mode when mode is independent (0.244308ms)
+  ✔ contains MCP tools when mcpAvailable is true (0.289074ms)
+  ✔ F193 AC-B1: MCP_TOOLS_SECTION lists cat_cafe_cross_post_message with routing hint (0.444962ms)
+  ✔ F193 AC-B1: post_message description signals KD-1 principal-conditioned threadId (0.23112ms)
+  ✔ omits MCP tools when mcpAvailable is false (0.190263ms)
+  ✔ contains anti-impersonation rule (0.174742ms)
+  ✔ is deterministic (identical inputs produce identical output) (0.276812ms)
+  ✔ output size stays under 3900 chars after Magic Words + runtime prompt growth (0.206855ms)
+  ✔ returns empty string for unknown catId (0.1023ms)
+  ✔ contains provider label (Anthropic for opus) (1.059759ms)
+  ✔ parallel mode produces independent thinking text (0.201237ms)
+  ✔ critique promptTag adds critical analysis text (0.21425ms)
+  ✔ empty promptTags produces no extra text (0.18417ms)
+  ✔ contains "不确定" honesty rule (0.21782ms)
+  ✔ contains "不要编造" anti-fabrication rule (0.185284ms)
+  ✔ buildStaticIdentity returns identity for known cat (0.209452ms)
+  ✔ buildStaticIdentity returns empty for unknown cat (0.11176ms)
+  ✔ buildStaticIdentity includes workflow triggers (0.298798ms)
+  ✔ buildStaticIdentity is deterministic (0.202305ms)
+  ✔ buildStaticIdentityPackOnly returns empty for unknown cat (0.145714ms)
+  ✔ buildStaticIdentityPackOnly returns empty when no pack blocks (0.088377ms)
+  ✔ buildStaticIdentityPackOnly contains all pack blocks, NO non-pack content (0.224456ms)
+  ✔ buildStaticIdentityPackOnly orders blocks masks→workflows→guardrail→defaults→world (0.6505ms)
+  ✔ buildStaticIdentityPackOnly skips null blocks (partial pack) (0.117384ms)
+  ✖ buildStaticIdentity disambiguates duplicate display names in runtime multi-variant config (1.850086ms)
+  ✖ buildStaticIdentity duplicate-name hint should not suggest self handle (0.945374ms)
+  ✔ buildStaticIdentity includes teammate roster with strengths (0.182263ms)
+  ✔ F127 V-1: buildStaticIdentity includes runtime-created cats in new-session roster (0.297056ms)
+  ✔ buildStaticIdentity roster excludes self (0.193854ms)
+  ✖ buildStaticIdentity roster uses teamStrengths from config (0.809919ms)
+  ✖ buildStaticIdentity roster: Sonnet does not inherit Opus cost caution (R1 null override) (0.800587ms)
+  ✔ buildStaticIdentity roster size with full runtime config stays under 4700 chars after Magic Words growth (0.71192ms)
+  ✔ buildInvocationContext returns teammates when present (0.121761ms)
+  ✔ F193 AC-B2: buildInvocationContext renders crossThreadReplyHint when present (0.12682ms)
+  ✔ F193 AC-B2 boundary: buildInvocationContext omits reply hint when not provided (0.138004ms)
+  ✔ buildInvocationContext omits teammate listing when empty (0.094461ms)
+  ✔ buildInvocationContext injects A2A exit check when enabled (non-parallel) (0.116159ms)
+  ✖ F167-F AC-F1: teammate roster surfaces resolved model per cat (handle/model 解绑) (0.9347ms)
+  ✖ F167-E: teammate roster surfaces restrictions (硬限制) for teammates with them (0.915496ms)
+  ✖ F167-E: cat sees its own restrictions in self identity (self-awareness) (0.850579ms)
+  ✔ coordinator self identity forbids doing concrete work itself (0.525475ms)
+  ✔ F167-E: cat without restrictions has NO self-restrictions block (0.896364ms)
+  ✖ F167-E: teammate roster omits restrictions marker for teammates without them (0.931121ms)
+  ✔ F167-F AC-F10: AGENTS.md / CLAUDE.md have no hardcoded "@x = model-y" bindings (0.435081ms)
+  ✔ F167-F AC-F7/F8: A2A section has inline-@ bad examples (URL / list / quote) and pre-send self-check (0.273124ms)
+  ✔ F167-F AC-F6: trailing anchor lists 外部 identity as hold_ball scenarios (not @-eligible) (0.242252ms)
+  ✔ F167-D2: trailing anchor uses decision-tree ordering (not flat three-choice) (0.205079ms)
+  ✔ F167-L AC-L2: trailing anchor option 2 distinguishes polling (2a) vs event-driven (2b) modes (0.288949ms)
+  ✔ F167-D2: trailing anchor names the three hard conditions for @co-creator (0.155406ms)
+  ✔ F167-D2: trailing anchor warns against 反问式 ping (soft @co-creator) (0.136577ms)
+  ✔ buildInvocationContext does not inject A2A exit check in parallel mode (0.112632ms)
+  ✔ buildInvocationContext injects parallel-mode no-mention hint in parallel mode (0.182372ms)
+  ✔ buildInvocationContext does NOT inject parallel-mode no-mention hint in serial/independent mode (0.118833ms)
+  ✔ buildInvocationContext injects mention routing feedback when provided (0.156731ms)
+  ✔ buildInvocationContext does not contain static identity or MCP tools (0.110552ms)
+  ✔ buildStaticIdentity includes MCP tools when mcpAvailable (0.204128ms)
+  ✔ buildStaticIdentity omits MCP tools when mcpAvailable is false (0.167623ms)
+  ✔ buildStaticIdentity does NOT include mcpCallbackInstructions (non-Claude stays per-message) (0.169843ms)
+  ✔ buildStaticIdentity includes 铲屎官 reference (0.170938ms)
+  ✔ buildStaticIdentity includes configured co-creator name and mention handles (0.329521ms)
+  ✔ buildReviewerSection returns reviewer list for opus (different family reviewers) (0.132196ms)
+  ✔ buildReviewerSection returns null for unknown cat (0.097386ms)
+  ✔ buildReviewerSection shows cross-family when available (R5 P2 prerequisite) (0.105897ms)
+  ✔ buildSystemPrompt includes reviewer section (0.196123ms)
+  ✔ buildInvocationContext injects most-recently-active participant (0.207064ms)
+  ✔ buildInvocationContext skips self in activity list (0.145776ms)
+  ✔ buildInvocationContext omits hint when activeParticipants absent (0.108873ms)
+  ✔ buildInvocationContext omits hint when only self has activity (0.108276ms)
+  ✔ buildSystemPrompt size with activeParticipants stays under 3900 chars after Magic Words + runtime prompt growth (0.256295ms)
+  ✔ buildInvocationContext includes pinned Identity line with handle + model (0.224599ms)
+  ✔ buildInvocationContext Identity line uses resolved runtime model override (0.130995ms)
+  ✔ buildInvocationContext includes Direct message reply target + sender model (F167 anti-spoofing) (0.242173ms)
+  ✔ buildInvocationContext handoff sender model respects CAT_<ID>_MODEL env override (0.130734ms)
+  ✖ buildInvocationContext supports runtime variant cat IDs (gpt52) (1.158728ms)
+  ✖ buildInvocationContext injects same-breed anti-spoofing line when opus-45 receives from opus (1.938721ms)
+  ✔ buildInvocationContext does NOT inject anti-spoofing for cross-breed handoff (0.145165ms)
+  ✖ formatHandleFreeLabel includes variantLabel (via ping-pong warning path) (0.745516ms)
+  ✔ buildInvocationContext injects routing policy summary line when present (0.299137ms)
+  ✔ buildInvocationContext sanitizes routing reason and tolerates malformed lists (0.144059ms)
+  ✔ buildInvocationContext injects SOP stage hint when sopStageHint provided (0.124565ms)
+  ✔ guide prompt emits offered transition only for a brand-new guide match (0.255812ms)
+  ✔ guide prompt does not re-send offered transition after the guide is already offered (0.115141ms)
+  ✔ guide preview from offered state advances to awaiting_choice once (12.237623ms)
+  ✔ guide preview from awaiting_choice does not re-send awaiting_choice transition (0.188202ms)
+  ✔ buildInvocationContext omits SOP hint when sopStageHint absent (0.108284ms)
+  ✔ buildInvocationContext SOP hint includes definition-sourced skill (0.10515ms)
+  ✔ buildSystemPrompt size stays under 3900 chars with SOP hint after Magic Words + runtime prompt growth (0.263359ms)
+  ✔ buildInvocationContext includes voice mode instructions when voiceMode=true (0.12125ms)
+  ✔ buildInvocationContext omits voice mode instructions when voiceMode absent (0.105144ms)
+  ✔ buildSystemPrompt size stays under 5200 chars with voice mode + SOP hint after Magic Words growth (0.229745ms)
+  ✔ buildInvocationContext injects bootcamp mode when bootcampState provided (0.142315ms)
+  ✔ buildInvocationContext injects threadId in bootcamp mode (0.13007ms)
+  ✔ buildInvocationContext omits bootcamp when bootcampState absent (0.193224ms)
+  ✔ maine-coon prompt contains execution discipline keywords (0.258388ms)
+  ✔ maine-coon workflow contains A2A state transition keywords (0.193255ms)
+  ✔ F129: buildStaticIdentity injects all pack blocks (0.213339ms)
+  ✔ F129: pack masks appear after identity, before governance (0.193281ms)
+  ✔ F129: pack guardrails appear after core governance (0.183614ms)
+  ✔ F129: buildSystemPrompt passes packBlocks through (0.203864ms)
+  ✔ F129: null/undefined packBlocks produce no pack sections (0.246274ms)
+  ✔ F129: partial packBlocks only inject present fields (0.182522ms)
+  ✔ GOVERNANCE_L0_DIGEST contains all magic words from shared-rules.md (0.665033ms)
+  ✔ GOVERNANCE_L0_DIGEST stays in sync with shared-rules.md world-view headings (2.70971ms)
+  ✔ F182 B1: disabled cat (antigravity) does not appear in teammate roster section (0.228667ms)
+  ✔ F182 B2: disabled cat mention patterns do not appear in any prompt section (0.191142ms)
+  ✔ F182 B1+B2: disabled cat does not appear in buildSystemPrompt output (0.19687ms)
+  ✔ F182 B3: available cats still appear in roster (regression guard) (0.165643ms)
+✖ SystemPromptBuilder (83.129291ms)
+ℹ tests 114
+ℹ suites 1
+ℹ pass 103
+ℹ fail 11
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 219.558931
+
+✖ failing tests:
+
+test at test/system-prompt-builder.test.js:441:3
+✖ buildStaticIdentity disambiguates duplicate display names in runtime multi-variant config (1.850086ms)
+  AssertionError [ERR_ASSERTION]: should include teammate @mention line
+      at TestContext.<anonymous> (file:///home/yunyi/Desktop/Bytedance_cmp/seedcmp/sections/clowder-ai/packages/api/test/system-prompt-builder.test.js:455:14)
+      at async Test.run (node:internal/test_runner/test:1069:7)
+      at async Suite.processPendingSubtests (node:internal/test_runner/test:752:7) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: undefined,
+    expected: true,
+    operator: '=='
+  }
+
+test at test/system-prompt-builder.test.js:470:3
+✖ buildStaticIdentity duplicate-name hint should not suggest self handle (0.945374ms)
+  AssertionError [ERR_ASSERTION]: should include duplicate-name hint
+      at TestContext.<anonymous> (file:///home/yunyi/Desktop/Bytedance_cmp/seedcmp/sections/clowder-ai/packages/api/test/system-prompt-builder.test.js:483:14)
+      at async Test.run (node:internal/test_runner/test:1069:7)
+      at async Suite.processPendingSubtests (node:internal/test_runner/test:752:7) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: false,
+    expected: true,
+    operator: '=='
+  }
+
+test at test/system-prompt-builder.test.js:540:3
+✖ buildStaticIdentity roster uses teamStrengths from config (0.809919ms)
+  AssertionError [ERR_ASSERTION]: Should include gpt52 teamStrengths
+      at TestContext.<anonymous> (file:///home/yunyi/Desktop/Bytedance_cmp/seedcmp/sections/clowder-ai/packages/api/test/system-prompt-builder.test.js:554:14)
+      at async Test.run (node:internal/test_runner/test:1069:7)
+      at async Suite.processPendingSubtests (node:internal/test_runner/test:752:7) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: false,
+    expected: true,
+    operator: '=='
+  }
+
+test at test/system-prompt-builder.test.js:566:3
+✖ buildStaticIdentity roster: Sonnet does not inherit Opus cost caution (R1 null override) (0.800587ms)
+  AssertionError [ERR_ASSERTION]: Roster section should exist
+      at TestContext.<anonymous> (file:///home/yunyi/Desktop/Bytedance_cmp/seedcmp/sections/clowder-ai/packages/api/test/system-prompt-builder.test.js:580:14)
+      at async Test.run (node:internal/test_runner/test:1069:7)
+      at async Suite.processPendingSubtests (node:internal/test_runner/test:752:7) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: undefined,
+    expected: true,
+    operator: '=='
+  }
+
+test at test/system-prompt-builder.test.js:704:3
+✖ F167-F AC-F1: teammate roster surfaces resolved model per cat (handle/model 解绑) (0.9347ms)
+  AssertionError [ERR_ASSERTION]: codex row must show "@codex · <model>" adjacency
+      at TestContext.<anonymous> (file:///home/yunyi/Desktop/Bytedance_cmp/seedcmp/sections/clowder-ai/packages/api/test/system-prompt-builder.test.js:722:14)
+      at async Test.run (node:internal/test_runner/test:1069:7)
+      at async Suite.processPendingSubtests (node:internal/test_runner/test:752:7) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: '',
+    expected: /@codex\s*·\s*\S+/,
+    operator: 'match'
+  }
+
+test at test/system-prompt-builder.test.js:733:3
+✖ F167-E: teammate roster surfaces restrictions (硬限制) for teammates with them (0.915496ms)
+  AssertionError [ERR_ASSERTION]: must include 队友名册 section
+      at TestContext.<anonymous> (file:///home/yunyi/Desktop/Bytedance_cmp/seedcmp/sections/clowder-ai/packages/api/test/system-prompt-builder.test.js:744:14)
+      at async Test.run (node:internal/test_runner/test:1069:7)
+      at async Suite.processPendingSubtests (node:internal/test_runner/test:752:7) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: '',
+    expected: /队友名册/,
+    operator: 'match'
+  }
+
+test at test/system-prompt-builder.test.js:755:3
+✖ F167-E: cat sees its own restrictions in self identity (self-awareness) (0.850579ms)
+  AssertionError [ERR_ASSERTION]: gemini own prompt must declare its restrictions
+      at TestContext.<anonymous> (file:///home/yunyi/Desktop/Bytedance_cmp/seedcmp/sections/clowder-ai/packages/api/test/system-prompt-builder.test.js:768:14)
+      at async Test.run (node:internal/test_runner/test:1069:7)
+      at async Suite.processPendingSubtests (node:internal/test_runner/test:752:7) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: '',
+    expected: /你的硬限制/,
+    operator: 'match'
+  }
+
+test at test/system-prompt-builder.test.js:836:3
+✖ F167-E: teammate roster omits restrictions marker for teammates without them (0.931121ms)
+  AssertionError [ERR_ASSERTION]: gemini row must include 硬限制; got: undefined
+      at TestContext.<anonymous> (file:///home/yunyi/Desktop/Bytedance_cmp/seedcmp/sections/clowder-ai/packages/api/test/system-prompt-builder.test.js:850:14)
+      at async Test.run (node:internal/test_runner/test:1069:7)
+      at async Suite.processPendingSubtests (node:internal/test_runner/test:752:7) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: undefined,
+    expected: true,
+    operator: '=='
+  }
+
+test at test/system-prompt-builder.test.js:1338:3
+✖ buildInvocationContext supports runtime variant cat IDs (gpt52) (1.158728ms)
+  AssertionError [ERR_ASSERTION]: The input did not match the regular expression /^Identity:/m. Input:
+
+  ''
+
+      at TestContext.<anonymous> (file:///home/yunyi/Desktop/Bytedance_cmp/seedcmp/sections/clowder-ai/packages/api/test/system-prompt-builder.test.js:1357:14)
+      at async Test.run (node:internal/test_runner/test:1069:7)
+      at async Suite.processPendingSubtests (node:internal/test_runner/test:752:7) {
+    generatedMessage: true,
+    code: 'ERR_ASSERTION',
+    actual: '',
+    expected: /^Identity:/m,
+    operator: 'match'
+  }
+
+test at test/system-prompt-builder.test.js:1371:3
+✖ buildInvocationContext injects same-breed anti-spoofing line when opus-45 receives from opus (1.938721ms)
+  AssertionError [ERR_ASSERTION]: The input did not match the regular expression /^Identity:.*opus-45/m. Input:
+
+  ''
+
+      at TestContext.<anonymous> (file:///home/yunyi/Desktop/Bytedance_cmp/seedcmp/sections/clowder-ai/packages/api/test/system-prompt-builder.test.js:1391:14)
+      at async Test.run (node:internal/test_runner/test:1069:7)
+      at async Suite.processPendingSubtests (node:internal/test_runner/test:752:7) {
+    generatedMessage: true,
+    code: 'ERR_ASSERTION',
+    actual: '',
+    expected: /^Identity:.*opus-45/m,
+    operator: 'match'
+  }
+
+test at test/system-prompt-builder.test.js:1424:3
+✖ formatHandleFreeLabel includes variantLabel (via ping-pong warning path) (0.745516ms)
+  AssertionError [ERR_ASSERTION]: ping-pong warning must include variantLabel (Opus 4.5) to disambiguate from other opus variants
+      at TestContext.<anonymous> (file:///home/yunyi/Desktop/Bytedance_cmp/seedcmp/sections/clowder-ai/packages/api/test/system-prompt-builder.test.js:1446:14)
+      at async Test.run (node:internal/test_runner/test:1069:7)
+      at async Suite.processPendingSubtests (node:internal/test_runner/test:752:7) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: false,
+    expected: true,
+    operator: '=='
+  }

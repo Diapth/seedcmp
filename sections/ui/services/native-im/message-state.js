@@ -790,6 +790,45 @@ export function findSelfEchoIndex(messages = [], incoming = {}, currentUser = {}
   return -1;
 }
 
+function normalizedSenderKey(message = {}) {
+  return clean(message.senderId || message.from_uid || message.fromUID || message.userId || message.uid).toLowerCase();
+}
+
+function isClowderReplySender(message = {}) {
+  const sender = normalizedSenderKey(message);
+  return sender === 'clowder'
+    || sender.startsWith('clowder:')
+    || sender.startsWith(CLOWDER_CAT_CONTACT_PREFIX);
+}
+
+function findEquivalentClowderReplyIndex(messages = [], incoming = {}, currentUser = {}, options = {}) {
+  if (!isClowderConversation(options.conversation || {})) return -1;
+  const incomingSenderId = incoming.senderId || incoming.from_uid || incoming.fromUID;
+  if (isSelfSender(incomingSenderId, currentUser)) return -1;
+  if (!isClowderReplySender(incoming)) return -1;
+  if (incoming.type && incoming.type !== 'text') return -1;
+
+  const incomingContent = contentKey(incoming);
+  if (!incomingContent) return -1;
+  const incomingSender = normalizedSenderKey(incoming);
+  const incomingTime = safeNumber(incoming.time, 0);
+  const timeWindowMs = options.agentReplyDedupeWindowMs || 10 * 60 * 1000;
+
+  for (let index = messages.length - 1; index >= 0; index -= 1) {
+    const candidate = messages[index];
+    if (!isVisibleChatMessage(candidate)) continue;
+    if (candidate.type && candidate.type !== 'text') continue;
+    if (!isClowderReplySender(candidate)) continue;
+    if (isSelfSender(candidate.senderId || candidate.from_uid || candidate.fromUID, currentUser)) continue;
+    if (normalizedSenderKey(candidate) !== incomingSender) continue;
+    if (contentKey(candidate) !== incomingContent) continue;
+    const candidateTime = safeNumber(candidate.time, 0);
+    if (incomingTime && candidateTime && Math.abs(incomingTime - candidateTime) > timeWindowMs) continue;
+    return index;
+  }
+  return -1;
+}
+
 export function mergeNativeMessageIntoList(messages = [], incoming = {}, options = {}) {
   const currentUser = options.currentUser || {};
   const conversation = options.conversation || {};
@@ -868,6 +907,21 @@ export function mergeNativeMessageIntoList(messages = [], incoming = {}, options
       };
       return sortMessages(next);
     }
+  }
+
+  const duplicateReplyIndex = findEquivalentClowderReplyIndex(next, enrichedIncoming, currentUser, options);
+  if (duplicateReplyIndex >= 0) {
+    next[duplicateReplyIndex] = {
+      ...next[duplicateReplyIndex],
+      ...enrichedIncoming,
+      id: firstNonEmpty(enrichedIncoming.id, next[duplicateReplyIndex].id),
+      status: enrichedIncoming.status || next[duplicateReplyIndex].status || 'success',
+      streaming: enrichedIncoming.streaming === undefined ? next[duplicateReplyIndex].streaming : enrichedIncoming.streaming,
+      reactions: next[duplicateReplyIndex].reactions || enrichedIncoming.reactions || [],
+      replyRef: next[duplicateReplyIndex].replyRef || enrichedIncoming.replyRef || null,
+      mentions: next[duplicateReplyIndex].mentions || enrichedIncoming.mentions || []
+    };
+    return sortMessages(next);
   }
 
   const echoIndex = findSelfEchoIndex(next, enrichedIncoming, currentUser, options);

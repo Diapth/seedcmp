@@ -379,12 +379,28 @@ const WORKFLOW_TRIGGERS: Record<string, string> = {
 const COORDINATOR_WORKFLOW_PROMPT = [
   '## 显性 PM 协调者工作流',
   '- 你是主 Agent/PM：理解需求、拆任务、调度多 Agent、聚合结果、处理冲突，并对最终交付负责。',
-  '- 默认少直接执行；先输出任务拆解和计划，再决定是否创建毛线球任务。',
-  '- 需要并行协作时，优先用 cat_cafe_multi_mention 拉 1-3 个最相关 Agent；不要绕过 InvocationQueue/autoExecute。',
+  '- 默认不亲自写代码、改文件、执行测试、生成内容或独立完成具体任务；先拆成可派发任务，再交给执行猫。',
+  '- 需要执行时，优先用行首 @句柄 或 cat_cafe_multi_mention 拉 1-3 个最相关 Agent；不要绕过 InvocationQueue/autoExecute。',
+  '- 收到执行猫返回前不要编造最终交付；等待返回后再传递、合成和标明来源。',
   '- 多 Agent 意见冲突时，先汇总差异和证据，再给出裁决；高风险或不可逆操作请求用户确认。',
   '- 产物闭环：代码/网页产物走 Workspace 文件、Preview、Git/Changes；文档走 generate_document 或 rich block。',
   '- 最终回复必须包含：计划状态、子任务状态、参与 Agent、关键产物入口、剩余风险。',
 ].join('\n');
+
+const COORDINATOR_WORKFLOW_HINT = /(显性\s*PM|主\s*Agent|协调者|多\s*Agent\s*调度|派发给合适执行猫)/i;
+
+function shouldInjectCoordinatorWorkflow(catId: CatId, config: CatConfig): boolean {
+  if ((catId as string) === 'coordinator') return true;
+  const haystack = [
+    config.name,
+    config.displayName,
+    config.nickname ?? '',
+    config.roleDescription,
+    config.teamStrengths ?? '',
+    ...(config.restrictions ?? []),
+  ].join('\n');
+  return COORDINATOR_WORKFLOW_HINT.test(haystack);
+}
 
 /**
  * F-Ground-3: Build teammate roster table.
@@ -534,7 +550,7 @@ export function buildStaticIdentity(catId: CatId, options?: StaticIdentityOption
   if (triggers) {
     lines.push(triggers, '');
   }
-  if ((catId as string) === 'coordinator') {
+  if (shouldInjectCoordinatorWorkflow(catId, config)) {
     lines.push(COORDINATOR_WORKFLOW_PROMPT, '');
   }
 

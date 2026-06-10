@@ -1,0 +1,4 @@
+# github.com/TangSengDaoDao/TangSengDaoDaoServer/modules/clowder [github.com/TangSengDaoDao/TangSengDaoDaoServer/modules/clowder.test]
+modules/clowder/proxy_test.go:189:134: directory.Templates[0].Restrictions undefined (type ClowderCatTemplate has no field or method Restrictions)
+FAIL	github.com/TangSengDaoDao/TangSengDaoDaoServer/modules/clowder [build failed]
+FAIL

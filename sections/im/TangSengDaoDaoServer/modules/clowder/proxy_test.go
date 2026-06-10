@@ -134,6 +134,7 @@ func TestFetchCatDirectoryUsesDirectHubAndKeepsExistingRagdoll(t *testing.T) {
 						"avatar":        "/avatars/keeper.png",
 						"personality":   "清晰、稳健",
 						"teamStrengths": "需求澄清、任务拆分",
+						"restrictions":  []string{"禁止生成内容或独立完成具体任务", "必须派发给合适执行猫"},
 					},
 				},
 				"clientDefaults": map[string]interface{}{
@@ -185,6 +186,7 @@ func TestFetchCatDirectoryUsesDirectHubAndKeepsExistingRagdoll(t *testing.T) {
 	assert.Equal(t, "opus", directory.Agents[0].CatID)
 	assert.Equal(t, "coordinator", directory.Templates[0].RoleTemplateID)
 	assert.Equal(t, "协调者", directory.Templates[0].DisplayName)
+	assert.Equal(t, []string{"禁止生成内容或独立完成具体任务", "必须派发给合适执行猫"}, directory.Templates[0].Restrictions)
 	require.Len(t, directory.SkillCatalog["codex"], 1)
 	assert.Equal(t, "tdd", directory.SkillCatalog["codex"][0].Name)
 	require.Len(t, directory.SkillCatalog["claude"], 1)
@@ -796,7 +798,23 @@ func TestCreateCatAndConnectAutoBindsDirectThread(t *testing.T) {
 				},
 			})
 		case "/api/cat-templates":
-			_ = json.NewEncoder(w).Encode(map[string]interface{}{"templates": []map[string]interface{}{}})
+			_ = json.NewEncoder(w).Encode(map[string]interface{}{
+				"templates": []map[string]interface{}{
+					{
+						"id":              "coordinator",
+						"name":            "暹罗猫（协调者）",
+						"nickname":        "罗罗",
+						"avatar":          "/avatars/keeper.png",
+						"roleDescription": "显性 PM / 主 Agent，只协调、少直接执行",
+						"personality":     "话痨但聪明，优先级意识极强",
+						"teamStrengths":   "需求澄清、任务拆分、并行调度、结果合成、交付闭环",
+						"restrictions": []string{
+							"禁止默认亲自写代码、改文件、执行测试、生成内容或独立完成具体任务；必须优先拆解并派发给合适执行猫",
+							"禁止跳过执行猫返回结果直接给最终交付；必须接收、合成并标明各执行猫产出",
+						},
+					},
+				},
+			})
 		default:
 			http.NotFound(w, r)
 		}
@@ -824,6 +842,13 @@ func TestCreateCatAndConnectAutoBindsDirectThread(t *testing.T) {
 	assert.Equal(t, "pm", gotCreateCat["catId"])
 	assert.Equal(t, "PM", gotCreateCat["displayName"])
 	assert.Equal(t, []interface{}{"@pm"}, gotCreateCat["mentionPatterns"])
+	assert.Equal(t, "显性 PM / 主 Agent，只协调、少直接执行", gotCreateCat["roleDescription"])
+	assert.Equal(t, "话痨但聪明，优先级意识极强", gotCreateCat["personality"])
+	assert.Equal(t, "需求澄清、任务拆分、并行调度、结果合成、交付闭环", gotCreateCat["teamStrengths"])
+	assert.Equal(t, []interface{}{
+		"禁止默认亲自写代码、改文件、执行测试、生成内容或独立完成具体任务；必须优先拆解并派发给合适执行猫",
+		"禁止跳过执行猫返回结果直接给最终交付；必须接收、合成并标明各执行猫产出",
+	}, gotCreateCat["restrictions"])
 	require.Len(t, inboundMessages, 1)
 	assert.Equal(t, "clowder_cat:coordinator", inboundMessages[0].ChannelID)
 	assert.Equal(t, "/new PM", inboundMessages[0].Text)

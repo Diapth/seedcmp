@@ -2885,6 +2885,46 @@ test('durable clowder stream messages without phase stay completed during histor
   assert.equal(merged[0].streaming, false);
 });
 
+test('native clowder duplicate durable replies with different ids collapse', () => {
+  const conversation = { id: 'clowder_cat:luoluo', type: 'robot', source: 'clowder' };
+  const first = normalizeMessage({
+    message_id: 'wk-first-reply',
+    client_msg_no: 'first-client-msg',
+    from_uid: 'clowder_cat:luoluo',
+    from_name: '暹罗猫（协调者）',
+    timestamp: 1781067600,
+    payload: JSON.stringify({
+      type: 1,
+      content: '## 快慢指针 PPT 课程汇报\n\n1. 需求拆解\n2. 分工派发',
+      format: 'markdown',
+      markdown: true
+    })
+  });
+  const duplicate = normalizeMessage({
+    message_id: 'wk-second-reply',
+    client_msg_no: 'second-client-msg',
+    from_uid: 'clowder_cat:luoluo',
+    from_name: '暹罗猫（协调者）',
+    timestamp: 1781067602,
+    payload: JSON.stringify({
+      type: 1,
+      content: '## 快慢指针 PPT 课程汇报\n\n1. 需求拆解\n2. 分工派发',
+      format: 'markdown',
+      markdown: true
+    })
+  });
+
+  const merged = messageState.mergeNativeMessageIntoList(
+    messageState.mergeNativeMessageIntoList([], first, { conversation }),
+    duplicate,
+    { conversation }
+  );
+
+  assert.equal(merged.length, 1);
+  assert.equal(merged[0].content, first.content);
+  assert.equal(merged[0].senderId, 'clowder_cat:luoluo');
+});
+
 test('conversation summary turns long clowder markdown into one line preview', () => {
   const summary = messageState.conversationSummaryForMessage({
     senderId: 'clowder',

@@ -1,0 +1,129 @@
+{
+  "issue": "ISSUE-043",
+  "generatedAt": "2026-06-10T12:33:06.441Z",
+  "pass": true,
+  "results": [
+    {
+      "name": "desktop: duplicate messages collapse in store",
+      "pass": true,
+      "detail": "{\"conversation\":{\"id\":\"clowder_cat:luoluo\",\"name\":\"暹罗猫（协调者）\",\"type\":\"robot\",\"source\":\"clowder\",\"directCatId\":\"luoluo\"},\"totalMessages\":1,\"contentCount\":1,\"ids\":[\"wk-second-reply\"],\"visibleCountInBody\":0,\"bodyTextSample\":\"I\\n聊天\\n通讯录\\n智能体\\n文件\\n设置\\n搜索会话...\\n未找到匹配会话\\n尝试输入其他关键字重新搜索\\n未知会话\\n输入消息...\"}"
+    },
+    {
+      "name": "desktop: duplicate message renders once",
+      "pass": true,
+      "detail": "{\"renderedCount\":1,\"state\":{\"conversation\":{\"id\":\"clowder_cat:luoluo\",\"name\":\"暹罗猫（协调者）\",\"type\":\"robot\",\"source\":\"clowder\",\"directCatId\":\"luoluo\"},\"totalMessages\":1,\"contentCount\":1,\"ids\":[\"wk-second-reply\"],\"visibleCountInBody\":0,\"bodyTextSample\":\"I\\n聊天\\n通讯录\\n智能体\\n文件\\n设置\\n搜索会话...\\n未找到匹配会话\\n尝试输入其他关键字重新搜索\\n未知会话\\n输入消息...\"}}"
+    },
+    {
+      "name": "desktop: clowder conversation remains robot",
+      "pass": true,
+      "detail": "{\"id\":\"clowder_cat:luoluo\",\"name\":\"暹罗猫（协调者）\",\"type\":\"robot\",\"source\":\"clowder\",\"directCatId\":\"luoluo\"}"
+    },
+    {
+      "name": "desktop: coordinator restrictions forbid concrete work",
+      "pass": true,
+      "detail": "{\"status\":200,\"found\":true,\"displayName\":\"暹罗猫（协调者）\",\"restrictions\":[\"禁止默认亲自写代码、改文件、执行测试、生成内容或独立完成具体任务；必须优先拆解并派发给合适执行猫\",\"禁止跳过执行猫返回结果直接给最终交付；必须接收、合成并标明各执行猫产出\",\"禁止在需求未收束、验收标准不清或依赖未确认时强行派发实现\",\"禁止把外部条件、CI、云端 bot 或用户决策伪装成本地猫球权\"],\"roleDescription\":\"显性 PM / 主 Agent，只协调、少直接执行，负责需求理解、任务拆解、多 Agent 调度、冲突处理和交付聚合\"}"
+    },
+    {
+      "name": "desktop: coordinator restrictions require delegation",
+      "pass": true,
+      "detail": "{\"status\":200,\"found\":true,\"displayName\":\"暹罗猫（协调者）\",\"restrictions\":[\"禁止默认亲自写代码、改文件、执行测试、生成内容或独立完成具体任务；必须优先拆解并派发给合适执行猫\",\"禁止跳过执行猫返回结果直接给最终交付；必须接收、合成并标明各执行猫产出\",\"禁止在需求未收束、验收标准不清或依赖未确认时强行派发实现\",\"禁止把外部条件、CI、云端 bot 或用户决策伪装成本地猫球权\"],\"roleDescription\":\"显性 PM / 主 Agent，只协调、少直接执行，负责需求理解、任务拆解、多 Agent 调度、冲突处理和交付聚合\"}"
+    },
+    {
+      "name": "mobile: duplicate messages collapse in store",
+      "pass": true,
+      "detail": "{\"conversation\":{\"id\":\"clowder_cat:luoluo\",\"name\":\"暹罗猫（协调者）\",\"type\":\"robot\",\"source\":\"clowder\",\"directCatId\":\"luoluo\"},\"totalMessages\":1,\"contentCount\":1,\"ids\":[\"wk-second-reply\"],\"visibleCountInBody\":0,\"bodyTextSample\":\"未知会话\\n输入消息...\\n发送\"}"
+    },
+    {
+      "name": "mobile: duplicate message renders once",
+      "pass": true,
+      "detail": "{\"renderedCount\":1,\"state\":{\"conversation\":{\"id\":\"clowder_cat:luoluo\",\"name\":\"暹罗猫（协调者）\",\"type\":\"robot\",\"source\":\"clowder\",\"directCatId\":\"luoluo\"},\"totalMessages\":1,\"contentCount\":1,\"ids\":[\"wk-second-reply\"],\"visibleCountInBody\":0,\"bodyTextSample\":\"未知会话\\n输入消息...\\n发送\"}}"
+    },
+    {
+      "name": "mobile: clowder conversation remains robot",
+      "pass": true,
+      "detail": "{\"id\":\"clowder_cat:luoluo\",\"name\":\"暹罗猫（协调者）\",\"type\":\"robot\",\"source\":\"clowder\",\"directCatId\":\"luoluo\"}"
+    },
+    {
+      "name": "mobile: coordinator restrictions forbid concrete work",
+      "pass": true,
+      "detail": "{\"status\":200,\"found\":true,\"displayName\":\"暹罗猫（协调者）\",\"restrictions\":[\"禁止默认亲自写代码、改文件、执行测试、生成内容或独立完成具体任务；必须优先拆解并派发给合适执行猫\",\"禁止跳过执行猫返回结果直接给最终交付；必须接收、合成并标明各执行猫产出\",\"禁止在需求未收束、验收标准不清或依赖未确认时强行派发实现\",\"禁止把外部条件、CI、云端 bot 或用户决策伪装成本地猫球权\"],\"roleDescription\":\"显性 PM / 主 Agent，只协调、少直接执行，负责需求理解、任务拆解、多 Agent 调度、冲突处理和交付聚合\"}"
+    },
+    {
+      "name": "mobile: coordinator restrictions require delegation",
+      "pass": true,
+      "detail": "{\"status\":200,\"found\":true,\"displayName\":\"暹罗猫（协调者）\",\"restrictions\":[\"禁止默认亲自写代码、改文件、执行测试、生成内容或独立完成具体任务；必须优先拆解并派发给合适执行猫\",\"禁止跳过执行猫返回结果直接给最终交付；必须接收、合成并标明各执行猫产出\",\"禁止在需求未收束、验收标准不清或依赖未确认时强行派发实现\",\"禁止把外部条件、CI、云端 bot 或用户决策伪装成本地猫球权\"],\"roleDescription\":\"显性 PM / 主 Agent，只协调、少直接执行，负责需求理解、任务拆解、多 Agent 调度、冲突处理和交付聚合\"}"
+    }
+  ],
+  "details": [
+    {
+      "label": "desktop",
+      "session": {
+        "uid": "3479bf107d204eaa8cc24bf9d5d0cff8"
+      },
+      "restrictions": {
+        "status": 200,
+        "found": true,
+        "displayName": "暹罗猫（协调者）",
+        "restrictions": [
+          "禁止默认亲自写代码、改文件、执行测试、生成内容或独立完成具体任务；必须优先拆解并派发给合适执行猫",
+          "禁止跳过执行猫返回结果直接给最终交付；必须接收、合成并标明各执行猫产出",
+          "禁止在需求未收束、验收标准不清或依赖未确认时强行派发实现",
+          "禁止把外部条件、CI、云端 bot 或用户决策伪装成本地猫球权"
+        ],
+        "roleDescription": "显性 PM / 主 Agent，只协调、少直接执行，负责需求理解、任务拆解、多 Agent 调度、冲突处理和交付聚合"
+      },
+      "state": {
+        "conversation": {
+          "id": "clowder_cat:luoluo",
+          "name": "暹罗猫（协调者）",
+          "type": "robot",
+          "source": "clowder",
+          "directCatId": "luoluo"
+        },
+        "totalMessages": 1,
+        "contentCount": 1,
+        "ids": [
+          "wk-second-reply"
+        ],
+        "visibleCountInBody": 0,
+        "bodyTextSample": "I\n聊天\n通讯录\n智能体\n文件\n设置\n搜索会话...\n未找到匹配会话\n尝试输入其他关键字重新搜索\n未知会话\n输入消息..."
+      },
+      "renderedCount": 1
+    },
+    {
+      "label": "mobile",
+      "session": {
+        "uid": "fc72ad35b09647d3af6f3d16b59749d9"
+      },
+      "restrictions": {
+        "status": 200,
+        "found": true,
+        "displayName": "暹罗猫（协调者）",
+        "restrictions": [
+          "禁止默认亲自写代码、改文件、执行测试、生成内容或独立完成具体任务；必须优先拆解并派发给合适执行猫",
+          "禁止跳过执行猫返回结果直接给最终交付；必须接收、合成并标明各执行猫产出",
+          "禁止在需求未收束、验收标准不清或依赖未确认时强行派发实现",
+          "禁止把外部条件、CI、云端 bot 或用户决策伪装成本地猫球权"
+        ],
+        "roleDescription": "显性 PM / 主 Agent，只协调、少直接执行，负责需求理解、任务拆解、多 Agent 调度、冲突处理和交付聚合"
+      },
+      "state": {
+        "conversation": {
+          "id": "clowder_cat:luoluo",
+          "name": "暹罗猫（协调者）",
+          "type": "robot",
+          "source": "clowder",
+          "directCatId": "luoluo"
+        },
+        "totalMessages": 1,
+        "contentCount": 1,
+        "ids": [
+          "wk-second-reply"
+        ],
+        "visibleCountInBody": 0,
+        "bodyTextSample": "未知会话\n输入消息...\n发送"
+      },
+      "renderedCount": 1
+    }
+  ]
+}

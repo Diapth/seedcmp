@@ -775,6 +775,80 @@ describe('SystemPromptBuilder', () => {
     }
   });
 
+  test('coordinator self identity forbids doing concrete work itself', async () => {
+    const { loadCatTemplateConfig } = await import('../dist/config/cat-config-loader.js');
+    const { buildStaticIdentity } = await import('../dist/domains/cats/services/context/SystemPromptBuilder.js');
+    const originalConfigs = catRegistry.getAllConfigs();
+    catRegistry.reset();
+    try {
+      const template = loadCatTemplateConfig(CAT_TEMPLATE_PATH).roleTemplates.find((item) => item.id === 'coordinator');
+      assert.ok(template, 'coordinator role template must exist');
+      catRegistry.register('coordinator', {
+        id: 'coordinator',
+        name: template.name,
+        displayName: 'PM',
+        nickname: template.nickname,
+        avatar: template.avatar,
+        color: template.color,
+        mentionPatterns: ['@pm', '@coordinator'],
+        clientId: 'openai',
+        defaultModel: 'gpt-5.4',
+        mcpSupport: true,
+        roleDescription: template.roleDescription,
+        personality: template.personality,
+        teamStrengths: template.teamStrengths,
+        restrictions: template.restrictions,
+      });
+      const prompt = buildStaticIdentity('coordinator');
+      assert.match(prompt, /你的硬限制/, 'coordinator own prompt must declare hard restrictions');
+      assert.match(prompt, /禁止默认亲自写代码、改文件、执行测试、生成内容或独立完成具体任务/);
+      assert.match(prompt, /派发给合适执行猫/);
+      assert.match(prompt, /收到执行猫返回前不要编造最终交付/);
+    } finally {
+      catRegistry.reset();
+      for (const [id, config] of Object.entries(originalConfigs)) {
+        catRegistry.register(id, config);
+      }
+    }
+  });
+
+  test('runtime PM created from coordinator template receives coordinator workflow', async () => {
+    const { loadCatTemplateConfig } = await import('../dist/config/cat-config-loader.js');
+    const { buildStaticIdentity } = await import('../dist/domains/cats/services/context/SystemPromptBuilder.js');
+    const originalConfigs = catRegistry.getAllConfigs();
+    catRegistry.reset();
+    try {
+      const template = loadCatTemplateConfig(CAT_TEMPLATE_PATH).roleTemplates.find((item) => item.id === 'coordinator');
+      assert.ok(template, 'coordinator role template must exist');
+      catRegistry.register('pm', {
+        id: 'pm',
+        name: 'PM',
+        displayName: 'PM',
+        nickname: 'pm',
+        avatar: template.avatar,
+        color: template.color,
+        mentionPatterns: ['@pm'],
+        clientId: 'openai',
+        defaultModel: 'gpt-5.4',
+        mcpSupport: true,
+        roleDescription: template.roleDescription,
+        personality: template.personality,
+        teamStrengths: template.teamStrengths,
+        restrictions: template.restrictions,
+      });
+      const prompt = buildStaticIdentity('pm');
+      assert.match(prompt, /你的硬限制/);
+      assert.match(prompt, /禁止默认亲自写代码、改文件、执行测试、生成内容或独立完成具体任务/);
+      assert.match(prompt, /显性 PM 协调者工作流/);
+      assert.match(prompt, /最终回复必须包含：计划状态、子任务状态、参与 Agent/);
+    } finally {
+      catRegistry.reset();
+      for (const [id, config] of Object.entries(originalConfigs)) {
+        catRegistry.register(id, config);
+      }
+    }
+  });
+
   test('F167-E: cat without restrictions has NO self-restrictions block', async () => {
     const { loadCatConfig, toAllCatConfigs } = await import('../dist/config/cat-config-loader.js');
     const { buildStaticIdentity } = await import('../dist/domains/cats/services/context/SystemPromptBuilder.js');
