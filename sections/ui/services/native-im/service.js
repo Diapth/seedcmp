@@ -22,6 +22,11 @@ import {
 import {
   normalizeDeploymentRequest
 } from './deployment.js';
+import {
+  compactManualContextPinPayload,
+  normalizeManualContextPin,
+  normalizeManualContextPinsResponse
+} from './manual-context-pins.js';
 
 const CHANNEL_TYPE_PERSON = 1;
 const CHANNEL_TYPE_GROUP = 2;
@@ -1382,6 +1387,42 @@ export function createNativeImService(options = {}) {
     return firstArray(resp.tasks, resp.data?.tasks, resp.items, resp.data?.items, resp.data);
   }
 
+  async function listManualContextPins(threadId, params = {}) {
+    const id = String(threadId || '').trim();
+    if (!id) return [];
+    const query = {};
+    if (params.limit !== undefined) query.limit = Number(params.limit);
+    if (params.includeInactive !== undefined) query.includeInactive = params.includeInactive ? 'true' : 'false';
+    const resp = await client.get(`clowder/thread/${encodeURIComponent(id)}/manual-context-pins`, query);
+    return normalizeManualContextPinsResponse(resp);
+  }
+
+  async function upsertManualContextPin(threadId, payload = {}) {
+    const id = String(threadId || '').trim();
+    if (!id) throw { msg: 'threadId不能为空' };
+    const body = compactManualContextPinPayload(payload);
+    if (!body.messageId || !body.contentExcerpt) throw { msg: 'messageId和contentExcerpt不能为空' };
+    const resp = await client.post(`clowder/thread/${encodeURIComponent(id)}/manual-context-pins`, body);
+    return normalizeManualContextPin(resp.pin || resp.data?.pin || resp.data || resp);
+  }
+
+  async function removeManualContextPin(threadId, pinId) {
+    const id = String(threadId || '').trim();
+    const pin = String(pinId || '').trim();
+    if (!id || !pin) throw { msg: 'threadId和pinId不能为空' };
+    await client.delete(`clowder/thread/${encodeURIComponent(id)}/manual-context-pins/${encodeURIComponent(pin)}`);
+    return { removed: true };
+  }
+
+  async function markManualContextPinSourceStatus(threadId, payload = {}) {
+    const id = String(threadId || '').trim();
+    if (!id) throw { msg: 'threadId不能为空' };
+    const body = compactManualContextPinPayload(payload);
+    if (!body.messageId || !body.status) throw { msg: 'messageId和status不能为空' };
+    const resp = await client.patch(`clowder/thread/${encodeURIComponent(id)}/manual-context-pins/source-status`, body);
+    return normalizeManualContextPinsResponse(resp);
+  }
+
   async function createCoordination(payload = {}) {
     return client.post('clowder/coordinator/coordination', payload);
   }
@@ -1496,6 +1537,10 @@ export function createNativeImService(options = {}) {
     uploadSkillPackage,
     fetchActiveProjectGroup,
     fetchThreadTasks,
+    listManualContextPins,
+    upsertManualContextPin,
+    removeManualContextPin,
+    markManualContextPinSourceStatus,
     createCoordination,
     createDeploymentRequest,
     updateDeploymentRequest,

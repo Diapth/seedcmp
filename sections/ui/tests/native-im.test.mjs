@@ -77,6 +77,11 @@ import {
 import {
   buildPreviewFilePayload
 } from '../services/native-im/file-preview.js';
+import {
+  applyManualContextPinsToMessages,
+  buildManualContextPinPayload,
+  resolveConversationThreadId
+} from '../services/native-im/manual-context-pins.js';
 
 function makeRequestStub(responses = {}) {
   const calls = [];
@@ -2980,6 +2985,146 @@ test('mobile preview payload keeps workspace path without treating file name as 
   assert.equal(payload.workspacePath, 'slides/lesson.md');
   assert.equal(payload.worktreeId, 'seedcmp');
   assert.equal(payload.generatedByAgent, true);
+});
+
+test('native service manages clowder manual context pins through TangSeng bridge', async () => {
+  const request = makeRequestStub({
+    'GET clowder/thread/thread-direct-1/manual-context-pins?limit=5': {
+      threadId: 'thread-direct-1',
+      pins: [{
+        id: 'pin-1',
+        threadId: 'thread-direct-1',
+        messageId: 'msg-1',
+        contentExcerpt: '用户明确要求所有回答使用中文',
+        status: 'active'
+      }]
+    },
+    'POST clowder/thread/thread-direct-1/manual-context-pins': {
+      pin: {
+        id: 'pin-1',
+        threadId: 'thread-direct-1',
+        messageId: 'msg-1',
+        contentExcerpt: '用户明确要求所有回答使用中文',
+        status: 'active'
+      }
+    },
+    'PATCH clowder/thread/thread-direct-1/manual-context-pins/source-status': {
+      threadId: 'thread-direct-1',
+      pins: [{
+        id: 'pin-1',
+        messageId: 'msg-1',
+        status: 'source_deleted'
+      }]
+    },
+    'DELETE clowder/thread/thread-direct-1/manual-context-pins/pin-1': {}
+  });
+  const service = createNativeImService({
+    baseUrl: '/v1/',
+    request,
+    getToken: () => 'token'
+  });
+
+  const listed = await service.listManualContextPins('thread-direct-1', { limit: 5 });
+  const created = await service.upsertManualContextPin('thread-direct-1', {
+    channelId: 'clowder_cat:luoluo',
+    channelType: 1,
+    messageId: 'msg-1',
+    clientMsgNo: 'client-1',
+    contentExcerpt: '用户明确要求所有回答使用中文',
+    senderName: '我'
+  });
+  const marked = await service.markManualContextPinSourceStatus('thread-direct-1', {
+    messageId: 'msg-1',
+    status: 'source_deleted'
+  });
+  await service.removeManualContextPin('thread-direct-1', 'pin-1');
+
+  assert.equal(listed[0].id, 'pin-1');
+  assert.equal(created.id, 'pin-1');
+  assert.equal(marked[0].status, 'source_deleted');
+  assert.equal(request.calls[0].method, 'GET');
+  assert.equal(request.calls[0].url, '/v1/clowder/thread/thread-direct-1/manual-context-pins?limit=5');
+  assert.equal(request.calls[1].method, 'POST');
+  assert.equal(request.calls[1].url, '/v1/clowder/thread/thread-direct-1/manual-context-pins');
+  assert.deepEqual(request.calls[1].data, {
+    channelId: 'clowder_cat:luoluo',
+    channelType: 1,
+    messageId: 'msg-1',
+    clientMsgNo: 'client-1',
+    contentExcerpt: '用户明确要求所有回答使用中文',
+    senderName: '我'
+  });
+  assert.equal(request.calls[2].method, 'PATCH');
+  assert.equal(request.calls[2].url, '/v1/clowder/thread/thread-direct-1/manual-context-pins/source-status');
+  assert.deepEqual(request.calls[2].data, {
+    messageId: 'msg-1',
+    status: 'source_deleted'
+  });
+  assert.equal(request.calls[3].method, 'DELETE');
+  assert.equal(request.calls[3].url, '/v1/clowder/thread/thread-direct-1/manual-context-pins/pin-1');
+});
+
+test('manual context pin helpers resolve threads build payloads and mark messages', () => {
+  const directConversation = {
+    id: 'clowder_cat:luoluo',
+    channelId: 'clowder_cat:luoluo',
+    channelType: 1,
+    type: 'robot',
+    threadId: 'thread-direct-1'
+  };
+  const groupConversation = {
+    id: 'group-1',
+    channelId: 'group-1',
+    channelType: 2,
+    type: 'group',
+    projectThreadId: 'thread-group-1',
+    binding: {
+      thread_id: 'thread-group-fallback'
+    }
+  };
+  const message = {
+    id: 'local-1',
+    messageId: 'msg-server-1',
+    clientMsgNo: 'client-1',
+    messageSeq: 42,
+    senderName: '产品经理',
+    type: 'text',
+    content: '## 关键约束\n\n后续回答必须先列风险，再给实现步骤。'.repeat(8)
+  };
+  const fileMessage = {
+    id: 'file-local',
+    messageId: 'file-msg-1',
+    senderName: '设计师',
+    type: 'file',
+    fileName: '需求说明.md'
+  };
+
+  const payload = buildManualContextPinPayload(message, directConversation);
+  const filePayload = buildManualContextPinPayload(fileMessage, groupConversation);
+  const marked = applyManualContextPinsToMessages([message, fileMessage], [{
+    id: 'pin-1',
+    threadId: 'thread-direct-1',
+    messageId: 'msg-server-1',
+    status: 'active',
+    contentExcerpt: payload.contentExcerpt
+  }]);
+
+  assert.equal(resolveConversationThreadId(directConversation), 'thread-direct-1');
+  assert.equal(resolveConversationThreadId(groupConversation), 'thread-group-1');
+  assert.equal(payload.channelId, 'clowder_cat:luoluo');
+  assert.equal(payload.channelType, 1);
+  assert.equal(payload.messageId, 'msg-server-1');
+  assert.equal(payload.clientMsgNo, 'client-1');
+  assert.equal(payload.messageSeq, 42);
+  assert.equal(payload.senderName, '产品经理');
+  assert(payload.contentExcerpt.includes('关键约束'));
+  assert(payload.contentExcerpt.length <= 240);
+  assert.equal(filePayload.channelId, 'group-1');
+  assert.equal(filePayload.channelType, 2);
+  assert.equal(filePayload.contentExcerpt, '[文件] 需求说明.md');
+  assert.equal(marked[0].manualContextPinned, true);
+  assert.equal(marked[0].manualContextPinId, 'pin-1');
+  assert.equal(marked[1].manualContextPinned, false);
 });
 
 test('conversation summary turns long clowder markdown into one line preview', () => {
