@@ -1,0 +1,4 @@
+interface:
+  display_name: "AgentHub Demo Packaging"
+  short_description: "Package sourced AgentHub demo evidence"
+  default_prompt: "Use $agenthub-demo-packaging to build a sourced AgentHub demo package with evidence and artifact coverage."

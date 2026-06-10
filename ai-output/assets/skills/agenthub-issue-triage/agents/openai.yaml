@@ -1,0 +1,4 @@
+interface:
+  display_name: "AgentHub Issue Triage"
+  short_description: "Triage seedcmp AgentHub and Clowder bugs"
+  default_prompt: "Use $agenthub-issue-triage to investigate this seedcmp AgentHub issue and produce an evidence packet."

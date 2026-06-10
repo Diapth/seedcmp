@@ -1,0 +1,5 @@
+flowchart TB
+    UI[sections/ui<br/>AgentHub IM 前端] --> IM[sections/im<br/>TangSengDaoDao + WuKongIM + Bridge]
+    IM --> CLOWDER[sections/clowder-ai<br/>ConnectorRouter + Agent Runtime + Artifacts]
+    CLOWDER --> IM
+    IM --> UI

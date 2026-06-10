@@ -1,0 +1,11 @@
+flowchart LR
+    A[进入 AgentHub IM] --> B{选择会话}
+    B --> C[普通单聊或群聊]
+    B --> D[Clowder Agent 直聊]
+    B --> E[项目群]
+    C --> F[文本 / 文件 / 图片 / 语音占位]
+    D --> G[发送请求并携带 promptContext]
+    E --> H["@Agent 或 PM 拆解任务"]
+    G --> I[Agent 回复、文件、部署卡]
+    H --> I
+    I --> J[刷新后从历史恢复]

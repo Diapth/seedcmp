@@ -5,7 +5,7 @@
       "id": "architect",
       "name": "布偶猫（架构师）",
       "nickname": "宪宪",
-      "avatar": "/avatars/architect.png",
+      "avatar": "/assets/avatars/ragdoll.png",
       "color": {
         "primary": "#9B7EBD",
         "secondary": "#E8DFF5"
@@ -23,7 +23,7 @@
       "id": "peer-reviewer",
       "name": "缅因猫（审查官）",
       "nickname": "因因",
-      "avatar": "/avatars/peer-reviewer.png",
+      "avatar": "/assets/avatars/maine-coon.png",
       "color": {
         "primary": "#5B8C5A",
         "secondary": "#D4E6D3"
@@ -41,7 +41,7 @@
       "id": "coordinator",
       "name": "暹罗猫（协调者）",
       "nickname": "罗罗",
-      "avatar": "/avatars/coordinator.png",
+      "avatar": "/assets/avatars/siamese.png",
       "color": {
         "primary": "#2563EB",
         "secondary": "#DBEAFE"
@@ -60,7 +60,7 @@
       "id": "devops",
       "name": "孟加拉猫（DevOps）",
       "nickname": "拉拉",
-      "avatar": "/avatars/devops.png",
+      "avatar": "/assets/avatars/bengal.png",
       "color": {
         "primary": "#D97706",
         "secondary": "#FEF3C7"
@@ -78,7 +78,7 @@
       "id": "frontend",
       "name": "波斯猫（前端工程师）",
       "nickname": "波波",
-      "avatar": "/avatars/frontend.png",
+      "avatar": "/assets/avatars/persian.png",
       "color": {
         "primary": "#EC4899",
         "secondary": "#FCE7F3"
@@ -96,7 +96,7 @@
       "id": "qa",
       "name": "英短（QA工程师）",
       "nickname": "短短",
-      "avatar": "/avatars/qa.png",
+      "avatar": "/assets/avatars/british-shorthair.png",
       "color": {
         "primary": "#475569",
         "secondary": "#E2E8F0"
@@ -114,7 +114,7 @@
       "id": "source-curator",
       "name": "狸花猫（资料整理师）",
       "nickname": "花花",
-      "avatar": "/avatars/source-curator.png",
+      "avatar": "/assets/avatars/li-hua.png",
       "color": {
         "primary": "#0F766E",
         "secondary": "#CCFBF1"
@@ -132,7 +132,7 @@
       "id": "deck-strategist",
       "name": "俄罗斯蓝猫（叙事策略师）",
       "nickname": "蓝蓝",
-      "avatar": "/avatars/deck-strategist.png",
+      "avatar": "/assets/avatars/russian-blue.png",
       "color": {
         "primary": "#4F46E5",
         "secondary": "#E0E7FF"
@@ -150,7 +150,7 @@
       "id": "storyboard-designer",
       "name": "土耳其安哥拉猫（分镜设计师）",
       "nickname": "安安",
-      "avatar": "/avatars/storyboard-designer.png",
+      "avatar": "/assets/avatars/turkish-angora.png",
       "color": {
         "primary": "#DB2777",
         "secondary": "#FCE7F3"
@@ -168,7 +168,7 @@
       "id": "svg-executor-guardian",
       "name": "挪威森林猫（SVG执行守门人）",
       "nickname": "森森",
-      "avatar": "/avatars/svg-executor-guardian.png",
+      "avatar": "/assets/avatars/norwegian-forest.png",
       "color": {
         "primary": "#166534",
         "secondary": "#DCFCE7"
@@ -186,7 +186,7 @@
       "id": "deck-qa-exporter",
       "name": "银渐层（交付质检员）",
       "nickname": "银银",
-      "avatar": "/avatars/deck-qa-exporter.png",
+      "avatar": "/assets/avatars/silver-shaded.png",
       "color": {
         "primary": "#64748B",
         "secondary": "#F1F5F9"
@@ -232,7 +232,7 @@
   "coCreator": {
     "name": "铲屎官",
     "nickname": "大当家",
-    "avatar": "/avatars/keeper.png",
+    "avatar": "/assets/avatars/keeper.png",
     "aliases": [
       "You",
       "Owner"

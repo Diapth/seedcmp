@@ -1,244 +1,518 @@
 # AgentHub — 多 Agent 协作平台
 
-## 课题背景
+AgentHub 是一个以 IM 聊天为入口的多 Agent 协作平台。用户像使用普通聊天工具一样发送需求、文件和确认指令；后端把消息同步到 TangSeng/WuKongIM，并通过 Clowder 调度 Claude Code、Codex、opencode 等执行型 Agent。Agent 的回复、文件、预览和部署请求会回到同一条聊天流里，方便追踪和验收。
 
-通过对话式交互创建网页、Workflow 等产物。本课题要求学生构建一个该业务的简化实战版：**多 Agent 协作平台（AgentHub）**。
+本文只描述当前主前端 `sections/ui` 的部署和配置方式。产品/技术说明见 `assets/roadmap/`。
 
-平台采用 **IM 聊天**作为核心交互范式。用户像使用飞书/微信一样，通过新建对话、发送消息的方式与不同 AI Agent 进行交互。每个 Agent 就是一个"聊天对象"，用户可以：
+## 1. 项目结构
 
-- **新建对话**：创建一个新的聊天会话，选择或指定要对话的 Agent（如 Claude Code、Codex、OpenCode 等）
-- **多会话并行**：同时开启多个对话窗口，分别与不同 Agent 交流不同任务（类似 IM 的多个聊天窗口）
-- **群聊协作**：在一个对话中 @ 多个 Agent，由主 Agent（Orchestrator）自动协调分工，多个 Agent 像群聊成员一样依次回复各自的产出
-- **上下文连续**：每个对话保持完整的聊天历史，Agent 能基于历史消息理解上下文，支持多轮迭代修改
-- **产物内联**：Agent 的回复不仅是文字，还可以内联展示代码 Diff、网页预览卡片、文件附件等富媒体产物，用户可直接在聊天流中预览和操作
+| 路径 | 作用 |
+| --- | --- |
+| `sections/ui` | AgentHub H5 前端，基于 Vue 3、uni-app、Pinia 和 Vite |
+| `sections/im/WuKongIM` | IM 通讯层，负责长连接、消息投递和历史 |
+| `sections/im/TangSengDaoDaoServer` | IM 业务层，负责登录、好友、群组、文件、消息 API 和 Clowder bridge |
+| `sections/clowder-ai` | 多 Agent 平台，负责 thread、connector、命令、路由、Agent 调用、产物和部署 |
+| `scripts/start-im-clowder.sh` | 本地集成启动脚本，拉起基础设施、IM、Clowder API 和 `sections/ui` |
+| `assets/roadmap` | PRD、技术文档、架构图和 UI 验收截图 |
 
-平台同时接入市面主流 Agent 平台（Claude Code、Codex、OpenCode 等），通过统一的适配器层屏蔽 API 差异，并支持用户自建 Agent。所有 Agent 产出（代码、网页、文档、PPT 等）支持实时预览、代码二次编辑和一键部署发布。
+## 2. 技术栈
 
----
+| 层级 | 技术 |
+| --- | --- |
+| 前端 | Vue 3、uni-app H5、Pinia、Vite、Sass、`wukongimjssdk` |
+| 文件预览 | `markdown-it`、KaTeX、Mammoth、PDF.js、JSZip |
+| IM 通讯 | WuKongIM、WebSocket、TCP、Pebble |
+| IM 业务 | TangSengDaoDaoServer、Go、Gin、MySQL、Redis、MinIO |
+| Agent 平台 | Node.js 20+、TypeScript、Fastify、Socket.IO、Redis、better-sqlite3 |
+| Agent 适配 | Claude Code、Codex、opencode、Clowder connector router |
+| 部署与预览 | Clowder deployment routes、preview gateway、静态站点预览 |
+| 本地基础设施 | Docker、MySQL 8、Redis 7、MinIO |
 
-## 核心功能
+## 3. 架构概览
 
-### 1. IM 聊天式交互（核心体验）
+```text
+Browser
+  |
+  |  sections/ui H5
+  |  /v1 -> TangSeng API
+  |  /clowder-api -> Clowder API
+  v
+TangSengDaoDaoServer  <->  WuKongIM
+  |
+  | HMAC signed inbound/outbound bridge
+  v
+Clowder API  <->  Agent runtimes
+  |
+  v
+Artifacts / preview / deployment
+```
 
-| 功能 | 说明 |
-|------|------|
-| 对话列表 | 左侧会话列表，支持新建/置顶/归档/搜索，按最近活跃排序 |
-| 单聊模式 | 1v1 与单个 Agent 对话，适合明确任务（如"用 Claude Code 写一个 React 组件"） |
-| 群聊模式 | 一个对话中包含多个 Agent，通过 @ 指定或由 Orchestrator 自动分派，Agent 依次回复 |
-| 消息类型 | 文本、代码块、图片、文件附件、网页预览卡片、Diff 视图卡片、部署状态卡片（可选） |
-| 消息操作 | 回复、引用、重新生成、复制代码、一键应用 Diff、展开预览 |
-| 上下文管理 | 聊天历史自动作为上下文传递给 Agent，支持手动 pin 关键消息作为长期上下文 |
+消息归属边界：
 
-### 2. 主 Agent 协调器（Orchestrator）
+- `sections/ui` 只负责用户界面、消息状态、文件预览、Agent 目录、技能、项目看板和卡片展示。
+- `sections/im` 负责 IM 账号、会话、群组、消息持久化、文件上传和多端同步。
+- `sections/clowder-ai` 负责 Agent 路由、权限、thread binding、协作记录、执行调用、产物和部署。
 
-- 在群聊模式下，自动理解用户意图，将复杂任务拆解并分派给合适的子 Agent
-- 子 Agent 完成后，Orchestrator 聚合产出并在聊天流中汇报结果
-- 支持并行调度、失败降级、代码冲突处理
+## 4. 本地一键启动
 
-### 3. 多 Agent 接入
+### 4.1 环境要求
 
-- 统一适配器层，至少接入 2 个主流 Agent 平台（Claude Code + Codex / OpenCode）
-- 支持用户自建 Agent（对话式创建，设定 System Prompt + 工具集）
-- 每个 Agent 在聊天列表中显示为独立的"联系人"，有头像、名称、能力标签
+建议环境：
 
-### 4. 产物预览与编辑
+| 依赖 | 版本或说明 |
+| --- | --- |
+| Node.js | 20+ |
+| Corepack / pnpm | 脚本会使用 Corepack；Clowder 默认 `pnpm@9.15.4` |
+| Go | 推荐 1.23.x；TangSeng 最低 1.20，WuKongIM 使用 1.23 toolchain |
+| Docker | 用于 MySQL、Redis、MinIO |
+| Bash | 启动脚本依赖 Bash、`lsof`/`ss`/`fuser` 中至少一个用于端口清理 |
 
-- Agent 回复中内联产物预览卡片（网页 iframe、文档渲染、**【P2】** PPT 浏览）
-- 点击卡片展开全屏预览 / 代码编辑器
-- **【P2】** 支持 Diff 视图、版本历史、对话式局部修改（选中代码 → 在聊天中描述修改）
-
-### 【P2】5. 部署发布
-
-- 聊天中直接发送"部署"指令，Agent 返回部署状态卡片
-- 一键生成预览 URL / 静态站点部署 / 容器化部署 / 源码打包下载
-
-### 【P2】6. 多端支持
-
-| 平台 | 定位 |
-|------|------|
-| Web 端 | 主力端，完整 IM 体验 + 代码编辑 + 全功能 |
-| 桌面端 | 本地文件访问、系统通知、Agent 进程管理 |
-| 移动端 | 轻量 IM 体验：查看对话、审批确认、产物预览 |
-
----
-
-## 考察要点
-
-| 维度 | 权重 | 评判要点 |
-|------|------|----------|
-| AI 协作能力 | 30% | 沉淀出和 AI 协作的 Spec、Skill、Rules 等协作规范 |
-| 功能完整度 | 25% | IM 核心体验是否流畅、多 Agent 调度是否跑通 |
-| 生成效果质量 | 20% | 聊天 UI 体验、产物预览效果 |
-| 代码理解度 | 15% | 答辩时能否解释架构选型和核心逻辑 |
-| 创新与产品感 | 10% | 超预期功能点或体验优化、详细的产品设计方案 |
-
-### 交付物
-
-产品设计文档 + 技术文档 + 可运行 Demo + AI 协作开发记录 + 3 分钟 Demo 视频
-
----
-
-## IM 基础设施（本地开发环境）
-
-### 已运行服务
-
-| 服务 | 说明 | 访问地址 | 端口 |
-|---|---|---|---|
-| **WuKongIM** | IM 通讯层 API | `http://127.0.0.1:5001` | 5001 |
-| | TCP 长连接网关 | `tcp://127.0.0.1:5100` | 5100 |
-| | WebSocket 网关 | `ws://127.0.0.1:5200` | 5200 |
-| | 管理后台 API | `http://127.0.0.1:5300` | 5300 |
-| **TangSengDaoDaoServer** | 业务层 API | `http://127.0.0.1:8090` | 8090 |
-| | gRPC Webhook | `127.0.0.1:6979` | 6979 |
-| | **WEB UI** | `http://127.0.0.1:82` | 82 |
-| **WuKongIM Admin** | **WEB UI** | `http://127.0.0.1:18080` | 18080 |
-| **MinIO** | 文件存储 API | `http://127.0.0.1:9000` | 9000 |
-| | Web 管理界面 | `http://127.0.0.1:9001` | 9001 |
-
-### 服务账号密码汇总
-
-| 服务 | 类型 | 地址 | 账号 | 密码 |
-|------|------|------|------|------|
-| **MySQL** | 数据库 | `127.0.0.1:3306` | `root` | 需 `sudo mysql` |
-| | 业务库 | `im` | `tsdd_user` | `tsdd_password` |
-| **Redis** | 缓存 | `127.0.0.1:6379` | — | — |
-| **MinIO** | API | `http://127.0.0.1:9000` | `minio` | `minio123` |
-| | 控制台 | `http://127.0.0.1:9001` | `minio` | `minio123` |
-| **WuKongIM** | 管理后台 API | `http://127.0.0.1:5300` | `admin` | `admin123` |
-| | Admin Web UI | `http://127.0.0.1:18080` | `admin` | `admin123` |
-| **TangSengDaoDao** | Web UI | `http://127.0.0.1:82` | 手机号登录 | — |
-| | 注册页 | `http://127.0.0.1:82/register.html` | — | — |
-| | API | `http://127.0.0.1:8090` | — | — |
-
-### 开发短信验证码
-
-所有短信验证码统一使用：**`123456`**
-
-### Orchestrator + Deployment Demo
-
-本地一键启动完整 IM + Clowder 演示栈：
+第一次使用可先启用 Corepack：
 
 ```bash
-cd /home/yunyi/Desktop/Bytedance_cmp/seedcmp
+corepack enable
+```
+
+### 4.2 启动完整本地栈
+
+在仓库根目录执行：
+
+```bash
 bash scripts/start-im-clowder.sh start
 ```
 
-Web 入口为 `http://127.0.0.1:3000`。推荐使用 `008618337488675` / `123456` 登录，进入包含 Clowder 猫猫的群聊后发送：
+脚本会自动处理：
+
+- Docker 容器：MySQL、Redis、MinIO
+- Go 服务：WuKongIM、TangSengDaoDaoServer
+- Node 服务：Clowder API
+- 前端：`sections/ui` H5 dev server
+
+启动完成后访问：
 
 ```text
-@协调者 请协调团队做一个“AgentHub 咖啡店活动页”静态页面，要求 Claude/Codex 至少一个真实执行，完成后部署到 preview 环境，最后在聊天里给我预览链接、源码下载链接、执行分工和风险说明。
+http://localhost:5173/#/pages/login/index
 ```
 
-预期闭环：聊天流出现协调/执行回复与部署确认卡；用户在卡片中补充 target、选择 `preview`、点击确认；卡片轮询到部署成功后显示预览和源码下载按钮，并自动追加 `Coordinator / Deployment 结果汇总`。点击“打开预览”会在右侧预览栏嵌入部署页面。
+已登录时可直接进入：
+
+```text
+http://localhost:5173/#/pages/chat/index
+```
+
+常用管理命令：
+
+```bash
+bash scripts/start-im-clowder.sh status
+bash scripts/start-im-clowder.sh logs
+bash scripts/start-im-clowder.sh logs agenthub-ui
+bash scripts/start-im-clowder.sh logs tangseng
+bash scripts/start-im-clowder.sh logs clowder-api
+bash scripts/start-im-clowder.sh restart
+bash scripts/start-im-clowder.sh stop
+```
+
+运行日志位于：
+
+```text
+.seedcmp-run/logs/
+```
+
+### 4.3 默认访问地址
+
+| 服务 | 地址 |
+| --- | --- |
+| AgentHub UI | `http://localhost:5173` |
+| TangSeng API | `http://127.0.0.1:8090` |
+| Clowder API | `http://127.0.0.1:3004` |
+| WuKongIM API | `http://127.0.0.1:5001` |
+| WuKongIM WebSocket | `ws://127.0.0.1:5200` |
+| MinIO API | `http://127.0.0.1:9000` |
+| MinIO Console | `http://127.0.0.1:9001` |
+| Clowder preview gateway | `http://127.0.0.1:4100` |
+
+### 4.4 测试账号
+
+短信验证码统一使用：
+
+```text
+123456
+```
+
+
+## 5. 配置如何修改
+
+本项目推荐通过环境变量改配置。最简单的方式是在启动命令前追加变量：
+
+```bash
+CLOWDER_CONNECTOR_SECRET=change-me \
+CLOWDER_DEFAULT_OWNER_USER_ID=user-1 \
+bash scripts/start-im-clowder.sh restart
+```
+
+### 5.1 本地集成启动脚本配置
+
+| 变量 | 默认值 | 说明 |
+| --- | --- | --- |
+| `AGENTHUB_UI` | `1` | 是否启动 `sections/ui` H5 前端 |
+| `CLOWDER_URL` | `http://127.0.0.1:3004` | Clowder API 地址，前端和 TangSeng 都会使用 |
+| `CLOWDER_WEB` | `0` | 是否额外启动 Clowder 管理 Web |
+| `CLOWDER_WEB_URL` | `http://127.0.0.1:3003` | Clowder 管理 Web 地址 |
+| `CLOWDER_CONNECTOR_ID` | `im-web` | Clowder connector ID，需与两端配置一致 |
+| `CLOWDER_CONNECTOR_SECRET` | `dev-shared-secret` | TangSeng 与 Clowder 双向 HMAC secret |
+| `CLOWDER_DEFAULT_OWNER_USER_ID` | `user-1` | TangSeng 代理访问 Clowder 时使用的默认 owner |
+| `TANGSENG_WAIT_TIMEOUT` | `180` | 等待 TangSeng API 启动的秒数 |
+| `SEEDCMP_CLEAN_OLD_PORTS` | `1` | 启动前清理旧 seedcmp/worktree 端口监听 |
+| `SEEDCMP_CLEAN_ALL_PORTS` | `0` | 设置为 `1` 会清理已知端口上的任意监听，谨慎使用 |
+| `REDIS_MODE` | `auto` | `auto`、`docker` 或 `external` |
+| `INFRA_IMAGE_PREFIX` | 空 | Docker 镜像前缀，适合内网镜像源 |
+
+基础设施账号和镜像：
+
+| 变量 | 默认值 |
+| --- | --- |
+| `MYSQL_CONTAINER` | `seedcmp-mysql` |
+| `MYSQL_IMAGE` | `m.daocloud.io/docker.io/library/mysql:8.0.33` |
+| `MYSQL_ROOT_PASSWORD` | `demo` |
+| `MYSQL_DATABASE` | `im` |
+| `MYSQL_USER` | `tsdd_user` |
+| `MYSQL_PASSWORD` | `tsdd_password` |
+| `REDIS_CONTAINER` | `seedcmp-redis` |
+| `REDIS_IMAGE` | `m.daocloud.io/docker.io/library/redis:7` |
+| `MINIO_CONTAINER` | `seedcmp-minio` |
+| `MINIO_IMAGE` | `m.daocloud.io/quay.io/minio/minio:latest` |
+| `MINIO_ROOT_USER` | `minio` |
+| `MINIO_ROOT_PASSWORD` | `minio123` |
+
+示例：使用外部 Redis 和公司镜像源：
+
+```bash
+REDIS_MODE=external \
+INFRA_IMAGE_PREFIX=registry.example.com/library/ \
+bash scripts/start-im-clowder.sh restart
+```
+
+### 5.2 `sections/ui` 前端配置
+
+开发模式下，`sections/ui/vite.config.js` 已经配置代理：
+
+| 前端请求 | 默认代理目标 | 修改方式 |
+| --- | --- | --- |
+| `/v1/*` | `http://127.0.0.1:8090` | `VITE_TANGSENG_PROXY_TARGET` |
+| `/clowder-api/*` | `http://127.0.0.1:3004` | `VITE_CLOWDER_PROXY_TARGET` |
+
+前端运行时也会读取浏览器 storage：
+
+| Storage key | 用途 |
+| --- | --- |
+| `native_api_base_url` | 覆盖 TangSeng API base URL |
+| `clowder_api_base_url` | 覆盖 Clowder API base URL |
+| `native_device_id` | 当前浏览器设备 ID |
+
+如果要单独启动 UI：
+
+```bash
+cd sections/ui
+npm install
+npm run dev:h5
+```
+
+如果要构建 H5 静态产物：
+
+```bash
+cd sections/ui
+npm install
+npm run build:h5
+```
+
+产物目录：
+
+```text
+sections/ui/dist/build/h5
+```
+
+本地预览构建产物：
+
+```bash
+cd sections/ui
+PORT=5173 node scripts/serve-prod.js
+```
+
+### 5.3 TangSeng Clowder bridge 配置
+
+TangSeng 通过环境变量启用 Clowder bridge：
+
+| 变量 | 默认值 | 说明 |
+| --- | --- | --- |
+| `IM_WEB_CLOWDER_ENABLED` | `false` | 设置为 `true` 后启用 bridge |
+| `CLOWDER_API_BASE_URL` | 空 | Clowder API 地址，例如 `http://127.0.0.1:3004` |
+| `CLOWDER_CONNECTOR_ID` | `im-web` | connector ID |
+| `CLOWDER_CONNECTOR_SECRET` | 空 | HMAC secret，必须与 Clowder 侧一致 |
+| `CLOWDER_DEFAULT_OWNER_USER_ID` | 空 | bridge 代理访问 Clowder 的默认 owner |
+| `CLOWDER_REQUEST_TIMEOUT_MS` | `5000` | 请求 Clowder 超时时间 |
+| `CLOWDER_SIGNATURE_TOLERANCE_MS` | `300000` | HMAC 签名时间窗 |
+
+只有当 `Enabled/APIBaseURL/ConnectorID/ConnectorSecret/DefaultOwnerUserID` 都有值时，bridge 才算配置完整。
+
+### 5.4 Clowder API 配置
+
+本地脚本会自动给 Clowder API 注入：
+
+| 变量 | 默认值或来源 | 说明 |
+| --- | --- | --- |
+| `CAT_CAFE_API_URL` | `CLOWDER_URL` | Clowder API public URL |
+| `NEXT_PUBLIC_API_URL` | `CLOWDER_URL` | 前端/公开 API URL |
+| `DEFAULT_OWNER_USER_ID` | `CLOWDER_DEFAULT_OWNER_USER_ID` | 默认 owner |
+| `REDIS_URL` | `redis://127.0.0.1:6379` | Clowder 状态存储 |
+| `REDIS_KEY_PREFIX` | `seedcmp:cat-cafe:` | Redis key 前缀 |
+| `API_SERVER_PORT` | `3004` | Clowder API 端口，单独启动 API 时可改 |
+| `PREVIEW_GATEWAY_PORT` | `4100` | preview gateway 端口 |
+| `MEMORY_STORE` | 未设置 | 没有 Redis 时可设为 `1` 使用内存存储，仅适合临时调试 |
+
+单独启动 Clowder API：
+
+```bash
+cd sections/clowder-ai
+corepack pnpm install
+corepack pnpm --filter @cat-cafe/api build
+
+cd packages/api
+REDIS_URL=redis://127.0.0.1:6379 \
+DEFAULT_OWNER_USER_ID=user-1 \
+API_SERVER_PORT=3004 \
+corepack pnpm start
+```
+
+## 6. 生产或演示环境部署
+
+### 6.1 推荐拓扑
+
+```text
+Nginx / Caddy / Ingress
+  |
+  +-- /                 -> sections/ui/dist/build/h5
+  +-- /v1               -> TangSengDaoDaoServer:8090
+  +-- /clowder-api      -> Clowder API:3004, strip /clowder-api
+  +-- WuKongIM WS/TCP   -> expose 5200/5100 or configure external gateway
+
+TangSengDaoDaoServer -> MySQL / Redis / MinIO / WuKongIM
+Clowder API          -> Redis / workspace storage / Agent runtimes
+```
+
+生产环境建议：
+
+- 使用独立 MySQL、Redis、MinIO，不复用本地 demo 容器。
+- 修改 `CLOWDER_CONNECTOR_SECRET`，不要使用 `dev-shared-secret`。
+- 用 HTTPS 终止在网关层，并让前端通过同域 `/v1` 和 `/clowder-api` 访问后端。
+- 对外只开放需要的端口；MySQL、Redis、MinIO API 不直接暴露公网。
+- 为 Clowder API、TangSeng 和 WuKongIM 配置进程守护，例如 systemd、Supervisor、Docker Compose 或 Kubernetes。
+
+### 6.2 构建步骤
+
+构建 AgentHub UI：
+
+```bash
+cd sections/ui
+npm install
+npm run build:h5
+```
+
+构建 Clowder API：
+
+```bash
+cd sections/clowder-ai
+corepack pnpm install
+corepack pnpm --filter @cat-cafe/api build
+```
+
+构建 WuKongIM：
+
+```bash
+cd sections/im/WuKongIM
+go mod download
+go build -o wukongim ./cmd/wukongim/
+```
+
+构建 TangSengDaoDaoServer：
+
+```bash
+cd sections/im/TangSengDaoDaoServer
+go mod download
+go build -o tsdd_server .
+```
+
+### 6.3 Nginx 示例
+
+下面示例假设：
+
+- H5 产物放在 `/opt/agenthub/ui`
+- TangSeng API 在 `127.0.0.1:8090`
+- Clowder API 在 `127.0.0.1:3004`
+
+```nginx
+server {
+    listen 80;
+    server_name agenthub.example.com;
+
+    root /opt/agenthub/ui;
+    index index.html;
+
+    location / {
+        try_files $uri $uri/ /index.html;
+    }
+
+    location /v1/ {
+        proxy_pass http://127.0.0.1:8090/v1/;
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
+    }
+
+    location /clowder-api/ {
+        proxy_pass http://127.0.0.1:3004/api/;
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
+    }
+}
+```
+
+如果前端与后端不在同域部署，需要通过 `VITE_TANGSENG_PROXY_TARGET`、`VITE_CLOWDER_PROXY_TARGET` 或运行时 storage 调整 API 地址，并同时配置后端 CORS。
+
+## 7. Demo 使用流程
+
+1. 启动完整本地栈：
+
+   ```bash
+   bash scripts/start-im-clowder.sh start
+   ```
+
+2. 打开 `http://localhost:5173/#/pages/login/index`。
+3. 使用 `008618337488675` / `123456` 登录。
+4. 进入群聊或 Agent 会话，发送需求并 @ 可用 Agent。
+5. 查看聊天流中的 Agent 回复、文件卡、预览入口、部署卡和看板状态。
+
+推荐测试一句：
+
+```text
+@协调者 请帮我拆解一个 AgentHub 活动页任务，安排执行 Agent 生成页面，完成后给出预览、源码下载和风险说明。
+```
 
 OAuth 前置条件：
 
-- 优先使用 Claude Code OAuth 猫猫；本机没有 Claude 登录态时先运行 `claude login`。
-- Claude 不可用时使用 Codex OAuth 猫猫；本机没有 Codex 登录态时先运行 `codex login`。
-- 当前本地验收群里可用的 Codex OAuth 猫猫是 `xtz`，可用执行猫包含 `dd`。模板里的 `@协调者` 会作为协调意图，真实可连接猫以页面联系人/群成员为准。
-- 最终 Demo 部署目标为 `packages/api/data/agenthub-coffee-event/index.html`，环境选择 `preview`。如果该 AgentHub 产物尚未生成，可用 `packages/api/qa-test-page.html` 作为部署卡链路 fallback。
+- 使用 Claude Code Agent 前，先在本机完成 `claude login`。
+- 使用 Codex Agent 前，先在本机完成 `codex login`。
+- 实际可用 Agent 以页面里的 Agent 列表、群成员和 Clowder API 返回为准。
 
-常见故障处理：
+## 8. 测试与验收
 
-- 部署卡已出现但烟测等待“新卡”超时：复用已有 active card，补 target 后点击“应用”，再确认部署。
-- 确认按钮提示“请先补充部署目标”：最终 Demo 填入 `packages/api/data/agenthub-coffee-event/index.html`，点击“应用”，确认环境为 `preview`；只验证部署卡链路时可改用 `packages/api/qa-test-page.html`。
-- 右侧预览空白：确认预览 URL 是 `http://127.0.0.1:3004/api/deployments/<id>/preview/`，并检查 Clowder API 是否通过 `bash scripts/start-im-clowder.sh start` 运行。
-- 下载按钮打开空白页：这是浏览器下载导航表现，使用对应 `download` URL 或检查卡片日志里的 source package 生成记录。
-- 猫猫没有回复：确认群成员里有在线 OAuth 猫猫；如果 `@协调者` 对应模板未连接，在 prompt 中同时 @ 当前在线猫，例如 `@协调者 @xtz`。
-
-可选浏览器烟测：
+常用检查命令：
 
 ```bash
-cd sections/im_web/apps/chat
-RUN_V3_CLOWDER_SMOKE=1 \
-TEST_GROUP_CONVERSATION_ID=16e006b0b84f40faaa77a271e69b5021 \
-TEST_AGENT_A=xtz \
-TEST_AGENT_B=dd \
-TEST_DEPLOYMENT_TARGET=packages/api/data/agenthub-coffee-event/index.html \
-corepack pnpm test:e2e -- tests-e2e/smoke-v3-orchestrator-deployment.spec.ts
+# 前端构建
+cd sections/ui
+npm run build:h5
+
+# 前端状态测试
+npm run test:native-im
+
+# 前端 smoke，H5_BASE_URL 可指向实际端口
+H5_BASE_URL=http://localhost:5173 npm run test:smoke
 ```
 
-### 已注册测试用户
-
-| 用户名 | 密码 | 手机号 | 名称 |
-|--------|------|--------|------|
-| `008613800138000` | `123456` | 13800138000 | 逐味魔 |
-| `008618337488675` | `123456` | 18337488675 | leng |
-| `008613733632709` | `123456` | 13733632709 | 123 |
-
-> 通过 Web UI 注册的新用户，如果登录提示"用户不存在"，请联系管理员修复 username 格式（需 `0086` + 手机号）。
-
-### 构建与启动
-
 ```bash
-# 构建 WuKongIM
-cd sections/im/WuKongIM
-go build -o wukongim ./cmd/wukongim/
-./wukongim -config ./wukongim.conf
-
-# 构建 TangSengDaoDaoServer（等 WuKongIM 就绪后）
+# TangSeng bridge 测试
 cd sections/im/TangSengDaoDaoServer
-go build -o tsdd_server .
-./tsdd_server -config ./configs/tsdd.yaml
-
-# MinIO（如未启动）
-export MINIO_ROOT_USER=minio
-export MINIO_ROOT_PASSWORD=minio123
-cd /path/to/minio && ./minio server ./data --console-address ':9001'
+go test ./modules/common ./modules/clowder
 ```
-
-### IM Web 前端手动测试流程
-
-以下流程用于本地验证 `sections/im_web` 下的 Vue 3 前端。开始前请确认 WuKongIM、TangSengDaoDaoServer、MinIO 已按上文启动。
-
-启动前端：
 
 ```bash
-cd sections/im_web
-corepack pnpm --filter chat dev
+# Clowder API 构建与公开测试
+cd sections/clowder-ai
+corepack pnpm --filter @cat-cafe/api build
+corepack pnpm --filter @cat-cafe/api test:public
 ```
 
-打开 Vite 输出的本地地址，通常为 `http://localhost:5173`。
+人工验收重点：
 
-#### 1. 登录与首屏
+- 登录、会话列表、群聊和单聊可用。
+- 文本消息发送后能同步、刷新后不重复。
+- 文件卡可以下载和预览。
+- Markdown、图片、Office/PDF 预览不空白。
+- Agent 回复能回写同一会话。
+- Clowder 不可用时，UI 有明确失败态。
+- 部署卡能进入 queued/running/succeeded/failed 状态。
 
-1. 打开前端地址，若未登录应自动进入 `/login`。
-2. 使用测试账号 `008618337488675` / `123456` 登录。
-3. 登录成功后应进入 `/chat`，左侧显示用户信息、搜索框、会话/联系人切换，右侧显示欢迎页。
-4. 点击右上角退出图标，应回到登录页。
+## 9. 常见问题
 
-#### 2. 文本消息发送
+### 9.1 5173 端口被占用
 
-1. 使用两个浏览器窗口或无痕窗口分别登录两个测试账号，例如 `008618337488675` 和 `008613800138000`。
-2. 在联系人列表中选择对方，或直接访问 `/chat/conversation/<对方 uid>/1`。
-3. 在输入框输入文本，确认右下角有明确的“发送 Enter”按钮。
-4. 点击发送按钮，或按 Enter 发送；Ctrl+Enter 应换行。
-5. 发送后消息应出现在当前聊天窗口，对方窗口收到实时消息或刷新同步后可见。
+执行：
 
-#### 3. 输入区附件入口与草稿
+```bash
+bash scripts/start-im-clowder.sh restart
+```
 
-1. 在任意聊天窗口点击图片按钮，选择一张图片；当前应提示“图片发送能力正在完善”，不应产生成功态图片消息。
-2. 点击文件按钮选择文件；当前应提示“文件发送能力正在完善”，不应产生成功态文件消息。
-3. 在输入框输入一段文字但不发送，切换到其他会话后再切回，草稿应恢复显示。
+脚本默认会清理旧 seedcmp/worktree 监听。如果仍然占用，可查看：
 
-#### 4. 联系人与好友申请
+```bash
+lsof -i :5173
+```
 
-1. 点击左侧“联系人”标签，应看到“新的朋友”“添加好友”和联系人列表。
-2. 点击“添加好友”，输入另一个测试用户的手机号或 UID，点击搜索。
-3. 搜索到用户后点击“发送好友申请”，页面应提示申请已发送。
-4. 用对方账号登录，进入“联系人” → “新的朋友”，应能看到申请并点击“同意”。
-5. 同意后双方联系人列表应刷新，且“新的朋友”红点应在打开列表后清除。
+### 9.2 Docker 拉镜像慢
 
-#### 5. 搜索、消息菜单与回应
+配置镜像前缀：
 
-1. 在左侧搜索框输入联系人名称、UID 或已加载聊天记录中的关键词。
-2. 有结果时点击联系人或聊天记录，应跳转到对应会话。
-3. 在消息气泡上右键，文本消息应显示复制、回复、撤回（2 分钟内自己的消息）等操作。
-4. 点击表情回应后，气泡下方应显示对应 reaction；再次点击同一 reaction 应取消或更新计数。
+```bash
+INFRA_IMAGE_PREFIX=registry.example.com/library/ \
+bash scripts/start-im-clowder.sh start
+```
 
-#### 6. 设备管理页
+也可以单独改 `MYSQL_IMAGE`、`REDIS_IMAGE`、`MINIO_IMAGE`。
 
-1. 登录后访问 `/chat/devices`。
-2. 页面应请求在线设备列表；无数据时显示“暂无在线设备记录”。
-3. 若存在设备，点击“移除”应调用单设备移除并刷新列表。
-4. 顶部“退出当前会话”只验证当前退出接口；“退出其他设备”语义仍需后端确认，不能作为已完成能力验收。
+### 9.3 TangSeng 已启动但前端请求失败
+
+检查：
+
+```bash
+bash scripts/start-im-clowder.sh status
+bash scripts/start-im-clowder.sh logs tangseng
+```
+
+确认 `/v1` 代理目标是 `http://127.0.0.1:8090`，并检查浏览器 storage 中是否误写了 `native_api_base_url`。
+
+### 9.4 Agent 没有回复
+
+检查：
+
+```bash
+bash scripts/start-im-clowder.sh logs clowder-api
+bash scripts/start-im-clowder.sh logs tangseng
+```
+
+重点确认：
+
+- `CLOWDER_CONNECTOR_SECRET` 两端一致。
+- `CLOWDER_DEFAULT_OWNER_USER_ID` 有值。
+- Clowder API `http://127.0.0.1:3004` 可访问。
+- 当前群聊或会话已绑定可用 Agent。
+- 需要真实 CLI Agent 时，本机已完成对应 OAuth 登录。
+
+### 9.5 文件预览空白
+
+检查：
+
+- TangSeng 文件上传是否成功。
+- MinIO 容器是否运行。
+- 浏览器控制台是否有资源 404。
+- `sections/ui` 是否已重新构建，尤其是 Office/PDF/Markdown 预览相关依赖更新后。
+
+## 10. 相关文档
+
+- `assets/roadmap/prd产品需求文档.md`
+- `assets/roadmap/技术文档.md`
+- `assets/roadmap/figures/`
+- `assets/roadmap/evidence/`
+- `sections/ui/issues/`
