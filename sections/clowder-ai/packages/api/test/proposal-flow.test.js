@@ -9,7 +9,7 @@
  *  - cross-user parent ownership rejection
  *  - clientRequestId idempotency
  *  - user-auth approve happy path + double-approve idempotency
- *  - cross-user approve 403
+ *  - cross-user approve/reject is allowed for shared IM cards
  *  - approve-after-reject 409
  *  - reject happy path + reject-after-approve 409
  *  - audit metadata + socket payload shape
@@ -108,6 +108,20 @@ describe('F128 propose / approve / reject lifecycle', () => {
     assert.equal(body.status, 'approved');
   });
 
+  test('proposal detail is visible to any identified user with the card id', async () => {
+    const ctx = await createProposalTestContext();
+    const source = await ctx.threadStore.create('alice', 'Source');
+    const { proposalId } = JSON.parse((await ctx.propose({ userId: 'alice', threadId: source.id })).body);
+    const res = await ctx.app.inject({
+      method: 'GET',
+      url: `/api/proposals/${proposalId}`,
+      headers: { 'x-cat-cafe-user': 'bob' },
+    });
+    assert.equal(res.statusCode, 200);
+    const body = JSON.parse(res.body);
+    assert.equal(body.proposal.proposalId, proposalId);
+  });
+
   // Approve-side dispatch behaviours (queue processor wiring, preferredCats
   // fallback, intent default, fork-and-return header, explicit-mention
   // precedence) moved to proposal-approve-dispatch.test.js to keep this file
@@ -122,12 +136,16 @@ describe('F128 propose / approve / reject lifecycle', () => {
     assert.equal(second.deduped, true);
   });
 
-  test('approve by a different user returns 403', async () => {
+  test('approve by a different user succeeds for shared IM proposal cards', async () => {
     const ctx = await createProposalTestContext();
     const source = await ctx.threadStore.create('alice', 'Source');
     const { proposalId } = JSON.parse((await ctx.propose({ userId: 'alice', threadId: source.id })).body);
     const res = await ctx.approve('bob', proposalId);
-    assert.equal(res.statusCode, 403);
+    assert.equal(res.statusCode, 200);
+    const body = JSON.parse(res.body);
+    assert.equal(body.status, 'approved');
+    const proposal = await ctx.proposalStore.get(proposalId);
+    assert.equal(proposal.approvedBy, 'bob');
   });
 
   test('approve after reject returns 409', async () => {
@@ -151,6 +169,17 @@ describe('F128 propose / approve / reject lifecycle', () => {
     const proposal = await ctx.proposalStore.get(proposalId);
     assert.equal(proposal.status, 'rejected');
     assert.equal(proposal.rejectionReason, 'not now');
+  });
+
+  test('reject by a different user succeeds for shared IM proposal cards', async () => {
+    const ctx = await createProposalTestContext();
+    const source = await ctx.threadStore.create('alice', 'Source');
+    const { proposalId } = JSON.parse((await ctx.propose({ userId: 'alice', threadId: source.id })).body);
+    const res = await ctx.reject('bob', proposalId, { rejectionReason: 'not now' });
+    assert.equal(res.statusCode, 200);
+    const proposal = await ctx.proposalStore.get(proposalId);
+    assert.equal(proposal.status, 'rejected');
+    assert.equal(proposal.rejectedBy, 'bob');
   });
 
   test('reject after approve returns 409', async () => {

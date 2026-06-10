@@ -422,18 +422,24 @@ export class ConnectorRouter {
     }
 
     // 2. Lookup or create binding
+    const projectPath = findMonorepoRoot();
     let binding = await bindingStore.getByExternal(connectorId, externalChatId);
     if (!binding) {
       const def = getConnectorDefinition(connectorId);
       const platformLabel = def?.displayName ?? connectorId;
       const title =
         chatType === 'group' ? `${platformLabel}群聊 · ${chatName || externalChatId.slice(-8)}` : `${platformLabel} DM`;
-      const thread = await threadStore.create(this.opts.defaultUserId, title);
+      const thread = await threadStore.create(this.opts.defaultUserId, title, projectPath);
       binding = await bindingStore.bind(connectorId, externalChatId, thread.id, this.opts.defaultUserId);
       log.info(
         { connectorId, externalChatId, threadId: thread.id },
         '[ConnectorRouter] New thread created for external chat',
       );
+    } else if (threadStore.get && threadStore.updateProjectPath) {
+      const thread = await threadStore.get(binding.threadId);
+      if (!thread?.projectPath || thread.projectPath === 'default') {
+        await threadStore.updateProjectPath(binding.threadId, projectPath);
+      }
     }
 
     // 3. Post connector message
@@ -629,18 +635,14 @@ export class ConnectorRouter {
     return out;
   }
 
-  private normalizeExplicitTargetCatIds(routing?: {
-    directCatId?: string;
-    targetCatIds?: string[];
-  }): CatId[] {
-    const values = [
-      ...(routing?.directCatId ? [routing.directCatId] : []),
-      ...(routing?.targetCatIds ?? []),
-    ];
+  private normalizeExplicitTargetCatIds(routing?: { directCatId?: string; targetCatIds?: string[] }): CatId[] {
+    const values = [...(routing?.directCatId ? [routing.directCatId] : []), ...(routing?.targetCatIds ?? [])];
     const out: CatId[] = [];
     const seen = new Set<string>();
     for (const raw of values) {
-      const trimmed = String(raw || '').replace(/^@/, '').trim();
+      const trimmed = String(raw || '')
+        .replace(/^@/, '')
+        .trim();
       if (!trimmed || seen.has(trimmed) || !catRegistry.has(trimmed)) continue;
       seen.add(trimmed);
       out.push(createCatId(trimmed));

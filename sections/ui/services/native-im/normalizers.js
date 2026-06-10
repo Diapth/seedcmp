@@ -571,6 +571,49 @@ function normalizeProposalCard(block = {}) {
   };
 }
 
+function textLineField(text = '', labels = []) {
+  const lines = String(text || '').split(/\r?\n/);
+  for (const line of lines) {
+    for (const label of labels) {
+      const match = line.match(new RegExp(`${label}\\s*[:：]\\s*(.+)$`, 'i'));
+      if (match?.[1]) return match[1].trim();
+    }
+  }
+  return '';
+}
+
+export function normalizeTextProposalCard(text = '') {
+  const content = String(text || '');
+  if (!/(提案|提议|proposal|批准并创建|创建.*thread)/i.test(content)) return null;
+  const proposalId = content.match(/\bproposal[_-][A-Za-z0-9][A-Za-z0-9_-]*\b/)?.[0] || '';
+  if (!proposalId) return null;
+
+  const title = firstText(
+    textLineField(content, ['标题', 'title']),
+    content.match(/提议新建\s*thread\s*[:：]\s*([^\n]+)/i)?.[1],
+    '提议新建 thread'
+  );
+  const members = textLineField(content, ['成员', '建议成员', 'participants']);
+  const fields = [
+    ...(members ? [{ label: '成员', value: members }] : []),
+    { label: '提案 ID', value: proposalId }
+  ];
+
+  return {
+    id: `proposal-${proposalId}`,
+    proposalId,
+    title,
+    bodyMarkdown: content,
+    tone: 'info',
+    fields,
+    actions: [
+      { label: '批准并创建', action: 'propose:approve', payload: { proposalId } },
+      { label: '驳回', action: 'propose:reject', payload: { proposalId } }
+    ],
+    status: 'pending'
+  };
+}
+
 export function normalizeMessage(input = {}, options = {}) {
   const payload = input.payload ?? input.content ?? input.contentObj ?? {};
   const normalizedContent = normalizeContent({ ...input, payload });
@@ -582,7 +625,9 @@ export function normalizeMessage(input = {}, options = {}) {
   const mentions = normalizeMentions(mention, normalizedContent.content, raw.mentions, input.mentions);
   const richBlocks = normalizeRichBlocks(input, raw);
   const proposalBlock = richBlocks.find(isProposalRichBlock);
-  const proposalCard = proposalBlock ? normalizeProposalCard(proposalBlock) : null;
+  const proposalCard = proposalBlock
+    ? normalizeProposalCard(proposalBlock)
+    : normalizeTextProposalCard(normalizedContent.content);
 
   return {
     id: String(id || `local-${Date.now()}`),

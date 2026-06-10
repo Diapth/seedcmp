@@ -21,17 +21,17 @@
 
     <view class="proposal-actions">
       <button
-        v-if="status === 'pending'"
+        v-if="canSubmit"
         class="proposal-btn secondary"
         :disabled="submitting"
         @click.stop="handleReject"
       >驳回</button>
       <button
-        v-if="status === 'pending'"
+        v-if="canSubmit"
         class="proposal-btn primary"
         :disabled="submitting"
         @click.stop="handleApprove"
-      >批准并创建</button>
+      >{{ status === 'failed' ? '重试创建' : '批准并创建' }}</button>
     </view>
   </view>
 </template>
@@ -56,6 +56,7 @@ const submitting = ref(false);
 const errorText = ref('');
 
 const fields = computed(() => props.card.fields || []);
+const canSubmit = computed(() => status.value === 'pending' || status.value === 'failed');
 const statusText = computed(() => {
   if (status.value === 'approved') return '已批准';
   if (status.value === 'rejected') return '已驳回';

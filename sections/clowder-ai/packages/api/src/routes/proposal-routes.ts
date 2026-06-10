@@ -5,8 +5,9 @@
  * POST /api/proposals/:proposalId/reject   — mark proposal rejected
  * GET  /api/proposals/pending              — list user's pending proposals
  *
- * All routes require user auth via X-Cat-Cafe-User. The cat-side propose
- * route lives in callback-propose-thread-routes.ts.
+ * Proposal cards are shared in IM, so approve/reject/detail require an
+ * identified user but do not require that user to be the proposal creator.
+ * The cat-side propose route lives in callback-propose-thread-routes.ts.
  */
 
 import type { CatId } from '@cat-cafe/shared';
@@ -78,10 +79,6 @@ export const proposalRoutes: FastifyPluginAsync<ProposalRoutesOptions> = async (
       reply.status(404);
       return { error: 'Proposal not found' };
     }
-    if (proposal.createdBy !== userId) {
-      reply.status(403);
-      return { error: 'Proposal does not belong to the current user' };
-    }
     if (proposal.status === 'rejected') {
       reply.status(409);
       return { error: 'Proposal already rejected', status: proposal.status };
@@ -118,9 +115,9 @@ export const proposalRoutes: FastifyPluginAsync<ProposalRoutesOptions> = async (
     let finalParentThreadId = overrides.parentThreadId ?? proposal.parentThreadId;
     if (overrides.parentThreadId && overrides.parentThreadId !== proposal.parentThreadId) {
       const parent = await threadStore.get(overrides.parentThreadId);
-      if (!parent || parent.createdBy !== userId) {
-        reply.status(403);
-        return { error: 'parentThreadId does not belong to the current user' };
+      if (!parent) {
+        reply.status(404);
+        return { error: 'parentThreadId not found' };
       }
       finalParentThreadId = overrides.parentThreadId;
     }
@@ -258,10 +255,6 @@ export const proposalRoutes: FastifyPluginAsync<ProposalRoutesOptions> = async (
       reply.status(404);
       return { error: 'Proposal not found' };
     }
-    if (proposal.createdBy !== userId) {
-      reply.status(403);
-      return { error: 'Proposal does not belong to the current user' };
-    }
     if (proposal.status === 'approved') {
       reply.status(409);
       return { error: 'Proposal already approved', status: proposal.status };
@@ -311,10 +304,6 @@ export const proposalRoutes: FastifyPluginAsync<ProposalRoutesOptions> = async (
     if (!proposal) {
       reply.status(404);
       return { error: 'Proposal not found' };
-    }
-    if (proposal.createdBy !== userId) {
-      reply.status(403);
-      return { error: 'Proposal does not belong to the current user' };
     }
     return { proposal };
   });

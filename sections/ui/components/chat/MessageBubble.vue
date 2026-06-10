@@ -110,10 +110,10 @@
           </view>
 
           <view
-            v-else-if="data.type === 'proposal_card'"
+            v-else-if="isProposalCardMessage"
             class="bubble-proposal-card"
           >
-            <ProposalCard :card="data.proposalCard || {}" :message="data" />
+            <ProposalCard :card="displayProposalCard || {}" :message="data" />
           </view>
 
           <!-- Text Message -->
@@ -213,6 +213,7 @@ import CoordinatorProjectGroupCard from './CoordinatorProjectGroupCard.vue';
 import CoordinatorTemplateCatsCard from './CoordinatorTemplateCatsCard.vue';
 import DeploymentCard from './DeploymentCard.vue';
 import ProposalCard from './ProposalCard.vue';
+import { normalizeTextProposalCard } from '@/services/native-im/normalizers';
 import {
   isSelfSender,
   resolveSelfAvatar,
@@ -274,6 +275,14 @@ const myAvatar = computed(() => {
 
 const myDisplayName = computed(() => {
   return resolveSelfName(appStore.currentUser || {}, props.data.senderName || '我');
+});
+
+const displayProposalCard = computed(() => {
+  return props.data.proposalCard || normalizeTextProposalCard(props.data.content || '');
+});
+
+const isProposalCardMessage = computed(() => {
+  return props.data.type === 'proposal_card' || Boolean(displayProposalCard.value);
 });
 
 // 拆分文本为 mention 段(高亮) + 普通段

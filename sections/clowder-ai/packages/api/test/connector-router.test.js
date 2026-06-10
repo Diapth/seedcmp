@@ -1,10 +1,10 @@
 import assert from 'node:assert/strict';
 import { beforeEach, describe, it } from 'node:test';
 import { catRegistry } from '@cat-cafe/shared';
+import { InMemoryCoordinatorStore } from '../dist/domains/cats/services/stores/ports/CoordinatorStore.js';
 import { ConnectorRouter } from '../dist/infrastructure/connectors/ConnectorRouter.js';
 import { MemoryConnectorThreadBindingStore } from '../dist/infrastructure/connectors/ConnectorThreadBindingStore.js';
 import { InboundMessageDedup } from '../dist/infrastructure/connectors/InboundMessageDedup.js';
-import { InMemoryCoordinatorStore } from '../dist/domains/cats/services/stores/ports/CoordinatorStore.js';
 
 function noopLog() {
   const noop = () => {};
@@ -131,7 +131,7 @@ function ensureMentionRegistry() {
       id: 'coordinator',
       name: 'coordinator',
       displayName: '协调者',
-      avatar: '/avatars/coordinator.png',
+      avatar: '/assets/avatars/siamese.png',
       color: { primary: '#7c3aed', secondary: '#ede9fe' },
       mentionPatterns: ['@coordinator', '@协调者', '@pm'],
       provider: 'openai',
