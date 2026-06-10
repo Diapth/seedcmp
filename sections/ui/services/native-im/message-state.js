@@ -58,6 +58,28 @@ function contentKey(message = {}) {
   ].join('|');
 }
 
+function comparableTextContent(message = {}) {
+  return clean(message.content)
+    .replace(/[▌▋▊█]+$/g, '')
+    .replace(/\s+/g, ' ')
+    .trim();
+}
+
+function isLikelyClowderPartialReplyDuplicate(candidate = {}, incoming = {}) {
+  const candidateContent = comparableTextContent(candidate);
+  const incomingContent = comparableTextContent(incoming);
+  if (!candidateContent || !incomingContent) return false;
+  if (candidateContent === incomingContent) return true;
+
+  const shorter = candidateContent.length <= incomingContent.length ? candidateContent : incomingContent;
+  const longer = candidateContent.length > incomingContent.length ? candidateContent : incomingContent;
+  if (shorter.length < 48) return false;
+  if (!longer.startsWith(shorter)) return false;
+
+  const coverage = shorter.length / Math.max(longer.length, 1);
+  return coverage >= 0.35;
+}
+
 function messageDigest(message = {}) {
   if (!isVisibleChatMessage(message)) return '';
   if (message.type === 'system') return clean(message.content);
@@ -863,7 +885,7 @@ function findEquivalentClowderReplyIndex(messages = [], incoming = {}, currentUs
     if (!isClowderReplySender(candidate)) continue;
     if (isSelfSender(candidate.senderId || candidate.from_uid || candidate.fromUID, currentUser)) continue;
     if (normalizedSenderKey(candidate) !== incomingSender) continue;
-    if (contentKey(candidate) !== incomingContent) continue;
+    if (contentKey(candidate) !== incomingContent && !isLikelyClowderPartialReplyDuplicate(candidate, incoming)) continue;
     const candidateTime = safeNumber(candidate.time, 0);
     if (incomingTime && candidateTime && Math.abs(incomingTime - candidateTime) > timeWindowMs) continue;
     return index;
@@ -958,7 +980,7 @@ export function mergeNativeMessageIntoList(messages = [], incoming = {}, options
       ...enrichedIncoming,
       id: firstNonEmpty(enrichedIncoming.id, next[duplicateReplyIndex].id),
       status: enrichedIncoming.status || next[duplicateReplyIndex].status || 'success',
-      streaming: enrichedIncoming.streaming === undefined ? next[duplicateReplyIndex].streaming : enrichedIncoming.streaming,
+      streaming: enrichedIncoming.streaming === undefined ? false : enrichedIncoming.streaming,
       reactions: next[duplicateReplyIndex].reactions || enrichedIncoming.reactions || [],
       replyRef: next[duplicateReplyIndex].replyRef || enrichedIncoming.replyRef || null,
       mentions: next[duplicateReplyIndex].mentions || enrichedIncoming.mentions || []

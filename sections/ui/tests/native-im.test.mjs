@@ -2933,6 +2933,63 @@ test('native clowder duplicate durable replies with different ids collapse', () 
   assert.equal(merged[0].senderId, 'clowder_cat:luoluo');
 });
 
+test('native clowder final durable reply replaces partial streamed bubble', () => {
+  const conversation = { id: 'clowder_cat:qq', type: 'robot', source: 'clowder' };
+  const partial = normalizeMessage({
+    message_id: 'wk-partial-reply',
+    client_msg_no: 'partial-client-msg',
+    from_uid: 'clowder_cat:qq',
+    from_name: 'QQ',
+    timestamp: 1781067700,
+    payload: JSON.stringify({
+      type: 1,
+      content: [
+        'QQ～宪宪在呢！🐾',
+        '',
+        '不过开工自检扫到两个小问题，先跟你同步一下：',
+        '',
+        '1. 主仓库在 new_ui 分支上',
+        '2. 有 5 个未 push 的 commit，内容涉及长期上下文接口、智能'
+      ].join('\n'),
+      format: 'markdown',
+      markdown: true
+    })
+  });
+  const final = normalizeMessage({
+    message_id: 'wk-final-reply',
+    client_msg_no: 'final-client-msg',
+    from_uid: 'clowder_cat:qq',
+    from_name: 'QQ',
+    timestamp: 1781067702,
+    payload: JSON.stringify({
+      type: 1,
+      content: [
+        'QQ～宪宪在呢！🐾',
+        '',
+        '不过开工自检扫到两个小问题，先跟你同步一下：',
+        '',
+        '1. 主仓库在 new_ui 分支上',
+        '2. 有 5 个未 push 的 commit，内容涉及长期上下文接口、智能体消息修复、Clowder 直聊名称退化等。需要 push 吗？',
+        '',
+        '有什么需要我做的？'
+      ].join('\n'),
+      format: 'markdown',
+      markdown: true
+    })
+  });
+
+  const merged = messageState.mergeNativeMessageIntoList(
+    messageState.mergeNativeMessageIntoList([], partial, { conversation }),
+    final,
+    { conversation }
+  );
+
+  assert.equal(merged.length, 1);
+  assert.equal(merged[0].id, 'wk-final-reply');
+  assert.equal(merged[0].content, final.content);
+  assert.equal(merged[0].streaming, false);
+});
+
 test('native clowder generated workspace files resolve through clowder workspace raw proxy', () => {
   const normalized = messageState.normalizeAgentReplyEvent({
     streamKey: 'ppt-artifact-stream',

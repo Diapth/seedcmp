@@ -1,0 +1,83 @@
+{
+  "issue": "ISSUE-046",
+  "generatedAt": "2026-06-10T13:48:30.262Z",
+  "pass": true,
+  "results": [
+    {
+      "name": "desktop: partial and final collapse in store",
+      "pass": true,
+      "detail": "{\"conversation\":{\"id\":\"clowder_cat:qq\",\"name\":\"QQ\",\"type\":\"robot\",\"source\":\"clowder\",\"directCatId\":\"qq\"},\"totalMessages\":1,\"ids\":[\"wk-final-reply\"],\"contents\":[\"QQ～宪宪在呢！🐾\\n\\n不过开工自检扫到两个小问题，先跟你同步一下：\\n\\n1. 主仓库在 new_ui 分支上\\n2. 有 5 个未 push 的 commit，内容涉及长期上下文接口、智能体消息修复、Clowder 直聊名称退化等。需要 push 吗？\\n\\n有什么需要我做的？\"],\"finalMatches\":1,\"partialMatches\":0}"
+    },
+    {
+      "name": "desktop: final reply renders once",
+      "pass": true,
+      "detail": "{\"renderedCount\":1,\"state\":{\"conversation\":{\"id\":\"clowder_cat:qq\",\"name\":\"QQ\",\"type\":\"robot\",\"source\":\"clowder\",\"directCatId\":\"qq\"},\"totalMessages\":1,\"ids\":[\"wk-final-reply\"],\"contents\":[\"QQ～宪宪在呢！🐾\\n\\n不过开工自检扫到两个小问题，先跟你同步一下：\\n\\n1. 主仓库在 new_ui 分支上\\n2. 有 5 个未 push 的 commit，内容涉及长期上下文接口、智能体消息修复、Clowder 直聊名称退化等。需要 push 吗？\\n\\n有什么需要我做的？\"],\"finalMatches\":1,\"partialMatches\":0}}"
+    },
+    {
+      "name": "desktop: clowder direct conversation stays active",
+      "pass": true,
+      "detail": "{\"id\":\"clowder_cat:qq\",\"name\":\"QQ\",\"type\":\"robot\",\"source\":\"clowder\",\"directCatId\":\"qq\"}"
+    },
+    {
+      "name": "mobile: partial and final collapse in store",
+      "pass": true,
+      "detail": "{\"conversation\":{\"id\":\"clowder_cat:qq\",\"name\":\"QQ\",\"type\":\"robot\",\"source\":\"clowder\",\"directCatId\":\"qq\"},\"totalMessages\":1,\"ids\":[\"wk-final-reply\"],\"contents\":[\"QQ～宪宪在呢！🐾\\n\\n不过开工自检扫到两个小问题，先跟你同步一下：\\n\\n1. 主仓库在 new_ui 分支上\\n2. 有 5 个未 push 的 commit，内容涉及长期上下文接口、智能体消息修复、Clowder 直聊名称退化等。需要 push 吗？\\n\\n有什么需要我做的？\"],\"finalMatches\":1,\"partialMatches\":0}"
+    },
+    {
+      "name": "mobile: final reply renders once",
+      "pass": true,
+      "detail": "{\"renderedCount\":1,\"state\":{\"conversation\":{\"id\":\"clowder_cat:qq\",\"name\":\"QQ\",\"type\":\"robot\",\"source\":\"clowder\",\"directCatId\":\"qq\"},\"totalMessages\":1,\"ids\":[\"wk-final-reply\"],\"contents\":[\"QQ～宪宪在呢！🐾\\n\\n不过开工自检扫到两个小问题，先跟你同步一下：\\n\\n1. 主仓库在 new_ui 分支上\\n2. 有 5 个未 push 的 commit，内容涉及长期上下文接口、智能体消息修复、Clowder 直聊名称退化等。需要 push 吗？\\n\\n有什么需要我做的？\"],\"finalMatches\":1,\"partialMatches\":0}}"
+    },
+    {
+      "name": "mobile: clowder direct conversation stays active",
+      "pass": true,
+      "detail": "{\"id\":\"clowder_cat:qq\",\"name\":\"QQ\",\"type\":\"robot\",\"source\":\"clowder\",\"directCatId\":\"qq\"}"
+    }
+  ],
+  "details": [
+    {
+      "label": "desktop",
+      "state": {
+        "conversation": {
+          "id": "clowder_cat:qq",
+          "name": "QQ",
+          "type": "robot",
+          "source": "clowder",
+          "directCatId": "qq"
+        },
+        "totalMessages": 1,
+        "ids": [
+          "wk-final-reply"
+        ],
+        "contents": [
+          "QQ～宪宪在呢！🐾\n\n不过开工自检扫到两个小问题，先跟你同步一下：\n\n1. 主仓库在 new_ui 分支上\n2. 有 5 个未 push 的 commit，内容涉及长期上下文接口、智能体消息修复、Clowder 直聊名称退化等。需要 push 吗？\n\n有什么需要我做的？"
+        ],
+        "finalMatches": 1,
+        "partialMatches": 0
+      },
+      "renderedCount": 1
+    },
+    {
+      "label": "mobile",
+      "state": {
+        "conversation": {
+          "id": "clowder_cat:qq",
+          "name": "QQ",
+          "type": "robot",
+          "source": "clowder",
+          "directCatId": "qq"
+        },
+        "totalMessages": 1,
+        "ids": [
+          "wk-final-reply"
+        ],
+        "contents": [
+          "QQ～宪宪在呢！🐾\n\n不过开工自检扫到两个小问题，先跟你同步一下：\n\n1. 主仓库在 new_ui 分支上\n2. 有 5 个未 push 的 commit，内容涉及长期上下文接口、智能体消息修复、Clowder 直聊名称退化等。需要 push 吗？\n\n有什么需要我做的？"
+        ],
+        "finalMatches": 1,
+        "partialMatches": 0
+      },
+      "renderedCount": 1
+    }
+  ]
+}
