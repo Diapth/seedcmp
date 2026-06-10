@@ -13,6 +13,7 @@ import {
 import {
   applyDraftToConversationList,
   buildGroupScopedRoute,
+  createDeletedConversationRecord,
   conversationDeleteKey,
   conversationDisplayUnread,
   filterDeletedConversations,
@@ -1946,6 +1947,48 @@ test('deleted conversation records suppress stale sync entries but allow newer m
     'clowder_cat:cs:2',
     'clowder_cat:architect:13'
   ]);
+});
+
+test('agent delete tombstone suppresses stale direct conversation even when sync has fresh timestamp only', () => {
+  const deletedAgentDirectConversation = {
+    [conversationDeleteKey('clowder_cat:architect', 1)]: {
+      lastSeq: Number.MAX_SAFE_INTEGER,
+      lastTime: 1781065600000,
+      deletedAt: 1781065700000
+    }
+  };
+
+  assert.equal(
+    shouldSuppressDeletedConversation({
+      channelId: 'clowder_cat:architect',
+      channelType: 1,
+      lastSeq: 0,
+      lastTime: 1781069900000
+    }, deletedAgentDirectConversation),
+    true
+  );
+});
+
+test('agent delete permanent tombstone ignores the previous direct conversation sequence', () => {
+  const record = createDeletedConversationRecord({
+    channelId: 'clowder_cat:architect',
+    channelType: 1,
+    lastSeq: 12,
+    lastTime: 1781065600000
+  }, 1781065700000, { permanent: true });
+
+  assert.equal(record.lastSeq, Number.MAX_SAFE_INTEGER);
+  assert.equal(
+    shouldSuppressDeletedConversation({
+      channelId: 'clowder_cat:architect',
+      channelType: 1,
+      lastSeq: 0,
+      lastTime: 1781069900000
+    }, {
+      [conversationDeleteKey('clowder_cat:architect', 1)]: record
+    }),
+    true
+  );
 });
 
 test('group creation candidates include existing agents and split native contacts from agents', () => {

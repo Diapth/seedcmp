@@ -80,12 +80,13 @@ function conversationSeqTime(conversation = {}) {
   };
 }
 
-export function createDeletedConversationRecord(conversation = {}, deletedAt = Date.now()) {
+export function createDeletedConversationRecord(conversation = {}, deletedAt = Date.now(), options = {}) {
   const { seq, time } = conversationSeqTime(conversation);
   return {
-    lastSeq: seq,
+    lastSeq: options.permanent ? Number.MAX_SAFE_INTEGER : seq,
     lastTime: time,
-    deletedAt
+    deletedAt,
+    ...(options.permanent ? { permanent: true } : {})
   };
 }
 
@@ -103,6 +104,7 @@ function incomingIsNewerThanDeletedRecord(conversation = {}, record = {}) {
   if (!normalized) return false;
   const { seq, time } = conversationSeqTime(conversation);
   if (seq > 0 && seq > normalized.lastSeq) return true;
+  if (normalized.lastSeq >= Number.MAX_SAFE_INTEGER && seq <= 0) return false;
   if (time > 0 && time > normalized.lastTime) return true;
   return false;
 }

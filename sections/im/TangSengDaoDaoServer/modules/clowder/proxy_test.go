@@ -741,6 +741,57 @@ func TestDeleteCatFromUpstreamReturnsUpstreamErrorStatus(t *testing.T) {
 	assert.Contains(t, string(body), "Cat not found")
 }
 
+func TestDeleteCatContactCleansDirectConversationAfterUpstreamSuccess(t *testing.T) {
+	var gotDelete map[string]interface{}
+	upstream := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		require.Equal(t, http.MethodDelete, r.Method)
+		require.Equal(t, "/api/cats/opus", r.URL.Path)
+		w.WriteHeader(http.StatusOK)
+		_ = json.NewEncoder(w).Encode(map[string]interface{}{
+			"deleted": true,
+		})
+	}))
+	defer upstream.Close()
+	imAPI := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		require.Equal(t, "/conversations/delete", r.URL.Path)
+		require.Equal(t, http.MethodPost, r.Method)
+		require.NoError(t, json.NewDecoder(r.Body).Decode(&gotDelete))
+		_ = json.NewEncoder(w).Encode(map[string]interface{}{"status": http.StatusOK})
+	}))
+	defer imAPI.Close()
+
+	cfg := config.New()
+	cfg.Test = true
+	cfg.WuKongIM.APIURL = imAPI.URL
+	appCtx := config.NewContext(cfg)
+	require.NoError(t, appCtx.Cache().Set(cfg.Cache.TokenCachePrefix+"token-user-a", wkhttp.EncodeTokenCacheInfo("user-a", "User A", "")))
+
+	c := New(appCtx)
+	c.SetConfig(commonmodule.ClowderBridgeConfig{
+		Enabled:            true,
+		APIBaseURL:         upstream.URL,
+		ConnectorID:        "im-web",
+		ConnectorSecret:    "secret",
+		DefaultOwnerUserID: "owner-1",
+		RequestTimeout:     time.Second,
+		SignatureTolerance: time.Minute,
+	})
+	s := server.New(appCtx)
+	c.Route(s.GetRoute())
+
+	recorder := httptest.NewRecorder()
+	req, err := http.NewRequest(http.MethodDelete, "/v1/clowder/cats/opus", nil)
+	require.NoError(t, err)
+	req.Header.Set("token", "token-user-a")
+	s.GetRoute().ServeHTTP(recorder, req)
+
+	require.Equal(t, http.StatusOK, recorder.Code, recorder.Body.String())
+	require.NotNil(t, gotDelete)
+	assert.Equal(t, "user-a", gotDelete["uid"])
+	assert.Equal(t, "clowder_cat:opus", gotDelete["channel_id"])
+	assert.Equal(t, float64(1), gotDelete["channel_type"])
+}
+
 func TestPruneGroupCatStateRemovesDeletedCatAndClearsEmptyPrompt(t *testing.T) {
 	c := New(nil)
 	c.storeGroupCats(groupCatSyncRequest{

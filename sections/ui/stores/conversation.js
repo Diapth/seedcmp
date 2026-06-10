@@ -431,7 +431,7 @@ export const useConversationStore = defineStore('conversation', {
     unhideConversation(id) {
       this.isHidden = this.isHidden.filter((x) => x !== id);
     },
-    markConversationDeleted(conversationOrId) {
+    markConversationDeleted(conversationOrId, options = {}) {
       const conversation = typeof conversationOrId === 'string'
         ? this.conversations.find((item) => item.id === conversationOrId || item.channelId === conversationOrId)
         : conversationOrId;
@@ -442,7 +442,7 @@ export const useConversationStore = defineStore('conversation', {
         id: identity.channelId,
         channelId: identity.channelId,
         channelType: identity.channelType
-      });
+      }, Date.now(), { permanent: options.permanent === true });
       writeDeletedConversationCache(this.deletedRecords);
       return key;
     },
@@ -495,7 +495,7 @@ export const useConversationStore = defineStore('conversation', {
           lastSeq: Number.MAX_SAFE_INTEGER,
           lastTime: Date.now()
         };
-        this.markConversationDeleted(tombstoneConversation);
+        this.markConversationDeleted(tombstoneConversation, { permanent: true });
       });
       return {
         ...next,

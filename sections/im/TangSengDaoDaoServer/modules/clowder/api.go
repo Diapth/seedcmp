@@ -1022,8 +1022,27 @@ func (c *Clowder) deleteCatContact(ctx *wkhttp.Context) {
 	if statusCode >= 200 && statusCode < 300 {
 		c.pruneGroupCatState(catID)
 		c.pruneCreatedCatContact(ctx.GetLoginUID(), catID)
+		if err := c.cleanupDeletedCatDirectConversation(ctx.GetLoginUID(), catID); err != nil {
+			c.Warn(fmt.Sprintf("cleanup deleted clowder cat direct conversation failed: %v", err))
+		}
 	}
 	ctx.Data(statusCode, "application/json; charset=utf-8", body)
+}
+
+func (c *Clowder) cleanupDeletedCatDirectConversation(userID string, catID string) error {
+	if c == nil || c.ctx == nil {
+		return nil
+	}
+	uid := strings.TrimSpace(userID)
+	channelID := clowderCatDirectChannelID(catID)
+	if uid == "" || channelID == "" {
+		return nil
+	}
+	return c.ctx.IMDeleteConversation(config.DeleteConversationReq{
+		UID:         uid,
+		ChannelID:   channelID,
+		ChannelType: common.ChannelTypePerson.Uint8(),
+	})
 }
 
 func (c *Clowder) syncGroupCats(ctx *wkhttp.Context) {
