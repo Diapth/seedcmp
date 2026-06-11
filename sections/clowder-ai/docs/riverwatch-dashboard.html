@@ -3,1061 +3,502 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-  <meta name="description" content="RiverWatch - 河流水质数据可视化看板">
-  <title>RiverWatch 水质监测</title>
-
-  <!-- Tailwind CSS -->
+  <title>RiverWatch — 水质监测仪表板</title>
+  <script src="https://unpkg.com/vue@3/dist/vue.global.js"></script>
   <script src="https://cdn.tailwindcss.com"></script>
-  <script>
-    tailwind.config = {
-      theme: {
-        extend: {
-          colors: {
-            primary: '#0EA5E9',
-            primaryDark: '#0284C7',
-            excellent: '#10B981',
-            good: '#3B82F6',
-            mild: '#F59E0B',
-            moderate: '#F97316',
-            severe: '#7F1D1D',
-          }
-        }
+  <link rel="preconnect" href="https://waterservices.usgs.gov">
+  <style>
+    /* Custom scrollbar */
+    ::-webkit-scrollbar { width: 6px; }
+    ::-webkit-scrollbar-track { background: #f1f5f9; }
+    ::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 3px; }
+
+    /* Animations */
+    @keyframes fadeInUp {
+      from { opacity: 0; transform: translateY(20px); }
+      to   { opacity: 1; transform: translateY(0); }
+    }
+    @keyframes pulse-ring {
+      0%   { transform: scale(0.8); opacity: 0.8; }
+      100% { transform: scale(2.2); opacity: 0; }
+    }
+    @keyframes shimmer {
+      0%   { background-position: -200% 0; }
+      100% { background-position: 200% 0; }
+    }
+
+    .animate-fade-in-up {
+      animation: fadeInUp 0.5s ease-out both;
+    }
+    .animate-shimmer {
+      background: linear-gradient(90deg, #e2e8f0 25%, #f1f5f9 50%, #e2e8f0 75%);
+      background-size: 200% 100%;
+      animation: shimmer 1.5s infinite;
+    }
+
+    /* Status dot pulse */
+    .status-pulse::before {
+      content: '';
+      position: absolute;
+      inset: -4px;
+      border-radius: 50%;
+      animation: pulse-ring 2s cubic-bezier(0.215, 0.61, 0.355, 1) infinite;
+    }
+
+    /* Touch-friendly tap targets */
+    .tap-target {
+      min-height: 44px;
+      min-width: 44px;
+    }
+
+    /* Card hover lift (desktop only) */
+    @media (hover: hover) {
+      .card-hover:hover {
+        transform: translateY(-2px);
+        box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.1), 0 8px 10px -6px rgba(0, 0, 0, 0.1);
       }
     }
-  </script>
 
-  <!-- Chart.js -->
-  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
-
-  <!-- Vue 3 -->
-  <script src="https://unpkg.com/vue@3/dist/vue.global.js"></script>
-
-  <!-- Vue Router -->
-  <script src="https://unpkg.com/vue-router@4/dist/vue-router.global.js"></script>
-
-  <style>
-    /* Base */
-    * { box-sizing: border-box; margin: 0; padding: 0; }
-    html { -webkit-text-size-adjust: 100%; -webkit-tap-highlight-color: transparent; }
-    body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, "PingFang SC", "Microsoft YaHei", sans-serif; background: #F0F9FF; color: #0F172A; line-height: 1.5; min-height: 100vh; }
-
-    /* Skeleton */
-    .skeleton { background: linear-gradient(90deg, #e2e8f0 25%, #f1f5f9 50%, #e2e8f0 75%); background-size: 200% 100%; animation: skeleton-loading 1.5s infinite; border-radius: 8px; }
-    @keyframes skeleton-loading { 0% { background-position: 200% 0 } 100% { background-position: -200% 0 } }
-
-    /* Vue cloak */
-    [v-cloak] { display: none !important; }
-
-    /* Status badges */
-    .status-excellent { background: rgba(16,185,129,0.12); color: #059669; }
-    .status-good { background: rgba(59,130,246,0.12); color: #2563EB; }
-    .status-mild { background: rgba(245,158,11,0.12); color: #D97706; }
-    .status-moderate { background: rgba(249,115,22,0.12); color: #EA580C; }
-    .status-severe { background: rgba(127,29,29,0.12); color: #7F1D1D; }
-
-    .border-excellent { border-left-color: #10B981; }
-    .border-good { border-left-color: #3B82F6; }
-    .border-mild { border-left-color: #F59E0B; }
-    .border-moderate { border-left-color: #F97316; }
-    .border-severe { border-left-color: #7F1D1D; }
-
-    /* Card hover */
-    .station-card { transition: transform 0.15s, box-shadow 0.15s; }
-    .station-card:active { transform: scale(0.98); }
-
-    /* Bottom nav */
-    .nav-item { transition: all 0.2s; }
-    .nav-item.active { color: #0EA5E9; }
-    .nav-item.active svg { stroke: #0EA5E9; }
-
-    /* Chart container */
-    .chart-container { position: relative; height: 280px; }
-    @media (min-width: 768px) { .chart-container { height: 320px; } }
-
-    /* Safe area */
-    @supports (padding: max(0px)) { .pb-safe { padding-bottom: max(16px, env(safe-area-inset-bottom)) } }
-
-    /* Scrollbar */
-    ::-webkit-scrollbar { width: 4px; }
-    ::-webkit-scrollbar-track { background: transparent; }
-    ::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 4px; }
+    /* Landscape mobile: 2-column grid */
+    @media (min-width: 640px) and (max-height: 500px) {
+      .landscape-grid {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+      }
+    }
   </style>
 </head>
-<body>
-  <!-- Skeleton Screen -->
-  <div id="skeleton-screen">
-    <div class="bg-gradient-to-r from-sky-500 to-sky-600 h-16"></div>
-    <div class="p-4 space-y-3">
-      <div class="skeleton h-14 rounded-xl"></div>
-      <div class="skeleton h-28 rounded-xl"></div>
-      <div class="skeleton h-28 rounded-xl"></div>
-      <div class="skeleton h-28 rounded-xl"></div>
-    </div>
-  </div>
+<body class="bg-slate-50 text-slate-800 antialiased">
+  <div id="app" class="min-h-screen flex flex-col">
 
-  <!-- Vue App -->
-  <div id="app" v-cloak class="min-h-screen flex flex-col">
     <!-- Header -->
-    <header class="bg-gradient-to-r from-sky-500 to-sky-600 text-white px-4 py-3 sticky top-0 z-50 shadow-md">
-      <div class="flex items-center justify-between max-w-6xl mx-auto">
-        <div class="flex items-center gap-2">
-          <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"/></svg>
+    <header class="bg-white border-b border-slate-200 sticky top-0 z-30">
+      <div class="max-w-3xl mx-auto px-4 py-3 flex items-center justify-between">
+        <div class="flex items-center gap-3">
+          <div class="relative w-10 h-10 flex items-center justify-center bg-sky-500 rounded-xl">
+            <svg class="w-6 h-6 text-white" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" d="M2.25 15a4.5 4.5 0 004.5 4.5H18a3.75 3.75 0 001.332-7.257 3 3 0 00-3.758-3.848 5.25 5.25 0 00-10.233 2.33A4.502 4.502 0 002.25 15z"/>
+            </svg>
+          </div>
           <div>
-            <h1 class="text-lg font-bold leading-tight">RiverWatch</h1>
-            <p class="text-xs opacity-90">河流水质实时监测</p>
+            <h1 class="text-lg font-bold leading-tight text-slate-900">RiverWatch</h1>
+            <p class="text-xs text-slate-500">水质实时监测</p>
           </div>
         </div>
-        <div class="text-right">
-          <div class="text-sm font-semibold">{{ stationCount }}个站点</div>
-          <div class="text-xs opacity-80">{{ lastUpdate }}</div>
-        </div>
+        <button
+          @click="fetchData"
+          :disabled="loading"
+          class="tap-target flex items-center gap-1.5 px-3 py-2 rounded-lg bg-sky-50 text-sky-700 text-sm font-medium active:bg-sky-100 transition-colors disabled:opacity-50"
+        >
+          <svg class="w-4 h-4" :class="{ 'animate-spin': loading }" fill="none" viewBox="0 0 24 24">
+            <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+            <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+          </svg>
+          <span class="hidden sm:inline">刷新</span>
+        </button>
       </div>
     </header>
 
     <!-- Main Content -->
-    <main class="flex-1 pb-20">
-      <router-view
-        :stations="stations"
-        :history="history"
-        :stats="stats"
-        :operational-stats="operationalStats"
-        :filters="filters"
-        @update-filters="updateFilters"
-        @refresh="refreshData"
-      ></router-view>
+    <main class="flex-1 max-w-3xl mx-auto w-full px-4 py-4 sm:py-6">
+
+      <!-- Site Info -->
+      <section class="mb-4 animate-fade-in-up" style="animation-delay: 0.05s">
+        <div class="bg-white rounded-2xl border border-slate-200 p-4 shadow-sm">
+          <div class="flex items-start gap-3">
+            <div class="mt-0.5 text-slate-400">
+              <svg class="w-5 h-5" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" d="M15 10.5a3 3 0 11-6 0 3 3 0 016 0z"/>
+                <path stroke-linecap="round" stroke-linejoin="round" d="M19.5 10.5c0 7.142-7.5 11.25-7.5 11.25S4.5 17.642 4.5 10.5a7.5 7.5 0 1115 0z"/>
+              </svg>
+            </div>
+            <div class="flex-1 min-w-0">
+              <h2 class="text-sm font-semibold text-slate-900">PECONIC RIVER at COUNTY HWY 105 at RIVERHEAD, NY</h2>
+              <p class="text-xs text-slate-500 mt-0.5">USGS 站点编号：01304562</p>
+            </div>
+            <div class="flex items-center gap-2 shrink-0">
+              <div class="relative">
+                <span
+                  class="status-pulse relative inline-block w-2.5 h-2.5 rounded-full"
+                  :class="siteStatusDotClass"
+                ></span>
+              </div>
+              <span class="text-xs font-medium" :class="siteStatusTextClass">{{ siteStatusLabel }}</span>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- Loading Skeleton -->
+      <template v-if="loading && !error">
+        <div class="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4 landscape-grid">
+          <div v-for="n in 6" :key="n" class="bg-white rounded-2xl border border-slate-200 p-4 shadow-sm">
+            <div class="flex items-center gap-3 mb-3">
+              <div class="w-10 h-10 rounded-xl animate-shimmer"></div>
+              <div class="flex-1 space-y-2">
+                <div class="h-4 w-24 rounded animate-shimmer"></div>
+                <div class="h-3 w-16 rounded animate-shimmer"></div>
+              </div>
+            </div>
+            <div class="h-8 w-20 rounded animate-shimmer mb-2"></div>
+            <div class="h-3 w-32 rounded animate-shimmer"></div>
+          </div>
+        </div>
+      </template>
+
+      <!-- Error State -->
+      <div
+        v-else-if="error"
+        class="bg-red-50 border border-red-200 rounded-2xl p-6 text-center animate-fade-in-up"
+      >
+        <div class="w-14 h-14 mx-auto mb-3 rounded-full bg-red-100 flex items-center justify-center">
+          <svg class="w-7 h-7 text-red-500" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" d="M12 9v3.75m9-.75a9 9 0 11-18 0 9 9 0 0118 0zm-9 3.75h.008v.008H12v-.008z"/>
+          </svg>
+        </div>
+        <h3 class="text-base font-semibold text-red-800 mb-1">数据加载失败</h3>
+        <p class="text-sm text-red-600 mb-4">{{ error }}</p>
+        <button
+          @click="fetchData"
+          class="tap-target inline-flex items-center gap-2 px-5 py-2.5 bg-red-600 text-white text-sm font-medium rounded-xl active:bg-red-700 transition-colors shadow-sm"
+        >
+          <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" d="M16.023 9.348h4.992v-.001M2.985 19.644v-4.992m0 0h4.992m-4.993 0l3.181 3.183a8.25 8.25 0 0013.803-3.7M4.031 9.865a8.25 8.25 0 0113.803-3.7l3.181 3.182"/>
+          </svg>
+          重试
+        </button>
+      </div>
+
+      <!-- Data Grid -->
+      <div
+        v-else
+        class="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4 landscape-grid"
+      >
+        <indicator-card
+          v-for="(indicator, index) in indicators"
+          :key="indicator.param"
+          :indicator="indicator"
+          :style="{ animationDelay: (0.1 + index * 0.05) + 's' }"
+        />
+      </div>
+
+      <!-- Supplementary Section -->
+      <section v-if="!loading && !error" class="mt-5 animate-fade-in-up" style="animation-delay: 0.4s">
+        <h3 class="text-xs font-semibold text-slate-400 uppercase tracking-wider mb-3 px-1">辅助参数</h3>
+        <div class="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4 landscape-grid">
+          <indicator-card
+            v-for="(indicator, index) in supplementary"
+            :key="indicator.param"
+            :indicator="indicator"
+            :style="{ animationDelay: (0.45 + index * 0.05) + 's' }"
+          />
+        </div>
+      </section>
+
     </main>
 
-    <!-- Bottom Navigation -->
-    <nav class="fixed bottom-0 left-0 right-0 bg-white border-t border-slate-200 z-50 pb-safe">
-      <div class="flex justify-around items-center h-14 max-w-6xl mx-auto">
-        <router-link to="/" class="nav-item flex flex-col items-center gap-0.5 px-4 py-1 text-slate-500" :class="{ active: $route.path === '/' }">
-          <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6"/></svg>
-          <span class="text-[10px]">总览</span>
-        </router-link>
-        <router-link to="/compare" class="nav-item flex flex-col items-center gap-0.5 px-4 py-1 text-slate-500" :class="{ active: $route.path === '/compare' }">
-          <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"/></svg>
-          <span class="text-[10px]">对比</span>
-        </router-link>
-        <router-link to="/trends" class="nav-item flex flex-col items-center gap-0.5 px-4 py-1 text-slate-500" :class="{ active: $route.path === '/trends' }">
-          <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 12l3-3 3 3 4-4M8 21l4-4 4 4M3 4h18M4 4h16v12a1 1 0 01-1 1H5a1 1 0 01-1-1V4z"/></svg>
-          <span class="text-[10px]">趋势</span>
-        </router-link>
+    <!-- Footer -->
+    <footer class="bg-white border-t border-slate-200 mt-auto">
+      <div class="max-w-3xl mx-auto px-4 py-3 flex flex-col sm:flex-row items-center justify-between gap-2">
+        <p class="text-xs text-slate-500">
+          数据来源：
+          <a href="https://waterservices.usgs.gov/" target="_blank" rel="noopener noreferrer" class="text-sky-600 hover:underline">USGS NWIS</a>
+        </p>
+        <p v-if="lastUpdated" class="text-xs text-slate-400">
+          最后更新：{{ lastUpdated }}
+        </p>
       </div>
-    </nav>
+    </footer>
+
   </div>
 
   <script>
-    const { createApp, ref, computed, onMounted, onUnmounted, watch, nextTick } = Vue;
-    const { createRouter, createWebHashHistory } = VueRouter;
+    const { createApp, ref, computed, onMounted } = Vue;
 
-    // ==================== Constants ====================
-    const THRESHOLDS = {
-      ph: { min: 6.5, max: 8.5, warningMin: 6.0, warningMax: 9.0 },
-      dissolvedOxygen: { min: 5.0, warningMin: 3.0 },
-      turbidity: { max: 5, warningMax: 10 },
-      ammoniaNitrogen: { max: 0.5, warningMax: 1.0, dangerMax: 2.0 }
-    };
-
-    const STATUS_MAP = {
-      excellent: { label: '优', color: 'excellent', bg: 'bg-emerald-500' },
-      good: { label: '良', color: 'good', bg: 'bg-blue-500' },
-      mild: { label: '轻度污染', color: 'mild', bg: 'bg-amber-500' },
-      moderate: { label: '中度污染', color: 'moderate', bg: 'bg-orange-500' },
-      severe: { label: '重度污染', color: 'severe', bg: 'bg-red-900' }
-    };
-
-    const OPERATIONAL_STATUS_MAP = {
-      online: { label: '在线', color: 'text-emerald-600', bg: 'bg-emerald-100', dot: 'bg-emerald-500' },
-      offline: { label: '离线', color: 'text-slate-600', bg: 'bg-slate-200', dot: 'bg-slate-400' },
-      alarm: { label: '告警', color: 'text-red-700', bg: 'bg-red-100', dot: 'bg-red-500' }
-    };
-
-    // ==================== Mock Data ====================
-    function generateMockData() {
-      const stations = [
-        {
-          id: 'st-001', name: '长江大桥监测点', lat: 30.59, lng: 114.30, region: '武昌区',
-          status: 'excellent', operationalStatus: 'online',
-          metrics: { ph: 7.4, dissolvedOxygen: 8.2, turbidity: 4, ammoniaNitrogen: 0.12 }
-        },
-        {
-          id: 'st-002', name: '汉江入江口', lat: 30.57, lng: 114.27, region: '汉阳区',
-          status: 'good', operationalStatus: 'online',
-          metrics: { ph: 7.1, dissolvedOxygen: 6.8, turbidity: 8, ammoniaNitrogen: 0.35 }
-        },
-        {
-          id: 'st-003', name: '东湖出口', lat: 30.55, lng: 114.37, region: '洪山区',
-          status: 'mild', operationalStatus: 'alarm',
-          metrics: { ph: 6.3, dissolvedOxygen: 4.5, turbidity: 15, ammoniaNitrogen: 0.65 }
-        },
-        {
-          id: 'st-004', name: '府河上游', lat: 30.72, lng: 114.22, region: '黄陂区',
-          status: 'moderate', operationalStatus: 'alarm',
-          metrics: { ph: 5.8, dissolvedOxygen: 3.2, turbidity: 35, ammoniaNitrogen: 1.2 }
-        },
-        {
-          id: 'st-005', name: '南湖中心', lat: 30.50, lng: 114.35, region: '洪山区',
-          status: 'mild', operationalStatus: 'online',
-          metrics: { ph: 7.8, dissolvedOxygen: 5.2, turbidity: 12, ammoniaNitrogen: 0.55 }
-        },
-        {
-          id: 'st-006', name: '汤逊湖入口', lat: 30.45, lng: 114.40, region: '江夏区',
-          status: 'severe', operationalStatus: 'offline',
-          metrics: { ph: 4.2, dissolvedOxygen: 1.5, turbidity: 65, ammoniaNitrogen: 3.8 }
-        }
-      ];
-
-      // Generate 30 days of hourly history for each station (720 points per station)
-      const history = {};
-      const now = new Date();
-      stations.forEach(station => {
-        history[station.id] = [];
-        for (let day = 29; day >= 0; day--) {
-          for (let hour = 23; hour >= 0; hour--) {
-            const date = new Date(now);
-            date.setDate(date.getDate() - day);
-            date.setHours(hour, 0, 0, 0);
-            const variation = () => (Math.random() - 0.5);
-            history[station.id].push({
-              timestamp: date.toISOString(),
-              metrics: {
-                ph: Math.max(4, Math.min(10, station.metrics.ph + variation() * 1.5)),
-                dissolvedOxygen: Math.max(0.5, Math.min(14, station.metrics.dissolvedOxygen + variation() * 3)),
-                turbidity: Math.max(0, station.metrics.turbidity + variation() * 15),
-                ammoniaNitrogen: Math.max(0, station.metrics.ammoniaNitrogen + variation() * 0.8)
-              }
-            });
-          }
-        }
-      });
-
-      return { stations, history };
-    }
-
-    // ==================== Utility Functions ====================
-    function getMetricStatus(metric, value) {
-      const t = THRESHOLDS[metric];
-      if (!t) return 'normal';
-
-      if (metric === 'ph') {
-        if (value < t.warningMin || value > t.warningMax) return 'danger';
-        if (value < t.min || value > t.max) return 'warning';
-      } else if (metric === 'dissolvedOxygen') {
-        if (value < t.warningMin) return 'danger';
-        if (value < t.min) return 'warning';
-      } else if (metric === 'turbidity') {
-        if (value > t.warningMax) return 'danger';
-        if (value > t.max) return 'warning';
-      } else if (metric === 'ammoniaNitrogen') {
-        if (t.dangerMax && value > t.dangerMax) return 'danger';
-        if (value > t.warningMax) return 'warning';
-        if (value > t.max) return 'warning';
-      }
-      return 'normal';
-    }
-
-    function calculateOverallStatus(metrics) {
-      const statuses = [
-        getMetricStatus('ph', metrics.ph),
-        getMetricStatus('dissolvedOxygen', metrics.dissolvedOxygen),
-        getMetricStatus('turbidity', metrics.turbidity),
-        getMetricStatus('ammoniaNitrogen', metrics.ammoniaNitrogen)
-      ];
-
-      const warningCount = statuses.filter(s => s === 'warning').length;
-      const dangerCount = statuses.filter(s => s === 'danger').length;
-
-      if (dangerCount >= 3 || metrics.ph < 5 || metrics.ph > 9.5) return 'severe';
-      if (warningCount >= 3 || dangerCount >= 2) return 'moderate';
-      if (warningCount >= 2 || dangerCount >= 1) return 'mild';
-      if (warningCount >= 1) return 'good';
-      return 'excellent';
-    }
-
-    function formatTime(iso) {
-      const d = new Date(iso);
-      return `${d.getHours().toString().padStart(2,'0')}:${d.getMinutes().toString().padStart(2,'0')}`;
-    }
-
-    function formatDate(iso) {
-      const d = new Date(iso);
-      return `${d.getMonth()+1}/${d.getDate()}`;
-    }
-
-    // ==================== Components ====================
-
-    // Dashboard Page
-    const DashboardPage = {
-      props: ['stations', 'stats', 'filters', 'operationalStats'],
-      emits: ['update-filters'],
+    // ── Indicator Card Component ───────────────────────────────────────
+    const IndicatorCard = {
+      name: 'IndicatorCard',
+      props: ['indicator'],
       setup(props) {
-        const qualityFilterOptions = [
-          { value: 'all', label: '全部水质' },
-          { value: 'excellent', label: '优' },
-          { value: 'good', label: '良' },
-          { value: 'mild', label: '轻度' },
-          { value: 'moderate', label: '中度' },
-          { value: 'severe', label: '重度' }
-        ];
+        const { indicator: ind } = props;
 
-        const operationalFilterOptions = [
-          { value: 'all', label: '全部状态' },
-          { value: 'online', label: '在线' },
-          { value: 'offline', label: '离线' },
-          { value: 'alarm', label: '告警' }
-        ];
-
-        const filteredStations = computed(() => {
-          return props.stations.filter(s => {
-            const qualityMatch = props.filters.quality === 'all' || s.status === props.filters.quality;
-            const opMatch = props.filters.operational === 'all' || s.operationalStatus === props.filters.operational;
-            return qualityMatch && opMatch;
-          });
+        const statusConfig = computed(() => {
+          if (ind.notReturned)  return { label: '未返回', dot: 'bg-slate-300', text: 'text-slate-400', border: 'border-slate-200', bg: 'bg-slate-50' };
+          if (ind.value == null) return { label: 'N/A',    dot: 'bg-slate-300', text: 'text-slate-400', border: 'border-slate-200', bg: 'bg-slate-50' };
+          if (ind.status === 'danger')  return { label: '异常', dot: 'bg-red-500',    text: 'text-red-600',    border: 'border-red-200',    bg: 'bg-red-50' };
+          if (ind.status === 'warning') return { label: '预警', dot: 'bg-amber-500',  text: 'text-amber-600',  border: 'border-amber-200',  bg: 'bg-amber-50' };
+          return { label: '正常', dot: 'bg-emerald-500', text: 'text-emerald-600', border: 'border-emerald-200', bg: 'bg-emerald-50' };
         });
 
-        return { qualityFilterOptions, operationalFilterOptions, filteredStations, STATUS_MAP, OPERATIONAL_STATUS_MAP, formatTime };
+        const iconBgClass = computed(() => {
+          if (ind.notReturned || ind.value == null) return 'bg-slate-100 text-slate-400';
+          if (ind.status === 'danger')  return 'bg-red-100 text-red-600';
+          if (ind.status === 'warning') return 'bg-amber-100 text-amber-600';
+          return 'bg-emerald-100 text-emerald-600';
+        });
+
+        const showTooltip = ref(false);
+
+        return { ind, statusConfig, iconBgClass, showTooltip };
       },
       template: `
-        <div class="max-w-6xl mx-auto p-4 space-y-4">
-          <!-- Operational Stats Bar -->
-          <div class="bg-white rounded-xl shadow-sm p-4 grid grid-cols-3 gap-2">
-            <div class="text-center">
-              <div class="text-2xl font-bold text-emerald-500">{{ operationalStats.online }}</div>
-              <div class="text-xs text-slate-500">在线</div>
-            </div>
-            <div class="text-center">
-              <div class="text-2xl font-bold text-red-500">{{ operationalStats.alarm }}</div>
-              <div class="text-xs text-slate-500">告警</div>
-            </div>
-            <div class="text-center">
-              <div class="text-2xl font-bold text-slate-400">{{ operationalStats.offline }}</div>
-              <div class="text-xs text-slate-500">离线</div>
-            </div>
-          </div>
-
-          <!-- Quality Stats Bar -->
-          <div class="bg-white rounded-xl shadow-sm p-4 grid grid-cols-4 gap-2">
-            <div class="text-center">
-              <div class="text-2xl font-bold text-emerald-500">{{ stats.excellent }}</div>
-              <div class="text-xs text-slate-500">优</div>
-            </div>
-            <div class="text-center">
-              <div class="text-2xl font-bold text-blue-500">{{ stats.good }}</div>
-              <div class="text-xs text-slate-500">良</div>
-            </div>
-            <div class="text-center">
-              <div class="text-2xl font-bold text-amber-500">{{ stats.mild + stats.moderate + stats.severe }}</div>
-              <div class="text-xs text-slate-500">污染</div>
-            </div>
-            <div class="text-center">
-              <div class="text-2xl font-bold text-sky-500">{{ stations.length }}</div>
-              <div class="text-xs text-slate-500">总计</div>
-            </div>
-          </div>
-
-          <!-- Filters -->
-          <div class="space-y-2">
-            <div class="flex gap-2 overflow-x-auto pb-1">
-              <button
-                v-for="opt in qualityFilterOptions"
-                :key="opt.value"
-                @click="$emit('update-filters', { quality: opt.value })"
-                class="px-4 py-2 rounded-full text-sm font-medium whitespace-nowrap transition-colors"
-                :class="filters.quality === opt.value ? 'bg-sky-500 text-white' : 'bg-white text-slate-600 hover:bg-slate-50'"
-              >
-                {{ opt.label }}
-              </button>
-            </div>
-            <div class="flex gap-2 overflow-x-auto pb-1">
-              <button
-                v-for="opt in operationalFilterOptions"
-                :key="opt.value"
-                @click="$emit('update-filters', { operational: opt.value })"
-                class="px-4 py-2 rounded-full text-sm font-medium whitespace-nowrap transition-colors border"
-                :class="filters.operational === opt.value ? 'bg-slate-800 text-white border-slate-800' : 'bg-white text-slate-600 border-slate-200 hover:bg-slate-50'"
-              >
-                {{ opt.label }}
-              </button>
-            </div>
-          </div>
-
-          <!-- Station Cards -->
-          <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-            <router-link
-              v-for="station in filteredStations"
-              :key="station.id"
-              :to="'/station/' + station.id"
-              class="station-card bg-white rounded-xl p-4 shadow-sm border-l-4"
-              :class="'border-' + station.status"
-            >
-              <div class="flex justify-between items-start mb-2">
-                <h3 class="font-semibold text-slate-800">{{ station.name }}</h3>
-                <div class="flex gap-1.5">
-                  <span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-semibold" :class="OPERATIONAL_STATUS_MAP[station.operationalStatus].bg + ' ' + OPERATIONAL_STATUS_MAP[station.operationalStatus].color">
-                    <span class="w-1.5 h-1.5 rounded-full" :class="OPERATIONAL_STATUS_MAP[station.operationalStatus].dot"></span>
-                    {{ OPERATIONAL_STATUS_MAP[station.operationalStatus].label }}
-                  </span>
-                  <span class="px-3 py-1 rounded-full text-xs font-semibold" :class="'status-' + station.status">
-                    {{ STATUS_MAP[station.status].label }}
-                  </span>
-                </div>
-              </div>
-              <div class="text-xs text-slate-500 mb-3 flex items-center gap-1">
-                <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z"/><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 11a3 3 0 11-6 0 3 3 0 016 0z"/></svg>
-                {{ station.region }}
-              </div>
-              <div class="grid grid-cols-4 gap-2 pt-3 border-t border-slate-100">
-                <div class="text-center">
-                  <div class="text-lg font-bold" :class="station.metrics.ph < 6.5 || station.metrics.ph > 8.5 ? 'text-amber-500' : 'text-emerald-500'">{{ station.metrics.ph.toFixed(1) }}</div>
-                  <div class="text-[10px] text-slate-400">pH</div>
-                </div>
-                <div class="text-center">
-                  <div class="text-lg font-bold" :class="station.metrics.dissolvedOxygen < 5 ? 'text-amber-500' : 'text-emerald-500'">{{ station.metrics.dissolvedOxygen.toFixed(1) }}</div>
-                  <div class="text-[10px] text-slate-400">DO</div>
-                </div>
-                <div class="text-center">
-                  <div class="text-lg font-bold" :class="station.metrics.turbidity > 5 ? 'text-amber-500' : 'text-emerald-500'">{{ station.metrics.turbidity.toFixed(0) }}</div>
-                  <div class="text-[10px] text-slate-400">浊度</div>
-                </div>
-                <div class="text-center">
-                  <div class="text-lg font-bold" :class="station.metrics.ammoniaNitrogen > 0.5 ? 'text-amber-500' : 'text-emerald-500'">{{ station.metrics.ammoniaNitrogen.toFixed(2) }}</div>
-                  <div class="text-[10px] text-slate-400">氨氮</div>
-                </div>
-              </div>
-            </router-link>
-          </div>
-
-          <!-- Empty State -->
-          <div v-if="filteredStations.length === 0" class="text-center py-12">
-            <svg class="w-16 h-16 mx-auto text-slate-300 mb-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9.172 16.172a4 4 0 015.656 0M9 10h.01M15 10h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
-            <p class="text-slate-500">暂无符合条件的站点</p>
-          </div>
-        </div>
-      `
-    };
-
-    // Station Detail Page
-    const StationDetailPage = {
-      props: ['stations', 'history'],
-      setup(props) {
-        const route = VueRouter.useRoute();
-        const router = VueRouter.useRouter();
-        const timeRange = ref('24h');
-        const chartInstance = ref(null);
-
-        const station = computed(() => {
-          return props.stations.find(s => s.id === route.params.id);
-        });
-
-        const stationHistory = computed(() => {
-          if (!station.value) return [];
-          const hist = props.history[station.value.id] || [];
-          if (timeRange.value === '24h') return hist.slice(-24);
-          if (timeRange.value === '7d') return hist.filter((_, i) => i % 24 === 23).slice(-7);
-          return hist.filter((_, i) => i % 24 === 23).slice(-30);
-        });
-
-        function getMetricStatusLocal(metric, value) {
-          return getMetricStatus(metric, value);
-        }
-
-        function getStatusColor(status) {
-          const colors = { normal: 'text-emerald-500', warning: 'text-amber-500', danger: 'text-red-500' };
-          return colors[status] || 'text-emerald-500';
-        }
-
-        function initChart() {
-          if (!chartInstance.value || !station.value) return;
-
-          const ctx = chartInstance.value.getContext('2d');
-          const data = stationHistory.value;
-
-          if (window.detailChart) {
-            window.detailChart.destroy();
-          }
-
-          window.detailChart = new Chart(ctx, {
-            type: 'line',
-            data: {
-              labels: data.map(d => timeRange.value === '24h' ? formatTime(d.timestamp) : formatDate(d.timestamp)),
-              datasets: [
-                {
-                  label: 'pH',
-                  data: data.map(d => d.metrics.ph),
-                  borderColor: '#0EA5E9',
-                  backgroundColor: 'rgba(14,165,233,0.1)',
-                  tension: 0.4,
-                  pointRadius: 3
-                },
-                {
-                  label: '溶解氧',
-                  data: data.map(d => d.metrics.dissolvedOxygen),
-                  borderColor: '#10B981',
-                  backgroundColor: 'rgba(16,185,129,0.1)',
-                  tension: 0.4,
-                  pointRadius: 3
-                },
-                {
-                  label: '浊度',
-                  data: data.map(d => d.metrics.turbidity),
-                  borderColor: '#F59E0B',
-                  backgroundColor: 'rgba(245,158,11,0.1)',
-                  tension: 0.4,
-                  pointRadius: 3,
-                  yAxisID: 'y1'
-                },
-                {
-                  label: '氨氮',
-                  data: data.map(d => d.metrics.ammoniaNitrogen),
-                  borderColor: '#EF4444',
-                  backgroundColor: 'rgba(239,68,68,0.1)',
-                  tension: 0.4,
-                  pointRadius: 3,
-                  yAxisID: 'y1'
-                }
-              ]
-            },
-            options: {
-              responsive: true,
-              maintainAspectRatio: false,
-              interaction: { mode: 'index', intersect: false },
-              plugins: {
-                legend: { position: 'top', labels: { usePointStyle: true, padding: 15 } }
-              },
-              scales: {
-                x: { grid: { display: false }, ticks: { font: { size: 11 } } },
-                y: { position: 'left', grid: { color: 'rgba(0,0,0,0.05)' }, ticks: { font: { size: 11 } } },
-                y1: { position: 'right', grid: { display: false }, ticks: { font: { size: 11 } } }
-              }
-            }
-          });
-        }
-
-        watch([station, timeRange], () => {
-          nextTick(() => initChart());
-        }, { immediate: true });
-
-        onUnmounted(() => {
-          if (window.detailChart) {
-            window.detailChart.destroy();
-            window.detailChart = null;
-          }
-        });
-
-        return { station, timeRange, chartInstance, router, getMetricStatusLocal, getStatusColor, STATUS_MAP };
-      },
-      template: `
-        <div v-if="station" class="max-w-6xl mx-auto p-4 space-y-4">
+        <div
+          class="card-hover bg-white rounded-2xl border p-4 shadow-sm transition-all duration-200 animate-fade-in-up relative"
+          :class="statusConfig.border"
+          @mouseenter="showTooltip = true"
+          @mouseleave="showTooltip = false"
+          @touchstart="showTooltip = !showTooltip"
+        >
           <!-- Header -->
-          <div class="flex items-center gap-3 mb-4">
-            <button @click="router.push('/')" class="p-2 rounded-lg bg-white shadow-sm hover:bg-slate-50">
-              <svg class="w-5 h-5 text-slate-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7"/></svg>
-            </button>
-            <div>
-              <h2 class="text-xl font-bold">{{ station.name }}</h2>
-              <p class="text-sm text-slate-500">{{ station.region }}</p>
+          <div class="flex items-center gap-3 mb-3">
+            <div class="w-10 h-10 rounded-xl flex items-center justify-center shrink-0" :class="iconBgClass">
+              <svg v-if="ind.icon === 'ph'" class="w-5 h-5" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" d="M9.75 3.104v5.714a2.25 2.25 0 01-.659 1.591L5 14.5M9.75 3.104c-.251.023-.501.05-.75.082m.75-.082a24.301 24.301 0 014.5 0m0 0v5.714c0 .597.237 1.17.659 1.591L19.8 15.3M14.25 3.104c.251.023.501.05.75.082M19.8 15.3l-1.57.393A9.065 9.065 0 0112 15a9.065 9.065 0 00-6.23.693L5 14.5m14.8.8l1.402 1.402c1.232 1.232.65 3.318-1.067 3.611A48.309 48.309 0 0112 21c-2.773 0-5.491-.235-8.135-.687-1.718-.293-2.3-2.379-1.067-3.61L5 14.5"/>
+              </svg>
+              <svg v-else-if="ind.icon === 'oxygen'" class="w-5 h-5" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" d="M12 3v2.25m6.364.386l-1.591 1.591M21 12h-2.25m-.386 6.364l-1.591-1.591M12 18.75V21m-4.773-4.227l-1.591 1.591M5.25 12H3m4.227-4.773L5.636 5.636M15.75 12a3.75 3.75 0 11-7.5 0 3.75 3.75 0 017.5 0z"/>
+              </svg>
+              <svg v-else-if="ind.icon === 'turbidity'" class="w-5 h-5" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" d="M3.75 13.5l10.5-11.25L12 10.5h8.25L9.75 21.75 12 13.5H3.75z"/>
+              </svg>
+              <svg v-else-if="ind.icon === 'ammonia'" class="w-5 h-5" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" d="M19.5 14.25v-2.625a3.375 3.375 0 00-3.375-3.375h-1.5A1.125 1.125 0 0113.5 7.125v-1.5a3.375 3.375 0 00-3.375-3.375H8.25m0 12.75h7.5m-7.5 3H12M10.5 2.25H5.625c-.621 0-1.125.504-1.125 1.125v17.25c0 .621.504 1.125 1.125 1.125h12.75c.621 0 1.125-.504 1.125-1.125V11.25a9 9 0 00-9-9z"/>
+              </svg>
+              <svg v-else-if="ind.icon === 'temp'" class="w-5 h-5" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" d="M15.362 5.214A8.252 8.252 0 0112 21 8.25 8.25 0 016.038 7.048 8.287 8.287 0 009 9.6a8.983 8.983 0 013.361-6.867 8.21 8.21 0 003 2.48z"/>
+                <path stroke-linecap="round" stroke-linejoin="round" d="M12 18a3.75 3.75 0 00.495-7.467 5.99 5.99 0 00-1.925 3.546 5.974 5.974 0 01-2.133-1A3.75 3.75 0 0012 18z"/>
+              </svg>
+              <svg v-else-if="ind.icon === 'conductance'" class="w-5 h-5" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" d="M3.75 13.5l10.5-11.25L12 10.5h8.25L9.75 21.75 12 13.5H3.75z"/>
+              </svg>
+              <svg v-else class="w-5 h-5" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" d="M9.594 3.94c.09-.542.56-.94 1.11-.94h2.593c.55 0 1.02.398 1.11.94l.213 1.281c.063.374.313.686.645.87.074.04.147.083.22.127.325.196.72.257 1.075.124l1.217-.456a1.125 1.125 0 011.37.49l1.296 2.247a1.125 1.125 0 01-.26 1.431l-1.003.827c-.293.241-.438.613-.43.992a7.723 7.723 0 010 .255c-.008.378.137.75.43.991l1.004.827c.424.35.534.955.26 1.431l-1.298 2.247a1.125 1.125 0 01-1.369.491l-1.217-.456c-.355-.133-.75-.072-1.076.124a6.47 6.47 0 01-.22.128c-.331.183-.581.495-.644.869l-.212 1.281c-.09.543-.56.941-1.11.941h-2.594c-.55 0-1.019-.398-1.11-.94l-.213-1.281c-.062-.374-.312-.686-.644-.87a6.52 6.52 0 01-.22-.127c-.325-.196-.72-.257-1.076-.124l-1.217.456a1.125 1.125 0 01-1.369-.49l-1.297-2.247a1.125 1.125 0 01.26-1.431l1.004-.827c.292-.24.437-.613.43-.991a6.932 6.932 0 010-.255c.007-.38-.138-.751-.43-.992l-1.004-.827a1.125 1.125 0 01-.26-1.431l1.297-2.247a1.125 1.125 0 011.37-.491l1.216.456c.356.133.751.072 1.076-.124.072-.044.146-.087.22-.128.332-.183.582-.495.644-.869l.214-1.28z"/>
+                <path stroke-linecap="round" stroke-linejoin="round" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"/>
+              </svg>
             </div>
-            <div class="ml-auto flex gap-1.5">
-              <span class="inline-flex items-center gap-1 px-2 py-1 rounded-full text-xs font-semibold" :class="OPERATIONAL_STATUS_MAP[station.operationalStatus].bg + ' ' + OPERATIONAL_STATUS_MAP[station.operationalStatus].color">
-                <span class="w-1.5 h-1.5 rounded-full" :class="OPERATIONAL_STATUS_MAP[station.operationalStatus].dot"></span>
-                {{ OPERATIONAL_STATUS_MAP[station.operationalStatus].label }}
-              </span>
-              <span class="px-3 py-1 rounded-full text-sm font-semibold" :class="'status-' + station.status">
-                {{ STATUS_MAP[station.status].label }}
-              </span>
+            <div class="flex-1 min-w-0">
+              <h4 class="text-sm font-semibold text-slate-900 truncate">{{ ind.name }}</h4>
+              <p class="text-xs text-slate-500">{{ ind.nameEn }}</p>
             </div>
-          </div>
-
-          <!-- Metrics Grid -->
-          <div class="grid grid-cols-2 lg:grid-cols-4 gap-3">
-            <div class="bg-white rounded-xl p-4 shadow-sm text-center">
-              <div class="text-xs text-slate-500 mb-1">pH 值</div>
-              <div class="text-3xl font-bold" :class="getStatusColor(getMetricStatusLocal('ph', station.metrics.ph))">{{ station.metrics.ph.toFixed(2) }}</div>
-              <div class="text-xs text-slate-400 mt-1">正常 6.5-8.5</div>
-              <div class="h-1.5 bg-slate-100 rounded-full mt-2 overflow-hidden">
-                <div class="h-full rounded-full transition-all" :class="getMetricStatusLocal('ph', station.metrics.ph) === 'normal' ? 'bg-emerald-500' : getMetricStatusLocal('ph', station.metrics.ph) === 'warning' ? 'bg-amber-500' : 'bg-red-500'" :style="{width: Math.min(station.metrics.ph / 14 * 100, 100) + '%'}"></div>
-              </div>
-            </div>
-            <div class="bg-white rounded-xl p-4 shadow-sm text-center">
-              <div class="text-xs text-slate-500 mb-1">溶解氧</div>
-              <div class="text-3xl font-bold" :class="getStatusColor(getMetricStatusLocal('dissolvedOxygen', station.metrics.dissolvedOxygen))">{{ station.metrics.dissolvedOxygen.toFixed(1) }}<span class="text-sm font-normal text-slate-400"> mg/L</span></div>
-              <div class="text-xs text-slate-400 mt-1">正常 ≥5.0</div>
-              <div class="h-1.5 bg-slate-100 rounded-full mt-2 overflow-hidden">
-                <div class="h-full rounded-full transition-all" :class="getMetricStatusLocal('dissolvedOxygen', station.metrics.dissolvedOxygen) === 'normal' ? 'bg-emerald-500' : getMetricStatusLocal('dissolvedOxygen', station.metrics.dissolvedOxygen) === 'warning' ? 'bg-amber-500' : 'bg-red-500'" :style="{width: Math.min(station.metrics.dissolvedOxygen / 12 * 100, 100) + '%'}"></div>
-              </div>
-            </div>
-            <div class="bg-white rounded-xl p-4 shadow-sm text-center">
-              <div class="text-xs text-slate-500 mb-1">浊度</div>
-              <div class="text-3xl font-bold" :class="getStatusColor(getMetricStatusLocal('turbidity', station.metrics.turbidity))">{{ station.metrics.turbidity.toFixed(0) }}<span class="text-sm font-normal text-slate-400"> NTU</span></div>
-              <div class="text-xs text-slate-400 mt-1">正常 ≤5</div>
-              <div class="h-1.5 bg-slate-100 rounded-full mt-2 overflow-hidden">
-                <div class="h-full rounded-full transition-all" :class="getMetricStatusLocal('turbidity', station.metrics.turbidity) === 'normal' ? 'bg-emerald-500' : getMetricStatusLocal('turbidity', station.metrics.turbidity) === 'warning' ? 'bg-amber-500' : 'bg-red-500'" :style="{width: Math.min(station.metrics.turbidity / 60 * 100, 100) + '%'}"></div>
-              </div>
-            </div>
-            <div class="bg-white rounded-xl p-4 shadow-sm text-center">
-              <div class="text-xs text-slate-500 mb-1">氨氮</div>
-              <div class="text-3xl font-bold" :class="getStatusColor(getMetricStatusLocal('ammoniaNitrogen', station.metrics.ammoniaNitrogen))">{{ station.metrics.ammoniaNitrogen.toFixed(2) }}<span class="text-sm font-normal text-slate-400"> mg/L</span></div>
-              <div class="text-xs text-slate-400 mt-1">正常 ≤0.5</div>
-              <div class="h-1.5 bg-slate-100 rounded-full mt-2 overflow-hidden">
-                <div class="h-full rounded-full transition-all" :class="getMetricStatusLocal('ammoniaNitrogen', station.metrics.ammoniaNitrogen) === 'normal' ? 'bg-emerald-500' : getMetricStatusLocal('ammoniaNitrogen', station.metrics.ammoniaNitrogen) === 'warning' ? 'bg-amber-500' : 'bg-red-500'" :style="{width: Math.min(station.metrics.ammoniaNitrogen / 3 * 100, 100) + '%'}"></div>
-              </div>
+            <div class="flex items-center gap-1.5 shrink-0">
+              <span class="w-2 h-2 rounded-full" :class="statusConfig.dot"></span>
+              <span class="text-xs font-medium" :class="statusConfig.text">{{ statusConfig.label }}</span>
             </div>
           </div>
 
-          <!-- Chart -->
-          <div class="bg-white rounded-xl shadow-sm p-4">
-            <div class="flex justify-between items-center mb-4">
-              <h3 class="font-semibold">历史趋势</h3>
-              <div class="flex gap-1 bg-slate-100 rounded-lg p-1">
-                <button @click="timeRange = '7d'" class="px-3 py-1.5 rounded-md text-sm transition-colors" :class="timeRange === '7d' ? 'bg-white text-sky-600 shadow-sm font-medium' : 'text-slate-500 hover:text-slate-700'">7天</button>
-                <button @click="timeRange = '30d'" class="px-3 py-1.5 rounded-md text-sm transition-colors" :class="timeRange === '30d' ? 'bg-white text-sky-600 shadow-sm font-medium' : 'text-slate-500 hover:text-slate-700'">30天</button>
-              </div>
-            </div>
-            <div class="chart-container">
-              <canvas ref="chartInstance"></canvas>
-            </div>
+          <!-- Value -->
+          <div class="flex items-baseline gap-2">
+            <span class="text-3xl font-bold tracking-tight" :class="ind.value == null || ind.notReturned ? 'text-slate-400' : 'text-slate-900'">
+              {{ ind.displayValue }}
+            </span>
+            <span v-if="ind.unit && !ind.notReturned" class="text-sm text-slate-500 font-medium">{{ ind.unit }}</span>
           </div>
 
-          <!-- Info -->
-          <div class="bg-white rounded-xl shadow-sm p-4">
-            <h3 class="font-semibold mb-3">指标说明</h3>
-            <div class="space-y-2 text-sm">
-              <div class="flex justify-between py-2 border-b border-slate-100">
-                <span class="text-slate-600">pH 值</span>
-                <span class="text-slate-500">6.5 - 8.5 为正常范围</span>
-              </div>
-              <div class="flex justify-between py-2 border-b border-slate-100">
-                <span class="text-slate-600">溶解氧 (DO)</span>
-                <span class="text-slate-500">≥ 5.0 mg/L 为正常</span>
-              </div>
-              <div class="flex justify-between py-2 border-b border-slate-100">
-                <span class="text-slate-600">浊度</span>
-                <span class="text-slate-500">≤ 10 NTU 为正常</span>
-              </div>
-              <div class="flex justify-between py-2">
-                <span class="text-slate-600">氨氮</span>
-                <span class="text-slate-500">≤ 0.5 mg/L 为Ⅰ类水标准</span>
-              </div>
-            </div>
+          <!-- Timestamp -->
+          <p v-if="ind.timestamp && !ind.notReturned" class="text-xs text-slate-400 mt-1.5">
+            测量时间：{{ formatTime(ind.timestamp) }}
+          </p>
+
+          <!-- Tooltip -->
+          <div
+            v-if="ind.notReturned || ind.value == null"
+            v-show="showTooltip"
+            class="absolute z-20 bottom-full left-1/2 -translate-x-1/2 mb-2 w-56 px-3 py-2 bg-slate-800 text-white text-xs rounded-lg shadow-lg"
+          >
+            <p v-if="ind.notReturned">USGS API 未返回此参数数据。该站点可能未监测此项指标。</p>
+            <p v-else>API 返回了此参数但数值为空（null）。可能是传感器暂时离线。</p>
+            <div class="absolute top-full left-1/2 -translate-x-1/2 -mt-1 border-4 border-transparent border-t-slate-800"></div>
           </div>
         </div>
-
-        <!-- Not Found -->
-        <div v-else class="text-center py-12">
-          <p class="text-slate-500">站点不存在</p>
-          <router-link to="/" class="text-sky-500 mt-2 inline-block">返回首页</router-link>
-        </div>
-      `
+      `,
     };
 
-    // Compare Page
-    const ComparePage = {
-      props: ['stations', 'history'],
-      setup(props) {
-        const selectedStations = ref([]);
-        const radarChartInstance = ref(null);
+    // ── Main App ───────────────────────────────────────────────────────
+    createApp({
+      components: { IndicatorCard },
+      setup() {
+        const loading = ref(false);
+        const error = ref('');
+        const lastUpdated = ref('');
+        const rawData = ref(null);
 
-        const availableStations = computed(() => {
-          return props.stations.map(s => ({ id: s.id, name: s.name, status: s.status }));
-        });
-
-        const selectedData = computed(() => {
-          return props.stations.filter(s => selectedStations.value.includes(s.id));
-        });
-
-        function toggleStation(id) {
-          if (selectedStations.value.includes(id)) {
-            selectedStations.value = selectedStations.value.filter(sid => sid !== id);
-          } else if (selectedStations.value.length < 4) {
-            selectedStations.value.push(id);
-          }
-        }
-
-        function getScore(metrics) {
-          let score = 100;
-          if (metrics.ph < 6.5 || metrics.ph > 8.5) score -= 15;
-          if (metrics.ph < 6.0 || metrics.ph > 9.0) score -= 25;
-          if (metrics.dissolvedOxygen < 5) score -= 15;
-          if (metrics.dissolvedOxygen < 3) score -= 25;
-          if (metrics.turbidity > 10) score -= 15;
-          if (metrics.turbidity > 50) score -= 25;
-          if (metrics.ammoniaNitrogen > 0.5) score -= 15;
-          if (metrics.ammoniaNitrogen > 1.0) score -= 25;
-          return Math.max(0, score);
-        }
-
-        function initRadarChart() {
-          if (!radarChartInstance.value || selectedData.value.length === 0) return;
-
-          const ctx = radarChartInstance.value.getContext('2d');
-
-          if (window.radarChart) {
-            window.radarChart.destroy();
-          }
-
-          const colors = ['#0EA5E9', '#10B981', '#F59E0B', '#EF4444'];
-
-          window.radarChart = new Chart(ctx, {
-            type: 'radar',
-            data: {
-              labels: ['pH稳定性', '溶解氧', '浊度清澈度', '氨氮控制'],
-              datasets: selectedData.value.map((s, i) => ({
-                label: s.name,
-                data: [
-                  Math.max(0, 100 - Math.abs(s.metrics.ph - 7.5) * 30),
-                  Math.min(100, s.metrics.dissolvedOxygen * 12),
-                  Math.max(0, 100 - s.metrics.turbidity * 2),
-                  Math.max(0, 100 - s.metrics.ammoniaNitrogen * 40)
-                ],
-                borderColor: colors[i % colors.length],
-                backgroundColor: colors[i % colors.length] + '20',
-                pointRadius: 3
-              }))
-            },
-            options: {
-              responsive: true,
-              maintainAspectRatio: false,
-              plugins: {
-                legend: { position: 'top', labels: { usePointStyle: true } }
-              },
-              scales: {
-                r: {
-                  beginAtZero: true,
-                  max: 100,
-                  ticks: { stepSize: 25, font: { size: 10 } }
-                }
-              }
-            }
-          });
-        }
-
-        watch(selectedData, () => {
-          nextTick(() => initRadarChart());
-        }, { deep: true });
-
-        onUnmounted(() => {
-          if (window.radarChart) {
-            window.radarChart.destroy();
-            window.radarChart = null;
-          }
-        });
-
-        return { selectedStations, availableStations, selectedData, toggleStation, getScore, radarChartInstance, STATUS_MAP };
-      },
-      template: `
-        <div class="max-w-6xl mx-auto p-4 space-y-4">
-          <h2 class="text-xl font-bold">数据对比</h2>
-
-          <!-- Station Selector -->
-          <div class="bg-white rounded-xl shadow-sm p-4">
-            <h3 class="font-semibold mb-3">选择站点（最多4个）</h3>
-            <div class="flex flex-wrap gap-2">
-              <button
-                v-for="s in availableStations"
-                :key="s.id"
-                @click="toggleStation(s.id)"
-                class="px-3 py-2 rounded-lg text-sm font-medium transition-all border-2"
-                :class="selectedStations.includes(s.id) ? 'border-sky-500 bg-sky-50 text-sky-700' : 'border-slate-200 bg-white text-slate-600 hover:border-slate-300'"
-              >
-                {{ s.name }}
-              </button>
-            </div>
-          </div>
-
-          <!-- Radar Chart -->
-          <div v-if="selectedData.length > 0" class="bg-white rounded-xl shadow-sm p-4">
-            <h3 class="font-semibold mb-4">综合评分雷达图</h3>
-            <div class="chart-container" style="height: 300px;">
-              <canvas ref="radarChartInstance"></canvas>
-            </div>
-          </div>
-
-          <!-- Comparison Table -->
-          <div v-if="selectedData.length > 0" class="bg-white rounded-xl shadow-sm p-4 overflow-x-auto">
-            <h3 class="font-semibold mb-4">详细对比</h3>
-            <table class="w-full text-sm">
-              <thead>
-                <tr class="border-b border-slate-200">
-                  <th class="text-left py-2 px-2">指标</th>
-                  <th v-for="s in selectedData" :key="s.id" class="text-center py-2 px-2">{{ s.name }}</th>
-                </tr>
-              </thead>
-              <tbody>
-                <tr class="border-b border-slate-100">
-                  <td class="py-2 px-2 text-slate-600">状态</td>
-                  <td v-for="s in selectedData" :key="s.id" class="text-center py-2 px-2">
-                    <span class="px-2 py-0.5 rounded-full text-xs font-semibold" :class="'status-' + s.status">{{ STATUS_MAP[s.status].label }}</span>
-                  </td>
-                </tr>
-                <tr class="border-b border-slate-100">
-                  <td class="py-2 px-2 text-slate-600">pH</td>
-                  <td v-for="s in selectedData" :key="s.id" class="text-center py-2 px-2 font-mono">{{ s.metrics.ph.toFixed(2) }}</td>
-                </tr>
-                <tr class="border-b border-slate-100">
-                  <td class="py-2 px-2 text-slate-600">溶解氧</td>
-                  <td v-for="s in selectedData" :key="s.id" class="text-center py-2 px-2 font-mono">{{ s.metrics.dissolvedOxygen.toFixed(1) }}</td>
-                </tr>
-                <tr class="border-b border-slate-100">
-                  <td class="py-2 px-2 text-slate-600">浊度</td>
-                  <td v-for="s in selectedData" :key="s.id" class="text-center py-2 px-2 font-mono">{{ s.metrics.turbidity.toFixed(0) }}</td>
-                </tr>
-                <tr class="border-b border-slate-100">
-                  <td class="py-2 px-2 text-slate-600">氨氮</td>
-                  <td v-for="s in selectedData" :key="s.id" class="text-center py-2 px-2 font-mono">{{ s.metrics.ammoniaNitrogen.toFixed(2) }}</td>
-                </tr>
-                <tr>
-                  <td class="py-2 px-2 text-slate-600 font-medium">综合评分</td>
-                  <td v-for="s in selectedData" :key="s.id" class="text-center py-2 px-2 font-bold" :class="getScore(s.metrics) >= 80 ? 'text-emerald-500' : getScore(s.metrics) >= 60 ? 'text-amber-500' : 'text-red-500'">{{ getScore(s.metrics) }}</td>
-                </tr>
-              </tbody>
-            </table>
-          </div>
-
-          <!-- Empty State -->
-          <div v-if="selectedData.length === 0" class="text-center py-12 bg-white rounded-xl shadow-sm">
-            <svg class="w-16 h-16 mx-auto text-slate-300 mb-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"/></svg>
-            <p class="text-slate-500">请选择至少一个站点进行对比</p>
-          </div>
-        </div>
-      `
-    };
-
-    // Trends Page
-    const TrendsPage = {
-      props: ['stations', 'history'],
-      setup(props) {
-        const timeRange = ref('7d');
-        const selectedMetric = ref('ph');
-        const selectedStations = ref([]);
-        const trendChartInstance = ref(null);
-
-        const metricOptions = [
-          { value: 'ph', label: 'pH 值' },
-          { value: 'dissolvedOxygen', label: '溶解氧' },
-          { value: 'turbidity', label: '浊度' },
-          { value: 'ammoniaNitrogen', label: '氨氮' }
-        ];
-
-        const metricColors = {
-          ph: '#0EA5E9',
-          dissolvedOxygen: '#10B981',
-          turbidity: '#F59E0B',
-          ammoniaNitrogen: '#EF4444'
+        // Parameter definitions
+        const PARAMS = {
+          '00400':  { name: 'pH 值',            nameEn: 'pH',                   unit: '',     icon: 'ph',         type: 'ph' },
+          '00300':  { name: '溶解氧',           nameEn: 'Dissolved Oxygen',     unit: 'mg/L', icon: 'oxygen',     type: 'do' },
+          '63680':  { name: '浊度',             nameEn: 'Turbidity',            unit: 'NTU',  icon: 'turbidity',  type: 'turbidity' },
+          '00608':  { name: '氨氮',             nameEn: 'Ammonia Nitrogen',     unit: 'mg/L', icon: 'ammonia',    type: 'ammonia' },
+          '00610':  { name: '氨氮 (alt)',       nameEn: 'Ammonia Nitrogen',     unit: 'mg/L', icon: 'ammonia',    type: 'ammonia' },
+          '00010':  { name: '水温',             nameEn: 'Water Temperature',    unit: '°C',   icon: 'temp',       type: 'temp' },
+          '00095':  { name: '比电导率',         nameEn: 'Specific Conductance', unit: 'μS/cm',icon: 'conductance',type: 'conductance' },
         };
 
-        const stationColors = ['#0EA5E9', '#10B981', '#F59E0B', '#EF4444', '#8B5CF6', '#EC4899'];
+        function formatTime(iso) {
+          if (!iso) return '';
+          const d = new Date(iso);
+          if (isNaN(d)) return iso;
+          const pad = n => String(n).padStart(2, '0');
+          return `${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())} ${pad(d.getHours())}:${pad(d.getMinutes())}`;
+        }
 
-        onMounted(() => {
-          selectedStations.value = props.stations.slice(0, 3).map(s => s.id);
-        });
-
-        function toggleStation(id) {
-          if (selectedStations.value.includes(id)) {
-            selectedStations.value = selectedStations.value.filter(sid => sid !== id);
-          } else {
-            selectedStations.value.push(id);
+        function evaluateStatus(type, value) {
+          if (value == null) return 'na';
+          switch (type) {
+            case 'ph':        return (value >= 6.5 && value <= 8.5) ? 'normal' : (value >= 6.0 && value <= 9.0) ? 'warning' : 'danger';
+            case 'do':        return value >= 5.0 ? 'normal' : value >= 3.0 ? 'warning' : 'danger';
+            case 'turbidity': return value <= 5 ? 'normal' : value <= 50 ? 'warning' : 'danger';
+            case 'ammonia':   return value <= 0.5 ? 'normal' : value <= 2.0 ? 'warning' : 'danger';
+            case 'temp':      return value >= 0 && value <= 35 ? 'normal' : 'warning';
+            case 'conductance': return value >= 50 && value <= 1500 ? 'normal' : 'warning';
+            default: return 'normal';
           }
         }
 
-        function initTrendChart() {
-          if (!trendChartInstance.value || selectedStations.value.length === 0) return;
+        function buildIndicators() {
+          if (!rawData.value) return { main: [], supplementary: [] };
 
-          const ctx = trendChartInstance.value.getContext('2d');
+          const ts = rawData.value.value?.timeSeries || [];
+          const byParam = {};
 
-          if (window.trendChart) {
-            window.trendChart.destroy();
-          }
+          ts.forEach(series => {
+            const vInfo = series.variable || {};
+            const pcode = String(vInfo.variableCode?.[0]?.value || '');
+            if (!pcode) return;
 
-          const days = timeRange.value === '7d' ? 7 : 30;
-
-          const datasets = selectedStations.value.map((stationId, i) => {
-            const station = props.stations.find(s => s.id === stationId);
-            const hist = (props.history[stationId] || []).slice(-days);
-            return {
-              label: station ? station.name : stationId,
-              data: hist.map(d => d.metrics[selectedMetric.value]),
-              borderColor: stationColors[i % stationColors.length],
-              backgroundColor: stationColors[i % stationColors.length] + '10',
-              tension: 0.4,
-              pointRadius: 2,
-              borderWidth: 2
+            const vals = series.values?.[0]?.value || [];
+            const latest = vals[vals.length - 1];
+            byParam[pcode] = {
+              value: latest?.value != null ? parseFloat(latest.value) : null,
+              timestamp: latest?.dateTime || null,
             };
           });
 
-          const firstHist = props.history[selectedStations.value[0]] || [];
-          const labels = firstHist.slice(-days).map(d => formatDate(d.timestamp));
+          const makeInd = (pcode) => {
+            const meta = PARAMS[pcode];
+            const data = byParam[pcode];
+            const notReturned = !data;
+            const val = data?.value ?? null;
+            return {
+              param: pcode,
+              name: meta.name,
+              nameEn: meta.nameEn,
+              unit: meta.unit,
+              icon: meta.icon,
+              value: val,
+              displayValue: notReturned ? '未返回' : (val == null ? 'N/A' : String(val)),
+              timestamp: data?.timestamp || null,
+              status: evaluateStatus(meta.type, val),
+              notReturned,
+            };
+          };
 
-          window.trendChart = new Chart(ctx, {
-            type: 'line',
-            data: { labels, datasets },
-            options: {
-              responsive: true,
-              maintainAspectRatio: false,
-              interaction: { mode: 'index', intersect: false },
-              plugins: {
-                legend: { position: 'top', labels: { usePointStyle: true, padding: 15 } }
-              },
-              scales: {
-                x: { grid: { display: false }, ticks: { font: { size: 11 } } },
-                y: { grid: { color: 'rgba(0,0,0,0.05)' }, ticks: { font: { size: 11 } } }
-              }
-            }
-          });
-        }
-
-        watch([timeRange, selectedMetric, selectedStations], () => {
-          nextTick(() => initTrendChart());
-        }, { deep: true });
-
-        onUnmounted(() => {
-          if (window.trendChart) {
-            window.trendChart.destroy();
-            window.trendChart = null;
+          // Ammonia: prefer 00608, fallback 00610
+          let ammoniaInd = makeInd('00608');
+          if (ammoniaInd.notReturned) {
+            const alt = makeInd('00610');
+            if (!alt.notReturned) ammoniaInd = alt;
           }
-        });
 
-        return { timeRange, selectedMetric, selectedStations, metricOptions, trendChartInstance, toggleStation, stations: props.stations };
-      },
-      template: `
-        <div class="max-w-6xl mx-auto p-4 space-y-4">
-          <h2 class="text-xl font-bold">趋势分析</h2>
+          const main = [
+            makeInd('00400'),
+            makeInd('00300'),
+            makeInd('63680'),
+            ammoniaInd,
+          ];
 
-          <!-- Controls -->
-          <div class="bg-white rounded-xl shadow-sm p-4 space-y-3">
-            <!-- Metric Selector -->
-            <div>
-              <label class="text-sm font-medium text-slate-600 mb-2 block">选择指标</label>
-              <div class="flex flex-wrap gap-2">
-                <button
-                  v-for="m in metricOptions"
-                  :key="m.value"
-                  @click="selectedMetric = m.value"
-                  class="px-4 py-2 rounded-lg text-sm font-medium transition-all"
-                  :class="selectedMetric === m.value ? 'bg-sky-500 text-white' : 'bg-slate-100 text-slate-600 hover:bg-slate-200'"
-                >
-                  {{ m.label }}
-                </button>
-              </div>
-            </div>
+          const supplementary = [
+            makeInd('00010'),
+            makeInd('00095'),
+          ];
 
-            <!-- Time Range -->
-            <div>
-              <label class="text-sm font-medium text-slate-600 mb-2 block">时间范围</label>
-              <div class="flex gap-2">
-                <button @click="timeRange = '7d'" class="px-4 py-2 rounded-lg text-sm font-medium transition-all" :class="timeRange === '7d' ? 'bg-sky-500 text-white' : 'bg-slate-100 text-slate-600 hover:bg-slate-200'">7天</button>
-                <button @click="timeRange = '30d'" class="px-4 py-2 rounded-lg text-sm font-medium transition-all" :class="timeRange === '30d' ? 'bg-sky-500 text-white' : 'bg-slate-100 text-slate-600 hover:bg-slate-200'">30天</button>
-              </div>
-            </div>
-
-            <!-- Station Selector -->
-            <div>
-              <label class="text-sm font-medium text-slate-600 mb-2 block">选择站点</label>
-              <div class="flex flex-wrap gap-2">
-                <button
-                  v-for="s in stations"
-                  :key="s.id"
-                  @click="toggleStation(s.id)"
-                  class="px-3 py-2 rounded-lg text-sm font-medium transition-all border-2"
-                  :class="selectedStations.includes(s.id) ? 'border-sky-500 bg-sky-50 text-sky-700' : 'border-slate-200 bg-white text-slate-600 hover:border-slate-300'"
-                >
-                  {{ s.name }}
-                </button>
-              </div>
-            </div>
-          </div>
-
-          <!-- Chart -->
-          <div v-if="selectedStations.length > 0" class="bg-white rounded-xl shadow-sm p-4">
-            <div class="chart-container">
-              <canvas ref="trendChartInstance"></canvas>
-            </div>
-          </div>
-
-          <!-- Empty State -->
-          <div v-else class="text-center py-12 bg-white rounded-xl shadow-sm">
-            <svg class="w-16 h-16 mx-auto text-slate-300 mb-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 12l3-3 3 3 4-4M8 21l4-4 4 4M3 4h18M4 4h16v12a1 1 0 01-1 1H5a1 1 0 01-1-1V4z"/></svg>
-            <p class="text-slate-500">请选择至少一个站点查看趋势</p>
-          </div>
-        </div>
-      `
-    };
-
-    // ==================== Router ====================
-    const routes = [
-      { path: '/', component: DashboardPage, props: true },
-      { path: '/station/:id', component: StationDetailPage, props: true },
-      { path: '/compare', component: ComparePage, props: true },
-      { path: '/trends', component: TrendsPage, props: true }
-    ];
-
-    const router = createRouter({
-      history: createWebHashHistory(),
-      routes
-    });
-
-    // ==================== App ====================
-    createApp({
-      setup() {
-        const stations = ref([]);
-        const history = ref({});
-        const filters = ref({ quality: 'all', operational: 'all' });
-        let refreshInterval = null;
-
-        const stationCount = computed(() => stations.value.length);
-
-        const stats = computed(() => {
-          const result = { excellent: 0, good: 0, mild: 0, moderate: 0, severe: 0 };
-          stations.value.forEach(s => result[s.status]++);
-          return result;
-        });
-
-        const operationalStats = computed(() => {
-          const result = { online: 0, offline: 0, alarm: 0 };
-          stations.value.forEach(s => result[s.operationalStatus]++);
-          return result;
-        });
-
-        const lastUpdate = computed(() => {
-          const now = new Date();
-          return `${now.getHours().toString().padStart(2,'0')}:${now.getMinutes().toString().padStart(2,'0')}`;
-        });
-
-        function updateFilters(newFilters) {
-          filters.value = { ...filters.value, ...newFilters };
+          return { main, supplementary };
         }
 
-        function refreshData() {
-          stations.value.forEach(s => {
-            s.metrics.ph = Math.max(4, Math.min(10, s.metrics.ph + (Math.random() - 0.5) * 0.3));
-            s.metrics.dissolvedOxygen = Math.max(0.5, s.metrics.dissolvedOxygen + (Math.random() - 0.5) * 0.5);
-            s.metrics.turbidity = Math.max(0, s.metrics.turbidity + (Math.random() - 0.5) * 2);
-            s.metrics.ammoniaNitrogen = Math.max(0, s.metrics.ammoniaNitrogen + (Math.random() - 0.5) * 0.1);
-            s.status = calculateOverallStatus(s.metrics);
-          });
+        const indicators = computed(() => buildIndicators().main);
+        const supplementary = computed(() => buildIndicators().supplementary);
+
+        const siteStatusLabel = computed(() => {
+          if (loading.value) return '加载中';
+          if (error.value) return '离线';
+          const all = [...indicators.value, ...supplementary.value];
+          const hasDanger = all.some(i => i.status === 'danger');
+          const hasWarning = all.some(i => i.status === 'warning');
+          if (hasDanger) return '异常';
+          if (hasWarning) return '预警';
+          return '正常';
+        });
+
+        const siteStatusDotClass = computed(() => {
+          if (loading.value) return 'bg-slate-300';
+          if (error.value) return 'bg-red-500';
+          const all = [...indicators.value, ...supplementary.value];
+          const hasDanger = all.some(i => i.status === 'danger');
+          const hasWarning = all.some(i => i.status === 'warning');
+          if (hasDanger) return 'bg-red-500';
+          if (hasWarning) return 'bg-amber-500';
+          return 'bg-emerald-500';
+        });
+
+        const siteStatusTextClass = computed(() => {
+          if (loading.value) return 'text-slate-400';
+          if (error.value) return 'text-red-600';
+          const all = [...indicators.value, ...supplementary.value];
+          const hasDanger = all.some(i => i.status === 'danger');
+          const hasWarning = all.some(i => i.status === 'warning');
+          if (hasDanger) return 'text-red-600';
+          if (hasWarning) return 'text-amber-600';
+          return 'text-emerald-600';
+        });
+
+        async function fetchData() {
+          loading.value = true;
+          error.value = '';
+          const controller = new AbortController();
+          const timeoutId = setTimeout(() => controller.abort(), 15000);
+
+          try {
+            const url = 'https://waterservices.usgs.gov/nwis/iv/?format=json&sites=01304562&parameterCd=00010,00095,00300,00400,63680,00608,00610&siteStatus=all';
+            const res = await fetch(url, { signal: controller.signal });
+            clearTimeout(timeoutId);
+
+            if (!res.ok) {
+              throw new Error(`API 错误：HTTP ${res.status} ${res.statusText}`);
+            }
+
+            const json = await res.json();
+            rawData.value = json;
+            lastUpdated.value = new Date().toLocaleString('zh-CN');
+          } catch (err) {
+            if (err.name === 'AbortError') {
+              error.value = '请求超时，请检查网络连接后重试。';
+            } else if (err.message?.includes('Failed to fetch') || err.message?.includes('NetworkError')) {
+              error.value = '网络连接失败，请检查网络后重试。';
+            } else {
+              error.value = err.message || '未知错误，请稍后重试。';
+            }
+          } finally {
+            loading.value = false;
+            clearTimeout(timeoutId);
+          }
         }
 
         onMounted(() => {
-          const mock = generateMockData();
-          stations.value = mock.stations;
-          history.value = mock.history;
-
-          // Hide skeleton
-          document.getElementById('skeleton-screen').style.display = 'none';
-
-          // Auto refresh every 5 minutes
-          refreshInterval = setInterval(refreshData, 300000);
-        });
-
-        onUnmounted(() => {
-          if (refreshInterval) clearInterval(refreshInterval);
+          fetchData();
         });
 
         return {
-          stations, history, filters, stationCount, stats, operationalStats, lastUpdate,
-          updateFilters, refreshData
+          loading,
+          error,
+          lastUpdated,
+          indicators,
+          supplementary,
+          siteStatusLabel,
+          siteStatusDotClass,
+          siteStatusTextClass,
+          fetchData,
+          formatTime,
         };
-      }
-    }).use(router).mount('#app');
+      },
+    }).mount('#app');
   </script>
 </body>
 </html>
