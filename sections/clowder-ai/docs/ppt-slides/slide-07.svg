@@ -154,9 +154,9 @@
     <!-- Legend -->
     <g transform="translate(500, 55)">
       <circle cx="0" cy="0" r="5" fill="#00A8E8"/>
-      <text x="12" y="4" font-family="'Noto Sans SC', sans-serif" font-size="12" fill="#6B7280">青龙溪上游</text>
-      <circle cx="100" cy="0" r="5" fill="#F59E0B"/>
-      <text x="112" y="4" font-family="'Noto Sans SC', sans-serif" font-size="12" fill="#6B7280">黄石工业园段</text>
+      <text x="12" y="4" font-family="'Noto Sans SC', sans-serif" font-size="12" fill="#6B7280">长江大桥监测点</text>
+      <circle cx="130" cy="0" r="5" fill="#F59E0B"/>
+      <text x="142" y="4" font-family="'Noto Sans SC', sans-serif" font-size="12" fill="#6B7280">府河上游</text>
     </g>
   </g>
 

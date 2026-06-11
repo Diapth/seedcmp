@@ -123,7 +123,7 @@
   <!-- Bottom info bar -->
   <rect x="80" y="620" width="1760" height="60" rx="8" fill="#FFFFFF" filter="url(#cardShadow)"/>
   <text x="120" y="658" font-family="'Noto Sans SC', sans-serif" font-size="16" fill="#0A2540" font-weight="600">监测站点：</text>
-  <text x="220" y="658" font-family="'Noto Sans SC', sans-serif" font-size="16" fill="#6B7280">青龙溪上游 · 红旗镇段 · 蓝河市段 · 黄石工业园段 · 碧水湾入江口</text>
+  <text x="220" y="658" font-family="'Noto Sans SC', sans-serif" font-size="16" fill="#6B7280">长江大桥监测点 · 汉江入江口 · 东湖出口 · 府河上游 · 南湖中心 · 汤逊湖入口</text>
   <text x="1400" y="658" font-family="'Noto Sans SC', sans-serif" font-size="16" fill="#00A8E8" font-weight="500">历史趋势: 7天 / 30天 切换 →</text>
 
   <!-- Page number -->

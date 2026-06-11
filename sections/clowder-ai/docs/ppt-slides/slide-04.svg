@@ -91,7 +91,7 @@
     <g transform="translate(40, 300)">
       <rect x="0" y="0" width="200" height="50" rx="8" fill="#FFFFFF" opacity="0.15"/>
       <circle cx="25" cy="25" r="8" fill="#10B981"/>
-      <text x="45" y="22" font-family="'Noto Sans SC', sans-serif" font-size="10" fill="#FFFFFF">青龙溪上游</text>
+      <text x="45" y="22" font-family="'Noto Sans SC', sans-serif" font-size="10" fill="#FFFFFF">长江大桥监测点</text>
       <text x="45" y="38" font-family="'Noto Sans SC', sans-serif" font-size="9" fill="#FFFFFF" opacity="0.7">状态正常</text>
     </g>
 
