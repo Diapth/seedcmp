@@ -176,54 +176,57 @@
       const stations = [
         {
           id: 'st-001', name: '长江大桥监测点', lat: 30.59, lng: 114.30, region: '武昌区',
-          status: 'excellent',
+          status: 'excellent', operationalStatus: 'online',
           metrics: { ph: 7.4, dissolvedOxygen: 8.2, turbidity: 4, ammoniaNitrogen: 0.12 }
         },
         {
           id: 'st-002', name: '汉江入江口', lat: 30.57, lng: 114.27, region: '汉阳区',
-          status: 'good',
+          status: 'good', operationalStatus: 'online',
           metrics: { ph: 7.1, dissolvedOxygen: 6.8, turbidity: 8, ammoniaNitrogen: 0.35 }
         },
         {
           id: 'st-003', name: '东湖出口', lat: 30.55, lng: 114.37, region: '洪山区',
-          status: 'mild',
+          status: 'mild', operationalStatus: 'alarm',
           metrics: { ph: 6.3, dissolvedOxygen: 4.5, turbidity: 15, ammoniaNitrogen: 0.65 }
         },
         {
           id: 'st-004', name: '府河上游', lat: 30.72, lng: 114.22, region: '黄陂区',
-          status: 'moderate',
+          status: 'moderate', operationalStatus: 'alarm',
           metrics: { ph: 5.8, dissolvedOxygen: 3.2, turbidity: 35, ammoniaNitrogen: 1.2 }
         },
         {
           id: 'st-005', name: '南湖中心', lat: 30.50, lng: 114.35, region: '洪山区',
-          status: 'mild',
+          status: 'mild', operationalStatus: 'online',
           metrics: { ph: 7.8, dissolvedOxygen: 5.2, turbidity: 12, ammoniaNitrogen: 0.55 }
         },
         {
           id: 'st-006', name: '汤逊湖入口', lat: 30.45, lng: 114.40, region: '江夏区',
-          status: 'severe',
+          status: 'severe', operationalStatus: 'offline',
           metrics: { ph: 4.2, dissolvedOxygen: 1.5, turbidity: 65, ammoniaNitrogen: 3.8 }
         }
       ];
 
-      // Generate 30 days of history for each station
+      // Generate 30 days of hourly history for each station (720 points per station)
       const history = {};
       const now = new Date();
       stations.forEach(station => {
         history[station.id] = [];
-        for (let i = 29; i >= 0; i--) {
-          const date = new Date(now);
-          date.setDate(date.getDate() - i);
-          const variation = () => (Math.random() - 0.5);
-          history[station.id].push({
-            timestamp: date.toISOString(),
-            metrics: {
-              ph: Math.max(4, Math.min(10, station.metrics.ph + variation() * 1.5)),
-              dissolvedOxygen: Math.max(0.5, station.metrics.dissolvedOxygen + variation() * 3),
-              turbidity: Math.max(0, station.metrics.turbidity + variation() * 15),
-              ammoniaNitrogen: Math.max(0, station.metrics.ammoniaNitrogen + variation() * 0.8)
-            }
-          });
+        for (let day = 29; day >= 0; day--) {
+          for (let hour = 23; hour >= 0; hour--) {
+            const date = new Date(now);
+            date.setDate(date.getDate() - day);
+            date.setHours(hour, 0, 0, 0);
+            const variation = () => (Math.random() - 0.5);
+            history[station.id].push({
+              timestamp: date.toISOString(),
+              metrics: {
+                ph: Math.max(4, Math.min(10, station.metrics.ph + variation() * 1.5)),
+                dissolvedOxygen: Math.max(0.5, Math.min(14, station.metrics.dissolvedOxygen + variation() * 3)),
+                turbidity: Math.max(0, station.metrics.turbidity + variation() * 15),
+                ammoniaNitrogen: Math.max(0, station.metrics.ammoniaNitrogen + variation() * 0.8)
+              }
+            });
+          }
         }
       });
 
@@ -284,11 +287,11 @@
 
     // Dashboard Page
     const DashboardPage = {
-      props: ['stations', 'stats', 'filters'],
+      props: ['stations', 'stats', 'filters', 'operationalStats'],
       emits: ['update-filters'],
       setup(props, { emit }) {
-        const filterOptions = [
-          { value: 'all', label: '全部' },
+        const qualityFilterOptions = [
+          { value: 'all', label: '全部水质' },
           { value: 'excellent', label: '优' },
           { value: 'good', label: '良' },
           { value: 'mild', label: '轻度' },
@@ -296,16 +299,42 @@
           { value: 'severe', label: '重度' }
         ];
 
+        const operationalFilterOptions = [
+          { value: 'all', label: '全部状态' },
+          { value: 'online', label: '在线' },
+          { value: 'offline', label: '离线' },
+          { value: 'alarm', label: '告警' }
+        ];
+
         const filteredStations = computed(() => {
-          if (props.filters.status === 'all') return props.stations;
-          return props.stations.filter(s => s.status === props.filters.status);
+          return props.stations.filter(s => {
+            const qualityMatch = props.filters.quality === 'all' || s.status === props.filters.quality;
+            const opMatch = props.filters.operational === 'all' || s.operationalStatus === props.filters.operational;
+            return qualityMatch && opMatch;
+          });
         });
 
-        return { filterOptions, filteredStations, STATUS_MAP, formatTime };
+        return { qualityFilterOptions, operationalFilterOptions, filteredStations, STATUS_MAP, OPERATIONAL_STATUS_MAP, formatTime };
       },
       template: `
         <div class="max-w-6xl mx-auto p-4 space-y-4">
-          <!-- Stats Bar -->
+          <!-- Operational Stats Bar -->
+          <div class="bg-white rounded-xl shadow-sm p-4 grid grid-cols-3 gap-2">
+            <div class="text-center">
+              <div class="text-2xl font-bold text-emerald-500">{{ operationalStats.online }}</div>
+              <div class="text-xs text-slate-500">在线</div>
+            </div>
+            <div class="text-center">
+              <div class="text-2xl font-bold text-red-500">{{ operationalStats.alarm }}</div>
+              <div class="text-xs text-slate-500">告警</div>
+            </div>
+            <div class="text-center">
+              <div class="text-2xl font-bold text-slate-400">{{ operationalStats.offline }}</div>
+              <div class="text-xs text-slate-500">离线</div>
+            </div>
+          </div>
+
+          <!-- Quality Stats Bar -->
           <div class="bg-white rounded-xl shadow-sm p-4 grid grid-cols-4 gap-2">
             <div class="text-center">
               <div class="text-2xl font-bold text-emerald-500">{{ stats.excellent }}</div>
@@ -325,17 +354,30 @@
             </div>
           </div>
 
-          <!-- Filter -->
-          <div class="flex gap-2 overflow-x-auto pb-1">
-            <button
-              v-for="opt in filterOptions"
-              :key="opt.value"
-              @click="$emit('update-filters', { status: opt.value })"
-              class="px-4 py-2 rounded-full text-sm font-medium whitespace-nowrap transition-colors"
-              :class="filters.status === opt.value ? 'bg-sky-500 text-white' : 'bg-white text-slate-600 hover:bg-slate-50'"
-            >
-              {{ opt.label }}
-            </button>
+          <!-- Filters -->
+          <div class="space-y-2">
+            <div class="flex gap-2 overflow-x-auto pb-1">
+              <button
+                v-for="opt in qualityFilterOptions"
+                :key="opt.value"
+                @click="$emit('update-filters', { quality: opt.value })"
+                class="px-4 py-2 rounded-full text-sm font-medium whitespace-nowrap transition-colors"
+                :class="filters.quality === opt.value ? 'bg-sky-500 text-white' : 'bg-white text-slate-600 hover:bg-slate-50'"
+              >
+                {{ opt.label }}
+              </button>
+            </div>
+            <div class="flex gap-2 overflow-x-auto pb-1">
+              <button
+                v-for="opt in operationalFilterOptions"
+                :key="opt.value"
+                @click="$emit('update-filters', { operational: opt.value })"
+                class="px-4 py-2 rounded-full text-sm font-medium whitespace-nowrap transition-colors border"
+                :class="filters.operational === opt.value ? 'bg-slate-800 text-white border-slate-800' : 'bg-white text-slate-600 border-slate-200 hover:bg-slate-50'"
+              >
+                {{ opt.label }}
+              </button>
+            </div>
           </div>
 
           <!-- Station Cards -->
@@ -349,9 +391,15 @@
             >
               <div class="flex justify-between items-start mb-2">
                 <h3 class="font-semibold text-slate-800">{{ station.name }}</h3>
-                <span class="px-3 py-1 rounded-full text-xs font-semibold" :class="'status-' + station.status">
-                  {{ STATUS_MAP[station.status].label }}
-                </span>
+                <div class="flex gap-1.5">
+                  <span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-semibold" :class="OPERATIONAL_STATUS_MAP[station.operationalStatus].bg + ' ' + OPERATIONAL_STATUS_MAP[station.operationalStatus].color">
+                    <span class="w-1.5 h-1.5 rounded-full" :class="OPERATIONAL_STATUS_MAP[station.operationalStatus].dot"></span>
+                    {{ OPERATIONAL_STATUS_MAP[station.operationalStatus].label }}
+                  </span>
+                  <span class="px-3 py-1 rounded-full text-xs font-semibold" :class="'status-' + station.status">
+                    {{ STATUS_MAP[station.status].label }}
+                  </span>
+                </div>
               </div>
               <div class="text-xs text-slate-500 mb-3 flex items-center gap-1">
                 <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z"/><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 11a3 3 0 11-6 0 3 3 0 016 0z"/></svg>
@@ -367,7 +415,7 @@
                   <div class="text-[10px] text-slate-400">DO</div>
                 </div>
                 <div class="text-center">
-                  <div class="text-lg font-bold" :class="station.metrics.turbidity > 10 ? 'text-amber-500' : 'text-emerald-500'">{{ station.metrics.turbidity.toFixed(0) }}</div>
+                  <div class="text-lg font-bold" :class="station.metrics.turbidity > 5 ? 'text-amber-500' : 'text-emerald-500'">{{ station.metrics.turbidity.toFixed(0) }}</div>
                   <div class="text-[10px] text-slate-400">浊度</div>
                 </div>
                 <div class="text-center">
@@ -403,9 +451,9 @@
         const stationHistory = computed(() => {
           if (!station.value) return [];
           const hist = props.history[station.value.id] || [];
-          if (timeRange.value === '24h') return hist.slice(-1);
-          if (timeRange.value === '7d') return hist.slice(-7);
-          return hist;
+          if (timeRange.value === '24h') return hist.slice(-24);
+          if (timeRange.value === '7d') return hist.filter((_, i) => i % 24 === 23).slice(-7);
+          return hist.filter((_, i) => i % 24 === 23).slice(-30);
         });
 
         function getMetricStatusLocal(metric, value) {
@@ -430,7 +478,7 @@
           window.detailChart = new Chart(ctx, {
             type: 'line',
             data: {
-              labels: data.map(d => formatDate(d.timestamp)),
+              labels: data.map(d => timeRange.value === '24h' ? formatTime(d.timestamp) : formatDate(d.timestamp)),
               datasets: [
                 {
                   label: 'pH',
@@ -508,9 +556,15 @@
               <h2 class="text-xl font-bold">{{ station.name }}</h2>
               <p class="text-sm text-slate-500">{{ station.region }}</p>
             </div>
-            <span class="ml-auto px-3 py-1 rounded-full text-sm font-semibold" :class="'status-' + station.status">
-              {{ STATUS_MAP[station.status].label }}
-            </span>
+            <div class="ml-auto flex gap-1.5">
+              <span class="inline-flex items-center gap-1 px-2 py-1 rounded-full text-xs font-semibold" :class="OPERATIONAL_STATUS_MAP[station.operationalStatus].bg + ' ' + OPERATIONAL_STATUS_MAP[station.operationalStatus].color">
+                <span class="w-1.5 h-1.5 rounded-full" :class="OPERATIONAL_STATUS_MAP[station.operationalStatus].dot"></span>
+                {{ OPERATIONAL_STATUS_MAP[station.operationalStatus].label }}
+              </span>
+              <span class="px-3 py-1 rounded-full text-sm font-semibold" :class="'status-' + station.status">
+                {{ STATUS_MAP[station.status].label }}
+              </span>
+            </div>
           </div>
 
           <!-- Metrics Grid -->
@@ -534,7 +588,7 @@
             <div class="bg-white rounded-xl p-4 shadow-sm text-center">
               <div class="text-xs text-slate-500 mb-1">浊度</div>
               <div class="text-3xl font-bold" :class="getStatusColor(getMetricStatusLocal('turbidity', station.metrics.turbidity))">{{ station.metrics.turbidity.toFixed(0) }}<span class="text-sm font-normal text-slate-400"> NTU</span></div>
-              <div class="text-xs text-slate-400 mt-1">正常 ≤10</div>
+              <div class="text-xs text-slate-400 mt-1">正常 ≤5</div>
               <div class="h-1.5 bg-slate-100 rounded-full mt-2 overflow-hidden">
                 <div class="h-full rounded-full transition-all" :class="getMetricStatusLocal('turbidity', station.metrics.turbidity) === 'normal' ? 'bg-emerald-500' : getMetricStatusLocal('turbidity', station.metrics.turbidity) === 'warning' ? 'bg-amber-500' : 'bg-red-500'" :style="{width: Math.min(station.metrics.turbidity / 60 * 100, 100) + '%'}"></div>
               </div>
@@ -945,7 +999,7 @@
       setup() {
         const stations = ref([]);
         const history = ref({});
-        const filters = ref({ status: 'all' });
+        const filters = ref({ quality: 'all', operational: 'all' });
         let refreshInterval = null;
 
         const stationCount = computed(() => stations.value.length);
