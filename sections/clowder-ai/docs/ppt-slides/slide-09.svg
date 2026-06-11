@@ -1,0 +1,196 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1920 1080" width="1920" height="1080">
+  <defs>
+    <!-- Background gradient -->
+    <linearGradient id="bgGrad9" x1="0%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%" stop-color="#F0F4F8"/>
+      <stop offset="100%" stop-color="#FFFFFF"/>
+    </linearGradient>
+
+    <!-- Card shadow -->
+    <filter id="cardShadow" x="-10%" y="-10%" width="120%" height="130%">
+      <feDropShadow dx="0" dy="4" stdDeviation="8" flood-color="#0A2540" flood-opacity="0.08"/>
+    </filter>
+
+    <!-- Upward gradient for value cards -->
+    <linearGradient id="valueGrad1" x1="0%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%" stop-color="#10B981" stop-opacity="0.1"/>
+      <stop offset="100%" stop-color="#10B981" stop-opacity="0.02"/>
+    </linearGradient>
+    <linearGradient id="valueGrad2" x1="0%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%" stop-color="#00A8E8" stop-opacity="0.1"/>
+      <stop offset="100%" stop-color="#00A8E8" stop-opacity="0.02"/>
+    </linearGradient>
+    <linearGradient id="valueGrad3" x1="0%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%" stop-color="#F59E0B" stop-opacity="0.1"/>
+      <stop offset="100%" stop-color="#F59E0B" stop-opacity="0.02"/>
+    </linearGradient>
+
+    <!-- Arrow marker -->
+    <marker id="arrowHead" markerWidth="10" markerHeight="7" refX="9" refY="3.5" orient="auto">
+      <polygon points="0 0, 10 3.5, 0 7" fill="#10B981"/>
+    </marker>
+  </defs>
+
+  <!-- Background -->
+  <rect width="1920" height="1080" fill="url(#bgGrad9)"/>
+
+  <!-- Top accent bar -->
+  <rect x="80" y="60" width="80" height="6" rx="3" fill="#10B981"/>
+
+  <!-- Page title -->
+  <text x="80" y="110" font-family="'Noto Sans SC', 'PingFang SC', 'Microsoft YaHei', sans-serif" font-size="40" font-weight="700" fill="#0A2540">
+    从"事后追溯"到"实时预警"，管理效能全面升级
+  </text>
+  <text x="80" y="155" font-family="'Noto Sans SC', 'PingFang SC', 'Microsoft YaHei', sans-serif" font-size="22" font-weight="400" fill="#6B7280">
+    效率提升 · 响应加速 · 成本可控
+  </text>
+
+  <!-- ===== THREE VALUE CARDS ===== -->
+  <!-- Card 1: Efficiency -->
+  <g transform="translate(80, 200)">
+    <rect width="540" height="380" rx="12" fill="url(#valueGrad1)" filter="url(#cardShadow)"/>
+    <rect x="0" y="0" width="4" height="380" rx="2" fill="#10B981"/>
+
+    <!-- Icon circle -->
+    <circle cx="50" cy="50" r="24" fill="#10B981" opacity="0.1"/>
+    <text x="50" y="58" text-anchor="middle" font-family="'Noto Sans SC', sans-serif" font-size="20" fill="#10B981" font-weight="600">⚡</text>
+
+    <text x="90" y="45" font-family="'Noto Sans SC', sans-serif" font-size="20" font-weight="600" fill="#0A2540">效率提升</text>
+    <text x="90" y="70" font-family="'Noto Sans SC', sans-serif" font-size="14" fill="#6B7280">监测时效质的飞跃</text>
+
+    <!-- Before/After comparison -->
+    <g transform="translate(30, 110)">
+      <!-- Before -->
+      <rect x="0" y="0" width="220" height="100" rx="8" fill="#FFFFFF"/>
+      <text x="110" y="30" text-anchor="middle" font-family="'Noto Sans SC', sans-serif" font-size="12" fill="#6B7280">传统方式</text>
+      <text x="110" y="60" text-anchor="middle" font-family="'DIN 1451', monospace" font-size="28" font-weight="700" fill="#6B7280">24h+</text>
+      <text x="110" y="82" text-anchor="middle" font-family="'Noto Sans SC', sans-serif" font-size="12" fill="#9CA3AF">人工采样周期</text>
+
+      <!-- Arrow -->
+      <line x1="240" y1="50" x2="270" y2="50" stroke="#10B981" stroke-width="2" marker-end="url(#arrowHead)"/>
+
+      <!-- After -->
+      <rect x="280" y="0" width="220" height="100" rx="8" fill="#FFFFFF"/>
+      <rect x="280" y="0" width="220" height="4" rx="2" fill="#10B981"/>
+      <text x="390" y="30" text-anchor="middle" font-family="'Noto Sans SC', sans-serif" font-size="12" fill="#10B981" font-weight="500">RiverWatch</text>
+      <text x="390" y="60" text-anchor="middle" font-family="'DIN 1451', monospace" font-size="28" font-weight="700" fill="#10B981">5min</text>
+      <text x="390" y="82" text-anchor="middle" font-family="'Noto Sans SC', sans-serif" font-size="12" fill="#6B7280">自动刷新</text>
+    </g>
+
+    <!-- Key metrics -->
+    <g transform="translate(30, 230)">
+      <rect x="0" y="0" width="235" height="60" rx="8" fill="#FFFFFF"/>
+      <text x="20" y="28" font-family="'DIN 1451', monospace" font-size="20" font-weight="700" fill="#10B981">实时</text>
+      <text x="20" y="48" font-family="'Noto Sans SC', sans-serif" font-size="12" fill="#6B7280">数据刷新频率</text>
+
+      <rect x="255" y="0" width="235" height="60" rx="8" fill="#FFFFFF"/>
+      <text x="275" y="28" font-family="'DIN 1451', monospace" font-size="20" font-weight="700" fill="#10B981">5站点</text>
+      <text x="275" y="48" font-family="'Noto Sans SC', sans-serif" font-size="12" fill="#6B7280">同步监测覆盖</text>
+    </g>
+
+    <!-- Bottom highlight -->
+    <text x="30" y="330" font-family="'Noto Sans SC', sans-serif" font-size="14" fill="#0A2540" font-weight="500">
+      从"日报"到"实时"，数据时效提升 <tspan fill="#10B981" font-weight="700">288 倍</tspan>
+    </text>
+  </g>
+
+  <!-- Card 2: Response Speed -->
+  <g transform="translate(660, 200)">
+    <rect width="540" height="380" rx="12" fill="url(#valueGrad2)" filter="url(#cardShadow)"/>
+    <rect x="0" y="0" width="4" height="380" rx="2" fill="#00A8E8"/>
+
+    <circle cx="50" cy="50" r="24" fill="#00A8E8" opacity="0.1"/>
+    <text x="50" y="58" text-anchor="middle" font-family="'Noto Sans SC', sans-serif" font-size="20" fill="#00A8E8" font-weight="600">🚨</text>
+
+    <text x="90" y="45" font-family="'Noto Sans SC', sans-serif" font-size="20" font-weight="600" fill="#0A2540">响应加速</text>
+    <text x="90" y="70" font-family="'Noto Sans SC', sans-serif" font-size="14" fill="#6B7280">异常发现分钟级感知</text>
+
+    <!-- Before/After comparison -->
+    <g transform="translate(30, 110)">
+      <rect x="0" y="0" width="220" height="100" rx="8" fill="#FFFFFF"/>
+      <text x="110" y="30" text-anchor="middle" font-family="'Noto Sans SC', sans-serif" font-size="12" fill="#6B7280">传统方式</text>
+      <text x="110" y="60" text-anchor="middle" font-family="'DIN 1451', monospace" font-size="28" font-weight="700" fill="#6B7280">4-6h</text>
+      <text x="110" y="82" text-anchor="middle" font-family="'Noto Sans SC', sans-serif" font-size="12" fill="#9CA3AF">异常上报周期</text>
+
+      <line x1="240" y1="50" x2="270" y2="50" stroke="#00A8E8" stroke-width="2" marker-end="url(#arrowHead)"/>
+
+      <rect x="280" y="0" width="220" height="100" rx="8" fill="#FFFFFF"/>
+      <rect x="280" y="0" width="220" height="4" rx="2" fill="#00A8E8"/>
+      <text x="390" y="30" text-anchor="middle" font-family="'Noto Sans SC', sans-serif" font-size="12" fill="#00A8E8" font-weight="500">RiverWatch</text>
+      <text x="390" y="60" text-anchor="middle" font-family="'DIN 1451', monospace" font-size="28" font-weight="700" fill="#00A8E8">秒级</text>
+      <text x="390" y="82" text-anchor="middle" font-family="'Noto Sans SC', sans-serif" font-size="12" fill="#6B7280">超标自动标红</text>
+    </g>
+
+    <g transform="translate(30, 230)">
+      <rect x="0" y="0" width="235" height="60" rx="8" fill="#FFFFFF"/>
+      <text x="20" y="28" font-family="'DIN 1451', monospace" font-size="20" font-weight="700" fill="#00A8E8">自动</text>
+      <text x="20" y="48" font-family="'Noto Sans SC', sans-serif" font-size="12" fill="#6B7280">超标预警机制</text>
+
+      <rect x="255" y="0" width="235" height="60" rx="8" fill="#FFFFFF"/>
+      <text x="275" y="28" font-family="'DIN 1451', monospace" font-size="20" font-weight="700" fill="#00A8E8">趋势预判</text>
+      <text x="275" y="48" font-family="'Noto Sans SC', sans-serif" font-size="12" fill="#6B7280">图表提前预警</text>
+    </g>
+
+    <text x="30" y="330" font-family="'Noto Sans SC', sans-serif" font-size="14" fill="#0A2540" font-weight="500">
+      从"小时级"到"分钟级"，响应速度提升 <tspan fill="#00A8E8" font-weight="700">60 倍</tspan>
+    </text>
+  </g>
+
+  <!-- Card 3: Cost Control -->
+  <g transform="translate(1240, 200)">
+    <rect width="540" height="380" rx="12" fill="url(#valueGrad3)" filter="url(#cardShadow)"/>
+    <rect x="0" y="0" width="4" height="380" rx="2" fill="#F59E0B"/>
+
+    <circle cx="50" cy="50" r="24" fill="#F59E0B" opacity="0.1"/>
+    <text x="50" y="58" text-anchor="middle" font-family="'Noto Sans SC', sans-serif" font-size="20" fill="#F59E0B" font-weight="600">💰</text>
+
+    <text x="90" y="45" font-family="'Noto Sans SC', sans-serif" font-size="20" font-weight="600" fill="#0A2540">成本可控</text>
+    <text x="90" y="70" font-family="'Noto Sans SC', sans-serif" font-size="14" fill="#6B7280">零服务器成本，维护极简</text>
+
+    <!-- Before/After comparison -->
+    <g transform="translate(30, 110)">
+      <rect x="0" y="0" width="220" height="100" rx="8" fill="#FFFFFF"/>
+      <text x="110" y="30" text-anchor="middle" font-family="'Noto Sans SC', sans-serif" font-size="12" fill="#6B7280">传统方式</text>
+      <text x="110" y="60" text-anchor="middle" font-family="'DIN 1451', monospace" font-size="28" font-weight="700" fill="#6B7280">¥5万+/年</text>
+      <text x="110" y="82" text-anchor="middle" font-family="'Noto Sans SC', sans-serif" font-size="12" fill="#9CA3AF">服务器+运维</text>
+
+      <line x1="240" y1="50" x2="270" y2="50" stroke="#F59E0B" stroke-width="2" marker-end="url(#arrowHead)"/>
+
+      <rect x="280" y="0" width="220" height="100" rx="8" fill="#FFFFFF"/>
+      <rect x="280" y="0" width="220" height="4" rx="2" fill="#F59E0B"/>
+      <text x="390" y="30" text-anchor="middle" font-family="'Noto Sans SC', sans-serif" font-size="12" fill="#F59E0B" font-weight="500">RiverWatch</text>
+      <text x="390" y="60" text-anchor="middle" font-family="'DIN 1451', monospace" font-size="28" font-weight="700" fill="#F59E0B">¥0</text>
+      <text x="390" y="82" text-anchor="middle" font-family="'Noto Sans SC', sans-serif" font-size="12" fill="#6B7280">CDN 免费托管</text>
+    </g>
+
+    <g transform="translate(30, 230)">
+      <rect x="0" y="0" width="235" height="60" rx="8" fill="#FFFFFF"/>
+      <text x="20" y="28" font-family="'DIN 1451', monospace" font-size="20" font-weight="700" fill="#F59E0B">单文件</text>
+      <text x="20" y="48" font-family="'Noto Sans SC', sans-serif" font-size="12" fill="#6B7280">更新只需替换</text>
+
+      <rect x="255" y="0" width="235" height="60" rx="8" fill="#FFFFFF"/>
+      <text x="275" y="28" font-family="'DIN 1451', monospace" font-size="20" font-weight="700" fill="#F59E0B">可扩展</text>
+      <text x="275" y="48" font-family="'Noto Sans SC', sans-serif" font-size="12" fill="#6B7280">对接物联网传感器</text>
+    </g>
+
+    <text x="30" y="330" font-family="'Noto Sans SC', sans-serif" font-size="14" fill="#0A2540" font-weight="500">
+      首年节省服务器成本 <tspan fill="#F59E0B" font-weight="700">¥50,000+</tspan>，ROI 立竿见影
+    </text>
+  </g>
+
+  <!-- ===== BOTTOM: Summary Bar ===== -->
+  <g transform="translate(80, 620)">
+    <rect x="0" y="0" width="1760" height="80" rx="12" fill="#0A2540" filter="url(#cardShadow)"/>
+
+    <text x="40" y="35" font-family="'Noto Sans SC', sans-serif" font-size="14" fill="#6B7280">核心升级</text>
+    <text x="40" y="60" font-family="'Noto Sans SC', sans-serif" font-size="18" font-weight="600" fill="#FFFFFF">
+      从"事后追溯"到"实时预警" · 从"人工巡检"到"自动监测" · 从"分散报表"到"统一看板"
+    </text>
+
+    <text x="1600" y="35" font-family="'Noto Sans SC', sans-serif" font-size="14" fill="#6B7280">管理效能</text>
+    <text x="1600" y="60" font-family="'DIN 1451', monospace" font-size="24" font-weight="700" fill="#10B981">全面提升</text>
+  </g>
+
+  <!-- Page number -->
+  <text x="1840" y="1050" text-anchor="end" font-family="'DIN 1451', monospace" font-size="14" fill="#6B7280">09 / 10</text>
+</svg>
