@@ -240,7 +240,7 @@ GET https://waterservices.usgs.gov/nwis/iv/
 
 ### 9.1 参考链接
 - [USGS NWIS 即时值服务文档](https://waterservices.usgs.gov/rest/IV-Service.html)
-- [USGS 参数码查询](https://help.waterdata.usgs.gov/parameter_cd?group_cd=%)
+- [USGS 参数码查询](https://help.waterdata.usgs.gov/parameter_cd?group_cd=PHY)
 - [站点 01304562 信息页](https://waterdata.usgs.gov/nwis/inventory?site_no=01304562)
 
 ### 9.2 术语表
