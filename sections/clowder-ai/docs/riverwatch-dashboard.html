@@ -1,0 +1,561 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <meta name="description" content="RiverWatch - 河流水质数据可视化看板">
+  <title>RiverWatch 水质监测</title>
+
+  <!-- Preconnect to CDN -->
+  <link rel="preconnect" href="https://cdn.bootcdn.net" crossorigin>
+
+  <!-- Critical CSS Inline (Performance Optimization) -->
+  <style>
+    /* Reset & Base */
+    *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+    html{-webkit-text-size-adjust:100%;-webkit-tap-highlight-color:transparent}
+    body{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,"Helvetica Neue",Arial,sans-serif;background:#f0f4f8;color:#1a202c;line-height:1.5;min-height:100vh}
+
+    /* Skeleton Screen (visible before JS loads) */
+    .skeleton{background:linear-gradient(90deg,#e2e8f0 25%,#edf2f7 50%,#e2e8f0 75%);background-size:200% 100%;animation:skeleton-loading 1.5s infinite;border-radius:8px}
+    @keyframes skeleton-loading{0%{background-position:200% 0}100%{background-position:-200% 0}}
+
+    /* App Shell */
+    #app{min-height:100vh;display:flex;flex-direction:column}
+    .app-header{background:linear-gradient(135deg,#00A8E8 0%,#0077b6 100%);color:#fff;padding:16px;position:sticky;top:0;z-index:100;box-shadow:0 2px 8px rgba(0,0,0,0.1)}
+    .app-header h1{font-size:20px;font-weight:700;display:flex;align-items:center;gap:8px}
+    .app-header .subtitle{font-size:12px;opacity:.9;margin-top:2px}
+
+    /* Stats Bar */
+    .stats-bar{display:flex;gap:12px;padding:12px 16px;background:#fff;margin:12px;border-radius:12px;box-shadow:0 1px 3px rgba(0,0,0,0.08)}
+    .stat-item{flex:1;text-align:center}
+    .stat-value{font-size:24px;font-weight:700;line-height:1}
+    .stat-value.normal{color:#00C897}
+    .stat-value.warning{color:#FF9F1C}
+    .stat-value.danger{color:#E84855}
+    .stat-label{font-size:11px;color:#718096;margin-top:4px}
+
+    /* Station Cards */
+    .station-list{padding:0 12px 12px;display:flex;flex-direction:column;gap:10px}
+    .station-card{background:#fff;border-radius:12px;padding:14px;box-shadow:0 1px 3px rgba(0,0,0,0.08);cursor:pointer;transition:transform .15s,box-shadow .15s;border-left:4px solid transparent}
+    .station-card:active{transform:scale(.98)}
+    .station-card.normal{border-left-color:#00C897}
+    .station-card.warning{border-left-color:#FF9F1C}
+    .station-card.danger{border-left-color:#E84855}
+    .station-header{display:flex;justify-content:space-between;align-items:center;margin-bottom:8px}
+    .station-name{font-size:16px;font-weight:600}
+    .station-status{font-size:11px;padding:3px 10px;border-radius:20px;font-weight:600}
+    .station-status.normal{background:rgba(0,200,151,.12);color:#00a37a}
+    .station-status.warning{background:rgba(255,159,28,.12);color:#cc7f16}
+    .station-status.danger{background:rgba(232,72,85,.12);color:#c0394b}
+    .station-meta{font-size:12px;color:#718096;display:flex;gap:12px}
+    .station-metrics{display:flex;gap:16px;margin-top:10px;padding-top:10px;border-top:1px solid #edf2f7}
+    .metric-mini{text-align:center;flex:1}
+    .metric-mini-value{font-size:18px;font-weight:700}
+    .metric-mini-label{font-size:10px;color:#a0aec0;margin-top:2px}
+
+    /* Detail View */
+    .detail-view{position:fixed;top:0;left:0;right:0;bottom:0;background:#f0f4f8;z-index:200;overflow-y:auto;transform:translateX(100%);transition:transform .3s ease}
+    .detail-view.active{transform:translateX(0)}
+    .detail-header{background:linear-gradient(135deg,#00A8E8 0%,#0077b6 100%);color:#fff;padding:16px;position:sticky;top:0;z-index:10}
+    .back-btn{background:rgba(255,255,255,.2);border:none;color:#fff;padding:8px 16px;border-radius:8px;cursor:pointer;font-size:14px;margin-bottom:12px;display:flex;align-items:center;gap:6px}
+    .detail-title{font-size:20px;font-weight:700}
+    .detail-location{font-size:13px;opacity:.9;margin-top:4px}
+
+    /* Gauge Cards */
+    .gauge-grid{display:grid;grid-template-columns:repeat(2,1fr);gap:10px;padding:12px}
+    .gauge-card{background:#fff;border-radius:12px;padding:14px;text-align:center;box-shadow:0 1px 3px rgba(0,0,0,0.08)}
+    .gauge-title{font-size:13px;color:#4a5568;margin-bottom:8px;font-weight:500}
+    .gauge-value{font-size:32px;font-weight:700;line-height:1;margin:8px 0}
+    .gauge-value.normal{color:#00C897}
+    .gauge-value.warning{color:#FF9F1C}
+    .gauge-value.danger{color:#E84855}
+    .gauge-range{font-size:11px;color:#a0aec0}
+    .gauge-bar{height:6px;background:#e2e8f0;border-radius:3px;margin-top:10px;overflow:hidden}
+    .gauge-bar-fill{height:100%;border-radius:3px;transition:width .6s ease}
+    .gauge-bar-fill.normal{background:#00C897}
+    .gauge-bar-fill.warning{background:#FF9F1C}
+    .gauge-bar-fill.danger{background:#E84855}
+
+    /* Chart Section */
+    .chart-section{background:#fff;margin:0 12px 12px;border-radius:12px;padding:14px;box-shadow:0 1px 3px rgba(0,0,0,0.08)}
+    .chart-header{display:flex;justify-content:space-between;align-items:center;margin-bottom:12px}
+    .chart-title{font-size:15px;font-weight:600}
+    .time-toggle{display:flex;gap:4px;background:#edf2f7;padding:3px;border-radius:8px}
+    .time-toggle button{border:none;background:transparent;padding:6px 14px;font-size:12px;border-radius:6px;cursor:pointer;color:#4a5568}
+    .time-toggle button.active{background:#fff;color:#00A8E8;box-shadow:0 1px 3px rgba(0,0,0,0.1);font-weight:600}
+    .chart-container{height:220px}
+
+    /* Loading States */
+    .loading{text-align:center;padding:40px;color:#718096}
+    .loading-spinner{width:40px;height:40px;border:3px solid #e2e8f0;border-top-color:#00A8E8;border-radius:50%;animation:spin 1s linear infinite;margin:0 auto 12px}
+    @keyframes spin{to{transform:rotate(360deg)}}
+
+    /* Refresh Button */
+    .refresh-btn{position:fixed;bottom:20px;right:20px;width:52px;height:52px;border-radius:50%;background:#00A8E8;color:#fff;border:none;box-shadow:0 4px 12px rgba(0,168,232,.4);display:flex;align-items:center;justify-content:center;cursor:pointer;z-index:50;font-size:20px;transition:transform .2s}
+    .refresh-btn:active{transform:scale(.9)}
+    .refresh-btn.spinning{animation:spin 1s linear infinite}
+
+    /* Safe Area */
+    @supports(padding:max(0px)){body{padding-bottom:max(12px,env(safe-area-inset-bottom))}}
+
+    /* Responsive */
+    @media(min-width:768px){.station-list{display:grid;grid-template-columns:repeat(2,1fr)}.gauge-grid{grid-template-columns:repeat(4,1fr)}}
+  </style>
+
+  <!-- Async load non-critical CSS -->
+  <link rel="preload" href="https://cdn.bootcdn.net/ajax/libs/font-awesome/6.5.1/css/all.min.css" as="style" onload="this.onload=null;this.rel='stylesheet'">
+  <noscript><link rel="stylesheet" href="https://cdn.bootcdn.net/ajax/libs/font-awesome/6.5.1/css/all.min.css"></noscript>
+</head>
+<body>
+  <!-- Skeleton Screen (shown before Vue mounts) -->
+  <div id="skeleton-screen">
+    <div style="background:linear-gradient(135deg,#00A8E8 0%,#0077b6 100%);padding:16px;height:64px"></div>
+    <div style="padding:12px 16px">
+      <div class="skeleton" style="height:60px;margin-bottom:12px"></div>
+      <div class="skeleton" style="height:100px;margin-bottom:10px"></div>
+      <div class="skeleton" style="height:100px;margin-bottom:10px"></div>
+      <div class="skeleton" style="height:100px;margin-bottom:10px"></div>
+    </div>
+  </div>
+
+  <!-- Vue App -->
+  <div id="app" v-cloak style="display:none">
+    <!-- Header -->
+    <header class="app-header">
+      <h1><i class="fas fa-water"></i> RiverWatch</h1>
+      <div class="subtitle">河流水质实时监测看板 · {{ stationCount }}个站点</div>
+    </header>
+
+    <!-- Stats Bar -->
+    <div class="stats-bar">
+      <div class="stat-item">
+        <div class="stat-value normal">{{ stats.normal }}</div>
+        <div class="stat-label">正常</div>
+      </div>
+      <div class="stat-item">
+        <div class="stat-value warning">{{ stats.warning }}</div>
+        <div class="stat-label">警告</div>
+      </div>
+      <div class="stat-item">
+        <div class="stat-value danger">{{ stats.danger }}</div>
+        <div class="stat-label">危险</div>
+      </div>
+      <div class="stat-item">
+        <div class="stat-value" style="color:#00A8E8">{{ lastUpdate }}</div>
+        <div class="stat-label">更新时间</div>
+      </div>
+    </div>
+
+    <!-- Station List -->
+    <div class="station-list">
+      <div v-for="station in stations" :key="station.id"
+           class="station-card"
+           :class="station.status"
+           @click="openDetail(station)">
+        <div class="station-header">
+          <span class="station-name">{{ station.name }}</span>
+          <span class="station-status" :class="station.status">{{ statusText(station.status) }}</span>
+        </div>
+        <div class="station-meta">
+          <span><i class="fas fa-map-marker-alt" style="color:#00A8E8;margin-right:4px"></i>{{ station.location }}</span>
+          <span><i class="fas fa-clock" style="color:#718096;margin-right:4px"></i>{{ formatTime(station.lastUpdated) }}</span>
+        </div>
+        <div class="station-metrics">
+          <div class="metric-mini">
+            <div class="metric-mini-value" :style="{color: getMetricColor('ph', station.metrics.ph)}">{{ station.metrics.ph.toFixed(1) }}</div>
+            <div class="metric-mini-label">pH</div>
+          </div>
+          <div class="metric-mini">
+            <div class="metric-mini-value" :style="{color: getMetricColor('dissolvedOxygen', station.metrics.dissolvedOxygen)}">{{ station.metrics.dissolvedOxygen.toFixed(1) }}</div>
+            <div class="metric-mini-label">溶解氧</div>
+          </div>
+          <div class="metric-mini">
+            <div class="metric-mini-value" :style="{color: getMetricColor('turbidity', station.metrics.turbidity)}">{{ station.metrics.turbidity.toFixed(0) }}</div>
+            <div class="metric-mini-label">浊度</div>
+          </div>
+          <div class="metric-mini">
+            <div class="metric-mini-value" :style="{color: getMetricColor('ammoniaNitrogen', station.metrics.ammoniaNitrogen)}">{{ station.metrics.ammoniaNitrogen.toFixed(2) }}</div>
+            <div class="metric-mini-label">氨氮</div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Detail View -->
+    <div class="detail-view" :class="{active: selectedStation}">
+      <template v-if="selectedStation">
+        <div class="detail-header">
+          <button class="back-btn" @click="closeDetail">
+            <i class="fas fa-arrow-left"></i> 返回
+          </button>
+          <div class="detail-title">{{ selectedStation.name }}</div>
+          <div class="detail-location">
+            <i class="fas fa-map-marker-alt"></i> {{ selectedStation.location }}
+            <span style="margin-left:12px" :class="selectedStation.status">{{ statusText(selectedStation.status) }}</span>
+          </div>
+        </div>
+
+        <!-- Gauge Cards -->
+        <div class="gauge-grid">
+          <div class="gauge-card">
+            <div class="gauge-title">pH 值</div>
+            <div class="gauge-value" :class="getMetricStatus('ph', selectedStation.metrics.ph)">{{ selectedStation.metrics.ph.toFixed(2) }}</div>
+            <div class="gauge-range">正常范围 6.5 - 8.5</div>
+            <div class="gauge-bar">
+              <div class="gauge-bar-fill" :class="getMetricStatus('ph', selectedStation.metrics.ph)" :style="{width: (selectedStation.metrics.ph / 14 * 100) + '%'}"></div>
+            </div>
+          </div>
+          <div class="gauge-card">
+            <div class="gauge-title">溶解氧</div>
+            <div class="gauge-value" :class="getMetricStatus('dissolvedOxygen', selectedStation.metrics.dissolvedOxygen)">{{ selectedStation.metrics.dissolvedOxygen.toFixed(1) }} <span style="font-size:14px">mg/L</span></div>
+            <div class="gauge-range">正常 ≥ 5.0 mg/L</div>
+            <div class="gauge-bar">
+              <div class="gauge-bar-fill" :class="getMetricStatus('dissolvedOxygen', selectedStation.metrics.dissolvedOxygen)" :style="{width: Math.min(selectedStation.metrics.dissolvedOxygen / 12 * 100, 100) + '%'}"></div>
+            </div>
+          </div>
+          <div class="gauge-card">
+            <div class="gauge-title">浊度</div>
+            <div class="gauge-value" :class="getMetricStatus('turbidity', selectedStation.metrics.turbidity)">{{ selectedStation.metrics.turbidity.toFixed(0) }} <span style="font-size:14px">NTU</span></div>
+            <div class="gauge-range">正常 ≤ 10 NTU</div>
+            <div class="gauge-bar">
+              <div class="gauge-bar-fill" :class="getMetricStatus('turbidity', selectedStation.metrics.turbidity)" :style="{width: Math.min(selectedStation.metrics.turbidity / 60 * 100, 100) + '%'}"></div>
+            </div>
+          </div>
+          <div class="gauge-card">
+            <div class="gauge-title">氨氮</div>
+            <div class="gauge-value" :class="getMetricStatus('ammoniaNitrogen', selectedStation.metrics.ammoniaNitrogen)">{{ selectedStation.metrics.ammoniaNitrogen.toFixed(2) }} <span style="font-size:14px">mg/L</span></div>
+            <div class="gauge-range">正常 ≤ 1.0 mg/L</div>
+            <div class="gauge-bar">
+              <div class="gauge-bar-fill" :class="getMetricStatus('ammoniaNitrogen', selectedStation.metrics.ammoniaNitrogen)" :style="{width: Math.min(selectedStation.metrics.ammoniaNitrogen / 3 * 100, 100) + '%'}"></div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Trend Chart -->
+        <div class="chart-section">
+          <div class="chart-header">
+            <span class="chart-title"><i class="fas fa-chart-line" style="color:#00A8E8;margin-right:6px"></i>历史趋势</span>
+            <div class="time-toggle">
+              <button :class="{active: timeRange === '7d'}" @click="setTimeRange('7d')">7天</button>
+              <button :class="{active: timeRange === '30d'}" @click="setTimeRange('30d')">30天</button>
+            </div>
+          </div>
+          <div ref="chartContainer" class="chart-container"></div>
+        </div>
+      </template>
+    </div>
+
+    <!-- Refresh Button -->
+    <button class="refresh-btn" :class="{spinning: isRefreshing}" @click="refreshData" title="刷新数据">
+      <i class="fas fa-sync-alt"></i>
+    </button>
+  </div>
+
+  <!-- Vue 3 -->
+  <script src="https://cdn.bootcdn.net/ajax/libs/vue/3.4.21/vue.global.min.js"></script>
+  <!-- ECharts (async loaded when needed) -->
+  <script>
+    // Lazy load ECharts when detail view opens
+    let echartsLoaded = false;
+    function loadECharts() {
+      if (echartsLoaded) return Promise.resolve();
+      return new Promise((resolve) => {
+        const script = document.createElement('script');
+        script.src = 'https://cdn.bootcdn.net/ajax/libs/echarts/5.5.0/echarts.min.js';
+        script.onload = () => { echartsLoaded = true; resolve(); };
+        document.head.appendChild(script);
+      });
+    }
+  </script>
+
+  <script>
+    const { createApp, ref, computed, onMounted, nextTick } = Vue;
+
+    // Thresholds configuration
+    const THRESHOLDS = {
+      ph: { min: 6.5, max: 8.5, warningMin: 6.0, warningMax: 9.0 },
+      dissolvedOxygen: { min: 5.0, warningMin: 3.0 },
+      turbidity: { max: 10, warningMax: 50 },
+      ammoniaNitrogen: { max: 1.0, warningMax: 2.0 }
+    };
+
+    // Color palette from visual spec
+    const COLORS = {
+      normal: '#00C897',
+      warning: '#FF9F1C',
+      danger: '#E84855',
+      primary: '#00A8E8',
+      text: '#1a202c',
+      textSecondary: '#718096',
+      bg: '#f0f4f8',
+      card: '#ffffff'
+    };
+
+    // Mock data generator
+    function generateMockData() {
+      const stations = [
+        {
+          id: 'A', name: '青龙溪上游', location: '清洁区 · 上游源头',
+          status: 'normal',
+          metrics: { ph: 7.2, dissolvedOxygen: 8.5, turbidity: 3, ammoniaNitrogen: 0.15 }
+        },
+        {
+          id: 'B', name: '红旗镇段', location: '农业区 · 中游',
+          status: 'warning',
+          metrics: { ph: 6.3, dissolvedOxygen: 4.2, turbidity: 18, ammoniaNitrogen: 0.85 }
+        },
+        {
+          id: 'C', name: '蓝河市段', location: '城镇生活区 · 中游',
+          status: 'danger',
+          metrics: { ph: 5.8, dissolvedOxygen: 2.1, turbidity: 45, ammoniaNitrogen: 2.3 }
+        },
+        {
+          id: 'D', name: '黄石工业园段', location: '工业区 · 下游',
+          status: 'danger',
+          metrics: { ph: 4.5, dissolvedOxygen: 1.8, turbidity: 80, ammoniaNitrogen: 4.5 }
+        },
+        {
+          id: 'E', name: '碧水湾入江口', location: '下游汇流区 · 入江前',
+          status: 'warning',
+          metrics: { ph: 7.8, dissolvedOxygen: 5.5, turbidity: 12, ammoniaNitrogen: 1.2 }
+        }
+      ];
+
+      // Generate history for each station (30 days)
+      const history = {};
+      const now = new Date();
+      stations.forEach(station => {
+        history[station.id] = [];
+        for (let i = 29; i >= 0; i--) {
+          const date = new Date(now);
+          date.setDate(date.getDate() - i);
+          // Add some random variation
+          const variation = () => (Math.random() - 0.5) * 0.3;
+          history[station.id].push({
+            timestamp: date.toISOString(),
+            metrics: {
+              ph: Math.max(0, Math.min(14, station.metrics.ph + variation() * 4)),
+              dissolvedOxygen: Math.max(0, station.metrics.dissolvedOxygen + variation() * 3),
+              turbidity: Math.max(0, station.metrics.turbidity + variation() * 10),
+              ammoniaNitrogen: Math.max(0, station.metrics.ammoniaNitrogen + variation() * 0.5)
+            }
+          });
+        }
+      });
+
+      return { stations, history };
+    }
+
+    createApp({
+      setup() {
+        const stations = ref([]);
+        const history = ref({});
+        const selectedStation = ref(null);
+        const timeRange = ref('7d');
+        const isRefreshing = ref(false);
+        const chartContainer = ref(null);
+        let chartInstance = null;
+
+        const stationCount = computed(() => stations.value.length);
+
+        const stats = computed(() => {
+          const result = { normal: 0, warning: 0, danger: 0 };
+          stations.value.forEach(s => result[s.status]++);
+          return result;
+        });
+
+        const lastUpdate = computed(() => {
+          const now = new Date();
+          return `${now.getHours().toString().padStart(2,'0')}:${now.getMinutes().toString().padStart(2,'0')}`;
+        });
+
+        function getMetricStatus(metric, value) {
+          const t = THRESHOLDS[metric];
+          if (!t) return 'normal';
+
+          if (metric === 'ph') {
+            if (value < t.warningMin || value > t.warningMax) return 'danger';
+            if (value < t.min || value > t.max) return 'warning';
+          } else if (metric === 'dissolvedOxygen') {
+            if (value < t.warningMin) return 'danger';
+            if (value < t.min) return 'warning';
+          } else if (metric === 'turbidity' || metric === 'ammoniaNitrogen') {
+            if (value > t.warningMax) return 'danger';
+            if (value > t.max) return 'warning';
+          }
+          return 'normal';
+        }
+
+        function getMetricColor(metric, value) {
+          const status = getMetricStatus(metric, value);
+          return COLORS[status];
+        }
+
+        function statusText(status) {
+          const map = { normal: '正常', warning: '警告', danger: '危险' };
+          return map[status] || status;
+        }
+
+        function formatTime(iso) {
+          const d = new Date(iso);
+          return `${d.getHours().toString().padStart(2,'0')}:${d.getMinutes().toString().padStart(2,'0')}`;
+        }
+
+        async function openDetail(station) {
+          selectedStation.value = station;
+          await loadECharts();
+          await nextTick();
+          initChart();
+        }
+
+        function closeDetail() {
+          selectedStation.value = null;
+          if (chartInstance) {
+            chartInstance.dispose();
+            chartInstance = null;
+          }
+        }
+
+        function setTimeRange(range) {
+          timeRange.value = range;
+          if (chartInstance) {
+            chartInstance.dispose();
+            chartInstance = null;
+          }
+          initChart();
+        }
+
+        function initChart() {
+          if (!chartContainer.value || !selectedStation.value) return;
+
+          const station = selectedStation.value;
+          const stationHistory = history.value[station.id] || [];
+          const days = timeRange.value === '7d' ? 7 : 30;
+          const data = stationHistory.slice(-days);
+
+          const dates = data.map(d => {
+            const date = new Date(d.timestamp);
+            return `${date.getMonth()+1}/${date.getDate()}`;
+          });
+
+          const option = {
+            grid: { top: 30, right: 20, bottom: 30, left: 50 },
+            tooltip: {
+              trigger: 'axis',
+              backgroundColor: 'rgba(255,255,255,0.95)',
+              borderColor: '#e2e8f0',
+              textStyle: { color: '#1a202c', fontSize: 12 }
+            },
+            legend: {
+              data: ['pH', '溶解氧', '浊度', '氨氮'],
+              top: 0,
+              textStyle: { fontSize: 11 }
+            },
+            xAxis: {
+              type: 'category',
+              data: dates,
+              axisLine: { lineStyle: { color: '#e2e8f0' } },
+              axisLabel: { color: '#718096', fontSize: 10 }
+            },
+            yAxis: {
+              type: 'value',
+              splitLine: { lineStyle: { color: '#edf2f7', type: 'dashed' } },
+              axisLabel: { color: '#718096', fontSize: 10 }
+            },
+            series: [
+              {
+                name: 'pH',
+                type: 'line',
+                data: data.map(d => d.metrics.ph.toFixed(1)),
+                smooth: true,
+                symbol: 'circle',
+                symbolSize: 6,
+                lineStyle: { color: '#00A8E8', width: 2 },
+                itemStyle: { color: '#00A8E8' }
+              },
+              {
+                name: '溶解氧',
+                type: 'line',
+                data: data.map(d => d.metrics.dissolvedOxygen.toFixed(1)),
+                smooth: true,
+                symbol: 'circle',
+                symbolSize: 6,
+                lineStyle: { color: '#00C897', width: 2 },
+                itemStyle: { color: '#00C897' }
+              },
+              {
+                name: '浊度',
+                type: 'line',
+                data: data.map(d => d.metrics.turbidity.toFixed(0)),
+                smooth: true,
+                symbol: 'circle',
+                symbolSize: 6,
+                lineStyle: { color: '#FF9F1C', width: 2 },
+                itemStyle: { color: '#FF9F1C' }
+              },
+              {
+                name: '氨氮',
+                type: 'line',
+                data: data.map(d => d.metrics.ammoniaNitrogen.toFixed(2)),
+                smooth: true,
+                symbol: 'circle',
+                symbolSize: 6,
+                lineStyle: { color: '#E84855', width: 2 },
+                itemStyle: { color: '#E84855' }
+              }
+            ]
+          };
+
+          chartInstance = echarts.init(chartContainer.value);
+          chartInstance.setOption(option);
+        }
+
+        function refreshData() {
+          isRefreshing.value = true;
+          // Simulate data refresh
+          setTimeout(() => {
+            stations.value.forEach(s => {
+              s.metrics.ph = Math.max(0, Math.min(14, s.metrics.ph + (Math.random() - 0.5) * 0.5));
+              s.metrics.dissolvedOxygen = Math.max(0, s.metrics.dissolvedOxygen + (Math.random() - 0.5) * 0.8);
+              s.metrics.turbidity = Math.max(0, s.metrics.turbidity + (Math.random() - 0.5) * 3);
+              s.metrics.ammoniaNitrogen = Math.max(0, s.metrics.ammoniaNitrogen + (Math.random() - 0.5) * 0.2);
+              // Recalculate status
+              const statuses = [
+                getMetricStatus('ph', s.metrics.ph),
+                getMetricStatus('dissolvedOxygen', s.metrics.dissolvedOxygen),
+                getMetricStatus('turbidity', s.metrics.turbidity),
+                getMetricStatus('ammoniaNitrogen', s.metrics.ammoniaNitrogen)
+              ];
+              if (statuses.includes('danger')) s.status = 'danger';
+              else if (statuses.includes('warning')) s.status = 'warning';
+              else s.status = 'normal';
+            });
+            isRefreshing.value = false;
+          }, 800);
+        }
+
+        onMounted(() => {
+          const mock = generateMockData();
+          stations.value = mock.stations;
+          history.value = mock.history;
+
+          // Hide skeleton, show app
+          document.getElementById('skeleton-screen').style.display = 'none';
+          document.getElementById('app').style.display = 'flex';
+
+          // Auto refresh every 5 minutes
+          setInterval(refreshData, 300000);
+        });
+
+        return {
+          stations, selectedStation, timeRange, isRefreshing,
+          stationCount, stats, lastUpdate, chartContainer,
+          getMetricStatus, getMetricColor, statusText, formatTime,
+          openDetail, closeDetail, setTimeRange, refreshData
+        };
+      }
+    }).mount('#app');
+  </script>
+</body>
+</html>
