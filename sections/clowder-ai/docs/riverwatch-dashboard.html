@@ -30,29 +30,29 @@
     .stats-bar{display:flex;gap:12px;padding:12px 16px;background:#fff;margin:12px;border-radius:12px;box-shadow:0 1px 3px rgba(0,0,0,0.08)}
     .stat-item{flex:1;text-align:center}
     .stat-value{font-size:24px;font-weight:700;line-height:1}
-    .stat-value.normal{color:#00C897}
-    .stat-value.warning{color:#FF9F1C}
-    .stat-value.danger{color:#E84855}
-    .stat-label{font-size:11px;color:#718096;margin-top:4px}
+    .stat-value.normal{color:#10B981}
+    .stat-value.warning{color:#F59E0B}
+    .stat-value.danger{color:#EF4444}
+    .stat-label{font-size:14px;color:#718096;margin-top:4px}
 
     /* Station Cards */
     .station-list{padding:0 12px 12px;display:flex;flex-direction:column;gap:10px}
     .station-card{background:#fff;border-radius:12px;padding:14px;box-shadow:0 1px 3px rgba(0,0,0,0.08);cursor:pointer;transition:transform .15s,box-shadow .15s;border-left:4px solid transparent}
     .station-card:active{transform:scale(.98)}
-    .station-card.normal{border-left-color:#00C897}
-    .station-card.warning{border-left-color:#FF9F1C}
-    .station-card.danger{border-left-color:#E84855}
+    .station-card.normal{border-left-color:#10B981}
+    .station-card.warning{border-left-color:#F59E0B}
+    .station-card.danger{border-left-color:#EF4444}
     .station-header{display:flex;justify-content:space-between;align-items:center;margin-bottom:8px}
     .station-name{font-size:16px;font-weight:600}
-    .station-status{font-size:11px;padding:3px 10px;border-radius:20px;font-weight:600}
-    .station-status.normal{background:rgba(0,200,151,.12);color:#00a37a}
-    .station-status.warning{background:rgba(255,159,28,.12);color:#cc7f16}
-    .station-status.danger{background:rgba(232,72,85,.12);color:#c0394b}
+    .station-status{font-size:14px;padding:4px 12px;border-radius:20px;font-weight:600}
+    .station-status.normal{background:rgba(16,185,129,.12);color:#059669}
+    .station-status.warning{background:rgba(245,158,11,.12);color:#d97706}
+    .station-status.danger{background:rgba(239,68,68,.12);color:#dc2626}
     .station-meta{font-size:12px;color:#718096;display:flex;gap:12px}
     .station-metrics{display:flex;gap:16px;margin-top:10px;padding-top:10px;border-top:1px solid #edf2f7}
     .metric-mini{text-align:center;flex:1}
     .metric-mini-value{font-size:18px;font-weight:700}
-    .metric-mini-label{font-size:10px;color:#a0aec0;margin-top:2px}
+    .metric-mini-label{font-size:14px;color:#a0aec0;margin-top:2px}
 
     /* Detail View */
     .detail-view{position:fixed;top:0;left:0;right:0;bottom:0;background:#f0f4f8;z-index:200;overflow-y:auto;transform:translateX(100%);transition:transform .3s ease}
@@ -67,22 +67,22 @@
     .gauge-card{background:#fff;border-radius:12px;padding:14px;text-align:center;box-shadow:0 1px 3px rgba(0,0,0,0.08)}
     .gauge-title{font-size:13px;color:#4a5568;margin-bottom:8px;font-weight:500}
     .gauge-value{font-size:32px;font-weight:700;line-height:1;margin:8px 0}
-    .gauge-value.normal{color:#00C897}
-    .gauge-value.warning{color:#FF9F1C}
-    .gauge-value.danger{color:#E84855}
-    .gauge-range{font-size:11px;color:#a0aec0}
+    .gauge-value.normal{color:#10B981}
+    .gauge-value.warning{color:#F59E0B}
+    .gauge-value.danger{color:#EF4444}
+    .gauge-range{font-size:14px;color:#a0aec0}
     .gauge-bar{height:6px;background:#e2e8f0;border-radius:3px;margin-top:10px;overflow:hidden}
     .gauge-bar-fill{height:100%;border-radius:3px;transition:width .6s ease}
-    .gauge-bar-fill.normal{background:#00C897}
-    .gauge-bar-fill.warning{background:#FF9F1C}
-    .gauge-bar-fill.danger{background:#E84855}
+    .gauge-bar-fill.normal{background:#10B981}
+    .gauge-bar-fill.warning{background:#F59E0B}
+    .gauge-bar-fill.danger{background:#EF4444}
 
     /* Chart Section */
     .chart-section{background:#fff;margin:0 12px 12px;border-radius:12px;padding:14px;box-shadow:0 1px 3px rgba(0,0,0,0.08)}
     .chart-header{display:flex;justify-content:space-between;align-items:center;margin-bottom:12px}
     .chart-title{font-size:15px;font-weight:600}
     .time-toggle{display:flex;gap:4px;background:#edf2f7;padding:3px;border-radius:8px}
-    .time-toggle button{border:none;background:transparent;padding:6px 14px;font-size:12px;border-radius:6px;cursor:pointer;color:#4a5568}
+    .time-toggle button{border:none;background:transparent;padding:10px 16px;font-size:14px;border-radius:6px;cursor:pointer;color:#4a5568;min-height:44px}
     .time-toggle button.active{background:#fff;color:#00A8E8;box-shadow:0 1px 3px rgba(0,0,0,0.1);font-weight:600}
     .chart-container{height:220px}
 
@@ -280,11 +280,11 @@
       ammoniaNitrogen: { max: 1.0, warningMax: 2.0 }
     };
 
-    // Color palette from visual spec
+    // Color palette - aligned with QA acceptance criteria
     const COLORS = {
-      normal: '#00C897',
-      warning: '#FF9F1C',
-      danger: '#E84855',
+      normal: '#10B981',
+      warning: '#F59E0B',
+      danger: '#EF4444',
       primary: '#00A8E8',
       text: '#1a202c',
       textSecondary: '#718096',
@@ -450,18 +450,18 @@
             legend: {
               data: ['pH', '溶解氧', '浊度', '氨氮'],
               top: 0,
-              textStyle: { fontSize: 11 }
+              textStyle: { fontSize: 14 }
             },
             xAxis: {
               type: 'category',
               data: dates,
               axisLine: { lineStyle: { color: '#e2e8f0' } },
-              axisLabel: { color: '#718096', fontSize: 10 }
+              axisLabel: { color: '#718096', fontSize: 14 }
             },
             yAxis: {
               type: 'value',
               splitLine: { lineStyle: { color: '#edf2f7', type: 'dashed' } },
-              axisLabel: { color: '#718096', fontSize: 10 }
+              axisLabel: { color: '#718096', fontSize: 14 }
             },
             series: [
               {
@@ -545,7 +545,12 @@
           document.getElementById('app').style.display = 'flex';
 
           // Auto refresh every 5 minutes
-          setInterval(refreshData, 300000);
+          const refreshInterval = setInterval(refreshData, 300000);
+
+          // Cleanup on page unload
+          window.addEventListener('beforeunload', () => {
+            clearInterval(refreshInterval);
+          });
         });
 
         return {
