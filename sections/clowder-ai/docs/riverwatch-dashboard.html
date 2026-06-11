@@ -120,6 +120,7 @@
         :stations="stations"
         :history="history"
         :stats="stats"
+        :operational-stats="operationalStats"
         :filters="filters"
         @update-filters="updateFilters"
         @refresh="refreshData"
@@ -289,7 +290,7 @@
     const DashboardPage = {
       props: ['stations', 'stats', 'filters', 'operationalStats'],
       emits: ['update-filters'],
-      setup(props, { emit }) {
+      setup(props) {
         const qualityFilterOptions = [
           { value: 'all', label: '全部水质' },
           { value: 'excellent', label: '优' },
@@ -1010,6 +1011,12 @@
           return result;
         });
 
+        const operationalStats = computed(() => {
+          const result = { online: 0, offline: 0, alarm: 0 };
+          stations.value.forEach(s => result[s.operationalStatus]++);
+          return result;
+        });
+
         const lastUpdate = computed(() => {
           const now = new Date();
           return `${now.getHours().toString().padStart(2,'0')}:${now.getMinutes().toString().padStart(2,'0')}`;
@@ -1046,7 +1053,7 @@
         });
 
         return {
-          stations, history, filters, stationCount, stats, lastUpdate,
+          stations, history, filters, stationCount, stats, operationalStats, lastUpdate,
           updateFilters, refreshData
         };
       }

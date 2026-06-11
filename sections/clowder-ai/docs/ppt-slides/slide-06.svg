@@ -1,0 +1,142 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1920 1080" width="1920" height="1080">
+  <defs>
+    <!-- Background gradient -->
+    <linearGradient id="bgGrad6" x1="0%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%" stop-color="#F0F4F8"/>
+      <stop offset="100%" stop-color="#FFFFFF"/>
+    </linearGradient>
+
+    <!-- Card shadow -->
+    <filter id="cardShadow" x="-10%" y="-10%" width="120%" height="130%">
+      <feDropShadow dx="0" dy="4" stdDeviation="8" flood-color="#0A2540" flood-opacity="0.08"/>
+    </filter>
+
+    <!-- Arrow marker -->
+    <marker id="arrowHead" markerWidth="10" markerHeight="7" refX="9" refY="3.5" orient="auto">
+      <polygon points="0 0, 10 3.5, 0 7" fill="#00A8E8"/>
+    </marker>
+  </defs>
+
+  <!-- Background -->
+  <rect width="1920" height="1080" fill="url(#bgGrad6)"/>
+
+  <!-- Top accent bar -->
+  <rect x="80" y="60" width="80" height="6" rx="3" fill="#00A8E8"/>
+
+  <!-- Page title -->
+  <text x="80" y="110" font-family="'Noto Sans SC', 'PingFang SC', 'Microsoft YaHei', sans-serif" font-size="40" font-weight="700" fill="#0A2540">
+    轻量技术栈
+  </text>
+  <text x="80" y="155" font-family="'Noto Sans SC', 'PingFang SC', 'Microsoft YaHei', sans-serif" font-size="22" font-weight="400" fill="#6B7280">
+    快速部署，低维护成本
+  </text>
+
+  <!-- Architecture Diagram -->
+  <g transform="translate(80, 200)">
+    <!-- Vue 3 Box -->
+    <rect x="0" y="0" width="280" height="120" rx="12" fill="#FFFFFF" filter="url(#cardShadow)"/>
+    <rect x="0" y="0" width="6" height="120" rx="3" fill="#00A8E8"/>
+    <text x="140" y="45" text-anchor="middle" font-family="'Noto Sans SC', sans-serif" font-size="20" font-weight="600" fill="#0A2540">Vue 3.4</text>
+    <text x="140" y="75" text-anchor="middle" font-family="'Noto Sans SC', sans-serif" font-size="14" fill="#6B7280">Composition API</text>
+    <text x="140" y="100" text-anchor="middle" font-family="'Noto Sans SC', sans-serif" font-size="13" fill="#00A8E8">CDN 引入 · 无需构建</text>
+
+    <!-- Arrow 1 -->
+    <line x1="280" y1="60" x2="360" y2="60" stroke="#00A8E8" stroke-width="3" marker-end="url(#arrowHead)"/>
+
+    <!-- Chart.js Box -->
+    <rect x="380" y="0" width="280" height="120" rx="12" fill="#FFFFFF" filter="url(#cardShadow)"/>
+    <rect x="380" y="0" width="6" height="120" rx="3" fill="#10B981"/>
+    <text x="520" y="45" text-anchor="middle" font-family="'Noto Sans SC', sans-serif" font-size="20" font-weight="600" fill="#0A2540">Chart.js 4.x</text>
+    <text x="520" y="75" text-anchor="middle" font-family="'Noto Sans SC', sans-serif" font-size="14" fill="#6B7280">趋势图 · 雷达图</text>
+    <text x="520" y="100" text-anchor="middle" font-family="'Noto Sans SC', sans-serif" font-size="13" fill="#10B981">按需加载 ~90KB</text>
+
+    <!-- Arrow 2 -->
+    <line x1="660" y1="60" x2="740" y2="60" stroke="#00A8E8" stroke-width="3" marker-end="url(#arrowHead)"/>
+
+    <!-- Browser Box -->
+    <rect x="760" y="0" width="280" height="120" rx="12" fill="#FFFFFF" filter="url(#cardShadow)"/>
+    <rect x="760" y="0" width="6" height="120" rx="3" fill="#F59E0B"/>
+    <text x="900" y="45" text-anchor="middle" font-family="'Noto Sans SC', sans-serif" font-size="20" font-weight="600" fill="#0A2540">浏览器</text>
+    <text x="900" y="75" text-anchor="middle" font-family="'Noto Sans SC', sans-serif" font-size="14" fill="#6B7280">Chrome 90+ / Safari 14+</text>
+    <text x="900" y="100" text-anchor="middle" font-family="'Noto Sans SC', sans-serif" font-size="13" fill="#F59E0B">即开即用</text>
+  </g>
+
+  <!-- Tech Stack Icons Row -->
+  <g transform="translate(80, 360)">
+    <text x="0" y="0" font-family="'Noto Sans SC', sans-serif" font-size="18" font-weight="600" fill="#0A2540">技术选型</text>
+
+    <!-- Vue -->
+    <rect x="0" y="20" width="160" height="70" rx="8" fill="#FFFFFF" filter="url(#cardShadow)"/>
+    <text x="80" y="50" text-anchor="middle" font-family="'Noto Sans SC', sans-serif" font-size="14" font-weight="600" fill="#0A2540">Vue 3.4</text>
+    <text x="80" y="75" text-anchor="middle" font-family="'Noto Sans SC', sans-serif" font-size="12" fill="#6B7280">Global Build</text>
+
+    <!-- Vue Router -->
+    <rect x="180" y="20" width="160" height="70" rx="8" fill="#FFFFFF" filter="url(#cardShadow)"/>
+    <text x="260" y="50" text-anchor="middle" font-family="'Noto Sans SC', sans-serif" font-size="14" font-weight="600" fill="#0A2540">Vue Router 4</text>
+    <text x="260" y="75" text-anchor="middle" font-family="'Noto Sans SC', sans-serif" font-size="12" fill="#6B7280">Hash 模式</text>
+
+    <!-- Tailwind -->
+    <rect x="360" y="20" width="160" height="70" rx="8" fill="#FFFFFF" filter="url(#cardShadow)"/>
+    <text x="440" y="50" text-anchor="middle" font-family="'Noto Sans SC', sans-serif" font-size="14" font-weight="600" fill="#0A2540">Tailwind CSS</text>
+    <text x="440" y="75" text-anchor="middle" font-family="'Noto Sans SC', sans-serif" font-size="12" fill="#6B7280">CDN 3.x</text>
+
+    <!-- Chart.js -->
+    <rect x="540" y="20" width="160" height="70" rx="8" fill="#FFFFFF" filter="url(#cardShadow)"/>
+    <text x="620" y="50" text-anchor="middle" font-family="'Noto Sans SC', sans-serif" font-size="14" font-weight="600" fill="#0A2540">Chart.js</text>
+    <text x="620" y="75" text-anchor="middle" font-family="'Noto Sans SC', sans-serif" font-size="12" fill="#6B7280">4.x 图表库</text>
+
+    <!-- Heroicons -->
+    <rect x="720" y="20" width="160" height="70" rx="8" fill="#FFFFFF" filter="url(#cardShadow)"/>
+    <text x="800" y="50" text-anchor="middle" font-family="'Noto Sans SC', sans-serif" font-size="14" font-weight="600" fill="#0A2540">Heroicons</text>
+    <text x="800" y="75" text-anchor="middle" font-family="'Noto Sans SC', sans-serif" font-size="12" fill="#6B7280">内联 SVG</text>
+  </g>
+
+  <!-- Performance Metrics -->
+  <g transform="translate(80, 500)">
+    <text x="0" y="0" font-family="'Noto Sans SC', sans-serif" font-size="18" font-weight="600" fill="#0A2540">性能表现</text>
+
+    <!-- Metric 1: FCP -->
+    <rect x="0" y="20" width="360" height="140" rx="12" fill="#FFFFFF" filter="url(#cardShadow)"/>
+    <text x="180" y="65" text-anchor="middle" font-family="'DIN 1451', 'Roboto Mono', monospace" font-size="48" font-weight="700" fill="#00A8E8">≤1.5s</text>
+    <text x="180" y="95" text-anchor="middle" font-family="'Noto Sans SC', sans-serif" font-size="14" fill="#6B7280">首屏加载 (FCP)</text>
+    <text x="180" y="120" text-anchor="middle" font-family="'Noto Sans SC', sans-serif" font-size="12" fill="#10B981">4G 网络环境</text>
+
+    <!-- Metric 2: Bundle Size -->
+    <rect x="380" y="20" width="360" height="140" rx="12" fill="#FFFFFF" filter="url(#cardShadow)"/>
+    <text x="560" y="65" text-anchor="middle" font-family="'DIN 1451', 'Roboto Mono', monospace" font-size="48" font-weight="700" fill="#00A8E8">~250KB</text>
+    <text x="560" y="95" text-anchor="middle" font-family="'Noto Sans SC', sans-serif" font-size="14" fill="#6B7280">包体积 (gzip)</text>
+    <text x="560" y="120" text-anchor="middle" font-family="'Noto Sans SC', sans-serif" font-size="12" fill="#10B981">单 HTML 文件</text>
+
+    <!-- Metric 3: Perceived Load -->
+    <rect x="760" y="20" width="360" height="140" rx="12" fill="#FFFFFF" filter="url(#cardShadow)"/>
+    <text x="940" y="65" text-anchor="middle" font-family="'DIN 1451', 'Roboto Mono', monospace" font-size="48" font-weight="700" fill="#00A8E8">&lt;1s</text>
+    <text x="940" y="95" text-anchor="middle" font-family="'Noto Sans SC', sans-serif" font-size="14" fill="#6B7280">感知加载</text>
+    <text x="940" y="120" text-anchor="middle" font-family="'Noto Sans SC', sans-serif" font-size="12" fill="#10B981">骨架屏 + 关键 CSS 内联</text>
+  </g>
+
+  <!-- Deployment Advantages -->
+  <g transform="translate(80, 700)">
+    <text x="0" y="0" font-family="'Noto Sans SC', sans-serif" font-size="18" font-weight="600" fill="#0A2540">部署优势</text>
+
+    <rect x="0" y="20" width="540" height="100" rx="12" fill="#FFFFFF" filter="url(#cardShadow)"/>
+    <rect x="0" y="20" width="6" height="100" rx="3" fill="#00A8E8"/>
+    <text x="30" y="55" font-family="'Noto Sans SC', sans-serif" font-size="16" font-weight="600" fill="#0A2540">零服务器成本</text>
+    <text x="30" y="80" font-family="'Noto Sans SC', sans-serif" font-size="14" fill="#6B7280">Vercel / Netlify / GitHub Pages 免费 tier 即可部署</text>
+    <text x="30" y="105" font-family="'Noto Sans SC', sans-serif" font-size="13" fill="#00A8E8">单文件 · CDN 资源 · 自动 HTTPS</text>
+
+    <rect x="560" y="20" width="540" height="100" rx="12" fill="#FFFFFF" filter="url(#cardShadow)"/>
+    <rect x="560" y="20" width="6" height="100" rx="3" fill="#10B981"/>
+    <text x="590" y="55" font-family="'Noto Sans SC', sans-serif" font-size="16" font-weight="600" fill="#0A2540">平滑扩展</text>
+    <text x="590" y="80" font-family="'Noto Sans SC', sans-serif" font-size="14" fill="#6B7280">后续可对接真实 API，无需重构架构</text>
+    <text x="590" y="105" font-family="'Noto Sans SC', sans-serif" font-size="13" fill="#10B981">模块化设计 · 数据层解耦</text>
+  </g>
+
+  <!-- CDN Fallback note -->
+  <rect x="80" y="840" width="1100" height="50" rx="8" fill="#00A8E8" opacity="0.08"/>
+  <text x="100" y="872" font-family="'Noto Sans SC', sans-serif" font-size="14" fill="#00A8E8" font-weight="500">
+    CDN 双源 fallback：BootCDN（国内）/ jsDelivr（全球）自动切换，保障资源可用性
+  </text>
+
+  <!-- Page number -->
+  <text x="1840" y="1050" text-anchor="end" font-family="'DIN 1451', monospace" font-size="14" fill="#6B7280">06 / 10</text>
+</svg>

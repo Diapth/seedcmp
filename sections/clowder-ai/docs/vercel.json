@@ -1,0 +1,16 @@
+{
+  "version": 2,
+  "name": "riverwatch-dashboard",
+  "builds": [
+    {
+      "src": "riverwatch-dashboard.html",
+      "use": "@vercel/static"
+    }
+  ],
+  "routes": [
+    {
+      "src": "/(.*)",
+      "dest": "/riverwatch-dashboard.html"
+    }
+  ]
+}
