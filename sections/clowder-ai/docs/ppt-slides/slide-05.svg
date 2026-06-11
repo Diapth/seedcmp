@@ -1,0 +1,131 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1920 1080" width="1920" height="1080">
+  <defs>
+    <!-- Background gradient -->
+    <linearGradient id="bgGrad5" x1="0%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%" stop-color="#F0F4F8"/>
+      <stop offset="100%" stop-color="#FFFFFF"/>
+    </linearGradient>
+
+    <!-- Card shadow -->
+    <filter id="cardShadow" x="-10%" y="-10%" width="120%" height="130%">
+      <feDropShadow dx="0" dy="4" stdDeviation="8" flood-color="#0A2540" flood-opacity="0.08"/>
+    </filter>
+
+    <!-- Mini chart gradient -->
+    <linearGradient id="chartGrad" x1="0%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%" stop-color="#00A8E8" stop-opacity="0.3"/>
+      <stop offset="100%" stop-color="#00A8E8" stop-opacity="0.05"/>
+    </linearGradient>
+  </defs>
+
+  <!-- Background -->
+  <rect width="1920" height="1080" fill="url(#bgGrad5)"/>
+
+  <!-- Top accent bar -->
+  <rect x="80" y="60" width="80" height="6" rx="3" fill="#00A8E8"/>
+
+  <!-- Page title -->
+  <text x="80" y="110" font-family="'Noto Sans SC', 'PingFang SC', 'Microsoft YaHei', sans-serif" font-size="40" font-weight="700" fill="#0A2540">
+    五大指标实时监测
+  </text>
+  <text x="80" y="155" font-family="'Noto Sans SC', 'PingFang SC', 'Microsoft YaHei', sans-serif" font-size="22" font-weight="400" fill="#6B7280">
+    一站掌握水质全貌
+  </text>
+
+  <!-- 5 Metric Cards -->
+  <!-- Card 1: pH (Normal - Green) -->
+  <g transform="translate(80, 200)" filter="url(#cardShadow)">
+    <rect width="320" height="380" rx="12" fill="#FFFFFF"/>
+    <rect x="0" y="0" width="4" height="380" rx="2" fill="#10B981"/>
+    <!-- Icon -->
+    <circle cx="40" cy="40" r="16" fill="#10B981" opacity="0.1"/>
+    <text x="40" y="46" text-anchor="middle" font-family="'Noto Sans SC', sans-serif" font-size="14" fill="#10B981" font-weight="600">pH</text>
+    <text x="68" y="44" font-family="'Noto Sans SC', sans-serif" font-size="14" fill="#6B7280">pH 值</text>
+    <!-- Value -->
+    <text x="160" y="130" text-anchor="middle" font-family="'DIN 1451', 'Roboto Mono', monospace" font-size="56" font-weight="700" fill="#0A2540">7.2</text>
+    <!-- Status badge -->
+    <rect x="120" y="155" width="80" height="28" rx="14" fill="#10B981" opacity="0.1"/>
+    <text x="160" y="174" text-anchor="middle" font-family="'Noto Sans SC', sans-serif" font-size="13" fill="#10B981" font-weight="500">正常</text>
+    <!-- Mini trend chart -->
+    <path d="M40,240 L80,220 L120,230 L160,210 L200,225 L240,215 L280,205" fill="none" stroke="#00A8E8" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+    <path d="M40,240 L80,220 L120,230 L160,210 L200,225 L240,215 L280,205 L280,280 L40,280 Z" fill="url(#chartGrad)"/>
+    <!-- Range -->
+    <text x="160" y="330" text-anchor="middle" font-family="'Noto Sans SC', sans-serif" font-size="13" fill="#6B7280">正常范围: 6.5 - 8.5</text>
+  </g>
+
+  <!-- Card 2: Dissolved Oxygen (Warning - Yellow) -->
+  <g transform="translate(430, 200)" filter="url(#cardShadow)">
+    <rect width="320" height="380" rx="12" fill="#FFFFFF"/>
+    <rect x="0" y="0" width="4" height="380" rx="2" fill="#F59E0B"/>
+    <circle cx="40" cy="40" r="16" fill="#F59E0B" opacity="0.1"/>
+    <text x="40" y="46" text-anchor="middle" font-family="'Noto Sans SC', sans-serif" font-size="14" fill="#F59E0B" font-weight="600">DO</text>
+    <text x="68" y="44" font-family="'Noto Sans SC', sans-serif" font-size="14" fill="#6B7280">溶解氧</text>
+    <text x="160" y="130" text-anchor="middle" font-family="'DIN 1451', 'Roboto Mono', monospace" font-size="56" font-weight="700" fill="#0A2540">4.8</text>
+    <rect x="120" y="155" width="80" height="28" rx="14" fill="#F59E0B" opacity="0.1"/>
+    <text x="160" y="174" text-anchor="middle" font-family="'Noto Sans SC', sans-serif" font-size="13" fill="#F59E0B" font-weight="500">警告</text>
+    <path d="M40,240 L80,250 L120,245 L160,255 L200,240 L240,250 L280,260" fill="none" stroke="#F59E0B" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+    <path d="M40,240 L80,250 L120,245 L160,255 L200,240 L240,250 L280,260 L280,280 L40,280 Z" fill="url(#chartGrad)" opacity="0.5"/>
+    <text x="160" y="330" text-anchor="middle" font-family="'Noto Sans SC', sans-serif" font-size="13" fill="#6B7280">正常范围: ≥ 5.0 mg/L</text>
+  </g>
+
+  <!-- Card 3: Turbidity (Normal - Green) -->
+  <g transform="translate(780, 200)" filter="url(#cardShadow)">
+    <rect width="320" height="380" rx="12" fill="#FFFFFF"/>
+    <rect x="0" y="0" width="4" height="380" rx="2" fill="#10B981"/>
+    <circle cx="40" cy="40" r="16" fill="#10B981" opacity="0.1"/>
+    <text x="40" y="46" text-anchor="middle" font-family="'Noto Sans SC', sans-serif" font-size="14" fill="#10B981" font-weight="600">NTU</text>
+    <text x="68" y="44" font-family="'Noto Sans SC', sans-serif" font-size="14" fill="#6B7280">浊度</text>
+    <text x="160" y="130" text-anchor="middle" font-family="'DIN 1451', 'Roboto Mono', monospace" font-size="56" font-weight="700" fill="#0A2540">6.5</text>
+    <rect x="120" y="155" width="80" height="28" rx="14" fill="#10B981" opacity="0.1"/>
+    <text x="160" y="174" text-anchor="middle" font-family="'Noto Sans SC', sans-serif" font-size="13" fill="#10B981" font-weight="500">正常</text>
+    <path d="M40,250 L80,245 L120,240 L160,235 L200,238 L240,232 L280,228" fill="none" stroke="#00A8E8" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+    <path d="M40,250 L80,245 L120,240 L160,235 L200,238 L240,232 L280,228 L280,280 L40,280 Z" fill="url(#chartGrad)"/>
+    <text x="160" y="330" text-anchor="middle" font-family="'Noto Sans SC', sans-serif" font-size="13" fill="#6B7280">正常范围: ≤ 10 NTU</text>
+  </g>
+
+  <!-- Card 4: Ammonia Nitrogen (Danger - Red) -->
+  <g transform="translate(1130, 200)" filter="url(#cardShadow)">
+    <rect width="320" height="380" rx="12" fill="#FFFFFF"/>
+    <rect x="0" y="0" width="4" height="380" rx="2" fill="#EF4444"/>
+    <circle cx="40" cy="40" r="16" fill="#EF4444" opacity="0.1"/>
+    <text x="40" y="46" text-anchor="middle" font-family="'Noto Sans SC', sans-serif" font-size="14" fill="#EF4444" font-weight="600">NH₃</text>
+    <text x="68" y="44" font-family="'Noto Sans SC', sans-serif" font-size="14" fill="#6B7280">氨氮</text>
+    <text x="160" y="130" text-anchor="middle" font-family="'DIN 1451', 'Roboto Mono', monospace" font-size="56" font-weight="700" fill="#0A2540">1.35</text>
+    <rect x="120" y="155" width="80" height="28" rx="14" fill="#EF4444" opacity="0.1"/>
+    <text x="160" y="174" text-anchor="middle" font-family="'Noto Sans SC', sans-serif" font-size="13" fill="#EF4444" font-weight="500">危险</text>
+    <path d="M40,230 L80,235 L120,240 L160,245 L200,250 L240,255 L280,260" fill="none" stroke="#EF4444" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+    <path d="M40,230 L80,235 L120,240 L160,245 L200,250 L240,255 L280,260 L280,280 L40,280 Z" fill="#EF4444" opacity="0.05"/>
+    <text x="160" y="330" text-anchor="middle" font-family="'Noto Sans SC', sans-serif" font-size="13" fill="#6B7280">正常范围: ≤ 1.0 mg/L</text>
+  </g>
+
+  <!-- Card 5: Station Status (Normal - Green) -->
+  <g transform="translate(1480, 200)" filter="url(#cardShadow)">
+    <rect width="320" height="380" rx="12" fill="#FFFFFF"/>
+    <rect x="0" y="0" width="4" height="380" rx="2" fill="#10B981"/>
+    <circle cx="40" cy="40" r="16" fill="#10B981" opacity="0.1"/>
+    <text x="40" y="46" text-anchor="middle" font-family="'Noto Sans SC', sans-serif" font-size="14" fill="#10B981" font-weight="600">●</text>
+    <text x="68" y="44" font-family="'Noto Sans SC', sans-serif" font-size="14" fill="#6B7280">站点状态</text>
+    <text x="160" y="130" text-anchor="middle" font-family="'DIN 1451', 'Roboto Mono', monospace" font-size="48" font-weight="700" fill="#0A2540">Ⅱ级</text>
+    <rect x="120" y="155" width="80" height="28" rx="14" fill="#10B981" opacity="0.1"/>
+    <text x="160" y="174" text-anchor="middle" font-family="'Noto Sans SC', sans-serif" font-size="13" fill="#10B981" font-weight="500">良好</text>
+    <!-- Station mini map representation -->
+    <g transform="translate(80, 220)">
+      <circle cx="30" cy="30" r="8" fill="#10B981"/>
+      <circle cx="80" cy="20" r="8" fill="#10B981"/>
+      <circle cx="130" cy="40" r="8" fill="#F59E0B"/>
+      <circle cx="60" cy="70" r="8" fill="#10B981"/>
+      <circle cx="110" cy="65" r="8" fill="#10B981"/>
+      <text x="80" y="110" text-anchor="middle" font-family="'Noto Sans SC', sans-serif" font-size="12" fill="#6B7280">5个监测站点</text>
+    </g>
+    <text x="160" y="330" text-anchor="middle" font-family="'Noto Sans SC', sans-serif" font-size="13" fill="#6B7280">五级分级 · 最差因子法</text>
+  </g>
+
+  <!-- Bottom info bar -->
+  <rect x="80" y="620" width="1760" height="60" rx="8" fill="#FFFFFF" filter="url(#cardShadow)"/>
+  <text x="120" y="658" font-family="'Noto Sans SC', sans-serif" font-size="16" fill="#0A2540" font-weight="600">监测站点：</text>
+  <text x="220" y="658" font-family="'Noto Sans SC', sans-serif" font-size="16" fill="#6B7280">青龙溪上游 · 红旗镇段 · 蓝河市段 · 黄石工业园段 · 碧水湾入江口</text>
+  <text x="1400" y="658" font-family="'Noto Sans SC', sans-serif" font-size="16" fill="#00A8E8" font-weight="500">历史趋势: 7天 / 30天 切换 →</text>
+
+  <!-- Page number -->
+  <text x="1840" y="1050" text-anchor="end" font-family="'DIN 1451', monospace" font-size="14" fill="#6B7280">05 / 10</text>
+</svg>

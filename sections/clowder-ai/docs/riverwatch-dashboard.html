@@ -6,323 +6,207 @@
   <meta name="description" content="RiverWatch - 河流水质数据可视化看板">
   <title>RiverWatch 水质监测</title>
 
-  <!-- Preconnect to CDN -->
-  <link rel="preconnect" href="https://cdn.bootcdn.net" crossorigin>
+  <!-- Tailwind CSS -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script>
+    tailwind.config = {
+      theme: {
+        extend: {
+          colors: {
+            primary: '#0EA5E9',
+            primaryDark: '#0284C7',
+            excellent: '#10B981',
+            good: '#3B82F6',
+            mild: '#F59E0B',
+            moderate: '#F97316',
+            severe: '#7F1D1D',
+          }
+        }
+      }
+    }
+  </script>
 
-  <!-- Critical CSS Inline (Performance Optimization) -->
+  <!-- Chart.js -->
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+
+  <!-- Vue 3 -->
+  <script src="https://unpkg.com/vue@3/dist/vue.global.js"></script>
+
+  <!-- Vue Router -->
+  <script src="https://unpkg.com/vue-router@4/dist/vue-router.global.js"></script>
+
   <style>
-    /* Reset & Base */
-    *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
-    html{-webkit-text-size-adjust:100%;-webkit-tap-highlight-color:transparent}
-    body{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,"Helvetica Neue",Arial,sans-serif;background:#f0f4f8;color:#1a202c;line-height:1.5;min-height:100vh}
+    /* Base */
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    html { -webkit-text-size-adjust: 100%; -webkit-tap-highlight-color: transparent; }
+    body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, "PingFang SC", "Microsoft YaHei", sans-serif; background: #F0F9FF; color: #0F172A; line-height: 1.5; min-height: 100vh; }
 
-    /* Skeleton Screen (visible before JS loads) */
-    .skeleton{background:linear-gradient(90deg,#e2e8f0 25%,#edf2f7 50%,#e2e8f0 75%);background-size:200% 100%;animation:skeleton-loading 1.5s infinite;border-radius:8px}
-    @keyframes skeleton-loading{0%{background-position:200% 0}100%{background-position:-200% 0}}
+    /* Skeleton */
+    .skeleton { background: linear-gradient(90deg, #e2e8f0 25%, #f1f5f9 50%, #e2e8f0 75%); background-size: 200% 100%; animation: skeleton-loading 1.5s infinite; border-radius: 8px; }
+    @keyframes skeleton-loading { 0% { background-position: 200% 0 } 100% { background-position: -200% 0 } }
 
-    /* App Shell */
-    #app{min-height:100vh;display:flex;flex-direction:column}
-    .app-header{background:linear-gradient(135deg,#00A8E8 0%,#0077b6 100%);color:#fff;padding:16px;position:sticky;top:0;z-index:100;box-shadow:0 2px 8px rgba(0,0,0,0.1)}
-    .app-header h1{font-size:20px;font-weight:700;display:flex;align-items:center;gap:8px}
-    .app-header .subtitle{font-size:12px;opacity:.9;margin-top:2px}
+    /* Vue cloak */
+    [v-cloak] { display: none !important; }
 
-    /* Stats Bar */
-    .stats-bar{display:flex;gap:12px;padding:12px 16px;background:#fff;margin:12px;border-radius:12px;box-shadow:0 1px 3px rgba(0,0,0,0.08)}
-    .stat-item{flex:1;text-align:center}
-    .stat-value{font-size:24px;font-weight:700;line-height:1}
-    .stat-value.normal{color:#10B981}
-    .stat-value.warning{color:#F59E0B}
-    .stat-value.danger{color:#EF4444}
-    .stat-label{font-size:14px;color:#718096;margin-top:4px}
+    /* Status badges */
+    .status-excellent { background: rgba(16,185,129,0.12); color: #059669; }
+    .status-good { background: rgba(59,130,246,0.12); color: #2563EB; }
+    .status-mild { background: rgba(245,158,11,0.12); color: #D97706; }
+    .status-moderate { background: rgba(249,115,22,0.12); color: #EA580C; }
+    .status-severe { background: rgba(127,29,29,0.12); color: #7F1D1D; }
 
-    /* Station Cards */
-    .station-list{padding:0 12px 12px;display:flex;flex-direction:column;gap:10px}
-    .station-card{background:#fff;border-radius:12px;padding:14px;box-shadow:0 1px 3px rgba(0,0,0,0.08);cursor:pointer;transition:transform .15s,box-shadow .15s;border-left:4px solid transparent}
-    .station-card:active{transform:scale(.98)}
-    .station-card.normal{border-left-color:#10B981}
-    .station-card.warning{border-left-color:#F59E0B}
-    .station-card.danger{border-left-color:#EF4444}
-    .station-header{display:flex;justify-content:space-between;align-items:center;margin-bottom:8px}
-    .station-name{font-size:16px;font-weight:600}
-    .station-status{font-size:14px;padding:4px 12px;border-radius:20px;font-weight:600}
-    .station-status.normal{background:rgba(16,185,129,.12);color:#059669}
-    .station-status.warning{background:rgba(245,158,11,.12);color:#d97706}
-    .station-status.danger{background:rgba(239,68,68,.12);color:#dc2626}
-    .station-meta{font-size:12px;color:#718096;display:flex;gap:12px}
-    .station-metrics{display:flex;gap:16px;margin-top:10px;padding-top:10px;border-top:1px solid #edf2f7}
-    .metric-mini{text-align:center;flex:1}
-    .metric-mini-value{font-size:18px;font-weight:700}
-    .metric-mini-label{font-size:14px;color:#a0aec0;margin-top:2px}
+    .border-excellent { border-left-color: #10B981; }
+    .border-good { border-left-color: #3B82F6; }
+    .border-mild { border-left-color: #F59E0B; }
+    .border-moderate { border-left-color: #F97316; }
+    .border-severe { border-left-color: #7F1D1D; }
 
-    /* Detail View */
-    .detail-view{position:fixed;top:0;left:0;right:0;bottom:0;background:#f0f4f8;z-index:200;overflow-y:auto;transform:translateX(100%);transition:transform .3s ease}
-    .detail-view.active{transform:translateX(0)}
-    .detail-header{background:linear-gradient(135deg,#00A8E8 0%,#0077b6 100%);color:#fff;padding:16px;position:sticky;top:0;z-index:10}
-    .back-btn{background:rgba(255,255,255,.2);border:none;color:#fff;padding:8px 16px;border-radius:8px;cursor:pointer;font-size:14px;margin-bottom:12px;display:flex;align-items:center;gap:6px}
-    .detail-title{font-size:20px;font-weight:700}
-    .detail-location{font-size:13px;opacity:.9;margin-top:4px}
+    /* Card hover */
+    .station-card { transition: transform 0.15s, box-shadow 0.15s; }
+    .station-card:active { transform: scale(0.98); }
 
-    /* Gauge Cards */
-    .gauge-grid{display:grid;grid-template-columns:repeat(2,1fr);gap:10px;padding:12px}
-    .gauge-card{background:#fff;border-radius:12px;padding:14px;text-align:center;box-shadow:0 1px 3px rgba(0,0,0,0.08)}
-    .gauge-title{font-size:13px;color:#4a5568;margin-bottom:8px;font-weight:500}
-    .gauge-value{font-size:32px;font-weight:700;line-height:1;margin:8px 0}
-    .gauge-value.normal{color:#10B981}
-    .gauge-value.warning{color:#F59E0B}
-    .gauge-value.danger{color:#EF4444}
-    .gauge-range{font-size:14px;color:#a0aec0}
-    .gauge-bar{height:6px;background:#e2e8f0;border-radius:3px;margin-top:10px;overflow:hidden}
-    .gauge-bar-fill{height:100%;border-radius:3px;transition:width .6s ease}
-    .gauge-bar-fill.normal{background:#10B981}
-    .gauge-bar-fill.warning{background:#F59E0B}
-    .gauge-bar-fill.danger{background:#EF4444}
+    /* Bottom nav */
+    .nav-item { transition: all 0.2s; }
+    .nav-item.active { color: #0EA5E9; }
+    .nav-item.active svg { stroke: #0EA5E9; }
 
-    /* Chart Section */
-    .chart-section{background:#fff;margin:0 12px 12px;border-radius:12px;padding:14px;box-shadow:0 1px 3px rgba(0,0,0,0.08)}
-    .chart-header{display:flex;justify-content:space-between;align-items:center;margin-bottom:12px}
-    .chart-title{font-size:15px;font-weight:600}
-    .time-toggle{display:flex;gap:4px;background:#edf2f7;padding:3px;border-radius:8px}
-    .time-toggle button{border:none;background:transparent;padding:10px 16px;font-size:14px;border-radius:6px;cursor:pointer;color:#4a5568;min-height:44px}
-    .time-toggle button.active{background:#fff;color:#00A8E8;box-shadow:0 1px 3px rgba(0,0,0,0.1);font-weight:600}
-    .chart-container{height:220px}
+    /* Chart container */
+    .chart-container { position: relative; height: 280px; }
+    @media (min-width: 768px) { .chart-container { height: 320px; } }
 
-    /* Loading States */
-    .loading{text-align:center;padding:40px;color:#718096}
-    .loading-spinner{width:40px;height:40px;border:3px solid #e2e8f0;border-top-color:#00A8E8;border-radius:50%;animation:spin 1s linear infinite;margin:0 auto 12px}
-    @keyframes spin{to{transform:rotate(360deg)}}
+    /* Safe area */
+    @supports (padding: max(0px)) { .pb-safe { padding-bottom: max(16px, env(safe-area-inset-bottom)) } }
 
-    /* Refresh Button */
-    .refresh-btn{position:fixed;bottom:20px;right:20px;width:52px;height:52px;border-radius:50%;background:#00A8E8;color:#fff;border:none;box-shadow:0 4px 12px rgba(0,168,232,.4);display:flex;align-items:center;justify-content:center;cursor:pointer;z-index:50;font-size:20px;transition:transform .2s}
-    .refresh-btn:active{transform:scale(.9)}
-    .refresh-btn.spinning{animation:spin 1s linear infinite}
-
-    /* Safe Area */
-    @supports(padding:max(0px)){body{padding-bottom:max(12px,env(safe-area-inset-bottom))}}
-
-    /* Responsive */
-    @media(min-width:768px){.station-list{display:grid;grid-template-columns:repeat(2,1fr)}.gauge-grid{grid-template-columns:repeat(4,1fr)}}
+    /* Scrollbar */
+    ::-webkit-scrollbar { width: 4px; }
+    ::-webkit-scrollbar-track { background: transparent; }
+    ::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 4px; }
   </style>
-
-  <!-- Async load non-critical CSS -->
-  <link rel="preload" href="https://cdn.bootcdn.net/ajax/libs/font-awesome/6.5.1/css/all.min.css" as="style" onload="this.onload=null;this.rel='stylesheet'">
-  <noscript><link rel="stylesheet" href="https://cdn.bootcdn.net/ajax/libs/font-awesome/6.5.1/css/all.min.css"></noscript>
 </head>
 <body>
-  <!-- Skeleton Screen (shown before Vue mounts) -->
+  <!-- Skeleton Screen -->
   <div id="skeleton-screen">
-    <div style="background:linear-gradient(135deg,#00A8E8 0%,#0077b6 100%);padding:16px;height:64px"></div>
-    <div style="padding:12px 16px">
-      <div class="skeleton" style="height:60px;margin-bottom:12px"></div>
-      <div class="skeleton" style="height:100px;margin-bottom:10px"></div>
-      <div class="skeleton" style="height:100px;margin-bottom:10px"></div>
-      <div class="skeleton" style="height:100px;margin-bottom:10px"></div>
+    <div class="bg-gradient-to-r from-sky-500 to-sky-600 h-16"></div>
+    <div class="p-4 space-y-3">
+      <div class="skeleton h-14 rounded-xl"></div>
+      <div class="skeleton h-28 rounded-xl"></div>
+      <div class="skeleton h-28 rounded-xl"></div>
+      <div class="skeleton h-28 rounded-xl"></div>
     </div>
   </div>
 
   <!-- Vue App -->
-  <div id="app" v-cloak style="display:none">
+  <div id="app" v-cloak class="min-h-screen flex flex-col">
     <!-- Header -->
-    <header class="app-header">
-      <h1><i class="fas fa-water"></i> RiverWatch</h1>
-      <div class="subtitle">河流水质实时监测看板 · {{ stationCount }}个站点</div>
+    <header class="bg-gradient-to-r from-sky-500 to-sky-600 text-white px-4 py-3 sticky top-0 z-50 shadow-md">
+      <div class="flex items-center justify-between max-w-6xl mx-auto">
+        <div class="flex items-center gap-2">
+          <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"/></svg>
+          <div>
+            <h1 class="text-lg font-bold leading-tight">RiverWatch</h1>
+            <p class="text-xs opacity-90">河流水质实时监测</p>
+          </div>
+        </div>
+        <div class="text-right">
+          <div class="text-sm font-semibold">{{ stationCount }}个站点</div>
+          <div class="text-xs opacity-80">{{ lastUpdate }}</div>
+        </div>
+      </div>
     </header>
 
-    <!-- Stats Bar -->
-    <div class="stats-bar">
-      <div class="stat-item">
-        <div class="stat-value normal">{{ stats.normal }}</div>
-        <div class="stat-label">正常</div>
-      </div>
-      <div class="stat-item">
-        <div class="stat-value warning">{{ stats.warning }}</div>
-        <div class="stat-label">警告</div>
-      </div>
-      <div class="stat-item">
-        <div class="stat-value danger">{{ stats.danger }}</div>
-        <div class="stat-label">危险</div>
-      </div>
-      <div class="stat-item">
-        <div class="stat-value" style="color:#00A8E8">{{ lastUpdate }}</div>
-        <div class="stat-label">更新时间</div>
-      </div>
-    </div>
+    <!-- Main Content -->
+    <main class="flex-1 pb-20">
+      <router-view
+        :stations="stations"
+        :history="history"
+        :stats="stats"
+        :filters="filters"
+        @update-filters="updateFilters"
+        @refresh="refreshData"
+      ></router-view>
+    </main>
 
-    <!-- Station List -->
-    <div class="station-list">
-      <div v-for="station in stations" :key="station.id"
-           class="station-card"
-           :class="station.status"
-           @click="openDetail(station)">
-        <div class="station-header">
-          <span class="station-name">{{ station.name }}</span>
-          <span class="station-status" :class="station.status">{{ statusText(station.status) }}</span>
-        </div>
-        <div class="station-meta">
-          <span><i class="fas fa-map-marker-alt" style="color:#00A8E8;margin-right:4px"></i>{{ station.location }}</span>
-          <span><i class="fas fa-clock" style="color:#718096;margin-right:4px"></i>{{ formatTime(station.lastUpdated) }}</span>
-        </div>
-        <div class="station-metrics">
-          <div class="metric-mini">
-            <div class="metric-mini-value" :style="{color: getMetricColor('ph', station.metrics.ph)}">{{ station.metrics.ph.toFixed(1) }}</div>
-            <div class="metric-mini-label">pH</div>
-          </div>
-          <div class="metric-mini">
-            <div class="metric-mini-value" :style="{color: getMetricColor('dissolvedOxygen', station.metrics.dissolvedOxygen)}">{{ station.metrics.dissolvedOxygen.toFixed(1) }}</div>
-            <div class="metric-mini-label">溶解氧</div>
-          </div>
-          <div class="metric-mini">
-            <div class="metric-mini-value" :style="{color: getMetricColor('turbidity', station.metrics.turbidity)}">{{ station.metrics.turbidity.toFixed(0) }}</div>
-            <div class="metric-mini-label">浊度</div>
-          </div>
-          <div class="metric-mini">
-            <div class="metric-mini-value" :style="{color: getMetricColor('ammoniaNitrogen', station.metrics.ammoniaNitrogen)}">{{ station.metrics.ammoniaNitrogen.toFixed(2) }}</div>
-            <div class="metric-mini-label">氨氮</div>
-          </div>
-        </div>
+    <!-- Bottom Navigation -->
+    <nav class="fixed bottom-0 left-0 right-0 bg-white border-t border-slate-200 z-50 pb-safe">
+      <div class="flex justify-around items-center h-14 max-w-6xl mx-auto">
+        <router-link to="/" class="nav-item flex flex-col items-center gap-0.5 px-4 py-1 text-slate-500" :class="{ active: $route.path === '/' }">
+          <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6"/></svg>
+          <span class="text-[10px]">总览</span>
+        </router-link>
+        <router-link to="/compare" class="nav-item flex flex-col items-center gap-0.5 px-4 py-1 text-slate-500" :class="{ active: $route.path === '/compare' }">
+          <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"/></svg>
+          <span class="text-[10px]">对比</span>
+        </router-link>
+        <router-link to="/trends" class="nav-item flex flex-col items-center gap-0.5 px-4 py-1 text-slate-500" :class="{ active: $route.path === '/trends' }">
+          <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 12l3-3 3 3 4-4M8 21l4-4 4 4M3 4h18M4 4h16v12a1 1 0 01-1 1H5a1 1 0 01-1-1V4z"/></svg>
+          <span class="text-[10px]">趋势</span>
+        </router-link>
       </div>
-    </div>
-
-    <!-- Detail View -->
-    <div class="detail-view" :class="{active: selectedStation}">
-      <template v-if="selectedStation">
-        <div class="detail-header">
-          <button class="back-btn" @click="closeDetail">
-            <i class="fas fa-arrow-left"></i> 返回
-          </button>
-          <div class="detail-title">{{ selectedStation.name }}</div>
-          <div class="detail-location">
-            <i class="fas fa-map-marker-alt"></i> {{ selectedStation.location }}
-            <span style="margin-left:12px" :class="selectedStation.status">{{ statusText(selectedStation.status) }}</span>
-          </div>
-        </div>
-
-        <!-- Gauge Cards -->
-        <div class="gauge-grid">
-          <div class="gauge-card">
-            <div class="gauge-title">pH 值</div>
-            <div class="gauge-value" :class="getMetricStatus('ph', selectedStation.metrics.ph)">{{ selectedStation.metrics.ph.toFixed(2) }}</div>
-            <div class="gauge-range">正常范围 6.5 - 8.5</div>
-            <div class="gauge-bar">
-              <div class="gauge-bar-fill" :class="getMetricStatus('ph', selectedStation.metrics.ph)" :style="{width: (selectedStation.metrics.ph / 14 * 100) + '%'}"></div>
-            </div>
-          </div>
-          <div class="gauge-card">
-            <div class="gauge-title">溶解氧</div>
-            <div class="gauge-value" :class="getMetricStatus('dissolvedOxygen', selectedStation.metrics.dissolvedOxygen)">{{ selectedStation.metrics.dissolvedOxygen.toFixed(1) }} <span style="font-size:14px">mg/L</span></div>
-            <div class="gauge-range">正常 ≥ 5.0 mg/L</div>
-            <div class="gauge-bar">
-              <div class="gauge-bar-fill" :class="getMetricStatus('dissolvedOxygen', selectedStation.metrics.dissolvedOxygen)" :style="{width: Math.min(selectedStation.metrics.dissolvedOxygen / 12 * 100, 100) + '%'}"></div>
-            </div>
-          </div>
-          <div class="gauge-card">
-            <div class="gauge-title">浊度</div>
-            <div class="gauge-value" :class="getMetricStatus('turbidity', selectedStation.metrics.turbidity)">{{ selectedStation.metrics.turbidity.toFixed(0) }} <span style="font-size:14px">NTU</span></div>
-            <div class="gauge-range">正常 ≤ 10 NTU</div>
-            <div class="gauge-bar">
-              <div class="gauge-bar-fill" :class="getMetricStatus('turbidity', selectedStation.metrics.turbidity)" :style="{width: Math.min(selectedStation.metrics.turbidity / 60 * 100, 100) + '%'}"></div>
-            </div>
-          </div>
-          <div class="gauge-card">
-            <div class="gauge-title">氨氮</div>
-            <div class="gauge-value" :class="getMetricStatus('ammoniaNitrogen', selectedStation.metrics.ammoniaNitrogen)">{{ selectedStation.metrics.ammoniaNitrogen.toFixed(2) }} <span style="font-size:14px">mg/L</span></div>
-            <div class="gauge-range">正常 ≤ 1.0 mg/L</div>
-            <div class="gauge-bar">
-              <div class="gauge-bar-fill" :class="getMetricStatus('ammoniaNitrogen', selectedStation.metrics.ammoniaNitrogen)" :style="{width: Math.min(selectedStation.metrics.ammoniaNitrogen / 3 * 100, 100) + '%'}"></div>
-            </div>
-          </div>
-        </div>
-
-        <!-- Trend Chart -->
-        <div class="chart-section">
-          <div class="chart-header">
-            <span class="chart-title"><i class="fas fa-chart-line" style="color:#00A8E8;margin-right:6px"></i>历史趋势</span>
-            <div class="time-toggle">
-              <button :class="{active: timeRange === '7d'}" @click="setTimeRange('7d')">7天</button>
-              <button :class="{active: timeRange === '30d'}" @click="setTimeRange('30d')">30天</button>
-            </div>
-          </div>
-          <div ref="chartContainer" class="chart-container"></div>
-        </div>
-      </template>
-    </div>
-
-    <!-- Refresh Button -->
-    <button class="refresh-btn" :class="{spinning: isRefreshing}" @click="refreshData" title="刷新数据">
-      <i class="fas fa-sync-alt"></i>
-    </button>
+    </nav>
   </div>
 
-  <!-- Vue 3 -->
-  <script src="https://cdn.bootcdn.net/ajax/libs/vue/3.4.21/vue.global.min.js"></script>
-  <!-- ECharts (async loaded when needed) -->
   <script>
-    // Lazy load ECharts when detail view opens
-    let echartsLoaded = false;
-    function loadECharts() {
-      if (echartsLoaded) return Promise.resolve();
-      return new Promise((resolve) => {
-        const script = document.createElement('script');
-        script.src = 'https://cdn.bootcdn.net/ajax/libs/echarts/5.5.0/echarts.min.js';
-        script.onload = () => { echartsLoaded = true; resolve(); };
-        document.head.appendChild(script);
-      });
-    }
-  </script>
+    const { createApp, ref, computed, onMounted, onUnmounted, watch, nextTick } = Vue;
+    const { createRouter, createWebHashHistory } = VueRouter;
 
-  <script>
-    const { createApp, ref, computed, onMounted, nextTick } = Vue;
-
-    // Thresholds configuration
+    // ==================== Constants ====================
     const THRESHOLDS = {
       ph: { min: 6.5, max: 8.5, warningMin: 6.0, warningMax: 9.0 },
       dissolvedOxygen: { min: 5.0, warningMin: 3.0 },
-      turbidity: { max: 10, warningMax: 50 },
-      ammoniaNitrogen: { max: 1.0, warningMax: 2.0 }
+      turbidity: { max: 5, warningMax: 10 },
+      ammoniaNitrogen: { max: 0.5, warningMax: 1.0, dangerMax: 2.0 }
     };
 
-    // Color palette - aligned with QA acceptance criteria
-    const COLORS = {
-      normal: '#10B981',
-      warning: '#F59E0B',
-      danger: '#EF4444',
-      primary: '#00A8E8',
-      text: '#1a202c',
-      textSecondary: '#718096',
-      bg: '#f0f4f8',
-      card: '#ffffff'
+    const STATUS_MAP = {
+      excellent: { label: '优', color: 'excellent', bg: 'bg-emerald-500' },
+      good: { label: '良', color: 'good', bg: 'bg-blue-500' },
+      mild: { label: '轻度污染', color: 'mild', bg: 'bg-amber-500' },
+      moderate: { label: '中度污染', color: 'moderate', bg: 'bg-orange-500' },
+      severe: { label: '重度污染', color: 'severe', bg: 'bg-red-900' }
     };
 
-    // Mock data generator
+    const OPERATIONAL_STATUS_MAP = {
+      online: { label: '在线', color: 'text-emerald-600', bg: 'bg-emerald-100', dot: 'bg-emerald-500' },
+      offline: { label: '离线', color: 'text-slate-600', bg: 'bg-slate-200', dot: 'bg-slate-400' },
+      alarm: { label: '告警', color: 'text-red-700', bg: 'bg-red-100', dot: 'bg-red-500' }
+    };
+
+    // ==================== Mock Data ====================
     function generateMockData() {
       const stations = [
         {
-          id: 'A', name: '青龙溪上游', location: '清洁区 · 上游源头',
-          status: 'normal',
-          metrics: { ph: 7.2, dissolvedOxygen: 8.5, turbidity: 3, ammoniaNitrogen: 0.15 }
+          id: 'st-001', name: '长江大桥监测点', lat: 30.59, lng: 114.30, region: '武昌区',
+          status: 'excellent',
+          metrics: { ph: 7.4, dissolvedOxygen: 8.2, turbidity: 4, ammoniaNitrogen: 0.12 }
         },
         {
-          id: 'B', name: '红旗镇段', location: '农业区 · 中游',
-          status: 'warning',
-          metrics: { ph: 6.3, dissolvedOxygen: 4.2, turbidity: 18, ammoniaNitrogen: 0.85 }
+          id: 'st-002', name: '汉江入江口', lat: 30.57, lng: 114.27, region: '汉阳区',
+          status: 'good',
+          metrics: { ph: 7.1, dissolvedOxygen: 6.8, turbidity: 8, ammoniaNitrogen: 0.35 }
         },
         {
-          id: 'C', name: '蓝河市段', location: '城镇生活区 · 中游',
-          status: 'danger',
-          metrics: { ph: 5.8, dissolvedOxygen: 2.1, turbidity: 45, ammoniaNitrogen: 2.3 }
+          id: 'st-003', name: '东湖出口', lat: 30.55, lng: 114.37, region: '洪山区',
+          status: 'mild',
+          metrics: { ph: 6.3, dissolvedOxygen: 4.5, turbidity: 15, ammoniaNitrogen: 0.65 }
         },
         {
-          id: 'D', name: '黄石工业园段', location: '工业区 · 下游',
-          status: 'danger',
-          metrics: { ph: 4.5, dissolvedOxygen: 1.8, turbidity: 80, ammoniaNitrogen: 4.5 }
+          id: 'st-004', name: '府河上游', lat: 30.72, lng: 114.22, region: '黄陂区',
+          status: 'moderate',
+          metrics: { ph: 5.8, dissolvedOxygen: 3.2, turbidity: 35, ammoniaNitrogen: 1.2 }
         },
         {
-          id: 'E', name: '碧水湾入江口', location: '下游汇流区 · 入江前',
-          status: 'warning',
-          metrics: { ph: 7.8, dissolvedOxygen: 5.5, turbidity: 12, ammoniaNitrogen: 1.2 }
+          id: 'st-005', name: '南湖中心', lat: 30.50, lng: 114.35, region: '洪山区',
+          status: 'mild',
+          metrics: { ph: 7.8, dissolvedOxygen: 5.2, turbidity: 12, ammoniaNitrogen: 0.55 }
+        },
+        {
+          id: 'st-006', name: '汤逊湖入口', lat: 30.45, lng: 114.40, region: '江夏区',
+          status: 'severe',
+          metrics: { ph: 4.2, dissolvedOxygen: 1.5, turbidity: 65, ammoniaNitrogen: 3.8 }
         }
       ];
 
-      // Generate history for each station (30 days)
+      // Generate 30 days of history for each station
       const history = {};
       const now = new Date();
       stations.forEach(station => {
@@ -330,15 +214,14 @@
         for (let i = 29; i >= 0; i--) {
           const date = new Date(now);
           date.setDate(date.getDate() - i);
-          // Add some random variation
-          const variation = () => (Math.random() - 0.5) * 0.3;
+          const variation = () => (Math.random() - 0.5);
           history[station.id].push({
             timestamp: date.toISOString(),
             metrics: {
-              ph: Math.max(0, Math.min(14, station.metrics.ph + variation() * 4)),
-              dissolvedOxygen: Math.max(0, station.metrics.dissolvedOxygen + variation() * 3),
-              turbidity: Math.max(0, station.metrics.turbidity + variation() * 10),
-              ammoniaNitrogen: Math.max(0, station.metrics.ammoniaNitrogen + variation() * 0.5)
+              ph: Math.max(4, Math.min(10, station.metrics.ph + variation() * 1.5)),
+              dissolvedOxygen: Math.max(0.5, station.metrics.dissolvedOxygen + variation() * 3),
+              turbidity: Math.max(0, station.metrics.turbidity + variation() * 15),
+              ammoniaNitrogen: Math.max(0, station.metrics.ammoniaNitrogen + variation() * 0.8)
             }
           });
         }
@@ -347,20 +230,728 @@
       return { stations, history };
     }
 
+    // ==================== Utility Functions ====================
+    function getMetricStatus(metric, value) {
+      const t = THRESHOLDS[metric];
+      if (!t) return 'normal';
+
+      if (metric === 'ph') {
+        if (value < t.warningMin || value > t.warningMax) return 'danger';
+        if (value < t.min || value > t.max) return 'warning';
+      } else if (metric === 'dissolvedOxygen') {
+        if (value < t.warningMin) return 'danger';
+        if (value < t.min) return 'warning';
+      } else if (metric === 'turbidity') {
+        if (value > t.warningMax) return 'danger';
+        if (value > t.max) return 'warning';
+      } else if (metric === 'ammoniaNitrogen') {
+        if (t.dangerMax && value > t.dangerMax) return 'danger';
+        if (value > t.warningMax) return 'warning';
+        if (value > t.max) return 'warning';
+      }
+      return 'normal';
+    }
+
+    function calculateOverallStatus(metrics) {
+      const statuses = [
+        getMetricStatus('ph', metrics.ph),
+        getMetricStatus('dissolvedOxygen', metrics.dissolvedOxygen),
+        getMetricStatus('turbidity', metrics.turbidity),
+        getMetricStatus('ammoniaNitrogen', metrics.ammoniaNitrogen)
+      ];
+
+      const warningCount = statuses.filter(s => s === 'warning').length;
+      const dangerCount = statuses.filter(s => s === 'danger').length;
+
+      if (dangerCount >= 3 || metrics.ph < 5 || metrics.ph > 9.5) return 'severe';
+      if (warningCount >= 3 || dangerCount >= 2) return 'moderate';
+      if (warningCount >= 2 || dangerCount >= 1) return 'mild';
+      if (warningCount >= 1) return 'good';
+      return 'excellent';
+    }
+
+    function formatTime(iso) {
+      const d = new Date(iso);
+      return `${d.getHours().toString().padStart(2,'0')}:${d.getMinutes().toString().padStart(2,'0')}`;
+    }
+
+    function formatDate(iso) {
+      const d = new Date(iso);
+      return `${d.getMonth()+1}/${d.getDate()}`;
+    }
+
+    // ==================== Components ====================
+
+    // Dashboard Page
+    const DashboardPage = {
+      props: ['stations', 'stats', 'filters'],
+      emits: ['update-filters'],
+      setup(props, { emit }) {
+        const filterOptions = [
+          { value: 'all', label: '全部' },
+          { value: 'excellent', label: '优' },
+          { value: 'good', label: '良' },
+          { value: 'mild', label: '轻度' },
+          { value: 'moderate', label: '中度' },
+          { value: 'severe', label: '重度' }
+        ];
+
+        const filteredStations = computed(() => {
+          if (props.filters.status === 'all') return props.stations;
+          return props.stations.filter(s => s.status === props.filters.status);
+        });
+
+        return { filterOptions, filteredStations, STATUS_MAP, formatTime };
+      },
+      template: `
+        <div class="max-w-6xl mx-auto p-4 space-y-4">
+          <!-- Stats Bar -->
+          <div class="bg-white rounded-xl shadow-sm p-4 grid grid-cols-4 gap-2">
+            <div class="text-center">
+              <div class="text-2xl font-bold text-emerald-500">{{ stats.excellent }}</div>
+              <div class="text-xs text-slate-500">优</div>
+            </div>
+            <div class="text-center">
+              <div class="text-2xl font-bold text-blue-500">{{ stats.good }}</div>
+              <div class="text-xs text-slate-500">良</div>
+            </div>
+            <div class="text-center">
+              <div class="text-2xl font-bold text-amber-500">{{ stats.mild + stats.moderate + stats.severe }}</div>
+              <div class="text-xs text-slate-500">污染</div>
+            </div>
+            <div class="text-center">
+              <div class="text-2xl font-bold text-sky-500">{{ stations.length }}</div>
+              <div class="text-xs text-slate-500">总计</div>
+            </div>
+          </div>
+
+          <!-- Filter -->
+          <div class="flex gap-2 overflow-x-auto pb-1">
+            <button
+              v-for="opt in filterOptions"
+              :key="opt.value"
+              @click="$emit('update-filters', { status: opt.value })"
+              class="px-4 py-2 rounded-full text-sm font-medium whitespace-nowrap transition-colors"
+              :class="filters.status === opt.value ? 'bg-sky-500 text-white' : 'bg-white text-slate-600 hover:bg-slate-50'"
+            >
+              {{ opt.label }}
+            </button>
+          </div>
+
+          <!-- Station Cards -->
+          <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+            <router-link
+              v-for="station in filteredStations"
+              :key="station.id"
+              :to="'/station/' + station.id"
+              class="station-card bg-white rounded-xl p-4 shadow-sm border-l-4"
+              :class="'border-' + station.status"
+            >
+              <div class="flex justify-between items-start mb-2">
+                <h3 class="font-semibold text-slate-800">{{ station.name }}</h3>
+                <span class="px-3 py-1 rounded-full text-xs font-semibold" :class="'status-' + station.status">
+                  {{ STATUS_MAP[station.status].label }}
+                </span>
+              </div>
+              <div class="text-xs text-slate-500 mb-3 flex items-center gap-1">
+                <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z"/><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 11a3 3 0 11-6 0 3 3 0 016 0z"/></svg>
+                {{ station.region }}
+              </div>
+              <div class="grid grid-cols-4 gap-2 pt-3 border-t border-slate-100">
+                <div class="text-center">
+                  <div class="text-lg font-bold" :class="station.metrics.ph < 6.5 || station.metrics.ph > 8.5 ? 'text-amber-500' : 'text-emerald-500'">{{ station.metrics.ph.toFixed(1) }}</div>
+                  <div class="text-[10px] text-slate-400">pH</div>
+                </div>
+                <div class="text-center">
+                  <div class="text-lg font-bold" :class="station.metrics.dissolvedOxygen < 5 ? 'text-amber-500' : 'text-emerald-500'">{{ station.metrics.dissolvedOxygen.toFixed(1) }}</div>
+                  <div class="text-[10px] text-slate-400">DO</div>
+                </div>
+                <div class="text-center">
+                  <div class="text-lg font-bold" :class="station.metrics.turbidity > 10 ? 'text-amber-500' : 'text-emerald-500'">{{ station.metrics.turbidity.toFixed(0) }}</div>
+                  <div class="text-[10px] text-slate-400">浊度</div>
+                </div>
+                <div class="text-center">
+                  <div class="text-lg font-bold" :class="station.metrics.ammoniaNitrogen > 0.5 ? 'text-amber-500' : 'text-emerald-500'">{{ station.metrics.ammoniaNitrogen.toFixed(2) }}</div>
+                  <div class="text-[10px] text-slate-400">氨氮</div>
+                </div>
+              </div>
+            </router-link>
+          </div>
+
+          <!-- Empty State -->
+          <div v-if="filteredStations.length === 0" class="text-center py-12">
+            <svg class="w-16 h-16 mx-auto text-slate-300 mb-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9.172 16.172a4 4 0 015.656 0M9 10h.01M15 10h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+            <p class="text-slate-500">暂无符合条件的站点</p>
+          </div>
+        </div>
+      `
+    };
+
+    // Station Detail Page
+    const StationDetailPage = {
+      props: ['stations', 'history'],
+      setup(props) {
+        const route = VueRouter.useRoute();
+        const router = VueRouter.useRouter();
+        const timeRange = ref('24h');
+        const chartInstance = ref(null);
+
+        const station = computed(() => {
+          return props.stations.find(s => s.id === route.params.id);
+        });
+
+        const stationHistory = computed(() => {
+          if (!station.value) return [];
+          const hist = props.history[station.value.id] || [];
+          if (timeRange.value === '24h') return hist.slice(-1);
+          if (timeRange.value === '7d') return hist.slice(-7);
+          return hist;
+        });
+
+        function getMetricStatusLocal(metric, value) {
+          return getMetricStatus(metric, value);
+        }
+
+        function getStatusColor(status) {
+          const colors = { normal: 'text-emerald-500', warning: 'text-amber-500', danger: 'text-red-500' };
+          return colors[status] || 'text-emerald-500';
+        }
+
+        function initChart() {
+          if (!chartInstance.value || !station.value) return;
+
+          const ctx = chartInstance.value.getContext('2d');
+          const data = stationHistory.value;
+
+          if (window.detailChart) {
+            window.detailChart.destroy();
+          }
+
+          window.detailChart = new Chart(ctx, {
+            type: 'line',
+            data: {
+              labels: data.map(d => formatDate(d.timestamp)),
+              datasets: [
+                {
+                  label: 'pH',
+                  data: data.map(d => d.metrics.ph),
+                  borderColor: '#0EA5E9',
+                  backgroundColor: 'rgba(14,165,233,0.1)',
+                  tension: 0.4,
+                  pointRadius: 3
+                },
+                {
+                  label: '溶解氧',
+                  data: data.map(d => d.metrics.dissolvedOxygen),
+                  borderColor: '#10B981',
+                  backgroundColor: 'rgba(16,185,129,0.1)',
+                  tension: 0.4,
+                  pointRadius: 3
+                },
+                {
+                  label: '浊度',
+                  data: data.map(d => d.metrics.turbidity),
+                  borderColor: '#F59E0B',
+                  backgroundColor: 'rgba(245,158,11,0.1)',
+                  tension: 0.4,
+                  pointRadius: 3,
+                  yAxisID: 'y1'
+                },
+                {
+                  label: '氨氮',
+                  data: data.map(d => d.metrics.ammoniaNitrogen),
+                  borderColor: '#EF4444',
+                  backgroundColor: 'rgba(239,68,68,0.1)',
+                  tension: 0.4,
+                  pointRadius: 3,
+                  yAxisID: 'y1'
+                }
+              ]
+            },
+            options: {
+              responsive: true,
+              maintainAspectRatio: false,
+              interaction: { mode: 'index', intersect: false },
+              plugins: {
+                legend: { position: 'top', labels: { usePointStyle: true, padding: 15 } }
+              },
+              scales: {
+                x: { grid: { display: false }, ticks: { font: { size: 11 } } },
+                y: { position: 'left', grid: { color: 'rgba(0,0,0,0.05)' }, ticks: { font: { size: 11 } } },
+                y1: { position: 'right', grid: { display: false }, ticks: { font: { size: 11 } } }
+              }
+            }
+          });
+        }
+
+        watch([station, timeRange], () => {
+          nextTick(() => initChart());
+        }, { immediate: true });
+
+        onUnmounted(() => {
+          if (window.detailChart) {
+            window.detailChart.destroy();
+            window.detailChart = null;
+          }
+        });
+
+        return { station, timeRange, chartInstance, router, getMetricStatusLocal, getStatusColor, STATUS_MAP };
+      },
+      template: `
+        <div v-if="station" class="max-w-6xl mx-auto p-4 space-y-4">
+          <!-- Header -->
+          <div class="flex items-center gap-3 mb-4">
+            <button @click="router.push('/')" class="p-2 rounded-lg bg-white shadow-sm hover:bg-slate-50">
+              <svg class="w-5 h-5 text-slate-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7"/></svg>
+            </button>
+            <div>
+              <h2 class="text-xl font-bold">{{ station.name }}</h2>
+              <p class="text-sm text-slate-500">{{ station.region }}</p>
+            </div>
+            <span class="ml-auto px-3 py-1 rounded-full text-sm font-semibold" :class="'status-' + station.status">
+              {{ STATUS_MAP[station.status].label }}
+            </span>
+          </div>
+
+          <!-- Metrics Grid -->
+          <div class="grid grid-cols-2 lg:grid-cols-4 gap-3">
+            <div class="bg-white rounded-xl p-4 shadow-sm text-center">
+              <div class="text-xs text-slate-500 mb-1">pH 值</div>
+              <div class="text-3xl font-bold" :class="getStatusColor(getMetricStatusLocal('ph', station.metrics.ph))">{{ station.metrics.ph.toFixed(2) }}</div>
+              <div class="text-xs text-slate-400 mt-1">正常 6.5-8.5</div>
+              <div class="h-1.5 bg-slate-100 rounded-full mt-2 overflow-hidden">
+                <div class="h-full rounded-full transition-all" :class="getMetricStatusLocal('ph', station.metrics.ph) === 'normal' ? 'bg-emerald-500' : getMetricStatusLocal('ph', station.metrics.ph) === 'warning' ? 'bg-amber-500' : 'bg-red-500'" :style="{width: Math.min(station.metrics.ph / 14 * 100, 100) + '%'}"></div>
+              </div>
+            </div>
+            <div class="bg-white rounded-xl p-4 shadow-sm text-center">
+              <div class="text-xs text-slate-500 mb-1">溶解氧</div>
+              <div class="text-3xl font-bold" :class="getStatusColor(getMetricStatusLocal('dissolvedOxygen', station.metrics.dissolvedOxygen))">{{ station.metrics.dissolvedOxygen.toFixed(1) }}<span class="text-sm font-normal text-slate-400"> mg/L</span></div>
+              <div class="text-xs text-slate-400 mt-1">正常 ≥5.0</div>
+              <div class="h-1.5 bg-slate-100 rounded-full mt-2 overflow-hidden">
+                <div class="h-full rounded-full transition-all" :class="getMetricStatusLocal('dissolvedOxygen', station.metrics.dissolvedOxygen) === 'normal' ? 'bg-emerald-500' : getMetricStatusLocal('dissolvedOxygen', station.metrics.dissolvedOxygen) === 'warning' ? 'bg-amber-500' : 'bg-red-500'" :style="{width: Math.min(station.metrics.dissolvedOxygen / 12 * 100, 100) + '%'}"></div>
+              </div>
+            </div>
+            <div class="bg-white rounded-xl p-4 shadow-sm text-center">
+              <div class="text-xs text-slate-500 mb-1">浊度</div>
+              <div class="text-3xl font-bold" :class="getStatusColor(getMetricStatusLocal('turbidity', station.metrics.turbidity))">{{ station.metrics.turbidity.toFixed(0) }}<span class="text-sm font-normal text-slate-400"> NTU</span></div>
+              <div class="text-xs text-slate-400 mt-1">正常 ≤10</div>
+              <div class="h-1.5 bg-slate-100 rounded-full mt-2 overflow-hidden">
+                <div class="h-full rounded-full transition-all" :class="getMetricStatusLocal('turbidity', station.metrics.turbidity) === 'normal' ? 'bg-emerald-500' : getMetricStatusLocal('turbidity', station.metrics.turbidity) === 'warning' ? 'bg-amber-500' : 'bg-red-500'" :style="{width: Math.min(station.metrics.turbidity / 60 * 100, 100) + '%'}"></div>
+              </div>
+            </div>
+            <div class="bg-white rounded-xl p-4 shadow-sm text-center">
+              <div class="text-xs text-slate-500 mb-1">氨氮</div>
+              <div class="text-3xl font-bold" :class="getStatusColor(getMetricStatusLocal('ammoniaNitrogen', station.metrics.ammoniaNitrogen))">{{ station.metrics.ammoniaNitrogen.toFixed(2) }}<span class="text-sm font-normal text-slate-400"> mg/L</span></div>
+              <div class="text-xs text-slate-400 mt-1">正常 ≤0.5</div>
+              <div class="h-1.5 bg-slate-100 rounded-full mt-2 overflow-hidden">
+                <div class="h-full rounded-full transition-all" :class="getMetricStatusLocal('ammoniaNitrogen', station.metrics.ammoniaNitrogen) === 'normal' ? 'bg-emerald-500' : getMetricStatusLocal('ammoniaNitrogen', station.metrics.ammoniaNitrogen) === 'warning' ? 'bg-amber-500' : 'bg-red-500'" :style="{width: Math.min(station.metrics.ammoniaNitrogen / 3 * 100, 100) + '%'}"></div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Chart -->
+          <div class="bg-white rounded-xl shadow-sm p-4">
+            <div class="flex justify-between items-center mb-4">
+              <h3 class="font-semibold">历史趋势</h3>
+              <div class="flex gap-1 bg-slate-100 rounded-lg p-1">
+                <button @click="timeRange = '7d'" class="px-3 py-1.5 rounded-md text-sm transition-colors" :class="timeRange === '7d' ? 'bg-white text-sky-600 shadow-sm font-medium' : 'text-slate-500 hover:text-slate-700'">7天</button>
+                <button @click="timeRange = '30d'" class="px-3 py-1.5 rounded-md text-sm transition-colors" :class="timeRange === '30d' ? 'bg-white text-sky-600 shadow-sm font-medium' : 'text-slate-500 hover:text-slate-700'">30天</button>
+              </div>
+            </div>
+            <div class="chart-container">
+              <canvas ref="chartInstance"></canvas>
+            </div>
+          </div>
+
+          <!-- Info -->
+          <div class="bg-white rounded-xl shadow-sm p-4">
+            <h3 class="font-semibold mb-3">指标说明</h3>
+            <div class="space-y-2 text-sm">
+              <div class="flex justify-between py-2 border-b border-slate-100">
+                <span class="text-slate-600">pH 值</span>
+                <span class="text-slate-500">6.5 - 8.5 为正常范围</span>
+              </div>
+              <div class="flex justify-between py-2 border-b border-slate-100">
+                <span class="text-slate-600">溶解氧 (DO)</span>
+                <span class="text-slate-500">≥ 5.0 mg/L 为正常</span>
+              </div>
+              <div class="flex justify-between py-2 border-b border-slate-100">
+                <span class="text-slate-600">浊度</span>
+                <span class="text-slate-500">≤ 10 NTU 为正常</span>
+              </div>
+              <div class="flex justify-between py-2">
+                <span class="text-slate-600">氨氮</span>
+                <span class="text-slate-500">≤ 0.5 mg/L 为Ⅰ类水标准</span>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Not Found -->
+        <div v-else class="text-center py-12">
+          <p class="text-slate-500">站点不存在</p>
+          <router-link to="/" class="text-sky-500 mt-2 inline-block">返回首页</router-link>
+        </div>
+      `
+    };
+
+    // Compare Page
+    const ComparePage = {
+      props: ['stations', 'history'],
+      setup(props) {
+        const selectedStations = ref([]);
+        const radarChartInstance = ref(null);
+
+        const availableStations = computed(() => {
+          return props.stations.map(s => ({ id: s.id, name: s.name, status: s.status }));
+        });
+
+        const selectedData = computed(() => {
+          return props.stations.filter(s => selectedStations.value.includes(s.id));
+        });
+
+        function toggleStation(id) {
+          if (selectedStations.value.includes(id)) {
+            selectedStations.value = selectedStations.value.filter(sid => sid !== id);
+          } else if (selectedStations.value.length < 4) {
+            selectedStations.value.push(id);
+          }
+        }
+
+        function getScore(metrics) {
+          let score = 100;
+          if (metrics.ph < 6.5 || metrics.ph > 8.5) score -= 15;
+          if (metrics.ph < 6.0 || metrics.ph > 9.0) score -= 25;
+          if (metrics.dissolvedOxygen < 5) score -= 15;
+          if (metrics.dissolvedOxygen < 3) score -= 25;
+          if (metrics.turbidity > 10) score -= 15;
+          if (metrics.turbidity > 50) score -= 25;
+          if (metrics.ammoniaNitrogen > 0.5) score -= 15;
+          if (metrics.ammoniaNitrogen > 1.0) score -= 25;
+          return Math.max(0, score);
+        }
+
+        function initRadarChart() {
+          if (!radarChartInstance.value || selectedData.value.length === 0) return;
+
+          const ctx = radarChartInstance.value.getContext('2d');
+
+          if (window.radarChart) {
+            window.radarChart.destroy();
+          }
+
+          const colors = ['#0EA5E9', '#10B981', '#F59E0B', '#EF4444'];
+
+          window.radarChart = new Chart(ctx, {
+            type: 'radar',
+            data: {
+              labels: ['pH稳定性', '溶解氧', '浊度清澈度', '氨氮控制'],
+              datasets: selectedData.value.map((s, i) => ({
+                label: s.name,
+                data: [
+                  Math.max(0, 100 - Math.abs(s.metrics.ph - 7.5) * 30),
+                  Math.min(100, s.metrics.dissolvedOxygen * 12),
+                  Math.max(0, 100 - s.metrics.turbidity * 2),
+                  Math.max(0, 100 - s.metrics.ammoniaNitrogen * 40)
+                ],
+                borderColor: colors[i % colors.length],
+                backgroundColor: colors[i % colors.length] + '20',
+                pointRadius: 3
+              }))
+            },
+            options: {
+              responsive: true,
+              maintainAspectRatio: false,
+              plugins: {
+                legend: { position: 'top', labels: { usePointStyle: true } }
+              },
+              scales: {
+                r: {
+                  beginAtZero: true,
+                  max: 100,
+                  ticks: { stepSize: 25, font: { size: 10 } }
+                }
+              }
+            }
+          });
+        }
+
+        watch(selectedData, () => {
+          nextTick(() => initRadarChart());
+        }, { deep: true });
+
+        onUnmounted(() => {
+          if (window.radarChart) {
+            window.radarChart.destroy();
+            window.radarChart = null;
+          }
+        });
+
+        return { selectedStations, availableStations, selectedData, toggleStation, getScore, radarChartInstance, STATUS_MAP };
+      },
+      template: `
+        <div class="max-w-6xl mx-auto p-4 space-y-4">
+          <h2 class="text-xl font-bold">数据对比</h2>
+
+          <!-- Station Selector -->
+          <div class="bg-white rounded-xl shadow-sm p-4">
+            <h3 class="font-semibold mb-3">选择站点（最多4个）</h3>
+            <div class="flex flex-wrap gap-2">
+              <button
+                v-for="s in availableStations"
+                :key="s.id"
+                @click="toggleStation(s.id)"
+                class="px-3 py-2 rounded-lg text-sm font-medium transition-all border-2"
+                :class="selectedStations.includes(s.id) ? 'border-sky-500 bg-sky-50 text-sky-700' : 'border-slate-200 bg-white text-slate-600 hover:border-slate-300'"
+              >
+                {{ s.name }}
+              </button>
+            </div>
+          </div>
+
+          <!-- Radar Chart -->
+          <div v-if="selectedData.length > 0" class="bg-white rounded-xl shadow-sm p-4">
+            <h3 class="font-semibold mb-4">综合评分雷达图</h3>
+            <div class="chart-container" style="height: 300px;">
+              <canvas ref="radarChartInstance"></canvas>
+            </div>
+          </div>
+
+          <!-- Comparison Table -->
+          <div v-if="selectedData.length > 0" class="bg-white rounded-xl shadow-sm p-4 overflow-x-auto">
+            <h3 class="font-semibold mb-4">详细对比</h3>
+            <table class="w-full text-sm">
+              <thead>
+                <tr class="border-b border-slate-200">
+                  <th class="text-left py-2 px-2">指标</th>
+                  <th v-for="s in selectedData" :key="s.id" class="text-center py-2 px-2">{{ s.name }}</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr class="border-b border-slate-100">
+                  <td class="py-2 px-2 text-slate-600">状态</td>
+                  <td v-for="s in selectedData" :key="s.id" class="text-center py-2 px-2">
+                    <span class="px-2 py-0.5 rounded-full text-xs font-semibold" :class="'status-' + s.status">{{ STATUS_MAP[s.status].label }}</span>
+                  </td>
+                </tr>
+                <tr class="border-b border-slate-100">
+                  <td class="py-2 px-2 text-slate-600">pH</td>
+                  <td v-for="s in selectedData" :key="s.id" class="text-center py-2 px-2 font-mono">{{ s.metrics.ph.toFixed(2) }}</td>
+                </tr>
+                <tr class="border-b border-slate-100">
+                  <td class="py-2 px-2 text-slate-600">溶解氧</td>
+                  <td v-for="s in selectedData" :key="s.id" class="text-center py-2 px-2 font-mono">{{ s.metrics.dissolvedOxygen.toFixed(1) }}</td>
+                </tr>
+                <tr class="border-b border-slate-100">
+                  <td class="py-2 px-2 text-slate-600">浊度</td>
+                  <td v-for="s in selectedData" :key="s.id" class="text-center py-2 px-2 font-mono">{{ s.metrics.turbidity.toFixed(0) }}</td>
+                </tr>
+                <tr class="border-b border-slate-100">
+                  <td class="py-2 px-2 text-slate-600">氨氮</td>
+                  <td v-for="s in selectedData" :key="s.id" class="text-center py-2 px-2 font-mono">{{ s.metrics.ammoniaNitrogen.toFixed(2) }}</td>
+                </tr>
+                <tr>
+                  <td class="py-2 px-2 text-slate-600 font-medium">综合评分</td>
+                  <td v-for="s in selectedData" :key="s.id" class="text-center py-2 px-2 font-bold" :class="getScore(s.metrics) >= 80 ? 'text-emerald-500' : getScore(s.metrics) >= 60 ? 'text-amber-500' : 'text-red-500'">{{ getScore(s.metrics) }}</td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+
+          <!-- Empty State -->
+          <div v-if="selectedData.length === 0" class="text-center py-12 bg-white rounded-xl shadow-sm">
+            <svg class="w-16 h-16 mx-auto text-slate-300 mb-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"/></svg>
+            <p class="text-slate-500">请选择至少一个站点进行对比</p>
+          </div>
+        </div>
+      `
+    };
+
+    // Trends Page
+    const TrendsPage = {
+      props: ['stations', 'history'],
+      setup(props) {
+        const timeRange = ref('7d');
+        const selectedMetric = ref('ph');
+        const selectedStations = ref([]);
+        const trendChartInstance = ref(null);
+
+        const metricOptions = [
+          { value: 'ph', label: 'pH 值' },
+          { value: 'dissolvedOxygen', label: '溶解氧' },
+          { value: 'turbidity', label: '浊度' },
+          { value: 'ammoniaNitrogen', label: '氨氮' }
+        ];
+
+        const metricColors = {
+          ph: '#0EA5E9',
+          dissolvedOxygen: '#10B981',
+          turbidity: '#F59E0B',
+          ammoniaNitrogen: '#EF4444'
+        };
+
+        const stationColors = ['#0EA5E9', '#10B981', '#F59E0B', '#EF4444', '#8B5CF6', '#EC4899'];
+
+        onMounted(() => {
+          selectedStations.value = props.stations.slice(0, 3).map(s => s.id);
+        });
+
+        function toggleStation(id) {
+          if (selectedStations.value.includes(id)) {
+            selectedStations.value = selectedStations.value.filter(sid => sid !== id);
+          } else {
+            selectedStations.value.push(id);
+          }
+        }
+
+        function initTrendChart() {
+          if (!trendChartInstance.value || selectedStations.value.length === 0) return;
+
+          const ctx = trendChartInstance.value.getContext('2d');
+
+          if (window.trendChart) {
+            window.trendChart.destroy();
+          }
+
+          const days = timeRange.value === '7d' ? 7 : 30;
+
+          const datasets = selectedStations.value.map((stationId, i) => {
+            const station = props.stations.find(s => s.id === stationId);
+            const hist = (props.history[stationId] || []).slice(-days);
+            return {
+              label: station ? station.name : stationId,
+              data: hist.map(d => d.metrics[selectedMetric.value]),
+              borderColor: stationColors[i % stationColors.length],
+              backgroundColor: stationColors[i % stationColors.length] + '10',
+              tension: 0.4,
+              pointRadius: 2,
+              borderWidth: 2
+            };
+          });
+
+          const firstHist = props.history[selectedStations.value[0]] || [];
+          const labels = firstHist.slice(-days).map(d => formatDate(d.timestamp));
+
+          window.trendChart = new Chart(ctx, {
+            type: 'line',
+            data: { labels, datasets },
+            options: {
+              responsive: true,
+              maintainAspectRatio: false,
+              interaction: { mode: 'index', intersect: false },
+              plugins: {
+                legend: { position: 'top', labels: { usePointStyle: true, padding: 15 } }
+              },
+              scales: {
+                x: { grid: { display: false }, ticks: { font: { size: 11 } } },
+                y: { grid: { color: 'rgba(0,0,0,0.05)' }, ticks: { font: { size: 11 } } }
+              }
+            }
+          });
+        }
+
+        watch([timeRange, selectedMetric, selectedStations], () => {
+          nextTick(() => initTrendChart());
+        }, { deep: true });
+
+        onUnmounted(() => {
+          if (window.trendChart) {
+            window.trendChart.destroy();
+            window.trendChart = null;
+          }
+        });
+
+        return { timeRange, selectedMetric, selectedStations, metricOptions, trendChartInstance, toggleStation, stations: props.stations };
+      },
+      template: `
+        <div class="max-w-6xl mx-auto p-4 space-y-4">
+          <h2 class="text-xl font-bold">趋势分析</h2>
+
+          <!-- Controls -->
+          <div class="bg-white rounded-xl shadow-sm p-4 space-y-3">
+            <!-- Metric Selector -->
+            <div>
+              <label class="text-sm font-medium text-slate-600 mb-2 block">选择指标</label>
+              <div class="flex flex-wrap gap-2">
+                <button
+                  v-for="m in metricOptions"
+                  :key="m.value"
+                  @click="selectedMetric = m.value"
+                  class="px-4 py-2 rounded-lg text-sm font-medium transition-all"
+                  :class="selectedMetric === m.value ? 'bg-sky-500 text-white' : 'bg-slate-100 text-slate-600 hover:bg-slate-200'"
+                >
+                  {{ m.label }}
+                </button>
+              </div>
+            </div>
+
+            <!-- Time Range -->
+            <div>
+              <label class="text-sm font-medium text-slate-600 mb-2 block">时间范围</label>
+              <div class="flex gap-2">
+                <button @click="timeRange = '7d'" class="px-4 py-2 rounded-lg text-sm font-medium transition-all" :class="timeRange === '7d' ? 'bg-sky-500 text-white' : 'bg-slate-100 text-slate-600 hover:bg-slate-200'">7天</button>
+                <button @click="timeRange = '30d'" class="px-4 py-2 rounded-lg text-sm font-medium transition-all" :class="timeRange === '30d' ? 'bg-sky-500 text-white' : 'bg-slate-100 text-slate-600 hover:bg-slate-200'">30天</button>
+              </div>
+            </div>
+
+            <!-- Station Selector -->
+            <div>
+              <label class="text-sm font-medium text-slate-600 mb-2 block">选择站点</label>
+              <div class="flex flex-wrap gap-2">
+                <button
+                  v-for="s in stations"
+                  :key="s.id"
+                  @click="toggleStation(s.id)"
+                  class="px-3 py-2 rounded-lg text-sm font-medium transition-all border-2"
+                  :class="selectedStations.includes(s.id) ? 'border-sky-500 bg-sky-50 text-sky-700' : 'border-slate-200 bg-white text-slate-600 hover:border-slate-300'"
+                >
+                  {{ s.name }}
+                </button>
+              </div>
+            </div>
+          </div>
+
+          <!-- Chart -->
+          <div v-if="selectedStations.length > 0" class="bg-white rounded-xl shadow-sm p-4">
+            <div class="chart-container">
+              <canvas ref="trendChartInstance"></canvas>
+            </div>
+          </div>
+
+          <!-- Empty State -->
+          <div v-else class="text-center py-12 bg-white rounded-xl shadow-sm">
+            <svg class="w-16 h-16 mx-auto text-slate-300 mb-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 12l3-3 3 3 4-4M8 21l4-4 4 4M3 4h18M4 4h16v12a1 1 0 01-1 1H5a1 1 0 01-1-1V4z"/></svg>
+            <p class="text-slate-500">请选择至少一个站点查看趋势</p>
+          </div>
+        </div>
+      `
+    };
+
+    // ==================== Router ====================
+    const routes = [
+      { path: '/', component: DashboardPage, props: true },
+      { path: '/station/:id', component: StationDetailPage, props: true },
+      { path: '/compare', component: ComparePage, props: true },
+      { path: '/trends', component: TrendsPage, props: true }
+    ];
+
+    const router = createRouter({
+      history: createWebHashHistory(),
+      routes
+    });
+
+    // ==================== App ====================
     createApp({
       setup() {
         const stations = ref([]);
         const history = ref({});
-        const selectedStation = ref(null);
-        const timeRange = ref('7d');
-        const isRefreshing = ref(false);
-        const chartContainer = ref(null);
-        let chartInstance = null;
+        const filters = ref({ status: 'all' });
+        let refreshInterval = null;
 
         const stationCount = computed(() => stations.value.length);
 
         const stats = computed(() => {
-          const result = { normal: 0, warning: 0, danger: 0 };
+          const result = { excellent: 0, good: 0, mild: 0, moderate: 0, severe: 0 };
           stations.value.forEach(s => result[s.status]++);
           return result;
         });
@@ -370,169 +961,18 @@
           return `${now.getHours().toString().padStart(2,'0')}:${now.getMinutes().toString().padStart(2,'0')}`;
         });
 
-        function getMetricStatus(metric, value) {
-          const t = THRESHOLDS[metric];
-          if (!t) return 'normal';
-
-          if (metric === 'ph') {
-            if (value < t.warningMin || value > t.warningMax) return 'danger';
-            if (value < t.min || value > t.max) return 'warning';
-          } else if (metric === 'dissolvedOxygen') {
-            if (value < t.warningMin) return 'danger';
-            if (value < t.min) return 'warning';
-          } else if (metric === 'turbidity' || metric === 'ammoniaNitrogen') {
-            if (value > t.warningMax) return 'danger';
-            if (value > t.max) return 'warning';
-          }
-          return 'normal';
-        }
-
-        function getMetricColor(metric, value) {
-          const status = getMetricStatus(metric, value);
-          return COLORS[status];
-        }
-
-        function statusText(status) {
-          const map = { normal: '正常', warning: '警告', danger: '危险' };
-          return map[status] || status;
-        }
-
-        function formatTime(iso) {
-          const d = new Date(iso);
-          return `${d.getHours().toString().padStart(2,'0')}:${d.getMinutes().toString().padStart(2,'0')}`;
-        }
-
-        async function openDetail(station) {
-          selectedStation.value = station;
-          await loadECharts();
-          await nextTick();
-          initChart();
-        }
-
-        function closeDetail() {
-          selectedStation.value = null;
-          if (chartInstance) {
-            chartInstance.dispose();
-            chartInstance = null;
-          }
-        }
-
-        function setTimeRange(range) {
-          timeRange.value = range;
-          if (chartInstance) {
-            chartInstance.dispose();
-            chartInstance = null;
-          }
-          initChart();
-        }
-
-        function initChart() {
-          if (!chartContainer.value || !selectedStation.value) return;
-
-          const station = selectedStation.value;
-          const stationHistory = history.value[station.id] || [];
-          const days = timeRange.value === '7d' ? 7 : 30;
-          const data = stationHistory.slice(-days);
-
-          const dates = data.map(d => {
-            const date = new Date(d.timestamp);
-            return `${date.getMonth()+1}/${date.getDate()}`;
-          });
-
-          const option = {
-            grid: { top: 30, right: 20, bottom: 30, left: 50 },
-            tooltip: {
-              trigger: 'axis',
-              backgroundColor: 'rgba(255,255,255,0.95)',
-              borderColor: '#e2e8f0',
-              textStyle: { color: '#1a202c', fontSize: 12 }
-            },
-            legend: {
-              data: ['pH', '溶解氧', '浊度', '氨氮'],
-              top: 0,
-              textStyle: { fontSize: 14 }
-            },
-            xAxis: {
-              type: 'category',
-              data: dates,
-              axisLine: { lineStyle: { color: '#e2e8f0' } },
-              axisLabel: { color: '#718096', fontSize: 14 }
-            },
-            yAxis: {
-              type: 'value',
-              splitLine: { lineStyle: { color: '#edf2f7', type: 'dashed' } },
-              axisLabel: { color: '#718096', fontSize: 14 }
-            },
-            series: [
-              {
-                name: 'pH',
-                type: 'line',
-                data: data.map(d => d.metrics.ph.toFixed(1)),
-                smooth: true,
-                symbol: 'circle',
-                symbolSize: 6,
-                lineStyle: { color: '#00A8E8', width: 2 },
-                itemStyle: { color: '#00A8E8' }
-              },
-              {
-                name: '溶解氧',
-                type: 'line',
-                data: data.map(d => d.metrics.dissolvedOxygen.toFixed(1)),
-                smooth: true,
-                symbol: 'circle',
-                symbolSize: 6,
-                lineStyle: { color: '#00C897', width: 2 },
-                itemStyle: { color: '#00C897' }
-              },
-              {
-                name: '浊度',
-                type: 'line',
-                data: data.map(d => d.metrics.turbidity.toFixed(0)),
-                smooth: true,
-                symbol: 'circle',
-                symbolSize: 6,
-                lineStyle: { color: '#FF9F1C', width: 2 },
-                itemStyle: { color: '#FF9F1C' }
-              },
-              {
-                name: '氨氮',
-                type: 'line',
-                data: data.map(d => d.metrics.ammoniaNitrogen.toFixed(2)),
-                smooth: true,
-                symbol: 'circle',
-                symbolSize: 6,
-                lineStyle: { color: '#E84855', width: 2 },
-                itemStyle: { color: '#E84855' }
-              }
-            ]
-          };
-
-          chartInstance = echarts.init(chartContainer.value);
-          chartInstance.setOption(option);
+        function updateFilters(newFilters) {
+          filters.value = { ...filters.value, ...newFilters };
         }
 
         function refreshData() {
-          isRefreshing.value = true;
-          // Simulate data refresh
-          setTimeout(() => {
-            stations.value.forEach(s => {
-              s.metrics.ph = Math.max(0, Math.min(14, s.metrics.ph + (Math.random() - 0.5) * 0.5));
-              s.metrics.dissolvedOxygen = Math.max(0, s.metrics.dissolvedOxygen + (Math.random() - 0.5) * 0.8);
-              s.metrics.turbidity = Math.max(0, s.metrics.turbidity + (Math.random() - 0.5) * 3);
-              s.metrics.ammoniaNitrogen = Math.max(0, s.metrics.ammoniaNitrogen + (Math.random() - 0.5) * 0.2);
-              // Recalculate status
-              const statuses = [
-                getMetricStatus('ph', s.metrics.ph),
-                getMetricStatus('dissolvedOxygen', s.metrics.dissolvedOxygen),
-                getMetricStatus('turbidity', s.metrics.turbidity),
-                getMetricStatus('ammoniaNitrogen', s.metrics.ammoniaNitrogen)
-              ];
-              if (statuses.includes('danger')) s.status = 'danger';
-              else if (statuses.includes('warning')) s.status = 'warning';
-              else s.status = 'normal';
-            });
-            isRefreshing.value = false;
-          }, 800);
+          stations.value.forEach(s => {
+            s.metrics.ph = Math.max(4, Math.min(10, s.metrics.ph + (Math.random() - 0.5) * 0.3));
+            s.metrics.dissolvedOxygen = Math.max(0.5, s.metrics.dissolvedOxygen + (Math.random() - 0.5) * 0.5);
+            s.metrics.turbidity = Math.max(0, s.metrics.turbidity + (Math.random() - 0.5) * 2);
+            s.metrics.ammoniaNitrogen = Math.max(0, s.metrics.ammoniaNitrogen + (Math.random() - 0.5) * 0.1);
+            s.status = calculateOverallStatus(s.metrics);
+          });
         }
 
         onMounted(() => {
@@ -540,27 +980,23 @@
           stations.value = mock.stations;
           history.value = mock.history;
 
-          // Hide skeleton, show app
+          // Hide skeleton
           document.getElementById('skeleton-screen').style.display = 'none';
-          document.getElementById('app').style.display = 'flex';
 
           // Auto refresh every 5 minutes
-          const refreshInterval = setInterval(refreshData, 300000);
+          refreshInterval = setInterval(refreshData, 300000);
+        });
 
-          // Cleanup on page unload
-          window.addEventListener('beforeunload', () => {
-            clearInterval(refreshInterval);
-          });
+        onUnmounted(() => {
+          if (refreshInterval) clearInterval(refreshInterval);
         });
 
         return {
-          stations, selectedStation, timeRange, isRefreshing,
-          stationCount, stats, lastUpdate, chartContainer,
-          getMetricStatus, getMetricColor, statusText, formatTime,
-          openDetail, closeDetail, setTimeRange, refreshData
+          stations, history, filters, stationCount, stats, lastUpdate,
+          updateFilters, refreshData
         };
       }
-    }).mount('#app');
+    }).use(router).mount('#app');
   </script>
 </body>
 </html>

@@ -1,0 +1,139 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1920 1080" width="1920" height="1080">
+  <defs>
+    <!-- Background -->
+    <linearGradient id="bgGrad2" x1="0%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%" stop-color="#E8EEF3"/>
+      <stop offset="100%" stop-color="#D1DDE6"/>
+    </linearGradient>
+
+    <!-- Card shadow -->
+    <filter id="cardShadow2" x="-10%" y="-10%" width="120%" height="130%">
+      <feDropShadow dx="0" dy="4" stdDeviation="12" flood-color="#0A2540" flood-opacity="0.1"/>
+    </filter>
+
+    <!-- Broken timeline gradient -->
+    <linearGradient id="timelineGrad" x1="0%" y1="0%" x2="100%" y2="0%">
+      <stop offset="0%" stop-color="#6B7280"/>
+      <stop offset="45%" stop-color="#6B7280"/>
+      <stop offset="50%" stop-color="#EF4444" stop-opacity="0.6"/>
+      <stop offset="55%" stop-color="#6B7280"/>
+      <stop offset="100%" stop-color="#6B7280"/>
+    </linearGradient>
+  </defs>
+
+  <!-- Background -->
+  <rect width="1920" height="1080" fill="url(#bgGrad2)"/>
+
+  <!-- Decorative top wave -->
+  <path d="M0,0 Q480,80 960,40 T1920,60 L1920,0 Z" fill="#0A2540" opacity="0.05"/>
+
+  <!-- Top accent bar -->
+  <rect x="80" y="60" width="80" height="6" rx="3" fill="#6B7280"/>
+
+  <!-- Page title -->
+  <text x="80" y="110" font-family="'Noto Sans SC', 'PingFang SC', 'Microsoft YaHei', sans-serif" font-size="40" font-weight="700" fill="#0A2540">
+    传统水质监测，三大痛点制约管理效能
+  </text>
+
+  <!-- Broken timeline visual -->
+  <g transform="translate(80, 160)">
+    <!-- Timeline line with gap -->
+    <line x1="0" y1="20" x2="700" y2="20" stroke="url(#timelineGrad)" stroke-width="3" stroke-dasharray="8,6"/>
+    <text x="710" y="26" font-family="'Noto Sans SC', sans-serif" font-size="14" fill="#EF4444" font-weight="500">数据断裂</text>
+    <!-- Time labels -->
+    <text x="0" y="50" font-family="'DIN 1451', monospace" font-size="12" fill="#6B7280">24h前</text>
+    <text x="350" y="50" font-family="'DIN 1451', monospace" font-size="12" fill="#6B7280">12h前</text>
+    <text x="700" y="50" font-family="'DIN 1451', monospace" font-size="12" fill="#6B7280">现在</text>
+  </g>
+
+  <!-- Pain Point 1: Data Lag -->
+  <g transform="translate(80, 240)" filter="url(#cardShadow2)">
+    <rect width="540" height="280" rx="12" fill="#FFFFFF"/>
+    <!-- Status indicator -->
+    <rect x="0" y="0" width="4" height="280" rx="2" fill="#EF4444"/>
+    <!-- Icon: Clock -->
+    <g transform="translate(40, 40)">
+      <circle cx="24" cy="24" r="20" fill="none" stroke="#EF4444" stroke-width="2.5"/>
+      <line x1="24" y1="24" x2="24" y2="12" stroke="#EF4444" stroke-width="2.5" stroke-linecap="round"/>
+      <line x1="24" y1="24" x2="32" y2="24" stroke="#EF4444" stroke-width="2.5" stroke-linecap="round"/>
+      <!-- Warning dot -->
+      <circle cx="42" cy="8" r="6" fill="#EF4444"/>
+      <text x="42" y="11" text-anchor="middle" font-family="sans-serif" font-size="8" fill="#FFFFFF" font-weight="bold">!</text>
+    </g>
+    <text x="90" y="68" font-family="'Noto Sans SC', sans-serif" font-size="22" font-weight="600" fill="#0A2540">数据滞后</text>
+    <!-- Bullet points -->
+    <text x="40" y="120" font-family="'Noto Sans SC', sans-serif" font-size="16" fill="#6B7280">• 人工采样周期 24-48 小时</text>
+    <text x="40" y="155" font-family="'Noto Sans SC', sans-serif" font-size="16" fill="#6B7280">• 错过最佳处理时机</text>
+    <text x="40" y="190" font-family="'Noto Sans SC', sans-serif" font-size="16" fill="#6B7280">• 污染事件事后追溯，难以主动防控</text>
+    <!-- Highlight stat -->
+    <rect x="40" y="220" width="200" height="36" rx="18" fill="#EF4444" opacity="0.1"/>
+    <text x="140" y="244" text-anchor="middle" font-family="'Noto Sans SC', sans-serif" font-size="14" fill="#EF4444" font-weight="500">⏱ 响应延迟 24-48h</text>
+  </g>
+
+  <!-- Pain Point 2: Poor Visualization -->
+  <g transform="translate(660, 240)" filter="url(#cardShadow2)">
+    <rect width="540" height="280" rx="12" fill="#FFFFFF"/>
+    <rect x="0" y="0" width="4" height="280" rx="2" fill="#F59E0B"/>
+    <!-- Icon: Chart/Grid -->
+    <g transform="translate(40, 40)">
+      <rect x="4" y="4" width="40" height="40" rx="4" fill="none" stroke="#F59E0B" stroke-width="2"/>
+      <line x1="4" y1="16" x2="44" y2="16" stroke="#F59E0B" stroke-width="1"/>
+      <line x1="4" y1="28" x2="44" y2="28" stroke="#F59E0B" stroke-width="1"/>
+      <line x1="16" y1="4" x2="16" y2="44" stroke="#F59E0B" stroke-width="1"/>
+      <line x1="28" y1="4" x2="28" y2="44" stroke="#F59E0B" stroke-width="1"/>
+      <!-- Scattered dots representing messy data -->
+      <circle cx="52" cy="12" r="3" fill="#F59E0B" opacity="0.5"/>
+      <circle cx="58" cy="28" r="2" fill="#F59E0B" opacity="0.4"/>
+      <circle cx="48" cy="38" r="2.5" fill="#F59E0B" opacity="0.6"/>
+    </g>
+    <text x="90" y="68" font-family="'Noto Sans SC', sans-serif" font-size="22" font-weight="600" fill="#0A2540">可视化差</text>
+    <text x="40" y="120" font-family="'Noto Sans SC', sans-serif" font-size="16" fill="#6B7280">• 数据分散在 Excel、纸质报表</text>
+    <text x="40" y="155" font-family="'Noto Sans SC', sans-serif" font-size="16" fill="#6B7280">• 无法快速判断水质状态</text>
+    <text x="40" y="190" font-family="'Noto Sans SC', sans-serif" font-size="16" fill="#6B7280">• 领导汇报时缺乏直观展示手段</text>
+    <rect x="40" y="220" width="200" height="36" rx="18" fill="#F59E0B" opacity="0.1"/>
+    <text x="140" y="244" text-anchor="middle" font-family="'Noto Sans SC', sans-serif" font-size="14" fill="#F59E0B" font-weight="500">📊 信息孤岛</text>
+  </g>
+
+  <!-- Pain Point 3: Slow Response -->
+  <g transform="translate(1240, 240)" filter="url(#cardShadow2)">
+    <rect width="540" height="280" rx="12" fill="#FFFFFF"/>
+    <rect x="0" y="0" width="4" height="280" rx="2" fill="#EF4444"/>
+    <!-- Icon: Alert/Bell -->
+    <g transform="translate(40, 40)">
+      <path d="M24,4 C16,4 10,10 10,18 L10,28 L6,32 L42,32 L38,28 L38,18 C38,10 32,4 24,4 Z" fill="none" stroke="#EF4444" stroke-width="2.5"/>
+      <line x1="20" y1="36" x2="28" y2="36" stroke="#EF4444" stroke-width="2"/>
+      <!-- Alert pulse -->
+      <circle cx="36" cy="12" r="5" fill="#EF4444" opacity="0.8">
+        <animate attributeName="r" values="5;8;5" dur="2s" repeatCount="indefinite"/>
+        <animate attributeName="opacity" values="0.8;0.3;0.8" dur="2s" repeatCount="indefinite"/>
+      </circle>
+    </g>
+    <text x="90" y="68" font-family="'Noto Sans SC', sans-serif" font-size="22" font-weight="600" fill="#0A2540">响应慢</text>
+    <text x="40" y="120" font-family="'Noto Sans SC', sans-serif" font-size="16" fill="#6B7280">• 异常发现依赖人工巡检</text>
+    <text x="40" y="155" font-family="'Noto Sans SC', sans-serif" font-size="16" fill="#6B7280">• 从发现问题到上报平均 4-6 小时</text>
+    <text x="40" y="190" font-family="'Noto Sans SC', sans-serif" font-size="16" fill="#6B7280">• 被动应对，错失处置窗口</text>
+    <rect x="40" y="220" width="200" height="36" rx="18" fill="#EF4444" opacity="0.1"/>
+    <text x="140" y="244" text-anchor="middle" font-family="'Noto Sans SC', sans-serif" font-size="14" fill="#EF4444" font-weight="500">🚨 被动响应 4-6h</text>
+  </g>
+
+  <!-- Data support quote -->
+  <g transform="translate(80, 560)">
+    <rect x="0" y="0" width="1760" height="80" rx="12" fill="#0A2540" opacity="0.05"/>
+    <text x="60" y="48" font-family="'Noto Sans SC', sans-serif" font-size="20" fill="#0A2540" font-weight="500">
+      📋 环保部门调研显示，
+    </text>
+    <text x="340" y="48" font-family="'DIN 1451', monospace" font-size="36" font-weight="700" fill="#EF4444">70%</text>
+    <text x="420" y="48" font-family="'Noto Sans SC', sans-serif" font-size="20" fill="#0A2540" font-weight="500">
+      基层河长希望获得实时水质数据
+    </text>
+  </g>
+
+  <!-- Bottom decorative: disconnected data streams -->
+  <g transform="translate(0, 700)" opacity="0.06">
+    <path d="M0,100 Q200,50 400,100 T800,100 T1200,100 T1600,100 T1920,100" fill="none" stroke="#0A2540" stroke-width="2" stroke-dasharray="20,15,5,15"/>
+    <path d="M0,150 Q200,100 400,150 T800,150 T1200,150 T1600,150 T1920,150" fill="none" stroke="#0A2540" stroke-width="1.5" stroke-dasharray="15,10,5,10"/>
+  </g>
+
+  <!-- Page number -->
+  <text x="1840" y="1050" text-anchor="end" font-family="'DIN 1451', monospace" font-size="14" fill="#6B7280">02 / 10</text>
+</svg>
