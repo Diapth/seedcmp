@@ -2141,6 +2141,13 @@ func (c *Clowder) outbound(ctx *wkhttp.Context) {
 				ctx.JSON(http.StatusBadGateway, map[string]string{"error": "group_subscribers_failed", "message": err.Error()})
 				return
 			}
+			if missing := missingGroupVirtualSenderMember(msgReq.FromUID, subscribers); missing != "" {
+				if err := c.ensureGroupVirtualSenderMember(msgReq.ChannelID, missing, c.config.DefaultOwnerUserID); err != nil {
+					c.Error("ensure clowder group virtual sender member failed")
+					ctx.JSON(http.StatusBadGateway, map[string]string{"error": "group_sender_member_failed", "message": err.Error()})
+					return
+				}
+			}
 			applyGroupOutboundSubscribers(msgReq, subscribers)
 		}
 	}
@@ -2947,6 +2954,45 @@ func (c *Clowder) groupOutboundSubscriberUIDs(groupNo string) ([]string, error) 
 		Where("group_no=? and is_deleted=0 and status=1", groupNo).
 		Load(&subscribers)
 	return subscribers, err
+}
+
+func (c *Clowder) ensureGroupVirtualSenderMember(groupNo string, senderUID string, inviteUID string) error {
+	groupNo = strings.TrimSpace(groupNo)
+	senderUID = strings.TrimSpace(senderUID)
+	if groupNo == "" || senderUID == "" || !isClowderVirtualSenderUID(senderUID) {
+		return nil
+	}
+	tx, err := c.ctx.DB().Begin()
+	if err != nil {
+		return err
+	}
+	if _, err = tx.InsertBySql(
+		"insert into group_member (group_no,uid,role,version,status,vercode,robot,invite_uid) values(?,?,?,?,?,?,?,?) ON DUPLICATE KEY UPDATE is_deleted=0,status=VALUES(status),robot=VALUES(robot),updated_at=NOW()",
+		groupNo,
+		senderUID,
+		0,
+		c.ctx.GenSeq(common.GroupMemberSeqKey),
+		int(common.GroupMemberStatusNormal),
+		fmt.Sprintf("%s@%d", util.GenerUUID(), common.GroupMember),
+		1,
+		strings.TrimSpace(inviteUID),
+	).Exec(); err != nil {
+		tx.RollbackUnlessCommitted()
+		return err
+	}
+	if err := c.ctx.IMAddSubscriber(&config.SubscriberAddReq{
+		ChannelID:   groupNo,
+		ChannelType: common.ChannelTypeGroup.Uint8(),
+		Subscribers: []string{senderUID},
+	}); err != nil {
+		tx.RollbackUnlessCommitted()
+		return err
+	}
+	if err := tx.Commit(); err != nil {
+		tx.RollbackUnlessCommitted()
+		return err
+	}
+	return nil
 }
 
 func virtualClowderUserUpsert(uidAndName ...string) (string, []interface{}) {

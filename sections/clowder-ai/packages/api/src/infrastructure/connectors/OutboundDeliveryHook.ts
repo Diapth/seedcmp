@@ -15,6 +15,7 @@ import { sanitizeFilenameStem, type SupportedImageMime } from '../../utils/image
 import { getDefaultUploadDir, resolveInternalRouteUrl } from '../../utils/upload-paths.js';
 import { ConnectorMessageFormatter, type MessageEnvelope, type MessageOrigin } from './ConnectorMessageFormatter.js';
 import type { IConnectorThreadBindingStore } from './ConnectorThreadBindingStore.js';
+import { selectDeliveryBindings } from './delivery-binding-selection.js';
 import { renderAllRichBlocksPlaintext } from './rich-block-plaintext.js';
 
 export interface IOutboundAdapter {
@@ -581,7 +582,7 @@ export class OutboundDeliveryHook {
     deliveryThreadId: string;
     fallbackFromThreadId?: string;
   }> {
-    const direct = await this.opts.bindingStore.getByThread(threadId);
+    const direct = selectDeliveryBindings(await this.opts.bindingStore.getByThread(threadId));
     if (direct.length > 0) return { bindings: direct, deliveryThreadId: threadId };
 
     if (!this.opts.threadLookup) return { bindings: direct, deliveryThreadId: threadId };
@@ -597,7 +598,7 @@ export class OutboundDeliveryHook {
       (id): id is string => typeof id === 'string' && id.length > 0 && id !== threadId,
     );
     for (const fallbackId of fallbackIds) {
-      const fallbackBindings = await this.opts.bindingStore.getByThread(fallbackId);
+      const fallbackBindings = selectDeliveryBindings(await this.opts.bindingStore.getByThread(fallbackId));
       if (fallbackBindings.length > 0) {
         return {
           bindings: fallbackBindings,

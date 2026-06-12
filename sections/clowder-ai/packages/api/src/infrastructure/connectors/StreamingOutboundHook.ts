@@ -1,6 +1,7 @@
 import { type CatId, catRegistry } from '@cat-cafe/shared';
 import type { FastifyBaseLogger } from 'fastify';
 import type { IConnectorThreadBindingStore } from './ConnectorThreadBindingStore.js';
+import { selectDeliveryBindings } from './delivery-binding-selection.js';
 import { pickReceiptLine } from './feishu-receipt-lines.js';
 import type { IStreamableOutboundAdapter } from './OutboundDeliveryHook.js';
 
@@ -102,6 +103,7 @@ export class StreamingOutboundHook {
       if (!force && delta < this.minDeltaChars) continue;
 
       const adapter = this.opts.adapters.get(session.connectorId);
+      if (session.connectorId === 'im-web') continue;
       if (!adapter?.editMessage || !session.platformMessageId) continue;
       try {
         await adapter.editMessage(session.externalChatId, session.platformMessageId, `${accumulatedText} ▌`);
@@ -122,7 +124,7 @@ export class StreamingOutboundHook {
     senderHint?: { id: string; name?: string },
   ): Promise<void> {
     const key = this.scopeKey(threadId, invocationId);
-    const bindings = await this.opts.bindingStore.getByThread(threadId);
+    const bindings = selectDeliveryBindings(await this.opts.bindingStore.getByThread(threadId));
     const sessions: StreamingSession[] = [];
 
     for (const binding of bindings) {
@@ -283,7 +285,7 @@ export class StreamingOutboundHook {
 
   /** F151: Notify adapters that an invocation's delivery batch is complete. */
   async notifyDeliveryBatchDone(threadId: string, chainDone: boolean): Promise<void> {
-    const bindings = await this.opts.bindingStore.getByThread(threadId);
+    const bindings = selectDeliveryBindings(await this.opts.bindingStore.getByThread(threadId));
     for (const binding of bindings) {
       const adapter = this.opts.adapters.get(binding.connectorId);
       if (!adapter?.onDeliveryBatchDone) continue;

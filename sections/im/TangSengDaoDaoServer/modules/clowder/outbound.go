@@ -259,25 +259,21 @@ func applyGroupOutboundSubscribers(req *config.MsgSendReq, subscribers []string)
 	if req == nil || req.ChannelType != common.ChannelTypeGroup.Uint8() || !isClowderVirtualSenderUID(req.FromUID) {
 		return false
 	}
-	seen := map[string]struct{}{}
-	realSubscribers := make([]string, 0, len(subscribers))
-	for _, subscriber := range subscribers {
-		uid := strings.TrimSpace(subscriber)
-		if uid == "" || isClowderVirtualSenderUID(uid) {
-			continue
-		}
-		if _, ok := seen[uid]; ok {
-			continue
-		}
-		seen[uid] = struct{}{}
-		realSubscribers = append(realSubscribers, uid)
-	}
-	if len(realSubscribers) == 0 {
-		return false
-	}
-	req.FromUID = realSubscribers[0]
 	req.Subscribers = nil
 	return true
+}
+
+func missingGroupVirtualSenderMember(fromUID string, subscribers []string) string {
+	uid := strings.TrimSpace(fromUID)
+	if !isClowderVirtualSenderUID(uid) {
+		return ""
+	}
+	for _, subscriber := range subscribers {
+		if strings.TrimSpace(subscriber) == uid {
+			return ""
+		}
+	}
+	return uid
 }
 
 func outboundDirectRecipientUID(payload OutboundPayload, defaultRecipientUID string) string {

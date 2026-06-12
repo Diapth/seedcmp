@@ -168,7 +168,7 @@ func TestOutboundPayloadExtractsCCRrichFileBlocksFromMarkdownContent(t *testing.
 	assert.Equal(t, "/v1/clowder/workspace/file/raw?worktreeId=thread-riverwatch&path=RiverWatch_PRD.docx", block["url"])
 }
 
-func TestApplyGroupOutboundSubscribersForVirtualCatGroupMessage(t *testing.T) {
+func TestApplyGroupOutboundSubscribersKeepsVirtualCatSender(t *testing.T) {
 	payload := OutboundPayload{
 		ConnectorID:    ConnectorID,
 		ExternalChatID: "2:group-cat-cafe",
@@ -183,9 +183,15 @@ func TestApplyGroupOutboundSubscribersForVirtualCatGroupMessage(t *testing.T) {
 	applied := applyGroupOutboundSubscribers(req, []string{"creator", "clowder:codex", "", "member", "creator"})
 
 	require.True(t, applied)
-	assert.Equal(t, "creator", req.FromUID)
+	assert.Equal(t, "clowder:codex", req.FromUID)
 	assert.Equal(t, common.ChannelTypeGroup.Uint8(), req.ChannelType)
 	assert.Empty(t, req.Subscribers)
+}
+
+func TestMissingGroupVirtualSenderMember(t *testing.T) {
+	assert.Equal(t, "clowder:codex", missingGroupVirtualSenderMember("clowder:codex", []string{"creator", "member"}))
+	assert.Empty(t, missingGroupVirtualSenderMember("clowder:codex", []string{"creator", "clowder:codex"}))
+	assert.Empty(t, missingGroupVirtualSenderMember("creator", []string{"creator", "member"}))
 }
 
 func TestOutboundPayloadBuildsVirtualClowderDirectMessageForUser(t *testing.T) {

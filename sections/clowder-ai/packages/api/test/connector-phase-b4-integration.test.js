@@ -220,7 +220,7 @@ describe('F088 Phase B+4 Integration', () => {
       assert.equal(adapter.edits.length, 2); // unchanged
     });
 
-    it('streams markdown chunks to im-web instead of skipping them', async () => {
+    it('keeps im-web token-stream chunks out of durable chat', async () => {
       await bindingStore.bind('im-web', '1:clowder_cat:opus', 'thread-im-stream', 'owner-1');
 
       const imWebAdapter = mockStreamableAdapter('im-web');
@@ -238,10 +238,9 @@ describe('F088 Phase B+4 Integration', () => {
       await streamingHook.onStreamStart('thread-im-stream', 'opus');
       await streamingHook.onStreamChunk('thread-im-stream', '## 标题\n\n| 项 | 值 |\n| --- | --- |\n| A | B |');
 
-      assert.equal(imWebAdapter.edits.length, 1);
-      assert.equal(imWebAdapter.edits[0].chatId, '1:clowder_cat:opus');
-      assert.match(imWebAdapter.edits[0].text, /^## 标题/);
-      assert.match(imWebAdapter.edits[0].text, /▌$/);
+      assert.equal(imWebAdapter.sent.length, 1);
+      assert.equal(imWebAdapter.sent[0].type, 'placeholder');
+      assert.equal(imWebAdapter.edits.length, 0);
     });
   });
 

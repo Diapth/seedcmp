@@ -11,7 +11,7 @@ describe('StreamingOutboundHook', () => {
 
   function createMockAdapter(opts = {}) {
     return {
-      connectorId: 'feishu',
+      connectorId: opts.connectorId ?? 'feishu',
       sendReply: async () => {},
       sendPlaceholder: async (_chatId, _text) => 'msg-placeholder-1',
       editMessage: async (_chatId, _msgId, _text) => {},
@@ -135,6 +135,42 @@ describe('StreamingOutboundHook', () => {
     assert.equal(telegramAdapter._calls.sendPlaceholder.length, 1);
     const text = telegramAdapter._calls.sendPlaceholder[0].text;
     assert.ok(text.includes('思考中'), `Non-Feishu adapter should get generic text, got: ${text}`);
+  });
+
+  it('prefers IM Web project group binding over PM direct binding for placeholders', async () => {
+    const adapter = wrapAdapter(createMockAdapter({ connectorId: 'im-web' }));
+    const adapters = new Map([['im-web', adapter]]);
+    const bindingStore = createBindingStore([
+      {
+        connectorId: 'im-web',
+        externalChatId: '1:user-1@clowder_cat:coordinator',
+        threadId: 'thread-project',
+        userId: 'u1',
+        createdAt: Date.now(),
+      },
+      {
+        connectorId: 'im-web',
+        externalChatId: '2:project-group-1',
+        threadId: 'thread-project',
+        userId: 'u1',
+        createdAt: Date.now(),
+      },
+    ]);
+    const log = {
+      warn: () => {},
+      info: () => {},
+      error: () => {},
+      debug: () => {},
+      fatal: () => {},
+      trace: () => {},
+      child: () => log,
+    };
+    const hook = new StreamingOutboundHook({ bindingStore, adapters, log, updateIntervalMs: 0, minDeltaChars: 0 });
+
+    await hook.onStreamStart('thread-project', 'codex');
+
+    assert.equal(adapter._calls.sendPlaceholder.length, 1);
+    assert.equal(adapter._calls.sendPlaceholder[0].chatId, '2:project-group-1');
   });
 
   it('F157 P2: sender hint adds sender name to Feishu receipt prefix with 🐱', async () => {
