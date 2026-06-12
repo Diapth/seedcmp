@@ -13,6 +13,7 @@ import { resolveProjectTemplatePath } from '../../config/project-template-path.j
 import { resolveActiveProjectRoot } from '../../utils/active-project-root.js';
 
 export interface ImWebCreateCatInput {
+  readonly catId?: string;
   readonly displayName: string;
   readonly mentionPatterns: readonly string[];
   readonly roleTemplateId?: string;
@@ -48,6 +49,12 @@ function uniqueCatId(displayName: string): string {
     if (!catRegistry.has(candidate)) return candidate;
   }
   return `${base}-${Date.now().toString(36).slice(-4)}`;
+}
+
+function explicitCatId(input?: string): string {
+  const value = (input || '').trim().toLowerCase();
+  if (!/^[a-z][a-z0-9_-]{0,63}$/.test(value)) return '';
+  return value;
 }
 
 function defaultCliForClient(client: ClientId): CliConfig {
@@ -149,7 +156,8 @@ export function createImWebCatCreator() {
         ...(defaultEffort ? { effort: defaultEffort } : {}),
       };
       const cli = runtimeTemplate?.cli ?? defaultCli;
-      const catId = uniqueCatId(displayName);
+      const requestedCatId = explicitCatId(input.catId);
+      const catId = requestedCatId && !catRegistry.has(requestedCatId) ? requestedCatId : uniqueCatId(displayName);
       const projectRoot = resolveActiveProjectRoot();
 
       const catalog = createRuntimeCat(projectRoot, {

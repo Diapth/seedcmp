@@ -94,7 +94,57 @@ export function isCliEntrypoint(metaUrl, argv1) {
  * 纯函数，可注入 isAvailableFn 测试。
  */
 export function filterAvailableTeammates(allConfigs, currentCatId, isAvailableFn) {
-  return Object.entries(allConfigs).filter(([id]) => id !== currentCatId && isAvailableFn(id));
+  const currentConfig = allConfigs[currentCatId];
+  return Object.entries(allConfigs)
+    .filter(([id]) => id !== currentCatId && isAvailableFn(id))
+    .filter(([, config]) => isProviderCompatibleTeammate(currentConfig, config));
+}
+
+function providerFamilyForConfig(config) {
+  const haystack = [config?.clientId, config?.accountRef, config?.provider].filter(Boolean).join(' ').toLowerCase();
+  if (haystack.includes('anthropic') || haystack.includes('claude')) return 'claude';
+  if (haystack.includes('openai') || haystack.includes('codex')) return 'codex';
+  if (haystack.includes('google') || haystack.includes('gemini')) return 'gemini';
+  if (haystack.includes('kimi')) return 'kimi';
+  if (haystack.includes('dare')) return 'dare';
+  if (haystack.includes('opencode')) return 'opencode';
+  return '';
+}
+
+function oauthLikeAccountRef(config) {
+  const authType = String(config?.authType ?? config?.accessMode ?? '').trim().toLowerCase();
+  if (authType === 'oauth') return true;
+
+  const value = String(config?.accountRef ?? '').trim().toLowerCase();
+  return [
+    'claude',
+    'codex',
+    'gemini',
+    'kimi',
+    'dare',
+    'opencode',
+    'anthropic',
+    'openai',
+    'google',
+    'builtin_anthropic',
+    'builtin_openai',
+    'builtin_google',
+    'builtin_kimi',
+    'builtin_dare',
+    'builtin_opencode',
+  ].includes(value);
+}
+
+function shouldProviderScopeTeammates(currentConfig) {
+  return Boolean(providerFamilyForConfig(currentConfig) && oauthLikeAccountRef(currentConfig));
+}
+
+function isProviderCompatibleTeammate(currentConfig, teammateConfig) {
+  if (!shouldProviderScopeTeammates(currentConfig)) return true;
+  return (
+    providerFamilyForConfig(teammateConfig) === providerFamilyForConfig(currentConfig) &&
+    oauthLikeAccountRef(teammateConfig)
+  );
 }
 
 // TODO(F203/Phase-C): replace with `import { WORKFLOW_TRIGGERS } from

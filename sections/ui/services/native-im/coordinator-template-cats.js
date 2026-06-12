@@ -38,6 +38,15 @@ function cleanCatId(value = '') {
  return String(value || '').trim().replace(new RegExp(`^${CLOWDER_CAT_CONTACT_PREFIX}`), '');
 }
 
+function stableRuntimeCatId(value = '') {
+ const text = firstText(value)
+ .toLowerCase()
+ .replace(/[^a-z0-9_-]+/g, '-')
+ .replace(/^-+|-+$/g, '');
+ if (!text) return '';
+ return /^[a-z]/.test(text) ? text.slice(0, 64) : `cat-${text}`.slice(0, 64);
+}
+
 function cardErrorText(error = '') {
  if (!error) return '';
  if (typeof error === 'string') return error;
@@ -221,6 +230,7 @@ export function buildAgentPayloadFromTemplate(template = {}, coordinatorProfile 
  ...(Array.isArray(profile.capabilityTags) ? profile.capabilityTags : [])
  ]);
  const base = {
+ catId: stableRuntimeCatId(firstText(options.catId, template.catId, options.agentIdPrefix && roleTemplateId && options.agentIdSuffix ? `${options.agentIdPrefix}-${roleTemplateId}-${options.agentIdSuffix}` : '')),
  name: displayName,
  alias,
  roleTemplateId,
@@ -233,6 +243,7 @@ export function buildAgentPayloadFromTemplate(template = {}, coordinatorProfile 
  capabilities,
  personality: firstText(template.personality, template.systemPrompt, profile.systemPrompt, options.personality)
  };
+ if (!base.catId) delete base.catId;
 
  if (profile.accessMode === 'oauth') {
  base.accessMode = 'oauth';
@@ -246,6 +257,17 @@ export function buildAgentPayloadFromTemplate(template = {}, coordinatorProfile 
  base.defaultModel = profile.defaultModel;
  }
  return base;
+}
+
+export function deriveTemplateCatPayloadOverrides(card = {}) {
+ const sourceText = firstText(card.sourceText, card.sourceMessage?.content);
+ const coordinatorId = firstText(card.coordinator?.id, card.coordinatorId);
+ if (!/riverwatch/i.test(sourceText) && !/^riverpm\d+$/i.test(coordinatorId)) return {};
+ const suffix = coordinatorId.match(/^riverpm(\d+)$/i)?.[1] || '';
+ return {
+ agentIdPrefix: 'riverwatch',
+ ...(suffix ? { agentIdSuffix: suffix } : {})
+ };
 }
 
 export function isCoordinatorTemplateCatsConfirmationMessage(message = {}) {
@@ -287,10 +309,10 @@ export function buildCoordinatorTemplateCatsRequestInput({
  templates = []
 } = {}) {
  const requiredProfile = detectRequiredCapabilityProfile(text || sourceMessage.content);
- const reusable = scanExistingCats({ requiredProfile, availableAgents });
- const missingRoleIds = findMissingRoles({ requiredProfile, availableAgents });
- const items = buildRequestItems({ missingRoleTemplateIds: missingRoleIds, templates });
  const coordinatorProfile = resolveCoordinatorCreationProfile(coordinator);
+ const reusable = scanExistingCats({ requiredProfile, availableAgents, coordinatorProfile });
+ const missingRoleIds = findMissingRoles({ requiredProfile, availableAgents, coordinatorProfile });
+ const items = buildRequestItems({ missingRoleTemplateIds: missingRoleIds, templates });
 
  return {
  sourceMessage,

@@ -11,7 +11,7 @@ const CAPABILITY_PROFILES = [
  'deck-strategist': ['deck-strategist', 'ppt 战略', '叙事策略', '汇报结构', 'presentation'],
  'storyboard-designer': ['storyboard-designer', '分镜', '页面叙事', '视觉分镜'],
  frontend: ['frontend', '前端', 'vue', 'ui 实现', '页面实现'],
- devops: ['devops', '部署', 'preview', 'ci/cd', 'sre']
+ devops: ['devops', '部署', 'preview 部署', 'ci/cd', 'sre']
  }
  },
  {
@@ -76,6 +76,35 @@ function lowerText(text = '') {
  return String(text || '').toLowerCase();
 }
 
+function normalizeProviderText(...values) {
+ return uniqueStrings(values).map((value) => lowerText(value)).join(' ');
+}
+
+function providerFamilyFromText(text = '') {
+ const value = lowerText(text);
+ if (value.includes('claude') || value.includes('anthropic')) return 'claude';
+ if (value.includes('codex') || value.includes('openai')) return 'codex';
+ if (value.includes('gemini') || value.includes('google')) return 'gemini';
+ return '';
+}
+
+function normalizeAccessMode(...values) {
+ const value = normalizeProviderText(...values).replace(/_/g, '-');
+ if (value.includes('oauth')) return 'oauth';
+ if (value.includes('api-key') || value.includes('api key') || value.includes('apikey')) return 'api-key';
+ return '';
+}
+
+function providerFamilyForProfile(profile = {}) {
+ return providerFamilyFromText(normalizeProviderText(
+ profile.provider,
+ profile.platform,
+ profile.clientId,
+ profile.accountRef,
+ profile.authProvider
+ ));
+}
+
 function matchProfileByKeywords(text = '') {
  const haystack = lowerText(text);
  if (!haystack) return null;
@@ -103,6 +132,12 @@ export function normalizeAgentForScan(agent = {}) {
  name: firstText(agent.name, agent.nickname, agent.displayName, agent.alias, agent.id, '智能体'),
  roleTemplate: firstText(agent.roleTemplate, agent.templateId, agent.roleTemplateId, raw.roleTemplate, raw.templateId, raw.roleTemplateId, '').toLowerCase(),
  templateId: firstText(agent.templateId, agent.roleTemplateId, agent.roleTemplate, raw.templateId, raw.roleTemplateId).toLowerCase(),
+ platform: firstText(agent.platform, agent.clientId, agent.provider, raw.platform, raw.clientId, raw.client_id, raw.provider, '').toLowerCase(),
+ clientId: firstText(agent.clientId, agent.client_id, raw.clientId, raw.client_id, '').toLowerCase(),
+ provider: firstText(agent.provider, raw.provider, '').toLowerCase(),
+ accessMode: normalizeAccessMode(agent.accessMode, agent.authType, raw.accessMode, raw.access_mode, raw.authType, raw.auth_type),
+ authType: normalizeAccessMode(agent.authType, agent.accessMode, raw.authType, raw.auth_type, raw.accessMode, raw.access_mode),
+ accountRef: firstText(agent.accountRef, agent.account_ref, raw.accountRef, raw.account_ref, '').toLowerCase(),
  source: firstText(agent.source, raw.source, raw.kind).toLowerCase(),
  rawSource: firstText(raw.source, raw.kind).toLowerCase(),
  capabilityTags: uniqueStrings([
@@ -138,6 +173,34 @@ export function normalizeAgentForScan(agent = {}) {
  ]).map((value) => lowerText(value)).join(' '),
  raw
  };
+}
+
+function agentProviderFamily(agent = {}) {
+ return providerFamilyFromText(normalizeProviderText(
+ agent.provider,
+ agent.platform,
+ agent.clientId,
+ agent.accountRef,
+ agent.raw?.provider,
+ agent.raw?.clientId,
+ agent.raw?.client_id,
+ agent.raw?.accountRef,
+ agent.raw?.account_ref
+ ));
+}
+
+export function isCompatibleWithCoordinatorProfile(agent = {}, coordinatorProfile = null) {
+ if (!coordinatorProfile) return true;
+ const requiredAccessMode = normalizeAccessMode(coordinatorProfile.accessMode, coordinatorProfile.authType);
+ const requiredFamily = providerFamilyForProfile(coordinatorProfile);
+ if (requiredAccessMode !== 'oauth' || !requiredFamily) return true;
+
+ const agentFamily = agentProviderFamily(agent);
+ const agentAccessMode = normalizeAccessMode(agent.accessMode, agent.authType);
+ if (!agentFamily && !agentAccessMode) return true;
+ if (agentFamily && agentFamily !== requiredFamily) return false;
+ if (agentAccessMode && agentAccessMode !== requiredAccessMode) return false;
+ return agentFamily === requiredFamily && (!agentAccessMode || agentAccessMode === requiredAccessMode);
 }
 
 function isNonReusableDirectoryEntry(agent = {}) {
@@ -187,10 +250,11 @@ function agentMatchesProfileKeywords(agent = {}, profile = null) {
  );
 }
 
-export function scanExistingCats({ requiredProfile = null, availableAgents = [] } = {}) {
+export function scanExistingCats({ requiredProfile = null, availableAgents = [], coordinatorProfile = null } = {}) {
  const normalizedAgents = availableAgents
  .map(normalizeAgentForScan)
  .filter((agent) => !isNonReusableDirectoryEntry(agent))
+ .filter((agent) => isCompatibleWithCoordinatorProfile(agent, coordinatorProfile))
  .filter((agent) => agent.id);
  const reusable = [];
  const seen = new Set();
@@ -227,12 +291,13 @@ export function scanExistingCats({ requiredProfile = null, availableAgents = [] 
  return reusable;
 }
 
-export function findMissingRoles({ requiredProfile = null, availableAgents = [] } = {}) {
+export function findMissingRoles({ requiredProfile = null, availableAgents = [], coordinatorProfile = null } = {}) {
  const requiredRoles = requiredProfile?.roleTemplateIds || [];
  if (!requiredRoles.length) return [];
  const normalizedAgents = availableAgents
  .map(normalizeAgentForScan)
  .filter((agent) => !isNonReusableDirectoryEntry(agent))
+ .filter((agent) => isCompatibleWithCoordinatorProfile(agent, coordinatorProfile))
  .filter((agent) => agent.id);
  return requiredRoles.filter((roleId) =>
  !normalizedAgents.some((agent) => agentMatchesRoleTemplate(agent, roleId))

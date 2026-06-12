@@ -117,9 +117,7 @@ func (r *replica) emitAppendBatchLocked() {
 		return
 	}
 
-	batch := r.appendPending[:count]
-	copy(r.appendPending, r.appendPending[count:])
-	r.appendPending = r.appendPending[:len(r.appendPending)-count]
+	batch := r.popAppendPendingBatchLocked(count)
 
 	active := r.appendInFlightRequests[:0]
 	activeIDs := r.appendInFlightIDs[:0]
@@ -444,6 +442,21 @@ func (r *replica) selectAppendBatchLocked() (int, int, int) {
 		return 1, len(r.appendPending[0].batch), r.appendPending[0].byteCount
 	}
 	return count, recordCount, byteCount
+}
+
+func (r *replica) popAppendPendingBatchLocked(count int) []*appendRequest {
+	if count <= 0 {
+		return nil
+	}
+	if count >= len(r.appendPending) {
+		batch := r.appendPending
+		r.appendPending = r.appendPending[:0]
+		return batch
+	}
+	batch := append(r.appendInFlightRequests[:0], r.appendPending[:count]...)
+	copy(r.appendPending, r.appendPending[count:])
+	r.appendPending = r.appendPending[:len(r.appendPending)-count]
+	return batch
 }
 
 func (r *replica) removePendingAppendLocked(target *appendRequest) bool {

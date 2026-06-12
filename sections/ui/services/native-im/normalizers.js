@@ -36,6 +36,16 @@ function firstRawText(...values) {
   return '';
 }
 
+function firstInlineFilePreviewText(...values) {
+  for (const value of values) {
+    if (value === undefined || value === null) continue;
+    if (typeof value !== 'string') continue;
+    if (!value.trim()) continue;
+    return value;
+  }
+  return '';
+}
+
 function firstArray(...values) {
   for (const value of values) {
     if (Array.isArray(value)) return value;
@@ -474,6 +484,7 @@ export function normalizeContent(payload) {
     return { type: 'voice', content: '[语音]', url: content.url || '', duration: toNumber(content.time || content.duration, 0) };
   }
   if (type === 8) {
+    const metadata = content.metadata && typeof content.metadata === 'object' ? content.metadata : {};
     const fileName = name || String(text || '').replace(/^\[文件\]\s*/, '').trim() || '文件';
     const url = firstNonEmpty(
       content.url,
@@ -488,13 +499,50 @@ export function normalizeContent(payload) {
       payload?.remote_url,
       payload?.path
     );
+    const fileType = firstText(
+      content.fileType,
+      content.file_type,
+      content.ext,
+      payload?.fileType,
+      payload?.file_type,
+      payload?.ext,
+      String(fileName).split('.').pop()
+    );
+    const previewContent = firstInlineFilePreviewText(
+      metadata.previewContent,
+      metadata.preview_content,
+      metadata.contentText,
+      metadata.content_text,
+      metadata.markdown,
+      content.previewContent,
+      content.preview_content,
+      content.contentText,
+      content.content_text,
+      content.markdown,
+      payload?.previewContent,
+      payload?.preview_content,
+      payload?.contentText,
+      payload?.content_text,
+      payload?.markdown
+    );
     return {
       type: 'file',
       content: `[文件] ${fileName}`.trim(),
       name: fileName,
       fileName,
       size: content.size || content.fileSize || content.file_size || payload?.size || payload?.file_size || 0,
-      url
+      fileSize: content.fileSize || content.file_size || content.size || payload?.fileSize || payload?.file_size || payload?.size || 0,
+      fileSizeBytes: toNumber(content.fileSizeBytes ?? content.file_size_bytes ?? content.bytes ?? payload?.fileSizeBytes ?? payload?.file_size_bytes ?? payload?.bytes, 0),
+      fileType,
+      mimeType: firstText(content.mimeType, content.mime_type, payload?.mimeType, payload?.mime_type),
+      url,
+      sourceUrl: firstNonEmpty(content.sourceUrl, content.source_url, payload?.sourceUrl, payload?.source_url, url),
+      contentUrl: firstNonEmpty(content.contentUrl, content.content_url, payload?.contentUrl, payload?.content_url, url),
+      previewUrl: firstNonEmpty(content.previewUrl, content.preview_url, payload?.previewUrl, payload?.preview_url),
+      downloadUrl: firstNonEmpty(content.downloadUrl, content.download_url, payload?.downloadUrl, payload?.download_url),
+      previewContent,
+      workspacePath: firstText(content.workspacePath, content.workspace_path, payload?.workspacePath, payload?.workspace_path),
+      worktreeId: firstText(content.worktreeId, content.worktree_id, payload?.worktreeId, payload?.worktree_id)
     };
   }
   if (streamState.streamKey) {
@@ -622,6 +670,8 @@ export function normalizeMessage(input = {}, options = {}) {
   const senderId = firstNonEmpty(input.from_uid, input.fromUID, input.senderId, options.currentUid);
   const senderName = firstNonEmpty(input.from_name, input.senderName, input.sender_name, senderId);
   const raw = parsePayload(payload);
+  const catId = firstText(raw.cat_id, raw.catId, input.cat_id, input.catId);
+  const catDisplayName = firstText(raw.cat_display_name, raw.catDisplayName, input.cat_display_name, input.catDisplayName);
   const mention = raw.mention || input.mention || {};
   const mentions = normalizeMentions(mention, normalizedContent.content, raw.mentions, input.mentions);
   const richBlocks = normalizeRichBlocks(input, raw);
@@ -638,6 +688,8 @@ export function normalizeMessage(input = {}, options = {}) {
     clientSeq: toNumber(input.client_seq ?? input.clientSeq, 0),
     senderId: String(senderId || ''),
     senderName: String(senderName || ''),
+    ...(catId ? { catId, cat_id: catId } : {}),
+    ...(catDisplayName ? { catDisplayName, cat_display_name: catDisplayName } : {}),
     senderAvatar: input.senderAvatar || input.from_avatar || '',
     time: toTimestampMs(input.timestamp ?? input.time ?? input.created_at, Date.now()),
     status: normalizeStatus(input),

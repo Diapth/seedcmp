@@ -2,6 +2,7 @@ package clowder
 
 import (
 	"encoding/json"
+	"strings"
 	"testing"
 
 	"github.com/TangSengDaoDao/TangSengDaoDaoServerLib/common"
@@ -135,6 +136,38 @@ func TestOutboundPayloadBuildsFileMessage(t *testing.T) {
 	assert.Equal(t, "Codex", body["cat_display_name"])
 }
 
+func TestOutboundPayloadExtractsCCRrichFileBlocksFromMarkdownContent(t *testing.T) {
+	payload := OutboundPayload{
+		ConnectorID:    ConnectorID,
+		ExternalChatID: "2:riverwatch-group",
+		CatID:          "riverpm",
+		CatDisplayName: "RiverWatch PM",
+		Content: strings.Join([]string{
+			"已完成 RiverWatch 产物，请查看文件卡。",
+			"",
+			"```cc_rich",
+			`{"v":1,"blocks":[{"id":"riverwatch-prd","kind":"file","fileName":"RiverWatch_PRD.docx","url":"/v1/clowder/workspace/file/raw?worktreeId=thread-riverwatch&path=RiverWatch_PRD.docx","mimeType":"application/vnd.openxmlformats-officedocument.wordprocessingml.document"}]}`,
+			"```",
+		}, "\n"),
+		Format: "markdown",
+	}
+
+	req, err := BuildOutboundMessage(payload)
+
+	require.NoError(t, err)
+	var body map[string]interface{}
+	require.NoError(t, json.Unmarshal(req.Payload, &body))
+	assert.Equal(t, "已完成 RiverWatch 产物，请查看文件卡。", body["content"])
+	richBlocks, ok := body["rich_blocks"].([]interface{})
+	require.True(t, ok)
+	require.Len(t, richBlocks, 1)
+	block, ok := richBlocks[0].(map[string]interface{})
+	require.True(t, ok)
+	assert.Equal(t, "file", block["kind"])
+	assert.Equal(t, "RiverWatch_PRD.docx", block["fileName"])
+	assert.Equal(t, "/v1/clowder/workspace/file/raw?worktreeId=thread-riverwatch&path=RiverWatch_PRD.docx", block["url"])
+}
+
 func TestApplyGroupOutboundSubscribersForVirtualCatGroupMessage(t *testing.T) {
 	payload := OutboundPayload{
 		ConnectorID:    ConnectorID,
@@ -197,6 +230,34 @@ func TestOutboundPayloadBuildsVirtualClowderCatDirectMessageForUser(t *testing.T
 	assert.Equal(t, "opus", body["cat_id"])
 	assert.Equal(t, "布偶猫", body["cat_display_name"])
 	assert.Equal(t, "im-web", body["connector_id"])
+}
+
+func TestOutboundPayloadShortensLongVirtualClowderCatDirectSender(t *testing.T) {
+	userID := "u_1"
+	catID := "riverwatch-storyboard-designer-673774"
+	catChannelID := "clowder_cat:" + catID
+	payload := OutboundPayload{
+		ConnectorID:    ConnectorID,
+		ExternalChatID: "1:" + common.GetFakeChannelIDWith(userID, catChannelID),
+		CatID:          catID,
+		CatDisplayName: "土耳其安哥拉猫（分镜设计师）",
+		Content:        "已创建。",
+		Format:         "markdown",
+	}
+
+	req, err := BuildOutboundMessage(payload)
+
+	require.NoError(t, err)
+	assert.Equal(t, userID, req.ChannelID)
+	assert.Equal(t, common.ChannelTypePerson.Uint8(), req.ChannelType)
+	assert.LessOrEqual(t, len(req.FromUID), 40)
+	assert.Regexp(t, `^clowder_cat:[0-9a-f]{16}$`, req.FromUID)
+	assert.NotEqual(t, catChannelID, req.FromUID)
+
+	var body map[string]interface{}
+	require.NoError(t, json.Unmarshal(req.Payload, &body))
+	assert.Equal(t, catID, body["cat_id"])
+	assert.Equal(t, "土耳其安哥拉猫（分镜设计师）", body["cat_display_name"])
 }
 
 func TestOutboundPayloadKeepsVirtualCatDirectWhenDefaultRecipientConfigured(t *testing.T) {

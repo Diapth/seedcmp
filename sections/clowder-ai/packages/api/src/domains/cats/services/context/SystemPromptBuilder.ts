@@ -218,9 +218,56 @@ function pickDisplayNameOrVariantMention(id: string, config: CatConfig): string 
   return pickDisplayNameMention(config) ?? pickVariantMention(id, config);
 }
 
+function providerFamilyForConfig(config: CatConfig | undefined): string {
+  const haystack = [config?.clientId, config?.accountRef, config?.provider].filter(Boolean).join(' ').toLowerCase();
+  if (haystack.includes('anthropic') || haystack.includes('claude')) return 'claude';
+  if (haystack.includes('openai') || haystack.includes('codex')) return 'codex';
+  if (haystack.includes('google') || haystack.includes('gemini')) return 'gemini';
+  if (haystack.includes('kimi')) return 'kimi';
+  if (haystack.includes('dare')) return 'dare';
+  if (haystack.includes('opencode')) return 'opencode';
+  return '';
+}
+
+function oauthLikeAccountRef(config: CatConfig | undefined): boolean {
+  const value = String(config?.accountRef ?? '').trim().toLowerCase();
+  return [
+    'claude',
+    'codex',
+    'gemini',
+    'kimi',
+    'dare',
+    'opencode',
+    'anthropic',
+    'openai',
+    'google',
+    'builtin_anthropic',
+    'builtin_openai',
+    'builtin_google',
+    'builtin_kimi',
+    'builtin_dare',
+    'builtin_opencode',
+  ].includes(value);
+}
+
+function shouldProviderScopeTeammates(currentConfig: CatConfig | undefined): boolean {
+  return Boolean(providerFamilyForConfig(currentConfig) && oauthLikeAccountRef(currentConfig));
+}
+
+function isProviderCompatibleTeammate(
+  currentConfig: CatConfig | undefined,
+  teammateConfig: CatConfig | undefined,
+): boolean {
+  if (!shouldProviderScopeTeammates(currentConfig)) return true;
+  return providerFamilyForConfig(teammateConfig) === providerFamilyForConfig(currentConfig)
+    && oauthLikeAccountRef(teammateConfig);
+}
+
 function buildCallableMentions(currentCatId: CatId): CallableMentionsResult {
+  const currentConfig = getConfig(currentCatId as string);
   const entries: CallableCatEntry[] = Object.entries(getAllConfigs())
     .filter(([id]) => id !== currentCatId && isCatAvailable(id))
+    .filter(([, config]) => isProviderCompatibleTeammate(currentConfig, config))
     .map(([id, config]) => ({ id, config }));
 
   if (entries.length === 0) {
@@ -409,7 +456,10 @@ function shouldInjectCoordinatorWorkflow(catId: CatId, config: CatConfig): boole
  */
 function buildTeammateRoster(currentCatId: CatId): string | null {
   const allConfigs = getAllConfigs();
-  const entries = Object.entries(allConfigs).filter(([id]) => id !== currentCatId && isCatAvailable(id));
+  const currentConfig = getConfig(currentCatId as string);
+  const entries = Object.entries(allConfigs)
+    .filter(([id]) => id !== currentCatId && isCatAvailable(id))
+    .filter(([, config]) => isProviderCompatibleTeammate(currentConfig, config));
   if (entries.length === 0) return null;
 
   const rows: string[] = [];

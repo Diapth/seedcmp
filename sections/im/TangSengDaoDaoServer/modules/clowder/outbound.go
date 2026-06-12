@@ -4,6 +4,8 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"hash/fnv"
+	"regexp"
 	"strconv"
 	"strings"
 
@@ -140,19 +142,20 @@ func BuildOutboundMessageWithDefaultRecipient(payload OutboundPayload, defaultRe
 	}
 	fromUID := clowderAIDirectChannelID
 	if catID := strings.TrimSpace(payload.CatID); catID != "" {
-		fromUID = "clowder:" + catID
+		fromUID = safeClowderVirtualSenderUID("clowder:" + catID)
 	}
 	if directRecipientUID != "" {
 		channelID = directRecipientUID
 		fromUID = clowderAIDirectChannelID
 		if directVirtualSenderUID != "" {
-			fromUID = directVirtualSenderUID
+			fromUID = safeClowderVirtualSenderUID(directVirtualSenderUID)
 		}
 	}
 	platformMessageID := payload.PlatformMessageID
 	if payload.Stream != nil && payload.Stream.PlatformMessageID != "" {
 		platformMessageID = payload.Stream.PlatformMessageID
 	}
+	content, extractedRichBlocks := extractCCRrichBlocks(content)
 	body := buildOutboundMessageBody(payload, content, format)
 	if payload.ThreadID != "" {
 		body["thread_id"] = payload.ThreadID
@@ -178,8 +181,10 @@ func BuildOutboundMessageWithDefaultRecipient(payload OutboundPayload, defaultRe
 		}
 		body["streaming"] = payload.Stream.State == "placeholder" || payload.Stream.State == "chunk"
 	}
-	if len(payload.RichBlocks) > 0 {
-		body["rich_blocks"] = payload.RichBlocks
+	richBlocks := append([]map[string]interface{}{}, payload.RichBlocks...)
+	richBlocks = append(richBlocks, extractedRichBlocks...)
+	if len(richBlocks) > 0 {
+		body["rich_blocks"] = richBlocks
 	}
 	if payload.Metadata != nil {
 		body["metadata"] = payload.Metadata
@@ -213,7 +218,7 @@ func buildOutboundReactionEvent(payload OutboundPayload, channelType uint8, chan
 	}
 	fromUID := clowderAIDirectChannelID
 	if directVirtualSenderUID != "" {
-		fromUID = directVirtualSenderUID
+		fromUID = safeClowderVirtualSenderUID(directVirtualSenderUID)
 	}
 	emoji := strings.TrimSpace(reaction.Emoji)
 	if emoji == "" {
@@ -313,6 +318,27 @@ func isClowderVirtualDirectChannelID(uid string) bool {
 		strings.HasPrefix(trimmed, "clowder:")
 }
 
+func safeClowderVirtualSenderUID(uid string) string {
+	trimmed := strings.TrimSpace(uid)
+	if len(trimmed) <= 40 {
+		return trimmed
+	}
+	switch {
+	case strings.HasPrefix(trimmed, "clowder_cat:"):
+		return "clowder_cat:" + shortUIDHash(trimmed)
+	case strings.HasPrefix(trimmed, "clowder:"):
+		return "clowder:" + shortUIDHash(trimmed)
+	default:
+		return trimmed
+	}
+}
+
+func shortUIDHash(value string) string {
+	h := fnv.New64a()
+	_, _ = h.Write([]byte(value))
+	return fmt.Sprintf("%016x", h.Sum64())
+}
+
 func buildOutboundMessageBody(payload OutboundPayload, content string, format string) map[string]interface{} {
 	body := map[string]interface{}{
 		"type":         common.Text,
@@ -358,6 +384,74 @@ func buildOutboundMessageBody(payload OutboundPayload, content string, format st
 		}
 	}
 	return body
+}
+
+var ccRichFencePattern = regexp.MustCompile("(?is)```[ \\t]*cc_rich[^\\r\\n]*\\r?\\n(.*?)\\r?\\n?[ \\t]*```")
+
+func extractCCRrichBlocks(content string) (string, []map[string]interface{}) {
+	if strings.TrimSpace(content) == "" || !strings.Contains(strings.ToLower(content), "```cc_rich") {
+		return content, nil
+	}
+	matches := ccRichFencePattern.FindAllStringSubmatchIndex(content, -1)
+	if len(matches) == 0 {
+		return content, nil
+	}
+
+	var blocks []map[string]interface{}
+	var cleaned strings.Builder
+	last := 0
+	for _, match := range matches {
+		if len(match) < 4 {
+			continue
+		}
+		rawJSON := strings.TrimSpace(content[match[2]:match[3]])
+		parsed := parseCCRrichBlockJSON(rawJSON)
+		if len(parsed) == 0 {
+			continue
+		}
+		cleaned.WriteString(content[last:match[0]])
+		last = match[1]
+		blocks = append(blocks, parsed...)
+	}
+	if len(blocks) == 0 {
+		return content, nil
+	}
+	cleaned.WriteString(content[last:])
+	return strings.TrimSpace(cleaned.String()), blocks
+}
+
+func parseCCRrichBlockJSON(raw string) []map[string]interface{} {
+	if strings.TrimSpace(raw) == "" {
+		return nil
+	}
+	var envelope interface{}
+	if err := json.Unmarshal([]byte(raw), &envelope); err != nil {
+		return nil
+	}
+	return coerceCCRrichBlocks(envelope)
+}
+
+func coerceCCRrichBlocks(value interface{}) []map[string]interface{} {
+	switch typed := value.(type) {
+	case []interface{}:
+		blocks := make([]map[string]interface{}, 0, len(typed))
+		for _, item := range typed {
+			if block, ok := item.(map[string]interface{}); ok && len(block) > 0 {
+				blocks = append(blocks, block)
+			}
+		}
+		return blocks
+	case map[string]interface{}:
+		for _, key := range []string{"blocks", "richBlocks", "rich_blocks"} {
+			if rawBlocks, ok := typed[key]; ok {
+				return coerceCCRrichBlocks(rawBlocks)
+			}
+		}
+		if len(typed) > 0 {
+			return []map[string]interface{}{typed}
+		}
+	}
+	return nil
 }
 
 var ErrOutboundNoop = errors.New("clowder outbound no-op")

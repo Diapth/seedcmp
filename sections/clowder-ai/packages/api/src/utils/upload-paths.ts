@@ -14,7 +14,12 @@ export function getDefaultUploadDir(configuredUploadDir?: string): string {
   return configuredUploadDir ? resolve(configuredUploadDir) : MODULE_DEFAULT_UPLOAD_DIR;
 }
 
-const INTERNAL_ROUTE_PREFIXES = ['/uploads/', '/api/connector-media/', '/api/tts/audio/'];
+const INTERNAL_ROUTE_PREFIXES = [
+  '/uploads/',
+  '/api/connector-media/',
+  '/api/tts/audio/',
+  '/api/workspace/file/raw',
+];
 
 function normalizeBaseUrl(value?: string): string | null {
   const trimmed = value?.trim().replace(/\/+$/, '');

@@ -489,6 +489,38 @@ func TestSendInboundTextWithRoutingForwardsExplicitTargets(t *testing.T) {
 	assert.Equal(t, "Group context", got.PromptContext)
 }
 
+func TestSendInboundTextWithRoutingUsesShortStableCommandMessageIDForLongChineseCommand(t *testing.T) {
+	var got InboundMessage
+	upstream := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		require.Equal(t, http.MethodPost, r.Method)
+		require.Equal(t, "/api/connectors/im-web/inbound", r.URL.Path)
+		require.NoError(t, json.NewDecoder(r.Body).Decode(&got))
+		_ = json.NewEncoder(w).Encode(RouteResponse{Kind: "routed", ThreadID: "thread-1", MessageID: "msg-1"})
+	}))
+	defer upstream.Close()
+
+	c := New(nil)
+	c.SetConfig(commonmodule.ClowderBridgeConfig{
+		Enabled:            true,
+		APIBaseURL:         upstream.URL,
+		ConnectorID:        "im-web",
+		ConnectorSecret:    "secret",
+		DefaultOwnerUserID: "owner-1",
+		RequestTimeout:     time.Second,
+		SignatureTolerance: time.Minute,
+	})
+	longCommand := "/cats new 资料整理师 @资料整理师 --platform claude-code --auth oauth --account claude --role-template riverwatch-source-curator"
+
+	_, err := c.sendInboundTextWithRouting("group-1", 2, "user-1", longCommand, "", nil, "")
+
+	require.NoError(t, err)
+	require.NotEmpty(t, got.MessageID)
+	assert.Equal(t, got.MessageID, got.ClientMsgNo)
+	assert.LessOrEqual(t, len(got.MessageID), 40)
+	assert.Regexp(t, `^imcmd-[0-9a-z]+-[0-9a-f]{8}$`, got.MessageID)
+	assert.NotContains(t, got.MessageID, "e8b5")
+}
+
 func TestGroupCatMembershipStoreRoundTripsPromptAndCats(t *testing.T) {
 	c := New(nil)
 
@@ -1001,6 +1033,60 @@ func TestCreateCatAndConnectAutoBindsDirectThread(t *testing.T) {
 	require.Len(t, inboundMessages, 1)
 	assert.Equal(t, "clowder_cat:coordinator", inboundMessages[0].ChannelID)
 	assert.Equal(t, "/new PM", inboundMessages[0].Text)
+}
+
+func TestCreateCatAndConnectForwardsExplicitCatID(t *testing.T) {
+	var gotCreateCat map[string]interface{}
+	upstream := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		switch r.URL.Path {
+		case "/api/cats":
+			require.Equal(t, http.MethodPost, r.Method)
+			require.NoError(t, json.NewDecoder(r.Body).Decode(&gotCreateCat))
+			_ = json.NewEncoder(w).Encode(map[string]interface{}{
+				"cat": map[string]interface{}{
+					"id":              "riverwatch-source-curator-934553",
+					"catId":           "riverwatch-source-curator-934553",
+					"displayName":     "狸花猫（资料整理师）",
+					"mentionPatterns": []string{"@source-curator"},
+					"available":       true,
+				},
+			})
+		case "/api/connectors/im-web/inbound":
+			_ = json.NewEncoder(w).Encode(RouteResponse{Kind: "routed", ThreadID: "thread-source-1", MessageID: "msg-thread"})
+		case "/api/connectors/im-web/agents":
+			_ = json.NewEncoder(w).Encode(map[string]interface{}{
+				"agents": []map[string]interface{}{
+					{
+						"catId":           "riverwatch-source-curator-934553",
+						"displayName":     "狸花猫（资料整理师）",
+						"aliases":         []string{"@source-curator"},
+						"mentionPatterns": []string{"@source-curator"},
+						"available":       true,
+					},
+				},
+			})
+		case "/api/cat-templates":
+			_ = json.NewEncoder(w).Encode(map[string]interface{}{"templates": []map[string]interface{}{}})
+		default:
+			http.NotFound(w, r)
+		}
+	}))
+	defer upstream.Close()
+	api := newSkillAPITestServer(t, upstream)
+
+	resp := api.request(t, http.MethodPost, "/v1/clowder/cats", strings.NewReader(`{
+		"catId":"riverwatch-source-curator-934553",
+		"name":"狸花猫（资料整理师）",
+		"alias":"@source-curator",
+		"roleTemplateId":"source-curator",
+		"clientId":"anthropic",
+		"authType":"oauth",
+		"accountRef":"claude"
+	}`), "token-user-a", "application/json")
+
+	require.Equal(t, http.StatusOK, resp.Code, resp.Body.String())
+	require.NotNil(t, gotCreateCat)
+	assert.Equal(t, "riverwatch-source-curator-934553", gotCreateCat["catId"])
 }
 
 func TestCreatedCatContactsPrependFallbackCatsToDirectory(t *testing.T) {

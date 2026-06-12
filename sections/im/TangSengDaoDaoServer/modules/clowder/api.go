@@ -258,6 +258,7 @@ type catContactRequest struct {
 }
 
 type createCatRequest struct {
+	CatID          string   `json:"catId,omitempty"`
 	Name           string   `json:"name"`
 	Alias          string   `json:"alias,omitempty"`
 	RoleTemplateID string   `json:"roleTemplateId,omitempty"`
@@ -2479,6 +2480,7 @@ func (c *Clowder) sendInboundTextWithRouting(channelID string, channelType uint8
 	if len(threadIDs) > 0 {
 		threadID = strings.TrimSpace(threadIDs[0])
 	}
+	messageID := commandMessageID(text)
 	return NewClient(c.config.APIBaseURL, c.config.ConnectorSecret, c.config.RequestTimeout).ForwardInbound(InboundMessage{
 		ConnectorID:    ConnectorID,
 		ExternalChatID: externalChatIDForUser(channelID, channelType, userID),
@@ -2486,8 +2488,8 @@ func (c *Clowder) sendInboundTextWithRouting(channelID string, channelType uint8
 		ChannelID:      channelID,
 		ChannelType:    channelType,
 		ChatType:       chatType(channelType),
-		MessageID:      commandMessageID(text),
-		ClientMsgNo:    commandMessageID(text),
+		MessageID:      messageID,
+		ClientMsgNo:    messageID,
 		Text:           text,
 		Timestamp:      time.Now().UnixMilli(),
 		Sender: Sender{
@@ -2558,8 +2560,9 @@ func decorateCatDirectoryContact(agent ClowderAgent) ClowderAgent {
 
 func fallbackCreatedCatResponse(req createCatRequest, alias string) catContactEnvelope {
 	name := strings.TrimSpace(req.Name)
+	catID := requestedRuntimeCatID(req, name, alias)
 	agent := ClowderAgent{
-		CatID:              fallbackCatID(name, alias),
+		CatID:              catID,
 		DisplayName:        name,
 		Aliases:            []string{alias},
 		MentionPatterns:    []string{alias},
@@ -2589,7 +2592,7 @@ func (c *Clowder) createCatViaUpstream(req createCatRequest, alias string, userI
 		return ClowderAgent{}, fmt.Errorf("clowder bridge is not configured")
 	}
 	name := strings.TrimSpace(req.Name)
-	catID := runtimeCatID(name, alias)
+	catID := requestedRuntimeCatID(req, name, alias)
 	mentions := []string{normalizeCatAlias(alias, name)}
 	template := c.lookupCreateCatTemplate(req.RoleTemplateID, userID)
 	capabilitySummary := strings.Join(cleanStringList(req.Capabilities), "、")
@@ -2837,6 +2840,20 @@ func runtimeCatID(name string, alias string) string {
 	return value
 }
 
+func requestedRuntimeCatID(req createCatRequest, name string, alias string) string {
+	explicit := strings.TrimSpace(req.CatID)
+	if explicit != "" {
+		value := fallbackCatID(explicit, explicit)
+		if value != "" {
+			if value[0] < 'a' || value[0] > 'z' {
+				value = "cat-" + value
+			}
+			return value
+		}
+	}
+	return runtimeCatID(name, alias)
+}
+
 func cleanStringList(values []string) []string {
 	cleaned := make([]string, 0, len(values))
 	seen := map[string]bool{}
@@ -2995,7 +3012,9 @@ func virtualClowderDisplayName(uid string, payload OutboundPayload) string {
 }
 
 func commandMessageID(text string) string {
-	return fmt.Sprintf("im-web-command-%d-%x", time.Now().UnixNano(), []byte(text))
+	h := fnv.New32a()
+	_, _ = h.Write([]byte(text))
+	return fmt.Sprintf("imcmd-%s-%08x", strconv.FormatInt(time.Now().UnixNano(), 36), h.Sum32())
 }
 
 func (c *Clowder) state() string {

@@ -26,6 +26,22 @@ function isClowderDirectConversation(conversation = {}) {
     || String(conversation.id || conversation.channelId || '').startsWith(CLOWDER_CAT_CONTACT_PREFIX);
 }
 
+function isClowderProjectGroupConversation(conversation = {}) {
+  const channelType = Number(conversation.channelType || conversation.channel_type || (conversation.type === 'group' ? 2 : 1));
+  if (channelType !== 2 && conversation.type !== 'group') return false;
+  return Boolean(
+    conversation.isProjectGroup
+    || conversation.raw?.isProjectGroup
+    || conversation.projectThreadId
+    || conversation.threadId
+    || conversation.binding?.projectThreadId
+    || conversation.binding?.project_thread_id
+  ) && (
+    conversation.source === 'clowder'
+    || Boolean(conversation.projectThreadId || conversation.threadId || conversation.binding?.projectThreadId || conversation.binding?.project_thread_id)
+  );
+}
+
 function deploymentStatusLabel(status = '') {
   const value = String(status || '').toLowerCase();
   if (value === 'needs_fields') return '需要补充信息';
@@ -126,7 +142,8 @@ export function isDeploymentIntent(text = '') {
 }
 
 export function shouldCreateDeploymentCard({ conversation = {}, text = '' } = {}) {
-  return isClowderDirectConversation(conversation) && isDeploymentIntent(text);
+  return (isClowderDirectConversation(conversation) || isClowderProjectGroupConversation(conversation))
+    && isDeploymentIntent(text);
 }
 
 export function isDeploymentCardMessage(message = {}) {

@@ -318,6 +318,70 @@ func TestEmitAppendBatchAvoidsCloningLoopOwnedPayloads(t *testing.T) {
 	require.LessOrEqual(t, allocs, 2.0)
 }
 
+func TestEmitAppendBatchKeepsSelectedBatchSeparateFromRemainingPending(t *testing.T) {
+	now := time.Unix(1_700_000_000, 0).UTC()
+	r := &replica{
+		localNode: 1,
+		now:       func() time.Time { return now },
+		meta: channel.Meta{
+			Key:         "group-10",
+			Epoch:       7,
+			LeaderEpoch: 70,
+			Leader:      1,
+			ISR:         []channel.NodeID{1},
+			MinISR:      1,
+			LeaseUntil:  now.Add(time.Minute),
+		},
+		state: channel.ReplicaState{
+			ChannelKey:  "group-10",
+			Epoch:       7,
+			Leader:      1,
+			Role:        channel.ReplicaRoleLeader,
+			CommitReady: true,
+		},
+		roleGeneration: 1,
+		appendGroupCommit: appendGroupCommitConfig{
+			maxWait:    time.Hour,
+			maxRecords: 1,
+			maxBytes:   1024,
+		},
+		appendRequests: make(map[uint64]*appendRequest, 2),
+		appendEffects:  make(chan appendLeaderBatchEffect, 1),
+	}
+
+	reqs := make([]appendRequest, 2)
+	waiters := make([]appendWaiter, len(reqs))
+	pending := make([]*appendRequest, len(reqs))
+	for i := range reqs {
+		req := &reqs[i]
+		req.requestID = uint64(i + 1)
+		req.ctx = context.Background()
+		req.batch = []channel.Record{{Payload: []byte{byte('a' + i)}, SizeBytes: 1}}
+		req.byteCount = 1
+		req.commitMode = channel.CommitModeLocal
+		req.waiter = &waiters[i]
+		req.enqueuedAt = now
+		req.stage = appendRequestQueued
+		waiters[i].request = req
+		pending[i] = req
+		r.appendRequests[req.requestID] = req
+	}
+	r.appendPending = pending
+
+	r.emitAppendBatchLocked()
+
+	var effect appendLeaderBatchEffect
+	select {
+	case effect = <-r.appendEffects:
+	default:
+		t.Fatal("append batch effect was not emitted")
+	}
+	require.Equal(t, []uint64{1}, effect.RequestIDs)
+	require.Equal(t, []channel.Record{{Payload: []byte("a"), SizeBytes: 1}}, effect.Records)
+	require.Equal(t, []*appendRequest{&reqs[1]}, r.appendPending)
+	require.Equal(t, []*appendRequest{&reqs[0]}, r.appendInFlightRequests)
+}
+
 func TestAppendRequestPoolResetsReusableState(t *testing.T) {
 	req := acquireAppendRequest()
 	waiter := acquireAppendWaiter()
@@ -350,6 +414,59 @@ func TestAppendRequestPoolResetsReusableState(t *testing.T) {
 	if reusedWaiter.request != nil || reusedWaiter.target != 0 {
 		t.Fatalf("reused waiter was not reset: %+v", reusedWaiter)
 	}
+}
+
+func TestLocalAppendCompletionCanBeReleasedBeforeLoopReturns(t *testing.T) {
+	env := newTestEnv(t)
+	env.replica = newReplicaFromEnv(t, env)
+	meta := activeMetaWithMinISR(7, 1, 1)
+	env.replica.mustApplyMeta(t, meta)
+	require.NoError(t, env.replica.BecomeLeader(meta))
+
+	req := acquireAppendRequest()
+	waiter := acquireAppendWaiter()
+	defer releaseAppendRequest(req)
+	ctx := channel.WithCommitMode(context.Background(), channel.CommitModeLocal)
+	req.requestID = 1
+	req.ctx = ctx
+	req.batch = []channel.Record{{Payload: []byte("x"), SizeBytes: 1}}
+	req.byteCount = 1
+	req.commitMode = channel.CommitModeLocal
+	req.waiter = waiter
+	req.enqueuedAt = env.replica.now()
+	req.stage = appendRequestDurable
+	waiter.request = req
+	waiter.enqueuedAt = req.enqueuedAt
+
+	env.replica.mu.Lock()
+	env.replica.appendRequests = map[uint64]*appendRequest{req.requestID: req}
+	env.replica.appendInFlightRequests = []*appendRequest{req}
+	env.replica.appendInFlightIDs = []uint64{req.requestID}
+	env.replica.appendInFlightEffectID = 10
+	env.replica.mu.Unlock()
+	done := make(chan struct{})
+	go func() {
+		defer close(done)
+		<-waiter.ch
+		*req = appendRequest{}
+	}()
+	result := env.replica.applyLeaderAppendCommittedEvent(machineLeaderAppendCommittedEvent{
+		EffectID:       10,
+		RequestIDs:     []uint64{1},
+		BaseOffset:     env.replica.state.LEO,
+		ChannelKey:     env.replica.state.ChannelKey,
+		Epoch:          env.replica.state.Epoch,
+		LeaderEpoch:    env.replica.meta.LeaderEpoch,
+		RoleGeneration: env.replica.roleGeneration,
+		Err:            nil,
+		DoneAt:         env.replica.now(),
+	})
+	<-done
+
+	require.NoError(t, result.Err)
+	require.Empty(t, env.replica.appendRequests)
+	require.Empty(t, env.replica.appendInFlightRequests)
+	require.Empty(t, env.replica.appendInFlightIDs)
 }
 
 func TestAppendQuorumModeWaitsForHWAdvance(t *testing.T) {

@@ -15,10 +15,12 @@ import {
 } from '@/services/native-im/deployment';
 import {
   buildProjectGroupConfirmationInput,
+  buildProjectGroupCreationContextMessage,
   buildProjectGroupEnsurePayload,
   isProjectGroupConfirmationMessage,
   projectGroupCreatedPatch,
   projectGroupFailedPatch,
+  resolveProjectGroupExecutionTargets,
   resolveProjectGroupTextConfirmation,
   updateProjectGroupConfirmationMessage,
   updateProjectGroupProposalMessage,
@@ -27,6 +29,7 @@ import {
 import {
   buildAgentPayloadFromTemplate,
   buildCoordinatorTemplateCatsRequestInput,
+  deriveTemplateCatPayloadOverrides,
   isCoordinatorTemplateCatsConfirmationMessage,
   shouldCreateCoordinatorTemplateCatsRequest,
   updateCoordinatorTemplateCatsMessage,
@@ -43,8 +46,10 @@ import {
   createClowderMarkdownStreamEvents,
   createClientMsgNo,
   enrichNativeMessageSender,
+  buildClowderConversationBridgePayload,
   isClowderConversation,
   isClowderDirectCatConversation,
+  isClowderProjectGroupConversation,
   isVisibleChatMessage,
   isSelfSender,
   applyAgentPendingFeedbackIntoList,
@@ -137,6 +142,41 @@ function firstText(...values) {
 
 function uniqueStrings(values = []) {
   return [...new Set((values || []).map((value) => firstText(value)).filter(Boolean))];
+}
+
+function resolveDeploymentActor(agent = {}, conversation = {}) {
+  const coordinatorId = cleanCatId(firstText(
+    agent.directCatId,
+    agent.direct_cat_id,
+    agent.catId,
+    agent.cat_id,
+    conversation.projectCoordinatorCatId,
+    conversation.project_coordinator_cat_id,
+    conversation.coordinator?.id,
+    conversation.binding?.projectCoordinatorCatId,
+    conversation.binding?.project_coordinator_cat_id,
+    conversation.directCatId,
+    conversation.direct_cat_id,
+    conversation.catId,
+    conversation.cat_id
+  ));
+  const isGroup = Number(conversation.channelType || conversation.channel_type || 1) === 2 || conversation.type === 'group';
+  const fallbackDirectId = isGroup ? '' : cleanCatId(firstText(agent.id, conversation.id));
+  const id = coordinatorId || fallbackDirectId;
+  return {
+    id,
+    name: firstText(
+      agent.name,
+      agent.nickname,
+      agent.displayName,
+      conversation.projectCoordinatorName,
+      conversation.project_coordinator_name,
+      conversation.coordinator?.name,
+      conversation.binding?.projectCoordinatorName,
+      conversation.binding?.project_coordinator_name,
+      id
+    )
+  };
 }
 
 function projectGroupCardSharesTemplateSource(projectCard = {}, templateCard = {}) {
@@ -511,13 +551,13 @@ export const useMessageStore = defineStore('message', {
 
       try {
         const routeContext = conversation || identity;
-        const sent = isClowderDirectCatConversation(routeContext)
+        const shouldUseClowderBridge = isClowderDirectCatConversation(routeContext)
+          || isClowderProjectGroupConversation(routeContext);
+        const sent = shouldUseClowderBridge
           ? await nativeImService.sendClowderConversationMessage({
             channelId: identity.channelId,
             channelType: identity.channelType,
-            text: payload.content,
-            directCatId: resolveClowderDirectCatId(routeContext),
-            promptContext: payload.promptContext
+            ...buildClowderConversationBridgePayload(routeContext, payload)
           })
           : await nativeImService.sendTextMessage({
             channelId: identity.channelId,
@@ -784,7 +824,11 @@ export const useMessageStore = defineStore('message', {
         const template = item.template
           || item
           || { id: item.templateId, roleTemplateId: item.roleTemplateId, name: item.name };
-        const payload = buildAgentPayloadFromTemplate(template, profile, options.payloadOverrides || {});
+        const payloadOverrides = {
+          ...deriveTemplateCatPayloadOverrides(card),
+          ...(options.payloadOverrides || {})
+        };
+        const payload = buildAgentPayloadFromTemplate(template, profile, payloadOverrides);
         try {
           let createdId = '';
           if (onCreateAgent) {
@@ -842,6 +886,12 @@ export const useMessageStore = defineStore('message', {
       if (!conversationId || sourceMessage?.status === 'failed') return null;
       if (!shouldCreateDeploymentCard({ conversation, text })) return null;
       const agent = options.agent || conversation;
+      const deploymentActor = resolveDeploymentActor(agent, conversation);
+      const cardAgent = {
+        ...agent,
+        ...(deploymentActor.id ? { id: deploymentActor.id, catId: deploymentActor.id, directCatId: deploymentActor.id } : {}),
+        ...(deploymentActor.name ? { name: deploymentActor.name, displayName: deploymentActor.name } : {})
+      };
       try {
         const sourceMessageId = firstText(sourceMessage.messageId, sourceMessage.id, sourceMessage.clientMsgNo);
         const payload = {
@@ -852,7 +902,7 @@ export const useMessageStore = defineStore('message', {
           originalText: String(text || '').trim(),
           target: options.target || '当前项目',
           environment: options.environment || 'preview',
-          directCatId: cleanCatId(firstText(agent.directCatId, agent.catId, agent.id, conversation.directCatId, conversation.catId, conversation.id))
+          directCatId: deploymentActor.id
         };
         Object.keys(payload).forEach((key) => {
           if (payload[key] === '' || payload[key] === undefined || payload[key] === null) delete payload[key];
@@ -862,7 +912,7 @@ export const useMessageStore = defineStore('message', {
           deploymentRequest,
           sourceMessage,
           conversation,
-          agent
+          agent: cardAgent
         });
       } catch (error) {
         const fallbackId = deploymentCardId(firstText(sourceMessage.messageId, sourceMessage.id, sourceMessage.clientMsgNo, Date.now()));
@@ -874,12 +924,12 @@ export const useMessageStore = defineStore('message', {
           status: 'failed',
           originalText: text,
           failureReason: errorText(error)
-        }, { sourceMessage, conversation, agent });
+        }, { sourceMessage, conversation, agent: cardAgent });
         this.messages[conversationId] = upsertDeploymentCardMessage(this.messages[conversationId] || [], {
           deploymentRequest: fallbackMessage.deploymentCard.deploymentRequest,
           sourceMessage,
           conversation,
-          agent
+          agent: cardAgent
         });
         return this.updateDeploymentCard(conversationId, fallbackMessage.id, deploymentFailedPatch(error));
       }
@@ -956,7 +1006,9 @@ export const useMessageStore = defineStore('message', {
       this.updateProjectGroupConfirmation(conversationId, cardId, { status: 'creating' });
       try {
         const ensurePayload = buildProjectGroupEnsurePayload(card, {
-          currentUser: options.currentUser || readCurrentUser()
+          currentUser: options.currentUser || readCurrentUser(),
+          agents: options.agents || [],
+          coordinatorId: cleanCatId(firstText(card.coordinator?.id, card.pmMemberId))
         });
         const ensured = await nativeImService.ensureProjectGroup(ensurePayload);
         const createdPatch = projectGroupCreatedPatch(ensured, card);
@@ -964,9 +1016,15 @@ export const useMessageStore = defineStore('message', {
         if (!groupId) throw { msg: '项目群编号缺失' };
 
         const groupName = createdPatch.projectGroupName || card.projectName || 'Clowder 项目群';
-        const catIds = createdPatch.catMemberIds?.length
-          ? createdPatch.catMemberIds
-          : (card.catMemberIds || card.targetCatIds || card.workerCatIds || []);
+        const coordinatorId = cleanCatId(firstText(card.coordinator?.id, card.pmMemberId));
+        const executionTargets = resolveProjectGroupExecutionTargets({
+          card,
+          createdPatch,
+          agents: options.agents || [],
+          coordinatorId
+        });
+        const catIds = executionTargets.catIds;
+        const workerCatIds = executionTargets.workerCatIds;
         const agents = matchingAgentsForCatIds(options.agents || [], catIds);
 
         await nativeImService.syncGroupCats({
@@ -988,7 +1046,37 @@ export const useMessageStore = defineStore('message', {
           name: groupName,
           member_count: memberCount,
           source: 'clowder',
-          isProjectGroup: true
+          isProjectGroup: true,
+          projectThreadId: createdPatch.projectThreadId,
+          threadId: createdPatch.projectThreadId,
+          projectCoordinatorCatId: coordinatorId,
+          projectCoordinatorName: firstText(card.coordinator?.name, 'PM / 协调者'),
+          catMemberIds: catIds,
+          workerCatIds,
+          targetCatIds: workerCatIds,
+          catMembers: agents.map((agent) => ({
+            id: cleanCatId(firstText(agent.directCatId, agent.catId, agent.id, agent.uid)),
+            catId: cleanCatId(firstText(agent.directCatId, agent.catId, agent.id, agent.uid)),
+            directCatId: cleanCatId(firstText(agent.directCatId, agent.catId, agent.id, agent.uid)),
+            name: firstText(agent.name, agent.nickname, agent.displayName),
+            nickname: firstText(agent.nickname, agent.name, agent.displayName),
+            displayName: firstText(agent.displayName, agent.name, agent.nickname),
+            alias: firstText(agent.alias),
+            platform: firstText(agent.platform, agent.clientId, agent.raw?.platform, agent.raw?.clientId, agent.raw?.client_id),
+            clientId: firstText(agent.clientId, agent.client_id, agent.raw?.clientId, agent.raw?.client_id),
+            accessMode: firstText(agent.accessMode, agent.access_mode, agent.authType, agent.auth_type, agent.raw?.accessMode, agent.raw?.access_mode, agent.raw?.authType, agent.raw?.auth_type),
+            authType: firstText(agent.authType, agent.auth_type, agent.accessMode, agent.access_mode, agent.raw?.authType, agent.raw?.auth_type, agent.raw?.accessMode, agent.raw?.access_mode),
+            accountRef: firstText(agent.accountRef, agent.account_ref, agent.raw?.accountRef, agent.raw?.account_ref)
+          })).filter((agent) => agent.id),
+          binding: {
+            id: createdPatch.projectBindingId,
+            bindingId: createdPatch.projectBindingId,
+            projectGroupNo: groupId,
+            projectGroupName: groupName,
+            projectThreadId: createdPatch.projectThreadId,
+            projectCoordinatorCatId: coordinatorId,
+            projectCoordinatorName: firstText(card.coordinator?.name, 'PM / 协调者')
+          }
         };
         const convStore = useConversationStore();
         const groupStore = useGroupStore();
@@ -997,12 +1085,16 @@ export const useMessageStore = defineStore('message', {
         agents.forEach((agent) => convStore.addAgentMember(groupId, agent));
         groupStore.syncNativeGroupMembers(groupId, { silent: true }).catch(() => {});
 
-        if (card.sourceText) {
+        const projectContextMessage = buildProjectGroupCreationContextMessage({
+          sourceText: card.sourceText,
+          projectName: groupName,
+          projectThreadId: createdPatch.projectThreadId
+        });
+        if (projectContextMessage?.text) {
           await nativeImService.sendClowderConversationMessage({
             channelId: groupId,
             channelType: 2,
-            text: card.sourceText,
-            targetCatIds: card.targetCatIds || card.workerCatIds || [],
+            text: projectContextMessage.text,
             promptContext: `项目群：${groupName}`,
             threadId: createdPatch.projectThreadId
           });

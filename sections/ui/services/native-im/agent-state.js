@@ -198,7 +198,12 @@ export function createAgentConversation(agent = {}) {
     ...(directCatId ? {
       source: 'clowder',
       directCatId
-    } : {})
+    } : {}),
+    platform: firstNonEmpty(agent.platform, agent.clientId, agent.raw?.platform, agent.raw?.clientId, agent.raw?.client_id),
+    clientId: firstNonEmpty(agent.clientId, agent.client_id, agent.raw?.clientId, agent.raw?.client_id),
+    accessMode: firstNonEmpty(agent.accessMode, agent.access_mode, agent.authType, agent.auth_type, agent.raw?.accessMode, agent.raw?.access_mode, agent.raw?.authType, agent.raw?.auth_type),
+    authType: firstNonEmpty(agent.authType, agent.auth_type, agent.accessMode, agent.access_mode, agent.raw?.authType, agent.raw?.auth_type, agent.raw?.accessMode, agent.raw?.access_mode),
+    accountRef: firstNonEmpty(agent.accountRef, agent.account_ref, agent.raw?.accountRef, agent.raw?.account_ref)
   };
 }
 
@@ -333,6 +338,11 @@ export function createAgentMember(agent = {}) {
       directCatId: catId,
       source: 'clowder'
     } : {}),
+    platform: firstNonEmpty(agent.platform, agent.clientId, agent.raw?.platform, agent.raw?.clientId, agent.raw?.client_id),
+    clientId: firstNonEmpty(agent.clientId, agent.client_id, agent.raw?.clientId, agent.raw?.client_id),
+    accessMode: firstNonEmpty(agent.accessMode, agent.access_mode, agent.authType, agent.auth_type, agent.raw?.accessMode, agent.raw?.access_mode, agent.raw?.authType, agent.raw?.auth_type),
+    authType: firstNonEmpty(agent.authType, agent.auth_type, agent.accessMode, agent.access_mode, agent.raw?.authType, agent.raw?.auth_type, agent.raw?.accessMode, agent.raw?.access_mode),
+    accountRef: firstNonEmpty(agent.accountRef, agent.account_ref, agent.raw?.accountRef, agent.raw?.account_ref),
     status: agent.status || 'active'
   };
 }

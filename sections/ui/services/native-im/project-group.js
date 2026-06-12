@@ -1,4 +1,5 @@
-import { detectRequiredCapabilityProfile } from './coordinator-capability.js';
+import { detectRequiredCapabilityProfile, isCompatibleWithCoordinatorProfile, scanExistingCats } from './coordinator-capability.js';
+import { resolveCoordinatorCreationProfile } from './coordinator-template-cats.js';
 
 const PROJECT_START_RE = /(项目群|创建.*群|拉.*(?:猫|智能体|agent|codex|claude)|拆解.*任务|分工执行|协调.*(?:智能体|agent|codex|claude)|PM|pm|coordinator)/i;
 
@@ -205,6 +206,20 @@ function isDirectAgentConversation(conversation = {}) {
     || String(conversation.id || conversation.channelId || '').startsWith(CLOWDER_CAT_CONTACT_PREFIX);
 }
 
+function isGroupConversation(conversation = {}) {
+  const channelType = Number(conversation.channelType || conversation.channel_type || (conversation.type === 'group' ? 2 : 1));
+  return channelType === 2 || conversation.type === 'group';
+}
+
+function isFormalProjectGroupExecutionPrompt(text = '', conversation = {}) {
+  const source = String(text || '').trim();
+  if (!source || source.length < 80 || !isGroupConversation(conversation)) return false;
+  const hasProjectPhaseMarker = /(本项目群|当前.*项目群|项目群已经创建|阶段切换|正式执行|真实分工)/i.test(source);
+  const hasExecutionMarker = /(交付物|workspace|文件卡|cc_rich|真实生成|生成文件|生成.*RiverWatch)/i.test(source);
+  const hasGuardrailMarker = /(禁止使用|不要检索|不要复用|不得.*拒绝|不得.*mock|mock|模拟数据|预置\s*assets)/i.test(source);
+  return hasProjectPhaseMarker && hasExecutionMarker && hasGuardrailMarker;
+}
+
 function agentCatId(agent = {}) {
   return cleanCatId(firstText(agent.directCatId, agent.direct_cat_id, agent.catId, agent.cat_id, agent.id, agent.uid));
 }
@@ -212,16 +227,24 @@ function agentCatId(agent = {}) {
 function isAvailableWorkerAgent(agent = {}) {
   const raw = agent.raw || {};
   const source = firstText(agent.source, raw.source, raw.kind).replace(/_/g, '-').toLowerCase();
+  const rawSource = firstText(raw.source, raw.kind).replace(/_/g, '-').toLowerCase();
   if (['role-template', 'cat-template', 'disconnected'].includes(source)) return false;
+  if (['role-template', 'cat-template', 'disconnected'].includes(rawSource)) return false;
   if (!agentCatId(agent)) return false;
   if (isCoordinatorEntity(agent)) return false;
   if (agent.available === false || agent.connected === false) return false;
   return !['inactive', 'disabled', 'unavailable'].includes(String(agent.status || '').toLowerCase());
 }
 
-function mentionedWorkerIds(text = '', agents = []) {
+function providerCompatibleWorkerAgents(agents = [], coordinatorProfile = null) {
+  return agents
+    .filter(isAvailableWorkerAgent)
+    .filter((agent) => isCompatibleWithCoordinatorProfile(agent, coordinatorProfile));
+}
+
+function mentionedWorkerIds(text = '', agents = [], coordinatorProfile = null) {
   const normalizedText = normalizeKeyword(text);
-  return uniqueStrings(agents.filter(isAvailableWorkerAgent).filter((agent) => {
+  return uniqueStrings(providerCompatibleWorkerAgents(agents, coordinatorProfile).filter((agent) => {
     const candidates = keywordValues(agent)
       .map(normalizeKeyword)
       .filter((value) => value && value.length >= 2);
@@ -229,13 +252,14 @@ function mentionedWorkerIds(text = '', agents = []) {
   }).map(agentCatId));
 }
 
-function defaultWorkerIds(agents = []) {
-  return uniqueStrings(agents.filter(isAvailableWorkerAgent).map(agentCatId)).slice(0, 3);
+function defaultWorkerIds(agents = [], coordinatorProfile = null) {
+  return uniqueStrings(providerCompatibleWorkerAgents(agents, coordinatorProfile).map(agentCatId)).slice(0, 3);
 }
 
-function profileWorkerIds(text = '') {
+function reusableProfileWorkerIds(text = '', agents = [], coordinatorProfile = null) {
   const profile = detectRequiredCapabilityProfile(text);
-  return uniqueStrings(profile?.roleTemplateIds || []);
+  if (!profile) return [];
+  return uniqueStrings(scanExistingCats({ requiredProfile: profile, availableAgents: agents, coordinatorProfile }).map((cat) => cat.id));
 }
 
 export function isProjectStartRequest(text = '') {
@@ -261,6 +285,13 @@ export function resolveProjectGroupName(text = '', fallback = '') {
   return (compact || 'Clowder 项目群').slice(0, 24);
 }
 
+export function buildProjectGroupCreationContextMessage() {
+  // Project-group creation is a space-opening action. The original kickoff text
+  // may contain stale phase rules or line-start @mentions, so it must not be
+  // forwarded through the executable Clowder bridge.
+  return null;
+}
+
 export function buildProjectGroupCardId(sourceMessage = {}) {
   const id = sourceMessage.id || sourceMessage.messageId || sourceMessage.clientMsgNo || sourceMessage.client_msg_no || '';
   return `project-group-card:${String(id || Date.now()).trim()}`;
@@ -282,11 +313,12 @@ export function buildProjectGroupConfirmationInput({
 } = {}) {
   const pmDirectChannelId = firstText(conversation.channelId, conversation.id);
   const coordinatorId = agentCatId(agent) || agentCatId(conversation) || 'coordinator';
-  const targetCatIds = mentionedWorkerIds(text || sourceMessage.content, availableAgents);
-  const profileCatIds = profileWorkerIds(text || sourceMessage.content).filter((id) => id !== coordinatorId);
+  const coordinatorProfile = resolveCoordinatorCreationProfile(agent);
+  const targetCatIds = mentionedWorkerIds(text || sourceMessage.content, availableAgents, coordinatorProfile);
+  const profileCatIds = reusableProfileWorkerIds(text || sourceMessage.content, availableAgents, coordinatorProfile).filter((id) => id !== coordinatorId);
   const workerCatIds = targetCatIds.length
     ? targetCatIds
-    : (profileCatIds.length ? profileCatIds : defaultWorkerIds(availableAgents));
+    : (profileCatIds.length ? profileCatIds : defaultWorkerIds(availableAgents, coordinatorProfile));
   const userId = firstText(currentUser.id, currentUser.uid, currentUser.userId, currentUser.raw?.uid, currentUser.raw?.id);
   const threadId = resolveThreadId(conversation) || resolveThreadId(agent);
   return {
@@ -302,6 +334,7 @@ export function buildProjectGroupConfirmationInput({
     catMemberIds: uniqueStrings([coordinatorId, ...workerCatIds]),
     targetCatIds: workerCatIds,
     workerCatIds,
+    coordinatorProfile,
     coordinator: {
       id: coordinatorId,
       name: firstText(agent.name, agent.nickname, conversation.name, 'PM / 协调者'),
@@ -355,6 +388,7 @@ function normalizeProjectGroupCard(input = {}) {
     },
     targetCatIds: uniqueStrings(input.targetCatIds || []),
     workerCatIds: uniqueStrings(input.workerCatIds || input.targetCatIds || []),
+    coordinatorProfile: input.coordinatorProfile || null,
     workspaceId: firstText(input.workspaceId),
     projectGroupNo: firstText(input.projectGroupNo, input.groupNo),
     projectGroupName: firstText(input.projectGroupName, input.groupName),
@@ -438,6 +472,8 @@ export function resolveProjectGroupTextConfirmation({
   conversation = {},
   agent = {}
 } = {}) {
+  if (isFormalProjectGroupExecutionPrompt(text, conversation)) return null;
+
   const hasCancelIntent = isProjectGroupTextCancelIntent(text);
   const hasConfirmIntent = isProjectGroupTextConfirmIntent(text);
   if (!hasCancelIntent && !hasConfirmIntent) return null;
@@ -586,6 +622,14 @@ export function updateProjectGroupProposalMessage(list = [], proposalId = '', pa
 export function buildProjectGroupEnsurePayload(card = {}, options = {}) {
   const currentUser = options.currentUser || {};
   const userId = firstText(currentUser.id, currentUser.uid, currentUser.userId, currentUser.raw?.uid, currentUser.raw?.id);
+  const filteredTargets = resolveProjectGroupExecutionTargets({
+    card,
+    agents: options.agents || [],
+    coordinatorId: cleanCatId(firstText(options.coordinatorId, card.coordinator?.id, card.pmMemberId))
+  });
+  const filteredCatMemberIds = filteredTargets.catIds.length
+    ? filteredTargets.catIds
+    : uniqueStrings([...(card.catMemberIds || []), ...(card.targetCatIds || []), ...(card.workerCatIds || [])]);
   const payload = {
     projectName: firstText(card.projectName, card.projectGroupName, 'Clowder 项目群'),
     workspaceId: firstText(card.workspaceId),
@@ -595,7 +639,7 @@ export function buildProjectGroupEnsurePayload(card = {}, options = {}) {
     projectThreadId: firstText(card.projectThreadId),
     pmMemberId: firstText(card.pmMemberId, card.coordinator?.id ? `${CLOWDER_CAT_CONTACT_PREFIX}${cleanCatId(card.coordinator.id)}` : ''),
     userMemberIds: uniqueStrings([...(card.userMemberIds || []), userId]),
-    catMemberIds: uniqueStrings([...(card.catMemberIds || []), ...(card.targetCatIds || []), ...(card.workerCatIds || [])]),
+    catMemberIds: filteredCatMemberIds,
     createdBy: firstText(card.createdBy, 'user')
   };
   Object.keys(payload).forEach((key) => {
@@ -618,6 +662,66 @@ export function projectGroupCreatedPatch(resp = {}, card = {}) {
     catMemberIds: uniqueStrings(binding.catMemberIds || binding.cat_member_ids || card.catMemberIds || []),
     reused: Boolean(resp.reused ?? resp.data?.reused ?? binding.reused ?? card.reused),
     error: ''
+  };
+}
+
+function agentIds(agent = {}) {
+  const raw = agent.raw || {};
+  return uniqueStrings([
+    agent.id,
+    agent.uid,
+    agent.catId,
+    agent.cat_id,
+    agent.directCatId,
+    agent.direct_cat_id,
+    agent.agentId,
+    agent.agent_id,
+    raw.id,
+    raw.uid,
+    raw.catId,
+    raw.cat_id,
+    raw.directCatId,
+    raw.direct_cat_id,
+    raw.agentId,
+    raw.agent_id
+  ].map(cleanCatId));
+}
+
+function agentById(agents = []) {
+  const byId = new Map();
+  for (const agent of agents || []) {
+    for (const id of agentIds(agent)) {
+      if (id && !byId.has(id)) byId.set(id, agent);
+    }
+  }
+  return byId;
+}
+
+export function resolveProjectGroupExecutionTargets({
+  card = {},
+  createdPatch = {},
+  agents = [],
+  coordinatorId = ''
+} = {}) {
+  const coordinator = cleanCatId(firstText(coordinatorId, card.coordinator?.id, card.pmMemberId));
+  const byId = agentById(agents);
+  const rawCatIds = uniqueStrings(
+    (createdPatch.catMemberIds?.length ? createdPatch.catMemberIds : [])
+      .concat(card.catMemberIds || [], card.targetCatIds || [], card.workerCatIds || [])
+      .map(cleanCatId)
+  );
+  const cardWorkers = new Set(uniqueStrings([...(card.workerCatIds || []), ...(card.targetCatIds || [])].map(cleanCatId)));
+  const kept = rawCatIds.filter((id) => {
+    if (!id) return false;
+    if (id === coordinator) return true;
+    const agent = byId.get(id);
+    if (!agent) return !/^runtime-cat-/i.test(id);
+    return isCompatibleWithCoordinatorProfile(agent, card.coordinatorProfile || null);
+  });
+  const workers = kept.filter((id) => id !== coordinator && (cardWorkers.has(id) || byId.has(id)));
+  return {
+    catIds: uniqueStrings([...(coordinator ? [coordinator] : []), ...workers]),
+    workerCatIds: uniqueStrings(workers)
   };
 }
 

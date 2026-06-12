@@ -432,10 +432,12 @@ function normalizeClowderAgent(agent = {}) {
     avatar: firstNonEmpty(agent.avatar, agent.logo),
     status: available ? 'active' : 'inactive',
     creator: isUserScopedClowderAgent(agent) ? 'User' : 'System',
-    platform: firstNonEmpty(agent.platform, 'clowder'),
-    accessMode: firstNonEmpty(agent.accessMode, 'backend'),
+    platform: firstNonEmpty(agent.platform, agent.clientId, agent.client_id, 'clowder'),
+    clientId: firstNonEmpty(agent.clientId, agent.client_id, agent.platform),
+    accessMode: firstNonEmpty(agent.accessMode, agent.access_mode, agent.authType, agent.auth_type, 'backend'),
+    authType: firstNonEmpty(agent.authType, agent.auth_type, agent.accessMode, agent.access_mode),
     model: firstNonEmpty(agent.model, agent.defaultModel),
-    accountRef: firstNonEmpty(agent.accountRef),
+    accountRef: firstNonEmpty(agent.accountRef, agent.account_ref),
     apiKey: '',
     apiUrl: '',
     customModel: '',
@@ -455,6 +457,12 @@ function isNotFoundError(error = {}) {
   const status = Number(error.status || error.statusCode || error.error?.status || error.error?.statusCode || 0);
   const message = String(error.msg || error.message || error.error?.data?.error || error.error?.data?.message || '');
   return status === 404 || /not found|不存在|未找到/i.test(message);
+}
+
+function isConversationExtraNotifyFailure(error = {}) {
+  const status = Number(error.status || error.statusCode || error.error?.status || error.error?.statusCode || 0);
+  const message = String(error.msg || error.message || error.error?.data?.msg || error.error?.data?.error || error.error?.data?.message || '');
+  return status === 400 && /同步扩展会话cmd失败|sync conversation extra|CMDSyncConversationExtra/i.test(message);
 }
 
 function normalizeCreatedClowderCat(resp = {}) {
@@ -995,6 +1003,7 @@ export function createNativeImService(options = {}) {
     const clientId = clientIdForAgentPlatform(agent.platform || agent.clientId);
     const authType = authTypeForAccessMode(agent.accessMode || agent.authType);
     const payload = {
+      catId: firstNonEmpty(agent.catId, agent.cat_id, agent.id && String(agent.id).startsWith('riverwatch-') ? agent.id : ''),
       name: firstNonEmpty(agent.name, agent.nickname),
       alias: firstNonEmpty(agent.alias),
       roleTemplateId: firstNonEmpty(agent.roleTemplateId, agent.roleTemplate, agent.templateId, 'general'),
@@ -1008,6 +1017,7 @@ export function createNativeImService(options = {}) {
       personality: firstNonEmpty(agent.personality, agent.systemPrompt, agent.desc),
       capabilities: firstList(agent.capabilities, agent.capabilityTags).map(String).filter(Boolean)
     };
+    if (!payload.catId) delete payload.catId;
     if (authType !== 'oauth') {
       payload.defaultModel = firstNonEmpty(agent.defaultModel, agent.model, agent.customModel);
     }
@@ -1137,7 +1147,18 @@ export function createNativeImService(options = {}) {
     if (browseTo !== undefined) payload.browse_to = browseTo;
     if (keepMessageSeq !== undefined) payload.keep_message_seq = keepMessageSeq;
     if (keepOffsetY !== undefined) payload.keep_offset_y = keepOffsetY;
-    return client.post(`conversations/${encodeURIComponent(String(channelId))}/${Number(channelType)}/extra`, payload);
+    try {
+      return await client.post(`conversations/${encodeURIComponent(String(channelId))}/${Number(channelType)}/extra`, payload);
+    } catch (error) {
+      if (isConversationExtraNotifyFailure(error)) {
+        return {
+          extraPersisted: true,
+          commandNotifyFailed: true,
+          error
+        };
+      }
+      throw error;
+    }
   }
 
   async function clearConversationUnread({ channelId, channelType = CHANNEL_TYPE_PERSON, unread = 0, messageSeq = 0 } = {}) {

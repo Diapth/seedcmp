@@ -11,7 +11,7 @@ import fastifyCookie from '@fastify/cookie';
 import cors from '@fastify/cors';
 import fastifyWebsocket from '@fastify/websocket';
 import Fastify, { type FastifyReply } from 'fastify';
-import { resolveAnthropicRuntimeProfile, resolveForClient } from './config/account-resolver.js';
+import { resolveAnthropicRuntimeProfile, resolveByAccountRef, resolveForClient } from './config/account-resolver.js';
 import { regenerateStartupCliConfigs } from './config/capabilities/startup-cli-config.js';
 import { resolveBoundAccountRefForCat } from './config/cat-account-binding.js';
 import { getCatContextBudget } from './config/cat-budgets.js';
@@ -239,6 +239,7 @@ import { threadExportRoutes } from './routes/thread-export.js';
 import { ApiInstanceLease, type ApiInstanceLeaseInvalidation } from './services/ApiInstanceLease.js';
 import { findMonorepoRoot } from './utils/monorepo-root.js';
 import { resolveUserId } from './utils/request-identity.js';
+import { catConfigToDirectoryAgent } from './utils/thread-cat-directory-agent.js';
 import { getDefaultUploadDir } from './utils/upload-paths.js';
 
 const PORT = parseInt(process.env.API_SERVER_PORT ?? '3004', 10);
@@ -267,20 +268,6 @@ function hasRuntimeSessionDrain(service: AgentService): service is AgentService 
   return typeof (service as { drainRuntimeSession?: unknown }).drainRuntimeSession === 'function';
 }
 
-function catConfigToDirectoryAgent(config: CatConfig, source: ThreadCatDirectoryAgent['source']): ThreadCatDirectoryAgent {
-  return {
-    catId: String(config.id),
-    displayName: config.displayName,
-    aliases: [...config.mentionPatterns],
-    mentionPatterns: [...config.mentionPatterns],
-    avatar: config.avatar,
-    personalitySummary: config.personality,
-    capabilitySummary: config.teamStrengths ?? config.roleDescription,
-    ...(config.restrictions && config.restrictions.length > 0 ? { restrictions: [...config.restrictions] } : {}),
-    source,
-  };
-}
-
 function getTemplateDirectoryAgents(): ThreadCatDirectoryAgent[] {
   try {
     const projectRoot = resolveActiveProjectRoot();
@@ -303,8 +290,9 @@ function getTemplateDirectoryAgents(): ThreadCatDirectoryAgent[] {
 
 function getImWebDirectoryAgents(): ThreadCatDirectoryAgent[] {
   const byCatId = new Map<string, ThreadCatDirectoryAgent>();
+  const projectRoot = resolveActiveProjectRoot();
   for (const config of Object.values(catRegistry.getAllConfigs())) {
-    const agent = catConfigToDirectoryAgent(config, 'existing');
+    const agent = catConfigToDirectoryAgent(config, 'existing', { projectRoot, resolveAccountRef: resolveByAccountRef });
     byCatId.set(agent.catId, agent);
   }
   for (const agent of getTemplateDirectoryAgents()) {

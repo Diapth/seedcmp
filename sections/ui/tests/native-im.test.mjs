@@ -86,6 +86,9 @@ import {
   buildManualContextPinPayload,
   resolveConversationThreadId
 } from '../services/native-im/manual-context-pins.js';
+import {
+  runTextPostSendEffects
+} from '../services/native-im/send-flow.js';
 
 function makeRequestStub(responses = {}) {
   const calls = [];
@@ -138,6 +141,35 @@ test('native service updates remote conversation draft extra', async () => {
   });
 });
 
+test('native service tolerates TangSeng conversation extra command notify failure', async () => {
+  const request = makeRequestStub({
+    'POST conversations/group-a/2/extra': {
+      statusCode: 400,
+      data: { msg: '发送同步扩展会话cmd失败！' }
+    }
+  });
+  const service = createNativeImService({
+    baseUrl: '/v1/',
+    request,
+    getToken: () => 'token'
+  });
+
+  const result = await service.updateConversationExtra({
+    channelId: 'group-a',
+    channelType: 2,
+    draft: '跨端草稿'
+  });
+
+  assert.equal(result.extraPersisted, true);
+  assert.equal(result.commandNotifyFailed, true);
+  assert.equal(request.calls[0].method, 'POST');
+  assert.deepEqual(request.calls[0].data, {
+    channel_id: 'group-a',
+    channel_type: 2,
+    draft: '跨端草稿'
+  });
+});
+
 test('native service clears remote conversation unread count', async () => {
   const request = makeRequestStub();
   const service = createNativeImService({
@@ -159,6 +191,78 @@ test('native service clears remote conversation unread count', async () => {
     unread: 0,
     message_seq: 0
   });
+});
+
+test('normalizes real outbound file preview metadata', () => {
+  const normalized = normalizeMessage({
+    id: 'm-file',
+    from_uid: 'clowder:frontend',
+    from_name: 'Frontend',
+    payload: {
+      type: 8,
+      name: 'RiverWatch_展示首页.html',
+      size: 18200,
+      url: '/assets/RiverWatch_%E5%B1%95%E7%A4%BA%E9%A6%96%E9%A1%B5.html',
+      fileType: 'html',
+      mimeType: 'text/html',
+      previewContent: '<h1>RiverWatch</h1>',
+      sourceUrl: '/assets/RiverWatch_%E5%B1%95%E7%A4%BA%E9%A6%96%E9%A1%B5.html'
+    }
+  });
+
+  assert.equal(normalized.type, 'file');
+  assert.equal(normalized.fileName, 'RiverWatch_展示首页.html');
+  assert.equal(normalized.fileType, 'html');
+  assert.equal(normalized.mimeType, 'text/html');
+  assert.equal(normalized.previewContent, '<h1>RiverWatch</h1>');
+  assert.equal(normalized.sourceUrl, '/assets/RiverWatch_%E5%B1%95%E7%A4%BA%E9%A6%96%E9%A1%B5.html');
+  assert.equal(normalized.fileSize, 18200);
+});
+
+test('normalizes file preview content by ignoring boolean preview flags', () => {
+  const normalized = normalizeMessage({
+    id: 'm-md-file',
+    payload: {
+      type: 8,
+      name: 'RiverWatch_技术README.md',
+      url: '/assets/riverwatch-readme.md',
+      fileType: 'md',
+      previewContent: true,
+      metadata: {
+        previewContent: '# RiverWatch Vue CDN 技术 README'
+      }
+    }
+  });
+
+  assert.equal(normalized.type, 'file');
+  assert.equal(normalized.fileType, 'md');
+  assert.equal(normalized.previewContent, '# RiverWatch Vue CDN 技术 README');
+});
+
+test('clowder group outbound messages keep cat display sender', () => {
+  const normalized = normalizeMessage({
+    id: 'm-cat-file',
+    from_uid: 'u_owner',
+    from_name: 'RiverWatch 演示用户',
+    payload: {
+      type: 8,
+      name: 'RiverWatch_项目汇报.pptx',
+      url: '/assets/RiverWatch_%E9%A1%B9%E7%9B%AE%E6%B1%87%E6%8A%A5.pptx',
+      cat_id: 'deck-strategist',
+      cat_display_name: 'Deck Strategist'
+    }
+  });
+  const enriched = messageState.enrichNativeMessageSender(normalized, {
+    id: 'group-riverwatch',
+    type: 'group'
+  }, {
+    id: 'u_owner',
+    nickname: 'RiverWatch 演示用户'
+  });
+
+  assert.equal(enriched.senderId, 'deck-strategist');
+  assert.equal(enriched.senderName, 'Deck Strategist');
+  assert.equal(enriched.fileName, 'RiverWatch_项目汇报.pptx');
 });
 
 test('native service deletes remote conversation through TangSeng recent conversation API', async () => {
@@ -411,7 +515,9 @@ test('native service fetches clowder cat directory as agent cards', async () => 
     status: 'active',
     creator: 'System',
     platform: 'clowder',
+    clientId: '',
     accessMode: 'backend',
+    authType: '',
     model: '',
     accountRef: '',
     apiKey: '',
@@ -427,6 +533,63 @@ test('native service fetches clowder cat directory as agent cards', async () => 
     preferred: true,
     raw: rawAgent
   });
+});
+
+test('native service preserves clowder cat provider metadata from directory', async () => {
+  const request = makeRequestStub({
+    'GET clowder/cats?includeUnavailable=true': {
+      agents: [{
+        catId: 'runtime-cat-source',
+        displayName: '狸花猫（资料整理师）',
+        clientId: 'openai',
+        authType: 'oauth',
+        accountRef: 'codex',
+        source: 'runtime-created',
+        available: true
+      }]
+    }
+  });
+  const service = createNativeImService({
+    baseUrl: '/v1/',
+    request,
+    getToken: () => 'token'
+  });
+
+  const directory = await service.fetchClowderCatDirectory({ includeUnavailable: true });
+  assert.equal(directory.agents[0].platform, 'openai');
+  assert.equal(directory.agents[0].clientId, 'openai');
+  assert.equal(directory.agents[0].accessMode, 'oauth');
+  assert.equal(directory.agents[0].authType, 'oauth');
+  assert.equal(directory.agents[0].accountRef, 'codex');
+});
+
+test('clowder agent conversations preserve provider metadata for coordinator gates', async () => {
+  const { createAgentConversation, createAgentMember } = await import('../services/native-im/agent-state.js');
+  const agent = {
+    id: 'riverpm',
+    catId: 'riverpm',
+    name: 'RiverWatch PM',
+    source: 'clowder',
+    platform: 'anthropic',
+    clientId: 'anthropic',
+    accessMode: 'oauth',
+    authType: 'oauth',
+    accountRef: 'claude'
+  };
+
+  const conversation = createAgentConversation(agent);
+  assert.equal(conversation.platform, 'anthropic');
+  assert.equal(conversation.clientId, 'anthropic');
+  assert.equal(conversation.accessMode, 'oauth');
+  assert.equal(conversation.authType, 'oauth');
+  assert.equal(conversation.accountRef, 'claude');
+
+  const member = createAgentMember(agent);
+  assert.equal(member.platform, 'anthropic');
+  assert.equal(member.clientId, 'anthropic');
+  assert.equal(member.accessMode, 'oauth');
+  assert.equal(member.authType, 'oauth');
+  assert.equal(member.accountRef, 'claude');
 });
 
 test('native service uses TangSeng clowder directory unless direct mode is explicit', () => {
@@ -675,7 +838,7 @@ test('native service uploads skill packages through multipart upload runtime', a
   }]);
 });
 
-test('deployment helper detects deployment intent only in clowder direct chats', () => {
+test('deployment helper detects deployment intent in clowder direct chats and project groups', () => {
   const clowderDirect = {
     id: 'clowder_cat:codex',
     channelId: 'clowder_cat:codex',
@@ -690,14 +853,36 @@ test('deployment helper detects deployment intent only in clowder direct chats',
     channelType: 1,
     type: 'single'
   };
+  const projectGroup = {
+    id: 'riverwatch-group',
+    channelId: 'riverwatch-group',
+    channelType: 2,
+    type: 'group',
+    source: 'clowder',
+    isProjectGroup: true,
+    projectThreadId: 'thread-riverwatch',
+    projectCoordinatorCatId: 'riverwatch-pm'
+  };
+  const normalGroup = {
+    id: 'team-group',
+    channelId: 'team-group',
+    channelType: 2,
+    type: 'group'
+  };
 
   assert.equal(shouldCreateDeploymentCard({ conversation: clowderDirect, text: '帮我把这个项目部署到 preview 环境' }), true);
+  assert.equal(shouldCreateDeploymentCard({ conversation: projectGroup, text: '请部署当前最新的 RiverWatch_展示首页_v2.html 到 preview 环境。' }), true);
   assert.equal(shouldCreateDeploymentCard({
     conversation: clowderDirect,
     text: '我想做一个 RiverWatch 河流水质数据看板项目，请你作为 PM 创建项目群并组织多智能体分工执行。交付物需要包括 preview 部署链接。'
   }), false);
+  assert.equal(shouldCreateDeploymentCard({
+    conversation: projectGroup,
+    text: '我想做一个 RiverWatch 河流水质数据看板项目，请你作为 PM 创建项目群并组织多智能体分工执行。交付物需要包括 preview 部署链接。'
+  }), false);
   assert.equal(shouldCreateDeploymentCard({ conversation: clowderDirect, text: '先不部署，继续改文案' }), false);
   assert.equal(shouldCreateDeploymentCard({ conversation: normalDirect, text: '帮我部署到线上' }), false);
+  assert.equal(shouldCreateDeploymentCard({ conversation: normalGroup, text: '帮我部署到 preview 环境' }), false);
 });
 
 test('native service uses conversation deployment request endpoints', async () => {
@@ -1284,6 +1469,38 @@ test('project group text confirmation can approve or reject pending project prop
   }), null);
 });
 
+test('project group text confirmation ignores formal execution prompts after project group opens', async () => {
+  const {
+    resolveProjectGroupTextConfirmation
+  } = await import('../services/native-im/project-group.js');
+  const pendingProposal = {
+    id: 'proposal-msg-riverwatch',
+    type: 'proposal_card',
+    proposalCard: {
+      proposalId: 'proposal-riverwatch-1',
+      title: '创建 RiverWatch 项目群',
+      bodyMarkdown: '建议批准并创建 RiverWatch 项目群，并拉 Codex 分工执行。',
+      fields: [{ label: '成员', value: 'PM, Frontend, DevOps' }],
+      status: 'pending'
+    }
+  };
+
+  const executionPrompt = `@狸花猫（资料整理师）
+@俄罗斯蓝猫（叙事策略师）
+@波斯猫（前端工程师）
+
+请在本项目群内真实分工完成 RiverWatch 第一版交付物。
+阶段切换说明：此前 PM 直聊里的“只建群、不生成交付物”限制已经结束。
+任何执行智能体不得用它拒绝生成文件。
+不要检索旧 thread，不要复用旧线程，禁止使用 mock、模拟数据、预置 assets 或伪造文件。`;
+
+  assert.equal(resolveProjectGroupTextConfirmation({
+    text: executionPrompt,
+    messages: [pendingProposal],
+    conversation: { id: '2:riverwatch', type: 'group', channelType: 2, name: 'RiverWatch 项目群' }
+  }), null);
+});
+
 test('project group proposal card status updates from text fallback', async () => {
   const {
     updateProjectGroupProposalMessage
@@ -1313,6 +1530,62 @@ test('project group proposal card status updates from text fallback', async () =
   assert.equal(failed[0].proposalCard.error, '批准失败');
 
   assert.deepEqual(updateProjectGroupProposalMessage(failed, 'missing', { status: 'rejected' }), failed);
+});
+
+test('text send effects create fresh project group card before old-context fallback can auto-confirm', async () => {
+  const calls = [];
+  const result = await runTextPostSendEffects({
+    conversation: { id: 'pm-direct', type: 'robot', directCatId: 'riverpm' },
+    content: '请作为 PM 创建项目群并组织多智能体分工执行',
+    localMessage: { id: 'msg-1', status: 'success' },
+    createCoordinatorTemplateCatsCard: async () => {
+      calls.push('template-card');
+      return { id: 'template-card' };
+    },
+    handleProjectGroupTextFallback: async () => {
+      calls.push('project-group-fallback');
+      return { id: 'project-card' };
+    },
+    startAgentPendingFeedback: () => calls.push('pending-feedback'),
+    createProjectGroupCard: () => {
+      calls.push('project-card');
+      return { id: 'fresh-project-card' };
+    },
+    createDeploymentCard: async () => calls.push('deployment-card')
+  });
+
+  assert.deepEqual(calls, ['template-card', 'project-card', 'pending-feedback', 'deployment-card']);
+  assert.equal(result.projectGroupCardCreated, true);
+  assert.equal(result.handledProjectGroupFallback, false);
+  assert.equal(result.shouldReturn, false);
+});
+
+test('text send effects still allow explicit confirmation fallback when no fresh project card is created', async () => {
+  const calls = [];
+  const result = await runTextPostSendEffects({
+    conversation: { id: 'pm-direct', type: 'robot', directCatId: 'riverpm' },
+    content: '确认创建',
+    localMessage: { id: 'msg-confirm', status: 'success' },
+    createCoordinatorTemplateCatsCard: async () => {
+      calls.push('template-card');
+      return null;
+    },
+    createProjectGroupCard: () => {
+      calls.push('project-card');
+      return null;
+    },
+    handleProjectGroupTextFallback: async () => {
+      calls.push('project-group-fallback');
+      return { id: 'created-project-group-card' };
+    },
+    startAgentPendingFeedback: () => calls.push('pending-feedback'),
+    createDeploymentCard: async () => calls.push('deployment-card')
+  });
+
+  assert.deepEqual(calls, ['template-card', 'project-card', 'project-group-fallback']);
+  assert.equal(result.projectGroupCardCreated, false);
+  assert.equal(result.handledProjectGroupFallback, true);
+  assert.equal(result.shouldReturn, true);
 });
 
 test('project group text confirmation can recover from recent project start context', async () => {
@@ -1453,10 +1726,67 @@ test('project group confirmation trigger is limited to coordinator direct chats'
       { id: 'devops', name: '孟加拉猫（DevOps）', source: 'clowder', raw: { source: 'disconnected' } }
     ]
   });
+  assert.deepEqual(riverWatchCard.targetCatIds, []);
+
+  const riverWatchWithReusableCats = buildProjectGroupConfirmationInput({
+    conversation: {
+      ...coordinatorConversation,
+      id: 'clowder_cat:riverpm144763',
+      channelId: 'clowder_cat:riverpm144763',
+      directCatId: 'riverpm144763',
+      name: 'RiverWatch PM 144763'
+    },
+    agent: {
+      id: 'riverpm144763',
+      name: 'RiverWatch PM 144763',
+      roleTemplate: 'general',
+      alias: '@riverpm144763'
+    },
+    sourceMessage: { id: 'prompt-riverwatch-real', content: 'RiverWatch 项目需要 PPT、PRD、Vue 前端页面、README 和 preview 部署链接' },
+    text: 'RiverWatch 项目需要 PPT、PRD、Vue 前端页面、README 和 preview 部署链接',
+    currentUser: { id: 'u-owner' },
+    availableAgents: [
+      { id: 'bobo', name: '波斯猫（前端工程师）', source: 'clowder', roleTemplate: 'general', capabilityTags: ['前端架构', 'Vue 页面实现'] },
+      { id: 'runtime-cat-source', name: '狸花猫（资料整理师）', source: 'clowder', roleTemplate: 'general', capabilityTags: ['source processing'] },
+      { id: 'runtime-cat-deck', name: '俄罗斯蓝猫（叙事策略师）', source: 'clowder', roleTemplate: 'general', capabilityTags: ['deck-strategist'] },
+      { id: 'devops', name: '孟加拉猫（DevOps）', source: 'clowder', raw: { source: 'disconnected' } }
+    ]
+  });
   assert.deepEqual(
-    riverWatchCard.targetCatIds,
-    ['source-curator', 'deck-strategist', 'storyboard-designer', 'frontend', 'devops']
+    riverWatchWithReusableCats.targetCatIds.sort(),
+    ['bobo', 'runtime-cat-deck', 'runtime-cat-source'].sort()
   );
+  assert.ok(!riverWatchWithReusableCats.targetCatIds.includes('devops'));
+});
+
+test('coordinator capability scan does not treat live preview as devops coverage', async () => {
+  const {
+    detectRequiredCapabilityProfile,
+    findMissingRoles,
+    scanExistingCats
+  } = await import('../services/native-im/coordinator-capability.js');
+
+  const profile = detectRequiredCapabilityProfile('RiverWatch 项目需要 PPT、PRD、Vue 前端页面、README 和 preview 部署链接');
+  const availableAgents = [
+    {
+      id: 'sensen',
+      name: '挪威森林猫（SVG执行守门人）',
+      source: 'clowder',
+      roleTemplate: 'general',
+      desc: 'SVG executor、串行生成纪律、spec_lock、live preview 守护',
+      capabilityTags: ['SVG executor', '串行生成纪律', 'live preview 守护']
+    },
+    {
+      id: 'bobo',
+      name: '波斯猫（前端工程师）',
+      source: 'clowder',
+      roleTemplate: 'general',
+      capabilityTags: ['前端架构', 'Vue 页面实现']
+    }
+  ];
+
+  assert.deepEqual(scanExistingCats({ requiredProfile: profile, availableAgents }).map((cat) => cat.id), ['bobo']);
+  assert.ok(findMissingRoles({ requiredProfile: profile, availableAgents }).includes('devops'));
 });
 
 test('native conversation normalization preserves clowder binding thread ids', () => {
@@ -1480,7 +1810,8 @@ test('project group confirmation builds ensure payload and created patch', async
   const {
     buildProjectGroupEnsurePayload,
     projectGroupCreatedPatch,
-    projectGroupFailedPatch
+    projectGroupFailedPatch,
+    resolveProjectGroupExecutionTargets
   } = await import('../services/native-im/project-group.js');
   const card = {
     projectName: 'ISSUE-029项目群',
@@ -1532,6 +1863,83 @@ test('project group confirmation builds ensure payload and created patch', async
     status: 'failed',
     error: 'sync failed'
   });
+
+  assert.deepEqual(resolveProjectGroupExecutionTargets({
+    card: {
+      catMemberIds: ['riverpm-claude', 'runtime-cat-old-codex', 'source-curator-claude'],
+      targetCatIds: ['runtime-cat-old-codex'],
+      workerCatIds: ['runtime-cat-old-codex'],
+      coordinatorProfile: {
+        platform: 'claude-code',
+        clientId: 'anthropic',
+        provider: 'claude',
+        accessMode: 'oauth',
+        accountRef: 'claude'
+      }
+    },
+    createdPatch: {
+      catMemberIds: ['riverpm-claude', 'runtime-cat-old-codex', 'source-curator-claude']
+    },
+    agents: [
+      { id: 'runtime-cat-old-codex', clientId: 'openai', accountRef: 'codex', authType: 'oauth' },
+      { id: 'source-curator-claude', clientId: 'anthropic', accountRef: 'claude', authType: 'oauth' }
+    ],
+    coordinatorId: 'riverpm-claude'
+  }), {
+    catIds: ['riverpm-claude', 'source-curator-claude'],
+    workerCatIds: ['source-curator-claude']
+  });
+
+  assert.deepEqual(buildProjectGroupEnsurePayload({
+    projectName: 'RiverWatch 项目群',
+    pmDirectChannelId: 'clowder_cat:riverpm-claude',
+    pmMemberId: 'clowder_cat:riverpm-claude',
+    userMemberIds: ['u-owner'],
+    catMemberIds: ['riverpm-claude', 'runtime-cat-old-codex', 'source-curator-claude'],
+    targetCatIds: ['runtime-cat-old-codex'],
+    workerCatIds: ['runtime-cat-old-codex'],
+    coordinator: { id: 'riverpm-claude' },
+    coordinatorProfile: {
+      platform: 'claude-code',
+      clientId: 'anthropic',
+      provider: 'claude',
+      accessMode: 'oauth',
+      accountRef: 'claude'
+    }
+  }, {
+    currentUser: { id: 'u-owner' },
+    agents: [
+      { id: 'runtime-cat-old-codex', clientId: 'openai', accountRef: 'codex', authType: 'oauth' },
+      { id: 'source-curator-claude', clientId: 'anthropic', accountRef: 'claude', authType: 'oauth' }
+    ]
+  }), {
+    projectName: 'RiverWatch 项目群',
+    pmDirectChannelId: 'clowder_cat:riverpm-claude',
+    pmDirectChannelType: 1,
+    pmMemberId: 'clowder_cat:riverpm-claude',
+    userMemberIds: ['u-owner'],
+    catMemberIds: ['riverpm-claude', 'source-curator-claude'],
+    createdBy: 'user'
+  });
+});
+
+test('project group creation does not forward original kickoff text as an executable group prompt', async () => {
+  const {
+    buildProjectGroupCreationContextMessage
+  } = await import('../services/native-im/project-group.js');
+
+  const oldStageKickoff = [
+    '@riverwatch-source-curator-085592 @riverwatch-deck-strategist-085592 @riverwatch-storyboard-designer-085592 我想做一个 RiverWatch 项目。',
+    '本轮请先只完成缺失执行猫盘点和 RiverWatch 项目群确认卡，不要生成交付物。'
+  ].join('\n');
+
+  assert.equal(
+    buildProjectGroupCreationContextMessage({
+      sourceText: oldStageKickoff,
+      projectName: 'RiverWatch 项目群'
+    }),
+    null
+  );
 });
 
 test('clowder project binding and thread tasks normalize into a group board', () => {
@@ -2068,6 +2476,44 @@ test('native service preserves explicit oauth account refs when creating templat
   assert.equal(Object.prototype.hasOwnProperty.call(request.calls[0].data, 'defaultModel'), false);
 });
 
+test('native service forwards stable cat ids when creating template cats', async () => {
+  const request = makeRequestStub({
+    'POST clowder/cats': {
+      agent: {
+        catId: 'riverwatch-source-curator-934553',
+        displayName: '狸花猫（资料整理师）',
+        alias: '@source-curator',
+        platform: 'claude-code',
+        accessMode: 'oauth',
+        available: true,
+        connected: true
+      },
+      contact: {
+        connected: true,
+        source: 'runtime-created'
+      }
+    }
+  });
+  const service = createNativeImService({
+    baseUrl: '/v1/',
+    request,
+    getToken: () => 'token'
+  });
+
+  await service.createClowderCat({
+    catId: 'riverwatch-source-curator-934553',
+    name: '狸花猫（资料整理师）',
+    alias: '@source-curator',
+    roleTemplateId: 'source-curator',
+    clientId: 'claude-code',
+    accessMode: 'oauth',
+    accountRef: 'claude',
+    inheritCoordinatorAuth: true
+  });
+
+  assert.equal(request.calls[0].data.catId, 'riverwatch-source-curator-934553');
+});
+
 test('native service deletes clowder cats through contact lifecycle API', async () => {
   const request = makeRequestStub({
     'DELETE clowder/cats/codex': { deleted: true, id: 'codex' }
@@ -2515,6 +2961,21 @@ test('conversation draft persistence skips local robot and mock conversations', 
     shouldPersistConversationDraft({ id: 'group-a', channelId: 'group-a', channelType: 2, type: 'group' }),
     true
   );
+  assert.equal(
+    shouldPersistConversationDraft({ id: 'group-project', channelId: 'group-project', channelType: 2, type: 'group', projectThreadId: 'thread-project' }),
+    false
+  );
+  assert.equal(
+    shouldPersistConversationDraft({ id: 'group-project', channelId: 'group-project', channelType: 2, type: 'group', source: 'clowder', isProjectGroup: true }),
+    false
+  );
+  const [projectGroup] = upsertGroupConversation([], {
+    id: 'group-project',
+    name: 'RiverWatch PM',
+    projectThreadId: 'thread-project'
+  });
+  assert.equal(projectGroup.projectThreadId, 'thread-project');
+  assert.equal(shouldPersistConversationDraft(projectGroup), false);
 });
 
 test('websocket address selection prefers ws for local http h5 sessions', () => {
@@ -2893,6 +3354,47 @@ test('native file message payloads normalize sender and receiver file cards', ()
   assert.equal(message.content, '[文件] upload-20260609.md');
 });
 
+test('native clowder rich file blocks surface as file card messages', () => {
+  const incoming = normalizeMessage({
+    message_id: 'rich-msg-1',
+    from_uid: 'clowder:riverpm',
+    from_name: 'RiverWatch PM',
+    payload: JSON.stringify({
+      type: 1,
+      content: '已完成 RiverWatch 产物，请查看文件卡。',
+      cat_id: 'riverpm',
+      cat_display_name: 'RiverWatch PM',
+      rich_blocks: [{
+        id: 'riverwatch-prd',
+        kind: 'file',
+        fileName: 'RiverWatch_PRD.docx',
+        url: '/v1/clowder/workspace/file/raw?worktreeId=thread-riverwatch&path=RiverWatch_PRD.docx',
+        mimeType: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document'
+      }]
+    })
+  });
+
+  const list = messageState.mergeNativeMessageIntoList([], incoming, {
+    conversation: {
+      id: 'riverwatch-group',
+      channelId: 'riverwatch-group',
+      channelType: 2,
+      type: 'group',
+      source: 'clowder',
+      isProjectGroup: true
+    },
+    currentUser: { id: 'demo-user' }
+  });
+
+  assert.equal(list.length, 2);
+  assert.equal(list[0].type, 'text');
+  assert.equal(list[1].type, 'file');
+  assert.equal(list[1].fileName, 'RiverWatch_PRD.docx');
+  assert.equal(list[1].url, '/v1/clowder/workspace/file/raw?worktreeId=thread-riverwatch&path=RiverWatch_PRD.docx');
+  assert.equal(list[1].generatedByAgent, true);
+  assert.equal(list[1].senderName, 'RiverWatch PM');
+});
+
 test('clowder helper creates markdown placeholder chunks and final event', () => {
   assert.equal(typeof messageState.isClowderConversation, 'function');
   assert.equal(typeof messageState.createClowderMarkdownStreamEvents, 'function');
@@ -3051,6 +3553,63 @@ test('synced clowder history preserves local successful user prompt until backen
 
   assert.deepEqual(merged.map((message) => message.id), ['local-prompt-1', 'local-pending-1', 'stream-1']);
   assert.equal(merged[0].content, '请总结任务');
+});
+
+test('synced clowder history preserves local coordinator confirmation cards', () => {
+  const templateCard = {
+    id: 'coordinator-template-cats-card:prompt-riverwatch',
+    type: 'coordinator_template_cats_request',
+    contentType: 'coordinator_template_cats_request',
+    senderId: 'riverpm144763',
+    senderName: 'RiverWatch PM 144763',
+    content: '协调者盘点：建议创建 1 个缺失模板猫猫（RiverWatch 多交付项目）',
+    status: 'success',
+    time: 1100,
+    coordinatorTemplateCatsCard: {
+      cardId: 'coordinator-template-cats-card:prompt-riverwatch',
+      status: 'pending_confirmation',
+      items: [{ roleTemplateId: 'devops', templateId: 'devops', name: '孟加拉猫（DevOps）', status: 'pending' }],
+      reusableCats: [{ id: 'bobo', name: '波斯猫（前端工程师）', matchedRole: 'frontend' }]
+    },
+    metadata: { coordinator_template_cats_request: true }
+  };
+  const projectCard = {
+    id: 'project-group-card:prompt-riverwatch',
+    type: 'project_group_confirmation',
+    contentType: 'project_group_confirmation',
+    senderId: 'riverpm144763',
+    senderName: 'RiverWatch PM 144763',
+    content: 'PM / 协调者建议创建项目群：RiverWatch PM 144763 项目群',
+    status: 'success',
+    time: 1200,
+    projectGroupCard: {
+      cardId: 'project-group-card:prompt-riverwatch',
+      status: 'pending_confirmation',
+      targetCatIds: ['bobo'],
+      workerCatIds: ['bobo']
+    },
+    metadata: { project_group_confirmation: true }
+  };
+  const remoteFinal = {
+    id: 'remote-final-riverwatch',
+    senderId: 'clowder_cat:riverpm144763',
+    content: '我会先组织项目群和执行智能体。',
+    type: 'text',
+    status: 'success',
+    time: 1300
+  };
+
+  const merged = messageState.mergeSyncedMessagesPreservingLocalContext(
+    [templateCard, projectCard],
+    [remoteFinal],
+    { currentUser: { id: 'u1' }, conversation: { id: 'clowder_cat:riverpm144763', type: 'robot', source: 'clowder' } }
+  );
+
+  assert.deepEqual(merged.map((message) => message.id), [
+    'coordinator-template-cats-card:prompt-riverwatch',
+    'project-group-card:prompt-riverwatch',
+    'remote-final-riverwatch'
+  ]);
 });
 
 test('agent placeholder ack adds reaction to user prompt instead of visible thinking message', () => {
@@ -4125,6 +4684,152 @@ test('clowder direct cat conversations are detected for bridge routing', () => {
   );
 });
 
+test('clowder project group conversations are detected for bridge routing', () => {
+  assert.equal(typeof messageState.isClowderProjectGroupConversation, 'function');
+  assert.equal(
+    messageState.isClowderProjectGroupConversation({
+      id: 'riverwatch-group',
+      channelId: 'riverwatch-group',
+      channelType: 2,
+      type: 'group',
+      projectThreadId: 'thread-riverwatch-1'
+    }),
+    true
+  );
+  assert.equal(
+    messageState.isClowderProjectGroupConversation({
+      id: 'plain-group',
+      channelId: 'plain-group',
+      channelType: 2,
+      type: 'group'
+    }),
+    false
+  );
+  assert.equal(
+    messageState.shouldStartLocalClowderStream({
+      id: 'riverwatch-group',
+      channelId: 'riverwatch-group',
+      channelType: 2,
+      type: 'group',
+      projectThreadId: 'thread-riverwatch-1'
+    }),
+    false
+  );
+});
+
+test('clowder project group bridge payload carries thread and mentioned cats', () => {
+  assert.equal(typeof messageState.buildClowderConversationBridgePayload, 'function');
+
+  const payload = messageState.buildClowderConversationBridgePayload({
+    id: 'riverwatch-group',
+    channelId: 'riverwatch-group',
+    channelType: 2,
+    type: 'group',
+    name: 'RiverWatch 项目群',
+    projectThreadId: 'thread-riverwatch-1'
+  }, {
+    content: '@资料整理师 请生成真实文件卡',
+    mentions: [
+      { userId: 'clowder_cat:source-curator', name: '资料整理师' },
+      { userId: 'runtime-cat-frontend', name: '前端工程师' },
+      { userId: 'clowder_cat:source-curator', name: '资料整理师' }
+    ]
+  });
+
+  assert.deepEqual(payload, {
+    text: '@资料整理师 请生成真实文件卡',
+    threadId: 'thread-riverwatch-1',
+    targetCatIds: ['source-curator', 'runtime-cat-frontend'],
+    promptContext: '项目群：RiverWatch 项目群'
+  });
+});
+
+test('clowder project group bridge payload derives target cats from line-start text mentions', () => {
+  const payload = messageState.buildClowderConversationBridgePayload({
+    id: 'riverwatch-group',
+    channelId: 'riverwatch-group',
+    channelType: 2,
+    type: 'group',
+    name: 'RiverWatch 项目群',
+    projectThreadId: 'thread-riverwatch-1',
+    catMembers: [
+      { id: 'runtime-cat-source', name: '狸花猫（资料整理师）', alias: '@狸花猫（资料整理师）' },
+      { id: 'runtime-cat-deck', name: '俄罗斯蓝猫（叙事策略师）', alias: '@俄罗斯蓝猫（叙事策略师）' }
+    ]
+  }, {
+    content: `@狸花猫（资料整理师）
+请你只负责生成 source-pack.md，并用 cc_rich 发送文件卡。`,
+    mentions: []
+  });
+
+  assert.deepEqual(payload, {
+    text: '@狸花猫（资料整理师）\n请你只负责生成 source-pack.md，并用 cc_rich 发送文件卡。',
+    threadId: 'thread-riverwatch-1',
+    targetCatIds: ['runtime-cat-source'],
+    promptContext: '项目群：RiverWatch 项目群'
+  });
+});
+
+test('clowder project group bridge payload does not revive stale codex runtime cats when Claude OAuth members exist', () => {
+  const payload = messageState.buildClowderConversationBridgePayload({
+    id: 'riverwatch-group',
+    channelId: 'riverwatch-group',
+    channelType: 2,
+    type: 'group',
+    name: 'RiverWatch 项目群',
+    projectThreadId: 'thread-riverwatch-claude',
+    catMemberIds: ['runtime-cat-18b7fe993abed0a2', 'source-curator-claude'],
+    workerCatIds: ['runtime-cat-18b7fe993abed0a2'],
+    targetCatIds: ['runtime-cat-18b7fe993abed0a2'],
+    catMembers: [
+      {
+        id: 'runtime-cat-18b7fe993abed0a2',
+        name: '狸花猫（资料整理师）',
+        alias: '@狸花猫（资料整理师）',
+        clientId: 'openai',
+        accountRef: 'codex',
+        authType: 'oauth'
+      },
+      {
+        id: 'source-curator-claude',
+        name: '狸花猫（资料整理师）',
+        alias: '@狸花猫（资料整理师）',
+        clientId: 'anthropic',
+        accountRef: 'claude',
+        authType: 'oauth'
+      }
+    ]
+  }, {
+    content: `@狸花猫（资料整理师）
+请你只负责生成 source-pack.md，并用 cc_rich 发送文件卡。`,
+    mentions: []
+  });
+
+  assert.deepEqual(payload, {
+    text: '@狸花猫（资料整理师）\n请你只负责生成 source-pack.md，并用 cc_rich 发送文件卡。',
+    threadId: 'thread-riverwatch-claude',
+    targetCatIds: ['source-curator-claude'],
+    promptContext: '项目群：RiverWatch 项目群'
+  });
+});
+
+test('project group conversation upsert preserves cat members for mention routing', () => {
+  const [conversation] = upsertGroupConversation([], {
+    id: 'riverwatch-group',
+    name: 'RiverWatch 项目群',
+    projectThreadId: 'thread-riverwatch-1',
+    catMemberIds: ['runtime-cat-source'],
+    catMembers: [
+      { id: 'runtime-cat-source', name: '狸花猫（资料整理师）', alias: '@狸花猫（资料整理师）' }
+    ]
+  });
+
+  assert.deepEqual(conversation.catMemberIds, ['runtime-cat-source']);
+  assert.deepEqual(conversation.catMembers, [
+    { id: 'runtime-cat-source', name: '狸花猫（资料整理师）', alias: '@狸花猫（资料整理师）' }
+  ]);
+});
+
 test('conversation display unread ignores mock and locally read conversations', () => {
   const conversations = [
     { id: 'mock-a', channelId: 'mock-a', channelType: 1, source: 'mock', unread: 3 },
@@ -4173,7 +4878,8 @@ test('coordinator capability profile detection covers ppt and review intents', a
 test('coordinator missing role scan ignores role-template catalog entries', async () => {
   const {
     detectRequiredCapabilityProfile,
-    findMissingRoles
+    findMissingRoles,
+    scanExistingCats
   } = await import('../services/native-im/coordinator-capability.js');
   const {
     buildCoordinatorTemplateCatsRequestInput
@@ -4245,12 +4951,181 @@ test('coordinator missing role scan ignores role-template catalog entries', asyn
   assert.deepEqual(allMissingInput.reusableCats, []);
 });
 
+test('claude oauth coordinator does not reuse codex runtime cats for RiverWatch roles', async () => {
+  const {
+    detectRequiredCapabilityProfile,
+    findMissingRoles,
+    scanExistingCats
+  } = await import('../services/native-im/coordinator-capability.js');
+  const {
+    buildCoordinatorTemplateCatsRequestInput
+  } = await import('../services/native-im/coordinator-template-cats.js');
+  const {
+    buildProjectGroupConfirmationInput
+  } = await import('../services/native-im/project-group.js');
+
+  const prompt = 'RiverWatch 项目需要 PPT、PRD、Vue 前端页面、README 和 preview 部署链接';
+  const profile = detectRequiredCapabilityProfile(prompt);
+  const coordinator = {
+    id: 'riverpm',
+    name: 'RiverWatch PM',
+    roleTemplate: 'coordinator',
+    platform: 'claude-code',
+    accessMode: 'oauth',
+    accountRef: 'claude'
+  };
+  const availableAgents = [
+    {
+      id: 'runtime-cat-source',
+      name: '狸花猫（资料整理师）',
+      source: 'clowder',
+      roleTemplate: 'general',
+      platform: 'codex',
+      clientId: 'openai',
+      accessMode: 'oauth',
+      accountRef: 'codex',
+      raw: {
+        source: 'runtime-created',
+        clientId: 'openai',
+        accountRef: 'codex',
+        roleDescription: 'PPT / 文档源材料整理专家，source processing、资料清洗、素材盘点'
+      }
+    },
+    {
+      id: 'runtime-cat-deck',
+      name: '俄罗斯蓝猫（叙事策略师）',
+      source: 'clowder',
+      roleTemplate: 'general',
+      platform: 'codex',
+      clientId: 'openai',
+      accessMode: 'oauth',
+      accountRef: 'codex',
+      capabilityTags: ['deck-strategist'],
+      raw: { source: 'runtime-created', clientId: 'openai', accountRef: 'codex' }
+    },
+    {
+      id: 'bobo',
+      name: '波斯猫（前端工程师）',
+      source: 'clowder',
+      roleTemplate: 'general',
+      platform: 'claude-code',
+      clientId: 'anthropic',
+      accessMode: 'oauth',
+      accountRef: 'claude',
+      capabilityTags: ['前端架构', 'Vue 页面实现']
+    },
+    {
+      id: 'devops',
+      name: '孟加拉猫（DevOps）',
+      source: 'clowder',
+      roleTemplate: 'devops',
+      platform: 'claude-code',
+      clientId: 'anthropic',
+      accessMode: 'oauth',
+      accountRef: 'claude'
+    }
+  ];
+  const coordinatorProfile = {
+    platform: 'claude-code',
+    provider: 'claude',
+    accessMode: 'oauth',
+    accountRef: 'claude'
+  };
+
+  assert.deepEqual(
+    scanExistingCats({ requiredProfile: profile, availableAgents, coordinatorProfile }).map((cat) => cat.id).sort(),
+    ['bobo', 'devops'].sort()
+  );
+  assert.deepEqual(
+    findMissingRoles({ requiredProfile: profile, availableAgents, coordinatorProfile }).sort(),
+    ['deck-strategist', 'source-curator', 'storyboard-designer'].sort()
+  );
+
+  const templateInput = buildCoordinatorTemplateCatsRequestInput({
+    conversation: {
+      id: 'clowder_cat:riverpm',
+      channelId: 'clowder_cat:riverpm',
+      channelType: 1,
+      type: 'robot',
+      source: 'clowder',
+      directCatId: 'riverpm',
+      name: 'RiverWatch PM'
+    },
+    coordinator,
+    sourceMessage: { id: 'msg-riverwatch-claude', content: prompt },
+    text: prompt,
+    availableAgents,
+    templates: [
+      { id: 'source-curator', name: '资料整理师' },
+      { id: 'deck-strategist', name: 'PPT 策略师' },
+      { id: 'storyboard-designer', name: '分镜设计师' },
+      { id: 'frontend', name: 'Frontend' },
+      { id: 'devops', name: 'DevOps' }
+    ]
+  });
+
+  assert.deepEqual(
+    templateInput.items.map((item) => item.roleTemplateId).sort(),
+    ['deck-strategist', 'source-curator', 'storyboard-designer'].sort()
+  );
+  assert.deepEqual(
+    templateInput.reusableCats.map((cat) => cat.id).sort(),
+    ['bobo', 'devops'].sort()
+  );
+
+  const projectCard = buildProjectGroupConfirmationInput({
+    conversation: {
+      id: 'clowder_cat:riverpm',
+      channelId: 'clowder_cat:riverpm',
+      channelType: 1,
+      type: 'robot',
+      source: 'clowder',
+      directCatId: 'riverpm',
+      name: 'RiverWatch PM'
+    },
+    agent: coordinator,
+    sourceMessage: { id: 'prompt-riverwatch-claude', content: prompt },
+    text: prompt,
+    currentUser: { id: 'u-owner' },
+    availableAgents
+  });
+
+  assert.deepEqual(projectCard.targetCatIds.sort(), ['bobo', 'devops'].sort());
+  assert.ok(!projectCard.targetCatIds.includes('runtime-cat-source'));
+  assert.ok(!projectCard.targetCatIds.includes('runtime-cat-deck'));
+
+  const explicitlyMentionedOldRuntimeCats = buildProjectGroupConfirmationInput({
+    conversation: {
+      id: 'clowder_cat:riverpm',
+      channelId: 'clowder_cat:riverpm',
+      channelType: 1,
+      type: 'robot',
+      source: 'clowder',
+      directCatId: 'riverpm',
+      name: 'RiverWatch PM'
+    },
+    agent: coordinator,
+    sourceMessage: {
+      id: 'prompt-riverwatch-mentions',
+      content: '@runtime-cat-source @runtime-cat-deck @bobo @devops RiverWatch 项目需要 PPT、PRD、Vue 前端页面、README 和 preview 部署链接'
+    },
+    text: '@runtime-cat-source @runtime-cat-deck @bobo @devops RiverWatch 项目需要 PPT、PRD、Vue 前端页面、README 和 preview 部署链接',
+    currentUser: { id: 'u-owner' },
+    availableAgents
+  });
+
+  assert.deepEqual(explicitlyMentionedOldRuntimeCats.targetCatIds.sort(), ['bobo', 'devops'].sort());
+  assert.ok(!explicitlyMentionedOldRuntimeCats.catMemberIds.includes('runtime-cat-source'));
+  assert.ok(!explicitlyMentionedOldRuntimeCats.catMemberIds.includes('runtime-cat-deck'));
+});
+
 test('coordinator template cats request input lists missing role templates and reusable cats', async () => {
   const {
     buildCoordinatorTemplateCatsRequestInput,
     shouldCreateCoordinatorTemplateCatsRequest,
     resolveCoordinatorCreationProfile,
     buildAgentPayloadFromTemplate,
+    deriveTemplateCatPayloadOverrides,
     createCoordinatorTemplateCatsMessage,
     upsertCoordinatorTemplateCatsMessage,
     updateCoordinatorTemplateCatsMessage,
@@ -4406,6 +5281,22 @@ test('coordinator template cats request input lists missing role templates and r
   assert.equal(oauthPayload.alias, '@deck-strategist');
   assert.equal(oauthPayload.inheritCoordinatorAuth, true);
   assert.ok(!Object.prototype.hasOwnProperty.call(oauthPayload, 'defaultModel'));
+
+  const riverWatchPayload = buildAgentPayloadFromTemplate(templates[1], oauthProfile, {
+    agentIdPrefix: 'riverwatch',
+    agentIdSuffix: '934553'
+  });
+  assert.equal(riverWatchPayload.catId, 'riverwatch-deck-strategist-934553');
+
+  const riverWatchOverrides = deriveTemplateCatPayloadOverrides({
+    sourceText: 'RiverWatch 项目需要 PPT、PRD 和 preview 部署链接',
+    coordinator: { id: 'riverpm934553' }
+  });
+  assert.deepEqual(riverWatchOverrides, {
+    agentIdPrefix: 'riverwatch',
+    agentIdSuffix: '934553'
+  });
+  assert.deepEqual(deriveTemplateCatPayloadOverrides({ sourceText: '普通 PPT 项目', coordinator: { id: 'coordinator' } }), {});
 });
 
 test('coordinator template cats card cancel and partial-failure transitions', async () => {

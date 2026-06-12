@@ -149,8 +149,21 @@ export function buildGroupScopedRoute(basePath, groupId, extraParams = {}) {
 export function shouldPersistConversationDraft(conversation = {}, identity = {}) {
   const channelId = clean(identity.channelId || conversation.channelId || conversation.channel_id || conversation.id);
   const name = clean(conversation.name || conversation.title || conversation.displayName).toLowerCase();
+  const clowderThreadId = clean(
+    conversation.projectThreadId
+      || conversation.project_thread_id
+      || conversation.directThreadId
+      || conversation.direct_thread_id
+      || conversation.clowderThreadId
+      || conversation.clowder_thread_id
+      || conversation.binding?.projectThreadId
+      || conversation.binding?.project_thread_id
+  );
+  const source = clean(conversation.source || conversation.raw?.source).toLowerCase();
   if (!channelId) return false;
   if (channelId.toLowerCase().includes('clowder') || name.includes('clowder') || name.includes('协同猫')) return false;
+  if (source === 'clowder' && (conversation.isProjectGroup || conversation.raw?.isProjectGroup || Number(identity.channelType || conversation.channelType || conversation.channel_type) === 2)) return false;
+  if (clowderThreadId) return false;
   if (conversation.source === 'mock' || conversation.type === 'robot' || conversation.isAgent) return false;
   return true;
 }
@@ -236,6 +249,30 @@ export function normalizeNativeGroup(input = {}) {
   const digest = messageDigestFromInput(input);
   const lastMessage = digest && digest !== '收到一条新消息' ? digest : '';
   const lastTime = toTimestampMs(groupLastMessageTime(input), lastMessage ? Date.now() : 0);
+  const binding = input.binding || input.raw?.binding || {};
+  const projectThreadId = clean(
+    input.projectThreadId
+      || input.project_thread_id
+      || input.threadId
+      || input.thread_id
+      || input.clowderThreadId
+      || input.clowder_thread_id
+      || binding.projectThreadId
+      || binding.project_thread_id
+      || binding.threadId
+      || binding.thread_id
+  );
+  const catMembers = Array.isArray(input.catMembers) ? input.catMembers : [];
+  const agentMembers = Array.isArray(input.agentMembers) ? input.agentMembers : [];
+  const catMemberIds = Array.isArray(input.catMemberIds)
+    ? input.catMemberIds.map(clean).filter(Boolean)
+    : [];
+  const workerCatIds = Array.isArray(input.workerCatIds)
+    ? input.workerCatIds.map(clean).filter(Boolean)
+    : [];
+  const targetCatIds = Array.isArray(input.targetCatIds)
+    ? input.targetCatIds.map(clean).filter(Boolean)
+    : [];
   return {
     id,
     groupNo: id,
@@ -249,6 +286,14 @@ export function normalizeNativeGroup(input = {}) {
     createTime: toTimestampMs(input.created_at ?? input.createdAt ?? input.createTime, 0),
     lastMessage,
     lastTime,
+    ...(projectThreadId ? { projectThreadId, threadId: projectThreadId } : {}),
+    ...(catMemberIds.length ? { catMemberIds } : {}),
+    ...(workerCatIds.length ? { workerCatIds } : {}),
+    ...(targetCatIds.length ? { targetCatIds } : {}),
+    ...(catMembers.length ? { catMembers } : {}),
+    ...(agentMembers.length ? { agentMembers } : {}),
+    ...(Object.keys(binding).length ? { binding } : {}),
+    ...(input.source ? { source: clean(input.source) } : {}),
     raw: input
   };
 }
@@ -290,7 +335,15 @@ export function upsertGroupConversation(conversations = [], group = {}) {
     memberCount: normalized.memberCount,
     isPinned: false,
     isMuted: false,
-    draft: ''
+    draft: '',
+    ...(normalized.projectThreadId ? { projectThreadId: normalized.projectThreadId, threadId: normalized.threadId || normalized.projectThreadId } : {}),
+    ...(normalized.catMemberIds ? { catMemberIds: normalized.catMemberIds } : {}),
+    ...(normalized.workerCatIds ? { workerCatIds: normalized.workerCatIds } : {}),
+    ...(normalized.targetCatIds ? { targetCatIds: normalized.targetCatIds } : {}),
+    ...(normalized.catMembers ? { catMembers: normalized.catMembers } : {}),
+    ...(normalized.agentMembers ? { agentMembers: normalized.agentMembers } : {}),
+    ...(normalized.binding ? { binding: normalized.binding } : {}),
+    ...(normalized.source ? { source: normalized.source } : {})
   };
 
   const index = conversations.findIndex((conversation) => {
@@ -310,6 +363,15 @@ export function upsertGroupConversation(conversations = [], group = {}) {
     memberCount: normalized.memberCount || existing.memberCount || 0,
     channelType: 2,
     type: 'group',
+    projectThreadId: normalized.projectThreadId || existing.projectThreadId,
+    threadId: normalized.threadId || existing.threadId,
+    catMemberIds: normalized.catMemberIds || existing.catMemberIds,
+    workerCatIds: normalized.workerCatIds || existing.workerCatIds,
+    targetCatIds: normalized.targetCatIds || existing.targetCatIds,
+    catMembers: normalized.catMembers || existing.catMembers,
+    agentMembers: normalized.agentMembers || existing.agentMembers,
+    binding: normalized.binding || existing.binding,
+    source: normalized.source || existing.source,
     lastMessage: shouldUseGroupLastMessage ? nextConversation.lastMessage : existing.lastMessage,
     lastTime: shouldUseGroupLastMessage ? nextConversation.lastTime : (existing.lastTime || nextConversation.lastTime || 0)
   };

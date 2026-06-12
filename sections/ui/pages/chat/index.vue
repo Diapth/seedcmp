@@ -343,6 +343,9 @@ import {
 import {
   resolveConversationThreadId
 } from '@/services/native-im/manual-context-pins';
+import {
+  runTextPostSendEffects
+} from '@/services/native-im/send-flow';
 
 const { isDesktop } = useResponsiveLayout();
 const appStore = useAppStore();
@@ -675,15 +678,21 @@ async function handleSendMessage({ type, content, fileName, fileSize, fileSizeBy
   }, sender);
   const localMessage = await sendPromise;
   if (type === 'text') {
-    const handledProjectGroupFallback = await maybeHandleProjectGroupTextFallback(conversation, content);
-    if (handledProjectGroupFallback) {
+    const effects = await runTextPostSendEffects({
+      conversation,
+      content,
+      localMessage,
+      mentions: extra.mentions || [],
+      createCoordinatorTemplateCatsCard: maybeCreateCoordinatorTemplateCatsCard,
+      handleProjectGroupTextFallback: maybeHandleProjectGroupTextFallback,
+      startAgentPendingFeedback: maybeStartAgentPendingFeedback,
+      createProjectGroupCard: maybeCreateProjectGroupCard,
+      createDeploymentCard: maybeCreateDeploymentCard
+    });
+    if (effects.shouldReturn) {
       replyTarget.value = null;
       return;
     }
-    maybeStartAgentPendingFeedback(conversation, localMessage, extra.mentions || []);
-    await maybeCreateCoordinatorTemplateCatsCard(conversation, content, localMessage);
-    maybeCreateProjectGroupCard(conversation, content, localMessage);
-    await maybeCreateDeploymentCard(conversation, content, localMessage);
   }
   if (type === 'text' && shouldStartLocalClowderStream(conversation)) {
     messageStore.startClowderMarkdownStream(conversation.id, content, {

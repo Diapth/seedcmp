@@ -1,4 +1,5 @@
 import { createHash, randomBytes } from 'node:crypto';
+import { existsSync } from 'node:fs';
 import { copyFile, mkdir, readdir, readFile, stat, unlink, writeFile } from 'node:fs/promises';
 import { homedir, tmpdir } from 'node:os';
 import { basename, dirname, extname, isAbsolute, join, relative, resolve, sep } from 'node:path';
@@ -364,8 +365,9 @@ export class OutboundDeliveryHook {
                 });
               }
               // Phase J: Send file blocks as file messages
-              // P0 security: file blocks MUST resolve to absPath — never pass raw url to adapter
-              // (raw url could be an arbitrary local path like /etc/passwd, exploitable via Telegram InputFile)
+              // P0 security: non-IM-Web file blocks MUST resolve to absPath — never pass raw url to adapter
+              // (raw url could be an arbitrary local path like /etc/passwd, exploitable via Telegram InputFile).
+              // IM Web may receive its own workspace raw-file route as a browser-only file card URL.
               if (block.kind === 'file' && 'url' in block && block.url) {
                 const fileUrl = block.url as string;
                 const absPath = resolve?.(fileUrl);
@@ -386,6 +388,18 @@ export class OutboundDeliveryHook {
                     type: 'file',
                     url: resolveInternalRouteUrl(fileUrl),
                     absPath,
+                    ...(fileName ? { fileName } : {}),
+                    ...(Number.isFinite(fileSize) && fileSize > 0 ? { size: fileSize } : {}),
+                    ...mediaIdentity,
+                  });
+                } else if (adapter.connectorId === 'im-web' && isImWebWorkspaceRawFileRoute(fileUrl)) {
+                  this.opts.log.info(
+                    { blockKind: block.kind, url: fileUrl, fileName },
+                    '[OutboundDeliveryHook] Phase J: sending IM Web workspace raw file block',
+                  );
+                  await adapter.sendMedia(binding.externalChatId, {
+                    type: 'file',
+                    url: resolveInternalRouteUrl(fileUrl),
                     ...(fileName ? { fileName } : {}),
                     ...(Number.isFinite(fileSize) && fileSize > 0 ? { size: fileSize } : {}),
                     ...mediaIdentity,
@@ -1193,18 +1207,23 @@ export class OutboundDeliveryHook {
 
   private extractLocalFileReferences(content: string): string[] {
     const references = new Set<string>();
-    const fileUrlPattern = /file:\/\/\/[^\s`"'<>)]*\.(?:zip|tar|gz|rar|7z|pdf|docx?|xlsx?|pptx?|txt|csv|json|md|xml)\b/gi;
+    const fileUrlPattern = /file:\/\/\/[^\s`"'<>)]*\.(?:zip|tar|gz|rar|7z|pdf|docx?|xlsx?|pptx?|html?|txt|csv|json|md|xml)\b/gi;
     for (const match of content.matchAll(fileUrlPattern)) {
       references.add(stripTrailingPunctuation(match[0]));
     }
 
-    const absolutePathPattern = /(?:^|[\s`"'(（:：])((?:\/[^\s`"'<>)]*)+\.(?:zip|tar|gz|rar|7z|pdf|docx?|xlsx?|pptx?|txt|csv|json|md|xml))\b/gi;
+    const absolutePathPattern = /(?:^|[\s`"'(（:：])((?:\/[^\s`"'<>)]*)+\.(?:zip|tar|gz|rar|7z|pdf|docx?|xlsx?|pptx?|html?|txt|csv|json|md|xml))\b/gi;
     for (const match of content.matchAll(absolutePathPattern)) {
       references.add(stripTrailingPunctuation(match[1]));
     }
 
-    const homePathPattern = /(?:^|[\s`"'(（:：])(~\/[^\s`"'<>)]*\.(?:zip|tar|gz|rar|7z|pdf|docx?|xlsx?|pptx?|txt|csv|json|md|xml))\b/gi;
+    const homePathPattern = /(?:^|[\s`"'(（:：])(~\/[^\s`"'<>)]*\.(?:zip|tar|gz|rar|7z|pdf|docx?|xlsx?|pptx?|html?|txt|csv|json|md|xml))\b/gi;
     for (const match of content.matchAll(homePathPattern)) {
+      references.add(stripTrailingPunctuation(match[1]));
+    }
+
+    const workspaceRelativePattern = /(?:^|[\s`"'(（:：])(((?:\.\/)?\.clowder|(?:sections\/)?clowder-ai\/\.clowder)\/workspaces\/[^\s`"'<>)]*\.(?:zip|tar|gz|rar|7z|pdf|docx?|xlsx?|pptx?|html?|txt|csv|json|md|xml))\b/gi;
+    for (const match of content.matchAll(workspaceRelativePattern)) {
       references.add(stripTrailingPunctuation(match[1]));
     }
     return [...references];
@@ -1241,6 +1260,7 @@ function extractArtifactReferencePaths(content: string): string[] {
     new RegExp(`file:\\/\\/\\/[^\\s\`"'<>)]*\\.${ARTIFACT_REF_EXT}\\b`, 'gi'),
     new RegExp(`(?:^|[\\s\`"'(（:：])((?:\\/[^\\s\`"'<>)]*)+\\.${ARTIFACT_REF_EXT})\\b`, 'gi'),
     new RegExp(`(?:^|[\\s\`"'(（:：])(~\\/[^\\s\`"'<>)]*\\.${ARTIFACT_REF_EXT})\\b`, 'gi'),
+    new RegExp(`(?:^|[\\s\`"'(（:：])(((?:\\.\\/)?\\.clowder|(?:sections\\/)?clowder-ai\\/\\.clowder)\\/workspaces\\/[^\\s\`"'<>)]*\\.${ARTIFACT_REF_EXT})\\b`, 'gi'),
   ];
   for (const re of patterns) {
     for (const match of content.matchAll(re)) {
@@ -1251,13 +1271,64 @@ function extractArtifactReferencePaths(content: string): string[] {
 }
 
 function isLocalPublishableReference(url: string): boolean {
-  return url.startsWith('file://') || url.startsWith('~/') || isAbsolute(url);
+  return url.startsWith('file://') || url.startsWith('~/') || isAbsolute(url) || isWorkspaceRelativeReference(url);
 }
 
 function normalizeLocalReferencePath(url: string): string {
   if (url.startsWith('file://')) return fileURLToPath(url);
   if (url.startsWith('~/')) return resolve(homedir(), url.slice(2));
+  if (isWorkspaceRelativeReference(url)) return resolveWorkspaceRelativeReference(url);
   return url;
+}
+
+function isImWebWorkspaceRawFileRoute(url: string): boolean {
+  if (!url.startsWith('/')) return false;
+  let parsed: URL;
+  try {
+    parsed = new URL(url, 'http://im-web.local');
+  } catch {
+    return false;
+  }
+  if (!['/api/workspace/file/raw', '/v1/clowder/workspace/file/raw'].includes(parsed.pathname)) {
+    return false;
+  }
+  const worktreeId = parsed.searchParams.get('worktreeId')?.trim();
+  const filePath = parsed.searchParams.get('path')?.trim();
+  if (!worktreeId || !filePath) return false;
+  if (filePath.includes('\\') || filePath.includes('\0')) return false;
+  if (filePath.startsWith('/') || filePath.split('/').includes('..')) return false;
+  return true;
+}
+
+function isWorkspaceRelativeReference(url: string): boolean {
+  const normalized = url.replace(/\\/g, '/').replace(/^\.\//, '');
+  return normalized.startsWith('.clowder/workspaces/')
+    || normalized.startsWith('sections/clowder-ai/.clowder/workspaces/')
+    || normalized.startsWith('clowder-ai/.clowder/workspaces/');
+}
+
+function resolveWorkspaceRelativeReference(url: string): string {
+  const candidates = workspaceRelativeCandidatePaths(url);
+  return candidates.find((candidate) => existsSync(candidate)) ?? candidates[0] ?? url;
+}
+
+function workspaceRelativeCandidatePaths(url: string): string[] {
+  const normalized = url.replace(/\\/g, '/').replace(/^\.\//, '');
+  const anchors = ancestorDirectories(process.cwd());
+  anchors.push(findLaunchedProjectRoot(process.cwd()));
+  return [...new Set(anchors.map((root) => resolve(root, normalized)))];
+}
+
+function ancestorDirectories(start: string): string[] {
+  const roots: string[] = [];
+  let dir = resolve(start);
+  while (!roots.includes(dir)) {
+    roots.push(dir);
+    const parent = dirname(dir);
+    if (parent === dir) break;
+    dir = parent;
+  }
+  return roots;
 }
 
 function splitPublishableFileName(fileName: string): { stem: string; ext: string } {

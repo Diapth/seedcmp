@@ -187,10 +187,85 @@ function normalizeAgentFile(file = {}, streamKey = '', index = 0) {
   };
 }
 
+function isRichFileBlock(block = {}) {
+  if (!block || typeof block !== 'object') return false;
+  const kind = clean(block.kind || block.type || block.blockType || block.block_type).toLowerCase();
+  if (['file', 'attachment', 'document'].includes(kind)) return true;
+  const name = firstNonEmpty(block.fileName, block.file_name, block.filename, block.name, block.title);
+  const location = firstNonEmpty(
+    block.url,
+    block.sourceUrl,
+    block.source_url,
+    block.contentUrl,
+    block.content_url,
+    block.downloadUrl,
+    block.download_url,
+    block.workspacePath,
+    block.workspace_path,
+    block.relativePath,
+    block.relative_path,
+    block.path
+  );
+  return Boolean(name && location);
+}
+
+function normalizeRichFileBlocks(message = {}) {
+  const blocks = Array.isArray(message.richBlocks) ? message.richBlocks : [];
+  const parentKey = firstNonEmpty(message.streamKey, message.clientMsgNo, message.messageId, message.id, 'rich');
+  return blocks
+    .filter(isRichFileBlock)
+    .map((block, index) => {
+      const blockId = firstNonEmpty(block.id, block.blockId, block.block_id, block.fileId, block.file_id, index);
+      return normalizeAgentFile({
+        ...block,
+        id: `${parentKey}-rich-file-${blockId}`,
+        fileName: firstNonEmpty(block.fileName, block.file_name, block.filename, block.name, block.title),
+        name: firstNonEmpty(block.name, block.fileName, block.file_name, block.filename, block.title),
+        fileType: firstNonEmpty(block.fileType, block.file_type, block.ext, block.extension),
+        mimeType: firstNonEmpty(block.mimeType, block.mime_type, block.type),
+        sourceUrl: firstNonEmpty(block.sourceUrl, block.source_url, block.url),
+        contentUrl: firstNonEmpty(block.contentUrl, block.content_url, block.url),
+        workspacePath: firstNonEmpty(block.workspacePath, block.workspace_path, block.relativePath, block.relative_path, block.path),
+        worktreeId: firstNonEmpty(block.worktreeId, block.worktree_id, block.workspaceWorktreeId, block.workspace_worktree_id)
+      }, parentKey, index);
+    });
+}
+
+function appendRichFileBlockMessages(messages = [], sourceMessage = {}) {
+  const files = normalizeRichFileBlocks(sourceMessage);
+  if (!files.length) return messages;
+  const next = [...messages];
+  files.forEach((file, index) => {
+    const fileMessage = {
+      reactions: [],
+      replyRef: null,
+      mentions: [],
+      ...file,
+      senderId: sourceMessage.senderId,
+      senderName: sourceMessage.senderName,
+      senderAvatar: sourceMessage.senderAvatar,
+      status: 'success',
+      time: safeNumber(sourceMessage.time, Date.now()) + index + 1,
+      generatedByAgent: true,
+      source: sourceMessage.source || 'clowder',
+      parentMessageId: firstNonEmpty(sourceMessage.messageId, sourceMessage.id, sourceMessage.clientMsgNo)
+    };
+    const fileKey = messageIdentityKey(fileMessage);
+    const existingIndex = next.findIndex((message) => messageIdentityKey(message) === fileKey);
+    if (existingIndex >= 0) {
+      next[existingIndex] = { ...next[existingIndex], ...fileMessage };
+    } else {
+      next.push(fileMessage);
+    }
+  });
+  return next;
+}
+
 export function isClowderConversation(conversation = {}) {
   const id = clean(conversation.id || conversation.channelId || conversation.agentId).toLowerCase();
   const name = clean(conversation.name || conversation.title || conversation.displayName).toLowerCase();
   return isClowderDirectCatConversation(conversation)
+    || isClowderProjectGroupConversation(conversation)
     || id.includes('clowder')
     || name.includes('clowder')
     || name.includes('协同猫');
@@ -221,9 +296,220 @@ export function isClowderDirectCatConversation(conversation = {}) {
   );
 }
 
+export function isClowderProjectGroupConversation(conversation = {}) {
+  const binding = conversation.binding || conversation.raw?.binding || {};
+  const threadId = resolveClowderConversationThreadId(conversation);
+  const channelType = Number(conversation.channelType || conversation.channel_type || (conversation.type === 'group' ? 2 : 0));
+  return Boolean(threadId && (channelType === 2 || conversation.type === 'group' || conversation.isProjectGroup));
+}
+
+function resolveClowderConversationThreadId(conversation = {}) {
+  const binding = conversation.binding || conversation.raw?.binding || {};
+  return firstNonEmpty(
+    conversation.projectThreadId,
+    conversation.project_thread_id,
+    conversation.threadId,
+    conversation.thread_id,
+    conversation.clowderThreadId,
+    conversation.clowder_thread_id,
+    binding.projectThreadId,
+    binding.project_thread_id,
+    binding.threadId,
+    binding.thread_id,
+    conversation.raw?.projectThreadId,
+    conversation.raw?.project_thread_id,
+    conversation.raw?.threadId,
+    conversation.raw?.thread_id
+  );
+}
+
+function normalizeTargetCatId(value = '') {
+  const id = firstNonEmpty(value);
+  if (!id) return '';
+  return getClowderCatIdFromContactId(id) || id.replace(/^@/, '');
+}
+
+function normalizeMentionText(value = '') {
+  return clean(value)
+    .replace(/^@/, '')
+    .replace(/\s+/g, '')
+    .toLowerCase();
+}
+
+function candidateMentionLabels(member = {}) {
+  return [
+    member.alias,
+    member.mention,
+    member.name,
+    member.displayName,
+    member.nickname,
+    member.title,
+    member.raw?.alias,
+    member.raw?.name,
+    member.raw?.displayName,
+    member.raw?.nickname
+  ].map(normalizeMentionText).filter(Boolean);
+}
+
+function providerFamilyFromMember(member = {}) {
+  const raw = member.raw || {};
+  const haystack = [
+    member.provider,
+    member.platform,
+    member.clientId,
+    member.client_id,
+    member.accountRef,
+    member.account_ref,
+    raw.provider,
+    raw.platform,
+    raw.clientId,
+    raw.client_id,
+    raw.accountRef,
+    raw.account_ref
+  ].map(clean).join(' ').toLowerCase();
+  if (haystack.includes('anthropic') || haystack.includes('claude')) return 'claude';
+  if (haystack.includes('openai') || haystack.includes('codex')) return 'codex';
+  if (haystack.includes('google') || haystack.includes('gemini')) return 'gemini';
+  return '';
+}
+
+function accessModeFromMember(member = {}) {
+  const raw = member.raw || {};
+  const haystack = [
+    member.accessMode,
+    member.access_mode,
+    member.authType,
+    member.auth_type,
+    raw.accessMode,
+    raw.access_mode,
+    raw.authType,
+    raw.auth_type
+  ].map(clean).join(' ').replace(/_/g, '-').toLowerCase();
+  if (haystack.includes('oauth')) return 'oauth';
+  if (haystack.includes('api-key') || haystack.includes('api key') || haystack.includes('apikey')) return 'api-key';
+  return '';
+}
+
+function runtimeCatPenalty(id = '', member = {}) {
+  const provider = providerFamilyFromMember(member);
+  if (provider === 'claude') return -20;
+  if (provider === 'codex') return 40;
+  if (/^runtime-cat-/i.test(id)) return 20;
+  return 0;
+}
+
+function memberMatchScore(member = {}, mentionedLabels = []) {
+  const id = normalizeTargetCatId(firstNonEmpty(
+    member.catId,
+    member.cat_id,
+    member.directCatId,
+    member.direct_cat_id,
+    member.agentId,
+    member.agent_id,
+    member.userId,
+    member.uid,
+    member.id
+  ));
+  if (!id) return null;
+  const labels = candidateMentionLabels(member);
+  if (!labels.length) return null;
+  const matched = mentionedLabels.some((mention) => labels.some((label) => mention === label || mention.includes(label) || label.includes(mention)));
+  if (!matched) return null;
+  const accessMode = accessModeFromMember(member);
+  return {
+    id,
+    score: runtimeCatPenalty(id, member) + (accessMode === 'oauth' ? -2 : 0)
+  };
+}
+
+function conversationCatMembers(conversation = {}) {
+  const binding = conversation.binding || conversation.raw?.binding || {};
+  const directMembers = [
+    ...(Array.isArray(conversation.catMembers) ? conversation.catMembers : []),
+    ...(Array.isArray(conversation.agents) ? conversation.agents : []),
+    ...(Array.isArray(conversation.agentMembers) ? conversation.agentMembers : []),
+    ...(Array.isArray(conversation.members) ? conversation.members : [])
+  ];
+  const idMembers = [
+    ...(Array.isArray(conversation.catMemberIds) ? conversation.catMemberIds : []),
+    ...(Array.isArray(conversation.workerCatIds) ? conversation.workerCatIds : []),
+    ...(Array.isArray(conversation.targetCatIds) ? conversation.targetCatIds : []),
+    ...(Array.isArray(binding.catMemberIds) ? binding.catMemberIds : []),
+    ...(Array.isArray(binding.workerCatIds) ? binding.workerCatIds : []),
+    ...(Array.isArray(binding.targetCatIds) ? binding.targetCatIds : [])
+  ].map((id) => ({ id }));
+  return [...directMembers, ...idMembers];
+}
+
+function lineStartMentionTargetsFromText(text = '', conversation = {}) {
+  const members = conversationCatMembers(conversation);
+  if (!members.length) return [];
+  const lines = String(text || '').split(/\r?\n/);
+  const mentionedLabels = lines
+    .map((line) => line.match(/^\s*@([^\s，,、:：]+)/u)?.[1])
+    .map(normalizeMentionText)
+    .filter(Boolean);
+  if (!mentionedLabels.length) return [];
+
+  const bestById = new Map();
+  members.forEach((member) => {
+    const matched = memberMatchScore(member, mentionedLabels);
+    if (!matched) return;
+    const previous = bestById.get(matched.id);
+    if (!previous || matched.score < previous.score) bestById.set(matched.id, matched);
+  });
+  const matches = [...bestById.values()];
+  if (!matches.length) return [];
+  const bestScore = Math.min(...matches.map((item) => item.score));
+  return matches
+    .filter((item) => item.score === bestScore)
+    .map((item) => item.id);
+}
+
+function targetCatIdsFromPayload(payload = {}) {
+  const explicit = Array.isArray(payload.targetCatIds) ? payload.targetCatIds : [];
+  const mentions = Array.isArray(payload.mentions) ? payload.mentions : [];
+  return [...new Set([
+    ...explicit.map(normalizeTargetCatId),
+    ...mentions.map((mention) => normalizeTargetCatId(
+      mention.catId
+        || mention.directCatId
+        || mention.agentId
+        || mention.userId
+        || mention.uid
+        || mention.id
+    ))
+  ].filter(Boolean))];
+}
+
+export function buildClowderConversationBridgePayload(conversation = {}, payload = {}) {
+  const text = firstNonEmpty(payload.content, payload.text);
+  const result = { text };
+  const promptContext = firstNonEmpty(payload.promptContext);
+  if (isClowderDirectCatConversation(conversation)) {
+    const directCatId = resolveClowderDirectCatId(conversation);
+    if (directCatId) result.directCatId = directCatId;
+    if (promptContext) result.promptContext = promptContext;
+    return result;
+  }
+
+  if (isClowderProjectGroupConversation(conversation)) {
+    const threadId = resolveClowderConversationThreadId(conversation);
+    const targetCatIds = [...new Set([
+      ...targetCatIdsFromPayload(payload),
+      ...lineStartMentionTargetsFromText(text, conversation)
+    ].filter(Boolean))];
+    if (threadId) result.threadId = threadId;
+    if (targetCatIds.length) result.targetCatIds = targetCatIds;
+    result.promptContext = promptContext || `项目群：${firstNonEmpty(conversation.name, conversation.title, conversation.id, conversation.channelId)}`;
+  }
+  return result;
+}
+
 export function shouldStartLocalClowderStream(conversation = {}) {
   return isClowderConversation(conversation)
-    && !isClowderDirectCatConversation(conversation);
+    && !isClowderDirectCatConversation(conversation)
+    && !isClowderProjectGroupConversation(conversation);
 }
 
 function splitStreamContent(content = '', chunkSize = 36) {
@@ -816,6 +1102,19 @@ function applyReactionToLatestSelfPrompt(messages = [], incoming = {}, options =
 
 export function enrichNativeMessageSender(message = {}, conversation = {}, currentUser = {}) {
   const next = { ...message };
+  const catId = firstNonEmpty(next.catId, next.cat_id, next.raw?.catId, next.raw?.cat_id);
+  const catDisplayName = firstNonEmpty(
+    next.catDisplayName,
+    next.cat_display_name,
+    next.raw?.catDisplayName,
+    next.raw?.cat_display_name
+  );
+  if (catId || catDisplayName) {
+    next.senderId = catId || next.senderId || next.from_uid || next.fromUID;
+    next.senderName = catDisplayName || next.senderName || next.senderId || 'Clowder AI';
+    next.senderAvatar = firstNonEmpty(next.senderAvatar, next.avatar);
+    return next;
+  }
   if (isSelfSender(next.senderId || next.from_uid || next.fromUID, currentUser)) {
     next.senderId = resolveSelfId(currentUser);
     next.senderName = resolveSelfName(currentUser, next.senderName || '我');
@@ -945,7 +1244,7 @@ export function mergeNativeMessageIntoList(messages = [], incoming = {}, options
       const mergedContent = phase === 'chunk' && streamMessage.streamDelta
         ? `${next[streamIndex].content || ''}${incomingContent}`
         : streamMessage.content;
-      next[streamIndex] = {
+      const mergedStreamMessage = {
         ...next[streamIndex],
         ...streamMessage,
         content: mergedContent,
@@ -953,10 +1252,11 @@ export function mergeNativeMessageIntoList(messages = [], incoming = {}, options
         replyRef: next[streamIndex].replyRef || streamMessage.replyRef || null,
         mentions: next[streamIndex].mentions || streamMessage.mentions || []
       };
-      return sortMessages(next);
+      next[streamIndex] = mergedStreamMessage;
+      return sortMessages(isFinal ? appendRichFileBlockMessages(next, mergedStreamMessage) : next);
     }
     next.push(streamMessage);
-    return sortMessages(next);
+    return sortMessages(isFinal ? appendRichFileBlockMessages(next, streamMessage) : next);
   }
   const key = messageIdentityKey(enrichedIncoming);
   const next = [...messages];
@@ -964,18 +1264,19 @@ export function mergeNativeMessageIntoList(messages = [], incoming = {}, options
   if (key) {
     const keyIndex = next.findIndex((message) => messageIdentityKey(message) === key);
     if (keyIndex >= 0) {
-      next[keyIndex] = {
+      const mergedMessage = {
         ...next[keyIndex],
         ...enrichedIncoming,
         status: enrichedIncoming.status || next[keyIndex].status || 'success'
       };
-      return sortMessages(next);
+      next[keyIndex] = mergedMessage;
+      return sortMessages(appendRichFileBlockMessages(next, mergedMessage));
     }
   }
 
   const duplicateReplyIndex = findEquivalentClowderReplyIndex(next, enrichedIncoming, currentUser, options);
   if (duplicateReplyIndex >= 0) {
-    next[duplicateReplyIndex] = {
+    const mergedMessage = {
       ...next[duplicateReplyIndex],
       ...enrichedIncoming,
       id: firstNonEmpty(enrichedIncoming.id, next[duplicateReplyIndex].id),
@@ -985,7 +1286,8 @@ export function mergeNativeMessageIntoList(messages = [], incoming = {}, options
       replyRef: next[duplicateReplyIndex].replyRef || enrichedIncoming.replyRef || null,
       mentions: next[duplicateReplyIndex].mentions || enrichedIncoming.mentions || []
     };
-    return sortMessages(next);
+    next[duplicateReplyIndex] = mergedMessage;
+    return sortMessages(appendRichFileBlockMessages(next, mergedMessage));
   }
 
   const echoIndex = findSelfEchoIndex(next, enrichedIncoming, currentUser, options);
@@ -1000,7 +1302,7 @@ export function mergeNativeMessageIntoList(messages = [], incoming = {}, options
   }
 
   next.push(enrichedIncoming);
-  return sortMessages(next);
+  return sortMessages(appendRichFileBlockMessages(next, enrichedIncoming));
 }
 
 export function mergeNativeMessageLists(current = [], incoming = [], options = {}) {
@@ -1025,12 +1327,38 @@ function shouldPreserveLocalContextMessage(message = {}, incoming = [], options 
   return isVisibleChatMessage(message);
 }
 
+function isLocalCoordinatorConfirmationCard(message = {}) {
+  return message?.metadata?.coordinator_template_cats_request === true
+    || message?.metadata?.project_group_confirmation === true
+    || message?.metadata?.deployment_card === true
+    || Boolean(message?.coordinatorTemplateCatsCard?.cardId)
+    || Boolean(message?.projectGroupCard?.cardId)
+    || Boolean(message?.deploymentCard?.cardId)
+    || message?.type === 'coordinator_template_cats_request'
+    || message?.type === 'project_group_confirmation'
+    || message?.type === 'deployment_card'
+    || message?.contentType === 'coordinator_template_cats_request'
+    || message?.contentType === 'project_group_confirmation'
+    || message?.contentType === 'deployment_card';
+}
+
+function shouldPreserveLocalUiStateMessage(message = {}, incoming = [], options = {}) {
+  const conversation = options.conversation || {};
+  if (!isClowderConversation(conversation)) return false;
+  if (!isLocalCoordinatorConfirmationCard(message)) return false;
+  if (hasEquivalentIncomingMessage(message, incoming, options.currentUser || {}, options)) return false;
+  return true;
+}
+
 export function mergeSyncedMessagesPreservingLocalContext(current = [], incoming = [], options = {}) {
   const contextMessages = firstArray(options.preservedContextMessages, options.localContextMessages)
     .filter((message) => shouldPreserveLocalContextMessage(message, incoming, options));
   const preserved = [
     ...contextMessages,
-    ...current.filter((message) => shouldPreserveLocalContextMessage(message, incoming, options))
+    ...current.filter((message) => (
+      shouldPreserveLocalContextMessage(message, incoming, options)
+      || shouldPreserveLocalUiStateMessage(message, incoming, options)
+    ))
   ];
   return mergeNativeMessageLists(preserved, incoming, options);
 }

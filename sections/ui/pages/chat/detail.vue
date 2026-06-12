@@ -322,6 +322,9 @@ import {
 import {
   resolveConversationThreadId
 } from '@/services/native-im/manual-context-pins';
+import {
+  runTextPostSendEffects
+} from '@/services/native-im/send-flow';
 
 const { isDesktop } = useResponsiveLayout();
 const convStore = useConversationStore();
@@ -509,7 +512,7 @@ onMounted(() => {
   // Restore persisted draft
   const persistedDraft = uni.getStorageSync(`draft:${id}`);
   if (persistedDraft && !convStore.conversations.find((c) => c.id === id)?.draft) {
-    convStore.updateConversationDraft(id, persistedDraft);
+    convStore.updateConversationDraft(id, persistedDraft, { persist: false });
   }
 
   // 移动端长按群成员跳入 chat: query.at=memberId -> 自动 @ 成员
@@ -518,7 +521,7 @@ onMounted(() => {
     if (member) {
       // 通过 draft 注入 @昵称 占位
       const cur = convStore.conversations.find((c) => c.id === id)?.draft || '';
-      convStore.updateConversationDraft(id, cur ? `${cur}@${member.nickname} ` : `@${member.nickname} `);
+      convStore.updateConversationDraft(id, cur ? `${cur}@${member.nickname} ` : `@${member.nickname} `, { persist: false });
     }
   }
 
@@ -702,15 +705,21 @@ async function handleSendMessage({ type, content, fileName, fileSize, fileSizeBy
   }, sender);
   const localMessage = await sendPromise;
   if (type === 'text') {
-    const handledProjectGroupFallback = await maybeHandleProjectGroupTextFallback(conversation, content);
-    if (handledProjectGroupFallback) {
+    const effects = await runTextPostSendEffects({
+      conversation,
+      content,
+      localMessage,
+      mentions: extra.mentions || [],
+      createCoordinatorTemplateCatsCard: maybeCreateCoordinatorTemplateCatsCard,
+      handleProjectGroupTextFallback: maybeHandleProjectGroupTextFallback,
+      startAgentPendingFeedback: maybeStartAgentPendingFeedback,
+      createProjectGroupCard: maybeCreateProjectGroupCard,
+      createDeploymentCard: maybeCreateDeploymentCard
+    });
+    if (effects.shouldReturn) {
       replyTarget.value = null;
       return;
     }
-    maybeStartAgentPendingFeedback(conversation, localMessage, extra.mentions || []);
-    await maybeCreateCoordinatorTemplateCatsCard(conversation, content, localMessage);
-    maybeCreateProjectGroupCard(conversation, content, localMessage);
-    await maybeCreateDeploymentCard(conversation, content, localMessage);
   }
   if (type === 'text' && shouldStartLocalClowderStream(conversation)) {
     messageStore.startClowderMarkdownStream(conversation.id, content, {
@@ -818,11 +827,7 @@ function handleProjectGroupOpen(payload = {}) {
     return;
   }
   convStore.setActiveId(groupId);
-  if (!isDesktop.value) {
-    uni.redirectTo({ url: `/pages/chat/detail?id=${encodeURIComponent(groupId)}` });
-  } else {
-    syncActiveMessages({ silent: true });
-  }
+  uni.redirectTo({ url: `/pages/chat/detail?id=${encodeURIComponent(groupId)}` });
 }
 
 function templateCatsCardId(payload = {}) {

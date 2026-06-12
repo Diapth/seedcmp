@@ -51,6 +51,8 @@ IM_WEB_CHOKIDAR_INTERVAL="${IM_WEB_CHOKIDAR_INTERVAL:-250}"
 SEEDCMP_CLEAN_OLD_PORTS="${SEEDCMP_CLEAN_OLD_PORTS:-1}"
 SEEDCMP_CLEAN_ALL_PORTS="${SEEDCMP_CLEAN_ALL_PORTS:-0}"
 OLD_SEEDCMP_PORTS="${OLD_SEEDCMP_PORTS:-5173 5174 5175 3000 3003 3004 4100 8090 6979 5001 5100 5200 5301 7000}"
+WK_DEMO_CHANNEL_BOOTSTRAP_DEFAULT_MIN_ISR="${WK_DEMO_CHANNEL_BOOTSTRAP_DEFAULT_MIN_ISR:-1}"
+WK_DEMO_CHANNEL_EXECUTION_MODE="${WK_DEMO_CHANNEL_EXECUTION_MODE:-dedicated}"
 
 MYSQL_CONTAINER="${MYSQL_CONTAINER:-seedcmp-mysql}"
 REDIS_CONTAINER="${REDIS_CONTAINER:-seedcmp-redis}"
@@ -109,6 +111,8 @@ Environment overrides:
   SEEDCMP_CLEAN_OLD_PORTS=1               (cleanup old seedcmp worktree listeners before start/restart)
   SEEDCMP_CLEAN_ALL_PORTS=0               (danger: set 1 to kill any listener on known seedcmp ports)
   OLD_SEEDCMP_PORTS="5173 5174 ..."       (ports checked by startup cleanup)
+  WK_DEMO_CHANNEL_BOOTSTRAP_DEFAULT_MIN_ISR=1
+  WK_DEMO_CHANNEL_EXECUTION_MODE=dedicated
   REDIS_MODE=auto|docker|external
   INFRA_IMAGE_PREFIX=docker.example.com/
 EOF
@@ -145,6 +149,21 @@ port_open() {
   local host="$1"
   local port="$2"
   (echo >"/dev/tcp/$host/$port") >/dev/null 2>&1
+}
+
+effective_redis_mode() {
+  case "$REDIS_MODE" in
+    auto)
+      if port_open 127.0.0.1 6379; then
+        printf 'external\n'
+      else
+        printf 'docker\n'
+      fi
+      ;;
+    *)
+      printf '%s\n' "$REDIS_MODE"
+      ;;
+  esac
 }
 
 ensure_container_started() {
@@ -476,7 +495,8 @@ ensure_wukongim() {
   if [ ! -f "$WK_DIR/wukongim.conf" ]; then
     log "creating WuKongIM config from example"
     cp "$WK_DIR/wukongim.conf.example" "$WK_DIR/wukongim.conf"
-    sed -i 's/^WK_CHANNEL_BOOTSTRAP_DEFAULT_MIN_ISR=.*/WK_CHANNEL_BOOTSTRAP_DEFAULT_MIN_ISR=1/' "$WK_DIR/wukongim.conf"
+    sed -i 's/^WK_CLUSTER_CHANNEL_BOOTSTRAP_DEFAULT_MIN_ISR=.*/WK_CLUSTER_CHANNEL_BOOTSTRAP_DEFAULT_MIN_ISR=1/' "$WK_DIR/wukongim.conf"
+    sed -i 's/^WK_CLUSTER_CHANNEL_EXECUTION_MODE=.*/WK_CLUSTER_CHANNEL_EXECUTION_MODE=dedicated/' "$WK_DIR/wukongim.conf"
   fi
 }
 
@@ -561,7 +581,10 @@ start_all() {
   ensure_tangseng
   ensure_node_deps
 
-  start_bg wukongim "$WK_DIR" ./wukongim -config ./wukongim.conf
+  start_bg wukongim "$WK_DIR" env \
+    WK_CLUSTER_CHANNEL_BOOTSTRAP_DEFAULT_MIN_ISR="$WK_DEMO_CHANNEL_BOOTSTRAP_DEFAULT_MIN_ISR" \
+    WK_CLUSTER_CHANNEL_EXECUTION_MODE="$WK_DEMO_CHANNEL_EXECUTION_MODE" \
+    ./wukongim -config ./wukongim.conf
   wait_bg_port wukongim 127.0.0.1 5001 "WuKongIM API"
 
   ensure_clowder_pnpm_wrapper
@@ -689,8 +712,10 @@ stop_all() {
   stop_project_port 5301 "WuKongIM Manager"
   stop_project_port 7000 "WuKongIM Monitor"
   if command -v docker >/dev/null 2>&1; then
+    local redis_mode
+    redis_mode="$(effective_redis_mode)"
     local containers=("$MINIO_CONTAINER" "$MYSQL_CONTAINER")
-    if [ "$REDIS_MODE" != "external" ]; then
+    if [ "$redis_mode" != "external" ]; then
       containers=("$MINIO_CONTAINER" "$REDIS_CONTAINER" "$MYSQL_CONTAINER")
     fi
     for c in "${containers[@]}"; do
@@ -756,8 +781,10 @@ status_all() {
   status_one agenthub-ui
   if command -v docker >/dev/null 2>&1; then
     log "containers:"
+    local redis_mode
+    redis_mode="$(effective_redis_mode)"
     local containers=("$MYSQL_CONTAINER" "$MINIO_CONTAINER")
-    if [ "$REDIS_MODE" != "external" ]; then
+    if [ "$redis_mode" != "external" ]; then
       containers=("$MYSQL_CONTAINER" "$REDIS_CONTAINER" "$MINIO_CONTAINER")
     fi
     for c in "${containers[@]}"; do
@@ -767,7 +794,7 @@ status_all() {
         printf '  %-15s missing\n' "$c"
       fi
     done
-    if [ "$REDIS_MODE" = "external" ]; then
+    if [ "$redis_mode" = "external" ]; then
       printf '  %-15s external\n' redis
     fi
   fi
