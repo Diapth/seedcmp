@@ -257,6 +257,62 @@ func TestWorkspaceRawProxyPreservesContentTypeAndQuery(t *testing.T) {
 	assert.Equal(t, []byte{0x50, 0x4b, 0x03, 0x04}, recorder.Body.Bytes())
 }
 
+func TestProposalApproveProxiesThroughAuthenticatedBridge(t *testing.T) {
+	var gotPath string
+	var gotUser string
+	var gotMethod string
+	var gotBody map[string]interface{}
+	upstream := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		gotPath = r.URL.RequestURI()
+		gotUser = r.Header.Get("x-cat-cafe-user")
+		gotMethod = r.Method
+		require.NoError(t, json.NewDecoder(r.Body).Decode(&gotBody))
+		_ = json.NewEncoder(w).Encode(map[string]interface{}{
+			"proposalId": "proposal-1",
+			"threadId":   "thread-created",
+			"status":     "approved",
+		})
+	}))
+	defer upstream.Close()
+
+	cfg := config.New()
+	cfg.Test = true
+	appCtx := config.NewContext(cfg)
+	require.NoError(t, appCtx.Cache().Set(cfg.Cache.TokenCachePrefix+"proposal-token", wkhttp.EncodeTokenCacheInfo("im-user-1", "Proposal User", "")))
+
+	c := New(appCtx)
+	c.SetConfig(commonmodule.ClowderBridgeConfig{
+		Enabled:            true,
+		APIBaseURL:         upstream.URL,
+		ConnectorID:        "im-web",
+		ConnectorSecret:    "secret",
+		DefaultOwnerUserID: "owner-1",
+		RequestTimeout:     time.Second,
+		SignatureTolerance: time.Minute,
+	})
+	s := server.New(appCtx)
+	c.Route(s.GetRoute())
+
+	recorder := httptest.NewRecorder()
+	req, err := http.NewRequest(
+		http.MethodPost,
+		"/v1/clowder/proposals/proposal-1/approve",
+		strings.NewReader(`{"initialMessage":"开始"}`),
+	)
+	require.NoError(t, err)
+	req.Header.Set("token", "proposal-token")
+	req.Header.Set("Content-Type", "application/json")
+
+	s.GetRoute().ServeHTTP(recorder, req)
+
+	require.Equal(t, http.StatusOK, recorder.Code)
+	assert.Equal(t, http.MethodPost, gotMethod)
+	assert.Equal(t, "/api/proposals/proposal-1/approve", gotPath)
+	assert.Equal(t, "owner-1", gotUser)
+	assert.Equal(t, "开始", gotBody["initialMessage"])
+	assert.Contains(t, recorder.Body.String(), `"threadId":"thread-created"`)
+}
+
 func TestFetchCatDirectoryFallsBackToTemplateCandidatesWhenAgentDirectoryFails(t *testing.T) {
 	gotPaths := []string{}
 	gotUsers := []string{}

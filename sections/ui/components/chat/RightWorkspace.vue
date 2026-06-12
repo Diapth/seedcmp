@@ -210,6 +210,7 @@ import { useGroupStore } from '@/stores/group';
 import { useAgentStore } from '@/stores/agent';
 import { useConversationStore } from '@/stores/conversation';
 import { buildGroupScopedRoute } from '@/services/native-im/conversation-state';
+import { mergeSharedFilesWithBoardDocuments } from '@/services/native-im/project-board';
 import AppAvatar from '../common/AppAvatar.vue';
 import AppIcon from '../common/AppIcon.vue';
 import ClowderPanel from './ClowderPanel.vue';
@@ -261,7 +262,10 @@ const groupData = computed(() => {
 
 const sharedFiles = computed(() => {
   const msgs = messageStore.messages[props.conversation.id] || [];
-  return msgs.filter((m) => m.type === 'file');
+  return mergeSharedFilesWithBoardDocuments(
+    msgs.filter((m) => m.type === 'file'),
+    agentBoard.value
+  );
 });
 
 const agentBoard = computed(() => {

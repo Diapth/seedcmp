@@ -45,9 +45,16 @@ import {
   shouldShowMessageTime
 } from '../utils/formatMessage.js';
 import {
+  collectProjectBoardDocuments,
+  mergeSharedFilesWithBoardDocuments,
   normalizeClowderProjectBoard,
+  resolveProjectBoardThreadIds,
   shouldSyncRemoteProjectBoard
 } from '../services/native-im/project-board.js';
+import {
+  previewContentOrEmpty,
+  resolvePreviewFileSource
+} from '../services/native-im/file-preview.js';
 import {
   cleanupAgentFromLocalState,
   filterDeletedAgents,
@@ -1270,12 +1277,11 @@ test('native service restores clowder group cats from catIds when cat payloads a
 
 test('native service approves and rejects clowder thread proposals with user identity header', async () => {
   const request = makeRequestStub({
-    'POST proposals/prop-1/approve': { proposalId: 'prop-1', status: 'approved', threadId: 'thread-new' },
-    'POST proposals/prop-2/reject': { proposalId: 'prop-2', status: 'rejected' }
+    'POST clowder/proposals/prop-1/approve': { proposalId: 'prop-1', status: 'approved', threadId: 'thread-new' },
+    'POST clowder/proposals/prop-2/reject': { proposalId: 'prop-2', status: 'rejected' }
   });
   const service = createNativeImService({
     baseUrl: '/v1/',
-    clowderBaseUrl: '/v1/',
     request,
     getToken: () => 'token'
   });
@@ -1284,13 +1290,33 @@ test('native service approves and rejects clowder thread proposals with user ide
   await service.rejectThreadProposal('prop-2', { userId: 'u-owner', reason: '暂不需要' });
 
   assert.equal(request.calls[0].method, 'POST');
-  assert.equal(request.calls[0].url, '/v1/proposals/prop-1/approve');
+  assert.equal(request.calls[0].url, '/v1/clowder/proposals/prop-1/approve');
+  assert.equal(request.calls[0].header.token, 'token');
   assert.equal(request.calls[0].header['X-Cat-Cafe-User'], 'u-owner');
   assert.deepEqual(request.calls[0].data, {});
   assert.equal(request.calls[1].method, 'POST');
-  assert.equal(request.calls[1].url, '/v1/proposals/prop-2/reject');
+  assert.equal(request.calls[1].url, '/v1/clowder/proposals/prop-2/reject');
+  assert.equal(request.calls[1].header.token, 'token');
   assert.equal(request.calls[1].header['X-Cat-Cafe-User'], 'u-owner');
-  assert.deepEqual(request.calls[1].data, { reason: '暂不需要' });
+  assert.deepEqual(request.calls[1].data, { rejectionReason: '暂不需要' });
+});
+
+test('native service approves clowder thread proposals through bridge without local app user', async () => {
+  const request = makeRequestStub({
+    'POST clowder/proposals/prop-card/approve': { proposalId: 'prop-card', status: 'approved', threadId: 'thread-new' }
+  });
+  const service = createNativeImService({
+    baseUrl: '/v1/',
+    request,
+    getToken: () => 'token'
+  });
+
+  await service.approveThreadProposal('prop-card');
+
+  assert.equal(request.calls[0].method, 'POST');
+  assert.equal(request.calls[0].url, '/v1/clowder/proposals/prop-card/approve');
+  assert.equal(request.calls[0].header.token, 'token');
+  assert.equal(request.calls[0].header['X-Cat-Cafe-User'], undefined);
 });
 
 
@@ -2050,6 +2076,110 @@ test('clowder project binding and thread tasks normalize into a group board', ()
   assert.equal(board.tasks[0].documents[0].generatedByAgent, true);
   assert.equal(board.tasks[1].status, 'done');
   assert.equal(board.tasks[1].documents[0].name, '看板截图.png');
+});
+
+test('clowder project board synthesizes tasks from thread artifacts when task cards are absent', () => {
+  const board = normalizeClowderProjectBoard({
+    binding: {
+      id: 'binding-riverwatch',
+      projectGroupNo: 'riverwatch-group',
+      projectName: 'RiverWatch 项目群',
+      projectThreadId: 'thread-riverwatch'
+    },
+    tasks: [],
+    artifacts: [
+      {
+        id: 'artifact-source-pack',
+        taskId: 'task-source',
+        ownerCatId: 'source-curator',
+        path: 'source-pack.md',
+        workspaceRelativePath: 'source-pack.md',
+        worktreeId: 'thread-riverwatch',
+        kind: 'doc',
+        description: '真实 USGS 数据源包',
+        status: 'available',
+        createdAt: 1781176284353
+      }
+    ],
+    agents: [
+      { id: 'source-curator', name: '资料整理师', alias: '@资料整理师' }
+    ]
+  });
+
+  assert.equal(board.tasks.length, 1);
+  assert.equal(board.tasks[0].id, 'task-source');
+  assert.equal(board.tasks[0].agentId, 'source-curator');
+  assert.equal(board.tasks[0].status, 'done');
+  assert.equal(board.tasks[0].progress, 100);
+  assert.equal(board.tasks[0].documents.length, 1);
+  assert.equal(board.tasks[0].documents[0].name, 'source-pack.md');
+  assert.equal(board.tasks[0].documents[0].workspacePath, 'source-pack.md');
+  assert.equal(board.tasks[0].documents[0].worktreeId, 'thread-riverwatch');
+});
+
+test('project shared files include board documents before local/mock message files', () => {
+  const board = normalizeClowderProjectBoard({
+    binding: {
+      id: 'binding-riverwatch',
+      projectGroupNo: 'riverwatch-group',
+      projectName: 'RiverWatch 项目群'
+    },
+    artifacts: [
+      {
+        id: 'artifact-source-pack',
+        ownerCatId: 'source-curator',
+        path: 'source-pack.md',
+        workspaceRelativePath: 'source-pack.md',
+        worktreeId: 'thread-riverwatch',
+        kind: 'doc',
+        description: '真实数据源包',
+        status: 'available'
+      }
+    ]
+  });
+  const files = mergeSharedFilesWithBoardDocuments([
+    { id: 'mock-file', type: 'file', name: 'test.md', source: 'mock' }
+  ], board);
+
+  assert.equal(collectProjectBoardDocuments(board).length, 1);
+  assert.equal(files[0].name, 'source-pack.md');
+  assert.equal(files[0].workspacePath, 'source-pack.md');
+  assert.equal(files[0].worktreeId, 'thread-riverwatch');
+  assert.equal(files[1].name, 'test.md');
+});
+
+test('project board thread ids resolve from group raw binding shapes', () => {
+  assert.deepEqual(
+    resolveProjectBoardThreadIds({}, {
+      raw: {
+        binding: {
+          thread_id: 'thread-from-raw-binding'
+        }
+      }
+    }),
+    ['thread-from-raw-binding']
+  );
+});
+
+test('file preview resolves workspace artifacts and never falls back to demo content', () => {
+  const resolved = resolvePreviewFileSource({
+    name: 'source-pack.md',
+    type: 'md',
+    source: 'clowder',
+    generatedByAgent: true,
+    workspacePath: 'source-pack.md',
+    worktreeId: 'thread-riverwatch'
+  });
+
+  assert.equal(
+    resolved.url,
+    '/v1/clowder/workspace/file/raw?worktreeId=thread-riverwatch&path=source-pack.md'
+  );
+  assert.equal(resolved.path, 'source-pack.md');
+  assert.equal(resolved.worktreeId, 'thread-riverwatch');
+  assert.equal(previewContentOrEmpty({ previewKind: 'markdown', fetchedContent: '', fileContent: '' }), '');
+  assert.equal(previewContentOrEmpty({ previewKind: 'html', fetchedContent: '', fileContent: '' }), '');
+  assert.equal(previewContentOrEmpty({ previewKind: 'code', fetchedContent: '', fileContent: '' }), '');
 });
 
 test('mock project boards skip remote clowder binding sync', () => {

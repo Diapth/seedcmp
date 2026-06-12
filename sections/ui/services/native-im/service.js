@@ -1527,9 +1527,8 @@ export function createNativeImService(options = {}) {
     const id = String(proposalId || '').trim();
     if (!id) throw { msg: 'proposalId不能为空' };
     const userId = firstNonEmpty(payload.userId, payload.user_id, readCurrentUserId());
-    if (!userId) throw { msg: '当前用户不能为空' };
-    const resp = await clowderClient.get(`proposals/${encodeURIComponent(id)}`, {}, {
-      header: { 'X-Cat-Cafe-User': userId }
+    const resp = await client.get(`clowder/proposals/${encodeURIComponent(id)}`, {}, {
+      header: userId ? { 'X-Cat-Cafe-User': userId } : {}
     });
     return resp.proposal || resp.data?.proposal || resp.data || resp;
   }
@@ -1538,10 +1537,9 @@ export function createNativeImService(options = {}) {
     const id = String(proposalId || '').trim();
     if (!id) throw { msg: 'proposalId不能为空' };
     const userId = firstNonEmpty(payload.userId, payload.user_id, readCurrentUserId());
-    if (!userId) throw { msg: '当前用户不能为空' };
     const { userId: _userId, user_id: _user_id, ...body } = payload;
-    return clowderClient.post(`proposals/${encodeURIComponent(id)}/approve`, body, {
-      header: { 'X-Cat-Cafe-User': userId }
+    return client.post(`clowder/proposals/${encodeURIComponent(id)}/approve`, body, {
+      header: userId ? { 'X-Cat-Cafe-User': userId } : {}
     });
   }
 
@@ -1549,10 +1547,10 @@ export function createNativeImService(options = {}) {
     const id = String(proposalId || '').trim();
     if (!id) throw { msg: 'proposalId不能为空' };
     const userId = firstNonEmpty(payload.userId, payload.user_id, readCurrentUserId());
-    if (!userId) throw { msg: '当前用户不能为空' };
-    const { userId: _userId, user_id: _user_id, ...body } = payload;
-    return clowderClient.post(`proposals/${encodeURIComponent(id)}/reject`, body, {
-      header: { 'X-Cat-Cafe-User': userId }
+    const { userId: _userId, user_id: _user_id, reason, ...body } = payload;
+    if (reason && !body.rejectionReason) body.rejectionReason = reason;
+    return client.post(`clowder/proposals/${encodeURIComponent(id)}/reject`, body, {
+      header: userId ? { 'X-Cat-Cafe-User': userId } : {}
     });
   }
 

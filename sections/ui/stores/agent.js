@@ -2,6 +2,7 @@ import { defineStore } from 'pinia';
 import { nativeImService } from '@/services/native-im/service';
 import {
   normalizeClowderProjectBoard,
+  resolveProjectBoardThreadIds,
   shouldSyncRemoteProjectBoard
 } from '@/services/native-im/project-board';
 import {
@@ -689,42 +690,30 @@ export const useAgentStore = defineStore('agent', {
         if (!binding?.projectGroupNo && !binding?.project_group_no && !binding?.projectGroupId && !binding?.project_group_id) {
           return null;
         }
-        const threadId = binding.projectThreadId || binding.project_thread_id || binding.threadId || binding.thread_id;
         let tasks = [];
         let artifacts = [];
-        if (threadId) {
+        const threadIds = resolveProjectBoardThreadIds(binding, group);
+        for (const threadId of threadIds) {
           try {
-            tasks = await nativeImService.fetchThreadTasks(threadId);
+            const nextTasks = await nativeImService.fetchThreadTasks(threadId);
+            tasks = [...tasks, ...nextTasks];
           } catch (error) {
-            tasks = [];
             this.nativeError = agentErrorText(error);
           }
           try {
-            artifacts = await nativeImService.fetchThreadArtifacts(threadId);
+            const nextArtifacts = await nativeImService.fetchThreadArtifacts(threadId);
+            artifacts = [...artifacts, ...nextArtifacts];
           } catch (error) {
-            artifacts = [];
             this.nativeError = agentErrorText(error);
           }
-        }
-        if (artifacts.length) {
-          const artifactsByTask = new Map();
-          artifacts.forEach((artifact) => {
-            const key = artifact.taskId || artifact.task_id || '';
-            if (!key) return;
-            if (!artifactsByTask.has(key)) artifactsByTask.set(key, []);
-            artifactsByTask.get(key).push(artifact);
-          });
-          tasks = tasks.map((task) => ({
-            ...task,
-            artifacts: [
-              ...(Array.isArray(task.artifacts) ? task.artifacts : []),
-              ...(artifactsByTask.get(task.id || task.taskId || task.task_id) || [])
-            ]
-          }));
         }
         const board = normalizeClowderProjectBoard({
-          binding,
+          binding: {
+            ...binding,
+            projectThreadId: binding.projectThreadId || binding.project_thread_id || binding.threadId || binding.thread_id || threadIds[0] || ''
+          },
           tasks,
+          artifacts,
           agents: this.agents
         });
         return this.applyProjectBoard(board);

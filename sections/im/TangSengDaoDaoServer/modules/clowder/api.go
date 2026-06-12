@@ -126,6 +126,9 @@ func (c *Clowder) Route(r *wkhttp.WKHttp) {
 		auth.GET("/thread/:threadId/workspaces", c.proxyThreadWorkspaces)
 		auth.GET("/thread/:threadId/workspace-binding", c.proxyGetThreadWorkspaceBinding)
 		auth.PUT("/thread/:threadId/workspace-binding", c.proxyPutThreadWorkspaceBinding)
+		auth.GET("/proposals/:proposalId", c.proxyGetThreadProposal)
+		auth.POST("/proposals/:proposalId/approve", c.proxyApproveThreadProposal)
+		auth.POST("/proposals/:proposalId/reject", c.proxyRejectThreadProposal)
 		// V3-37: user-visible Maomi project workspaces.
 		auth.GET("/maomi-workspaces/root", c.proxyMaomiWorkspaceRoot)
 		auth.POST("/maomi-workspaces/propose", c.proxyPostMaomiWorkspacePropose)
@@ -921,6 +924,41 @@ func (c *Clowder) proxyPutThreadWorkspaceBinding(ctx *wkhttp.Context) {
 		return
 	}
 	c.proxyToClowder(ctx, http.MethodPut, "/api/threads/"+url.PathEscape(threadID)+"/workspace-binding", bytes.NewReader(body), "thread_workspace_binding_update_unavailable")
+}
+
+func (c *Clowder) proxyGetThreadProposal(ctx *wkhttp.Context) {
+	proposalID := strings.TrimSpace(ctx.Param("proposalId"))
+	if proposalID == "" {
+		ctx.JSON(http.StatusBadRequest, map[string]string{"error": "proposal_required"})
+		return
+	}
+	c.proxyToClowder(ctx, http.MethodGet, "/api/proposals/"+url.PathEscape(proposalID), nil, "proposal_unavailable")
+}
+
+func (c *Clowder) proxyApproveThreadProposal(ctx *wkhttp.Context) {
+	proposalID := strings.TrimSpace(ctx.Param("proposalId"))
+	if proposalID == "" {
+		ctx.JSON(http.StatusBadRequest, map[string]string{"error": "proposal_required"})
+		return
+	}
+	body, ok := c.readJSONBody(ctx)
+	if !ok {
+		return
+	}
+	c.proxyToClowder(ctx, http.MethodPost, "/api/proposals/"+url.PathEscape(proposalID)+"/approve", bytes.NewReader(body), "proposal_approve_unavailable")
+}
+
+func (c *Clowder) proxyRejectThreadProposal(ctx *wkhttp.Context) {
+	proposalID := strings.TrimSpace(ctx.Param("proposalId"))
+	if proposalID == "" {
+		ctx.JSON(http.StatusBadRequest, map[string]string{"error": "proposal_required"})
+		return
+	}
+	body, ok := c.readJSONBody(ctx)
+	if !ok {
+		return
+	}
+	c.proxyToClowder(ctx, http.MethodPost, "/api/proposals/"+url.PathEscape(proposalID)+"/reject", bytes.NewReader(body), "proposal_reject_unavailable")
 }
 
 // proxyCreateThread proxies `POST /api/threads` to Clowder 3004. im_web's

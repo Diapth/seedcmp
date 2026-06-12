@@ -567,6 +567,11 @@ import * as pdfjsLib from 'pdfjs-dist';
 import pdfWorkerUrl from 'pdfjs-dist/build/pdf.worker.min.mjs?url';
 import AppIcon from '../common/AppIcon.vue';
 import AppEmptyState from '../common/AppEmptyState.vue';
+import {
+  normalizeWorkspaceArtifactPath,
+  previewContentOrEmpty,
+  resolvePreviewFileSource
+} from '@/services/native-im/file-preview';
 
 pdfjsLib.GlobalWorkerOptions.workerSrc = pdfWorkerUrl;
 
@@ -662,26 +667,7 @@ const sheetsData = ref([]);
 const editingCell = ref({ row: -1, col: -1, val: '' });
 
 const normalizedFile = computed(() => {
-  const source = props.file || {};
-  const name = source.name || source.fileName || source.content || '未命名文件';
-  const rawType = source.fileType || source.ext || source.type || getTypeFromName(name);
-  const detectedType = String(rawType || 'file').toLowerCase();
-  const workspacePath = normalizeWorkspaceArtifactPath(source.workspacePath || source.workspace_path || source.relativePath || source.relative_path || source.path);
-  const worktreeId = source.worktreeId || source.worktree_id || source.workspaceWorktreeId || source.workspace_worktree_id || source.worktree?.id || source.workspace?.worktreeId || source.workspace?.worktree_id || '';
-  const explicitUrl = firstFetchableFileUrl(source.url, source.sourceUrl, source.contentUrl, source.previewUrl, source.downloadUrl);
-  const workspaceUrl = explicitUrl ? '' : workspaceRawFileUrl(worktreeId, workspacePath || source.url || source.sourceUrl || source.contentUrl);
-
-  return {
-    id: source.id || '',
-    conversationId: source.conversationId || source.channelId || source.channel_id || '',
-    name,
-    size: source.size || source.fileSize || '未知大小',
-    type: detectedType === 'file' ? getTypeFromName(name) : detectedType,
-    url: explicitUrl || workspaceUrl,
-    path: workspacePath,
-    worktreeId,
-    content: source.previewContent || source.contentText || source.markdown || source.text || ''
-  };
+  return resolvePreviewFileSource(props.file || {});
 });
 
 const extension = computed(() => {
@@ -1138,29 +1124,6 @@ function resolveFileUrl(name) {
   }
 
   return `/assets/${encodeURIComponent(name)}`;
-}
-
-function isFetchableFileUrl(value = '') {
-  const url = String(value || '').trim();
-  return /^(https?:|blob:|data:)/i.test(url)
-    || /^\/(uploads|v1|clowder-api|api|static|assets)\//i.test(url);
-}
-
-function firstFetchableFileUrl(...values) {
-  return values.map((value) => String(value || '').trim()).find(isFetchableFileUrl) || '';
-}
-
-function normalizeWorkspaceArtifactPath(value = '') {
-  const raw = String(value || '').trim();
-  if (!raw || isFetchableFileUrl(raw) || /^javascript:/i.test(raw)) return '';
-  return raw.replace(/^\.?\//, '').replace(/\\/g, '/');
-}
-
-function workspaceRawFileUrl(worktreeId = '', workspacePath = '') {
-  const tree = String(worktreeId || '').trim();
-  const path = normalizeWorkspaceArtifactPath(workspacePath);
-  if (!tree || !path) return '';
-  return `/v1/clowder/workspace/file/raw?worktreeId=${encodeURIComponent(tree)}&path=${encodeURIComponent(path)}`;
 }
 
 function isWorkspaceBackedFile(file = {}) {
@@ -2147,28 +2110,11 @@ function formatExcelDate(value) {
 }
 
 const previewContent = computed(() => {
-  // 首选拉取到的真实文件正文
-  if (fetchedContent.value) return fetchedContent.value;
-
-  if (normalizedFile.value.content) return normalizedFile.value.content;
-
-  if (previewKind.value === 'markdown') {
-    return `# 智能无人船三维参数化建模报告\n\n先进制造技术课程建模作业\n\n- 成功加载本地 Markdown 文件。\n- 右上角可一键切换源码和渲染预览。`;
-  }
-
-  if (previewKind.value === 'html') {
-    return `<article>\n  <h1>基于系统描述的 FreeCAD 3D 建模</h1>\n  <p>这是 H5 容器内置 HTML 仿真渲染效果页面。</p>\n  <button style="background: #2563eb; color: white; border: none; padding: 6px 12px; border-radius: 4px;">体验按钮</button>\n</article>`;
-  }
-
-  if (previewKind.value === 'presentation' || previewKind.value === 'sheet') {
-    return '';
-  }
-
-  if (previewKind.value === 'code') {
-    return `// ${normalizedFile.value.name}\nconsole.log("正在为您准备代码预览...");`;
-  }
-
-  return '';
+  return previewContentOrEmpty({
+    previewKind: previewKind.value,
+    fetchedContent: fetchedContent.value,
+    fileContent: normalizedFile.value.content
+  });
 });
 
 const renderedMarkdown = computed(() => markdown.render(previewContent.value));

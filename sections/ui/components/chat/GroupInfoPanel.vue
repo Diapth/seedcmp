@@ -92,6 +92,7 @@ import { useAgentStore } from '@/stores/agent';
 import { useAppStore } from '@/stores/app';
 import { useConfirm } from '@/composables/useConfirm';
 import { resolveSelfId } from '@/services/native-im/message-state';
+import { mergeSharedFilesWithBoardDocuments } from '@/services/native-im/project-board';
 import AppAvatar from '../common/AppAvatar.vue';
 import AppIcon from '../common/AppIcon.vue';
 import GroupAnnouncement from './GroupAnnouncement.vue';
@@ -128,7 +129,10 @@ const announcementText = computed(() => {
 
 const sharedFiles = computed(() => {
   const msgs = messageStore.messages[props.group.id] || [];
-  return msgs.filter((m) => m.type === 'file').slice(0, 4);
+  return mergeSharedFilesWithBoardDocuments(
+    msgs.filter((m) => m.type === 'file'),
+    agentBoard.value
+  ).slice(0, 4);
 });
 
 function handleMemberSelect(member) {
