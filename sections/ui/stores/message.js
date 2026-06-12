@@ -16,6 +16,7 @@ import {
 import {
   buildProjectGroupConfirmationInput,
   buildProjectGroupCreationContextMessage,
+  buildProjectGroupExecutionMessagePayload,
   buildProjectGroupEnsurePayload,
   isProjectGroupConfirmationMessage,
   projectGroupCreatedPatch,
@@ -1032,7 +1033,7 @@ export const useMessageStore = defineStore('message', {
           groupName,
           catIds,
           agents,
-          prompt: `项目群「${groupName}」已创建，请按用户原始任务协作执行。`,
+          prompt: `项目群「${groupName}」已创建。原始任务：${firstText(card.sourceText, '请按项目目标协作执行。')}`,
           proactiveReplies: true,
           autoReplyMode: 'auto',
           projectThreadId: createdPatch.projectThreadId,
@@ -1099,6 +1100,15 @@ export const useMessageStore = defineStore('message', {
             threadId: createdPatch.projectThreadId
           });
         }
+        const executionPayload = buildProjectGroupExecutionMessagePayload({
+          card,
+          groupId,
+          groupName,
+          createdPatch,
+          workerCatIds,
+          catIds
+        });
+        if (executionPayload) await nativeImService.sendClowderConversationMessage(executionPayload);
 
         return this.updateProjectGroupConfirmation(conversationId, cardId, createdPatch);
       } catch (error) {

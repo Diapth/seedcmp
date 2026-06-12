@@ -731,3 +731,28 @@ export function projectGroupFailedPatch(error = '') {
     error: cardErrorText(error)
   };
 }
+
+export function buildProjectGroupExecutionMessagePayload({
+  card = {},
+  groupId = '',
+  groupName = '',
+  createdPatch = {},
+  workerCatIds = [],
+  catIds = []
+} = {}) {
+  const text = firstText(card.sourceText);
+  const channelId = firstText(groupId, createdPatch.projectGroupNo, card.projectGroupNo);
+  if (!text || !channelId) return null;
+  const projectName = firstText(groupName, createdPatch.projectGroupName, card.projectGroupName, card.projectName, 'Clowder 项目群');
+  const targets = uniqueStrings(workerCatIds.length ? workerCatIds : catIds);
+  const payload = {
+    channelId,
+    channelType: 2,
+    text,
+    promptContext: `项目群：${projectName}`
+  };
+  if (targets.length) payload.targetCatIds = targets;
+  const threadId = firstText(createdPatch.projectThreadId, card.projectThreadId);
+  if (threadId) payload.threadId = threadId;
+  return payload;
+}

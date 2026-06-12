@@ -87,6 +87,7 @@ import {
   resolveConversationThreadId
 } from '../services/native-im/manual-context-pins.js';
 import {
+  resolveTextPreSendEffects,
   runTextPostSendEffects
 } from '../services/native-im/send-flow.js';
 
@@ -1585,7 +1586,33 @@ test('text send effects still allow explicit confirmation fallback when no fresh
   assert.deepEqual(calls, ['template-card', 'project-card', 'project-group-fallback']);
   assert.equal(result.projectGroupCardCreated, false);
   assert.equal(result.handledProjectGroupFallback, true);
+  assert.equal(result.shouldSend, false);
   assert.equal(result.shouldReturn, true);
+  assert.equal(result.result.id, 'created-project-group-card');
+});
+
+test('text pre-send effects consume project group confirmation before PM bridge send', async () => {
+  const calls = [];
+  const result = await resolveTextPreSendEffects({
+    conversation: { id: 'pm-direct', type: 'robot', directCatId: 'riverpm' },
+    content: '确认',
+    handleProjectGroupTextFallback: async () => {
+      calls.push('project-group-fallback');
+      return {
+        id: 'project-group-card:msg-1',
+        projectGroupCard: {
+          status: 'created',
+          projectGroupNo: 'riverwatch-group'
+        }
+      };
+    }
+  });
+
+  assert.deepEqual(calls, ['project-group-fallback']);
+  assert.equal(result.handledProjectGroupFallback, true);
+  assert.equal(result.shouldSend, false);
+  assert.equal(result.shouldReturn, true);
+  assert.equal(result.result.projectGroupCard.projectGroupNo, 'riverwatch-group');
 });
 
 test('project group text confirmation can recover from recent project start context', async () => {
@@ -1808,6 +1835,7 @@ test('native conversation normalization preserves clowder binding thread ids', (
 
 test('project group confirmation builds ensure payload and created patch', async () => {
   const {
+    buildProjectGroupExecutionMessagePayload,
     buildProjectGroupEnsurePayload,
     projectGroupCreatedPatch,
     projectGroupFailedPatch,
@@ -1862,6 +1890,28 @@ test('project group confirmation builds ensure payload and created patch', async
   assert.deepEqual(projectGroupFailedPatch({ msg: 'sync failed' }), {
     status: 'failed',
     error: 'sync failed'
+  });
+
+  assert.deepEqual(buildProjectGroupExecutionMessagePayload({
+    card: {
+      sourceText: '请完成 RiverWatch PRD、README、Vue HTML 和部署预览。',
+      projectName: 'RiverWatch 项目群'
+    },
+    groupId: 'riverwatch-group',
+    groupName: 'RiverWatch 项目群',
+    createdPatch: {
+      projectGroupNo: 'riverwatch-group',
+      projectThreadId: 'thread-riverwatch'
+    },
+    workerCatIds: ['source-curator-claude', 'frontend-claude'],
+    catIds: ['riverpm-claude', 'source-curator-claude', 'frontend-claude']
+  }), {
+    channelId: 'riverwatch-group',
+    channelType: 2,
+    text: '请完成 RiverWatch PRD、README、Vue HTML 和部署预览。',
+    promptContext: '项目群：RiverWatch 项目群',
+    targetCatIds: ['source-curator-claude', 'frontend-claude'],
+    threadId: 'thread-riverwatch'
   });
 
   assert.deepEqual(resolveProjectGroupExecutionTargets({

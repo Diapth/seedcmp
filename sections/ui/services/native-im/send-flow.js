@@ -20,6 +20,8 @@ export async function runTextPostSendEffects({
       return {
         projectGroupCardCreated: false,
         handledProjectGroupFallback: true,
+        result: handledProjectGroupFallback,
+        shouldSend: false,
         shouldReturn: true
       };
     }
@@ -31,6 +33,7 @@ export async function runTextPostSendEffects({
     return {
       projectGroupCardCreated: true,
       handledProjectGroupFallback: false,
+      shouldSend: true,
       shouldReturn: false
     };
   }
@@ -41,6 +44,27 @@ export async function runTextPostSendEffects({
   return {
     projectGroupCardCreated: false,
     handledProjectGroupFallback: false,
+    shouldSend: true,
     shouldReturn: false
+  };
+}
+
+export async function resolveTextPreSendEffects({
+  conversation = null,
+  content = '',
+  handleProjectGroupTextFallback
+} = {}) {
+  const handledProjectGroupFallback = await handleProjectGroupTextFallback?.(conversation, content);
+  if (!handledProjectGroupFallback) {
+    return {
+      handledProjectGroupFallback: false,
+      shouldSend: true
+    };
+  }
+  return {
+    handledProjectGroupFallback: true,
+    result: handledProjectGroupFallback,
+    shouldSend: false,
+    shouldReturn: true
   };
 }

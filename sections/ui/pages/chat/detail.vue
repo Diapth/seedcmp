@@ -323,6 +323,7 @@ import {
   resolveConversationThreadId
 } from '@/services/native-im/manual-context-pins';
 import {
+  resolveTextPreSendEffects,
   runTextPostSendEffects
 } from '@/services/native-im/send-flow';
 
@@ -662,6 +663,19 @@ async function handleSendMessage({ type, content, fileName, fileSize, fileSizeBy
     name: appStore.currentUser?.nickname || '我'
   };
 
+  if (type === 'text') {
+    const preEffects = await resolveTextPreSendEffects({
+      conversation,
+      content,
+      handleProjectGroupTextFallback: maybeHandleProjectGroupTextFallback
+    });
+    if (preEffects.shouldReturn || preEffects.shouldSend === false) {
+      await openProjectGroupConversationFromMessage(preEffects.result);
+      replyTarget.value = null;
+      return;
+    }
+  }
+
   // 解析 mentions: 从当前 text 提取 @昵称 -> 对应 groupMembers
   const extra = {};
   if (type === 'text' && activeConversation.value?.type === 'group') {
@@ -744,7 +758,20 @@ async function maybeHandleProjectGroupTextFallback(conversation, text) {
   if (message?.proposalCard?.status === 'failed') {
     uni.showToast({ title: message.proposalCard.error || '提案处理失败', icon: 'none' });
   }
-  return Boolean(message);
+  return message || false;
+}
+
+async function openProjectGroupConversationFromMessage(message) {
+  const groupId = message?.projectGroupCard?.projectGroupNo || message?.projectGroupCard?.groupNo;
+  if (!groupId || message?.projectGroupCard?.status !== 'created') return false;
+  convStore.setActiveId(groupId);
+  if (!isDesktop.value) {
+    uni.redirectTo({ url: `/pages/chat/detail?id=${encodeURIComponent(groupId)}` });
+    return true;
+  }
+  await syncActiveMessages({ silent: true });
+  await syncActiveManualContextPins({ silent: true });
+  return true;
 }
 
 function maybeCreateProjectGroupCard(conversation, text, sourceMessage) {
@@ -817,7 +844,9 @@ async function handleProjectGroupConfirm(payload = {}) {
   });
   if (message?.projectGroupCard?.status === 'failed') {
     uni.showToast({ title: message.projectGroupCard.error || '项目群创建失败', icon: 'none' });
+    return;
   }
+  await openProjectGroupConversationFromMessage(message);
 }
 
 function handleProjectGroupOpen(payload = {}) {
