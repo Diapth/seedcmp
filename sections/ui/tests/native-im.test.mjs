@@ -2207,6 +2207,32 @@ test('project group info overview exposes member status and produced files', () 
   assert.equal(overview.files[1].name, 'local-note.md');
 });
 
+test('project group info overview falls back to message file cards when board is empty', () => {
+  const overview = deriveProjectGroupInfoOverview({
+    board: null,
+    agents: [
+      { id: 'qa-cat', name: '英短（QA工程师）', alias: '@qa-cat' }
+    ],
+    messageFiles: [
+      {
+        id: 'msg-file-1',
+        type: 'file',
+        name: 'qa-report.md',
+        summary: 'QA 交付物清单',
+        workspacePath: '.clowder/workspaces/project/qa-report.md',
+        senderId: 'qa-cat',
+        senderName: '英短（QA工程师）'
+      }
+    ]
+  });
+
+  assert.equal(overview.taskCount, 1);
+  assert.equal(overview.documentCount, 1);
+  assert.equal(overview.memberStatuses[0].agentName, '英短（QA工程师）');
+  assert.equal(overview.memberStatuses[0].taskTitle, 'qa-report.md');
+  assert.equal(overview.files[0].name, 'qa-report.md');
+});
+
 test('project board thread ids resolve from group raw binding shapes', () => {
   assert.deepEqual(
     resolveProjectBoardThreadIds({}, {

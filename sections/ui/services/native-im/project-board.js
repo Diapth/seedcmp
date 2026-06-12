@@ -263,6 +263,40 @@ function agentAlias(agent = {}, fallback = '') {
   return fallback ? `@${fallback}` : '@agent';
 }
 
+function fileDisplayName(file = {}, index = 0) {
+  return firstText(file.name, file.fileName, file.filename, file.title, file.path, file.workspacePath, `产出文件 ${index + 1}`);
+}
+
+function fileOwnerId(file = {}) {
+  return firstText(file.agentId, file.agent_id, file.catId, file.cat_id, file.senderId, file.sender_id, file.ownerCatId, file.owner_cat_id);
+}
+
+function fileOwnerName(file = {}, fallback = '') {
+  return firstText(file.agentName, file.agent_name, file.senderName, file.sender_name, file.ownerName, file.owner_name, fallback);
+}
+
+function synthesizeStatusesFromFiles(files = [], agentsById = new Map()) {
+  return firstArray(files).map((file, index) => {
+    const agentId = fileOwnerId(file);
+    const agent = agentsById.get(agentId) || {};
+    const agentName = agentDisplayName(agent, fileOwnerName(file, agentId));
+    const name = fileDisplayName(file, index);
+    return {
+      id: firstText(file.id, file.messageId, file.workspacePath, file.path, `${agentId || 'file'}-${index}`),
+      agentId,
+      agentName,
+      agentAlias: agentAlias(agent, agentId),
+      agentAvatar: firstText(agent.avatar, agent.logo, file.avatar, file.senderAvatar),
+      taskTitle: name,
+      status: 'done',
+      statusText: projectTaskStatusText('done'),
+      progress: 100,
+      documentCount: 1,
+      documents: [file]
+    };
+  });
+}
+
 export function deriveProjectGroupInfoOverview({ board = null, agents = [], messageFiles = [] } = {}) {
   const tasks = firstArray(board?.tasks);
   const agentsById = new Map(
@@ -290,12 +324,15 @@ export function deriveProjectGroupInfoOverview({ board = null, agents = [], mess
     };
   });
   const files = mergeSharedFilesWithBoardDocuments(messageFiles, board || {});
+  const fallbackStatuses = memberStatuses.length ? [] : synthesizeStatusesFromFiles(files, agentsById);
+  const effectiveStatuses = memberStatuses.length ? memberStatuses : fallbackStatuses;
+  const fallbackDocumentCount = memberStatuses.length ? 0 : files.length;
   return {
     board,
-    taskCount: tasks.length,
-    completedCount: memberStatuses.filter((item) => item.status === 'done').length,
-    documentCount: collectProjectBoardDocuments(board || {}).length,
-    memberStatuses,
+    taskCount: tasks.length || fallbackStatuses.length,
+    completedCount: effectiveStatuses.filter((item) => item.status === 'done').length,
+    documentCount: collectProjectBoardDocuments(board || {}).length || fallbackDocumentCount,
+    memberStatuses: effectiveStatuses,
     files
   };
 }
