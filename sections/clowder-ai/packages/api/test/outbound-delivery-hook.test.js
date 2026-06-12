@@ -3,6 +3,7 @@ import { homedir, tmpdir } from 'node:os';
 import { join, relative } from 'node:path';
 import assert from 'node:assert/strict';
 import { beforeEach, describe, it } from 'node:test';
+import { catRegistry } from '@cat-cafe/shared';
 import './helpers/setup-cat-registry.js';
 import { MemoryConnectorThreadBindingStore } from '../dist/infrastructure/connectors/ConnectorThreadBindingStore.js';
 import { OutboundDeliveryHook } from '../dist/infrastructure/connectors/OutboundDeliveryHook.js';
@@ -31,6 +32,46 @@ function mockAdapter(connectorId) {
       },
     },
   };
+}
+
+function ensureRuntimeCoordinatorCat(catId = 'riverpm-claude') {
+  if (catRegistry.has(catId)) return catId;
+  catRegistry.register(catId, {
+    id: catId,
+    name: '逻罗猫（协调者）',
+    displayName: '逻罗猫（协调者）',
+    nickname: 'PM',
+    avatar: '/avatars/runtime-pm.png',
+    color: { primary: '#b7e533', secondary: '#eef9bd' },
+    mentionPatterns: [`@${catId}`, '@PM'],
+    clientId: 'anthropic',
+    defaultModel: 'claude-sonnet-4-6',
+    mcpSupport: true,
+    roleDescription: '显性 PM / 主 Agent，负责需求理解、任务拆解、多 Agent 调度和交付聚合',
+    personality: '协调、汇总、同步进度',
+    teamStrengths: 'PM 协调者，聚合产出并向用户汇报进展',
+  });
+  return catId;
+}
+
+function ensureRuntimeWorkerCat(catId = 'svg-guardian-runtime') {
+  if (catRegistry.has(catId)) return catId;
+  catRegistry.register(catId, {
+    id: catId,
+    name: '挪威森林猫（SVG执行守门人）',
+    displayName: '挪威森林猫',
+    nickname: '森森',
+    avatar: '/avatars/runtime-worker.png',
+    color: { primary: '#4b5563', secondary: '#e5e7eb' },
+    mentionPatterns: [`@${catId}`],
+    clientId: 'anthropic',
+    defaultModel: 'claude-sonnet-4-6',
+    mcpSupport: true,
+    roleDescription: 'PPT SVG 执行守门人，负责监督主 Agent 串行逐页生成、spec_lock 复读和 live preview 纪律',
+    personality: '稳、慢、准，对流程漂移很敏感',
+    teamStrengths: 'SVG executor、串行生成纪律、spec_lock 逐页复读、live preview 守护',
+  });
+  return catId;
 }
 
 describe('OutboundDeliveryHook', () => {
@@ -112,6 +153,40 @@ describe('OutboundDeliveryHook', () => {
 
     assert.equal(imWebMock.sent.length, 1);
     assert.equal(imWebMock.sent[0].externalChatId, '1:user-1@clowder_cat:coordinator');
+  });
+
+  it('keeps runtime coordinator-style PM aggregate replies in the IM Web PM direct binding', async () => {
+    const runtimePmCatId = ensureRuntimeCoordinatorCat();
+    const imWebMock = mockAdapter('im-web');
+    hook = new OutboundDeliveryHook({
+      bindingStore,
+      adapters: new Map([['im-web', imWebMock.adapter]]),
+      log: noopLog(),
+    });
+    bindingStore.bind('im-web', `1:user-1@clowder_cat:${runtimePmCatId}`, 'thread-project', 'user-1');
+    bindingStore.bind('im-web', '2:project-group-1', 'thread-project', 'user-1');
+
+    await hook.deliver('thread-project', 'current progress summary for the user', runtimePmCatId);
+
+    assert.equal(imWebMock.sent.length, 1);
+    assert.equal(imWebMock.sent[0].externalChatId, `1:user-1@clowder_cat:${runtimePmCatId}`);
+  });
+
+  it('keeps runtime worker cats in the IM Web project group even when their role mentions main Agent', async () => {
+    const workerCatId = ensureRuntimeWorkerCat();
+    const imWebMock = mockAdapter('im-web');
+    hook = new OutboundDeliveryHook({
+      bindingStore,
+      adapters: new Map([['im-web', imWebMock.adapter]]),
+      log: noopLog(),
+    });
+    bindingStore.bind('im-web', `1:user-1@clowder_cat:${workerCatId}`, 'thread-project', 'user-1');
+    bindingStore.bind('im-web', '2:project-group-1', 'thread-project', 'user-1');
+
+    await hook.deliver('thread-project', 'worker status update for project group', workerCatId);
+
+    assert.equal(imWebMock.sent.length, 1);
+    assert.equal(imWebMock.sent[0].externalChatId, '2:project-group-1');
   });
 
   it('does not throw when adapter.sendReply fails', async () => {

@@ -1,4 +1,4 @@
-import type { ConnectorThreadBinding } from '@cat-cafe/shared';
+import { catRegistry, type ConnectorThreadBinding } from '@cat-cafe/shared';
 
 export interface DeliveryBindingSelectionContext {
   readonly catId?: string | undefined;
@@ -33,5 +33,14 @@ function externalChatChannelType(externalChatId: string): string {
 
 function isCoordinatorCat(catId: string | undefined): boolean {
   const normalized = String(catId || '').trim().toLowerCase();
-  return normalized === 'coordinator' || normalized === 'pm';
+  if (normalized === 'coordinator' || normalized === 'pm') return true;
+  const config = catId ? catRegistry.tryGet(catId)?.config : undefined;
+  const identityText = [config?.name, config?.displayName, config?.nickname].filter(Boolean).join(' ');
+  if (/(协调者|\bPM\b|orchestrator|coordinator)/i.test(identityText)) return true;
+  const responsibilityText = [config?.roleDescription, config?.teamStrengths, config?.personality]
+    .filter(Boolean)
+    .join(' ');
+  return /(显性\s*PM|交付聚合|结果合成|任务拆分|并行调度|多\s*Agent\s*调度|需求澄清)/i.test(
+    responsibilityText,
+  );
 }

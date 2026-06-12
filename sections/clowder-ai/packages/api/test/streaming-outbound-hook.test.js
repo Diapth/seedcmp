@@ -1,5 +1,6 @@
 import assert from 'node:assert/strict';
 import { before, describe, it, mock } from 'node:test';
+import { catRegistry } from '@cat-cafe/shared';
 
 describe('StreamingOutboundHook', () => {
   let StreamingOutboundHook;
@@ -86,6 +87,26 @@ describe('StreamingOutboundHook', () => {
       minDeltaChars: opts.minDeltaChars ?? 0,
     });
     return { hook, adapter };
+  }
+
+  function ensureRuntimeCoordinatorCat(catId = 'riverpm-claude') {
+    if (catRegistry.has(catId)) return catId;
+    catRegistry.register(catId, {
+      id: catId,
+      name: '逻罗猫（协调者）',
+      displayName: '逻罗猫（协调者）',
+      nickname: 'PM',
+      avatar: '/avatars/runtime-pm.png',
+      color: { primary: '#b7e533', secondary: '#eef9bd' },
+      mentionPatterns: [`@${catId}`, '@PM'],
+      clientId: 'anthropic',
+      defaultModel: 'claude-sonnet-4-6',
+      mcpSupport: true,
+      roleDescription: '显性 PM / 主 Agent，负责需求理解、任务拆解、多 Agent 调度和交付聚合',
+      personality: '协调、汇总、同步进度',
+      teamStrengths: 'PM 协调者，聚合产出并向用户汇报进展',
+    });
+    return catId;
   }
 
   it('F157: onStreamStart sends cat-personality receipt instead of generic thinking text', async () => {
@@ -207,6 +228,43 @@ describe('StreamingOutboundHook', () => {
 
     assert.equal(adapter._calls.sendPlaceholder.length, 1);
     assert.equal(adapter._calls.sendPlaceholder[0].chatId, '1:user-1@clowder_cat:coordinator');
+  });
+
+  it('keeps runtime coordinator-style PM placeholders in the IM Web PM direct binding', async () => {
+    const runtimePmCatId = ensureRuntimeCoordinatorCat();
+    const adapter = wrapAdapter(createMockAdapter({ connectorId: 'im-web' }));
+    const adapters = new Map([['im-web', adapter]]);
+    const bindingStore = createBindingStore([
+      {
+        connectorId: 'im-web',
+        externalChatId: `1:user-1@clowder_cat:${runtimePmCatId}`,
+        threadId: 'thread-project',
+        userId: 'u1',
+        createdAt: Date.now(),
+      },
+      {
+        connectorId: 'im-web',
+        externalChatId: '2:project-group-1',
+        threadId: 'thread-project',
+        userId: 'u1',
+        createdAt: Date.now(),
+      },
+    ]);
+    const log = {
+      warn: () => {},
+      info: () => {},
+      error: () => {},
+      debug: () => {},
+      fatal: () => {},
+      trace: () => {},
+      child: () => log,
+    };
+    const hook = new StreamingOutboundHook({ bindingStore, adapters, log, updateIntervalMs: 0, minDeltaChars: 0 });
+
+    await hook.onStreamStart('thread-project', runtimePmCatId);
+
+    assert.equal(adapter._calls.sendPlaceholder.length, 1);
+    assert.equal(adapter._calls.sendPlaceholder[0].chatId, `1:user-1@clowder_cat:${runtimePmCatId}`);
   });
 
   it('F157 P2: sender hint adds sender name to Feishu receipt prefix with 🐱', async () => {
