@@ -90,18 +90,20 @@ export function createDeletedConversationRecord(conversation = {}, deletedAt = D
   };
 }
 
-function normalizeDeletedConversationRecord(record = {}) {
+function normalizeDeletedConversationRecord(record) {
   if (!record || typeof record !== 'object') return null;
   return {
     lastSeq: safeNumber(record.lastSeq || record.last_msg_seq || record.lastMsgSeq || record.seq, 0),
     lastTime: safeNumber(record.lastTime || record.last_msg_time || record.lastMsgTime || record.time, 0),
-    deletedAt: safeNumber(record.deletedAt || record.deleted_at, Date.now())
+    deletedAt: safeNumber(record.deletedAt || record.deleted_at, Date.now()),
+    permanent: record.permanent === true
   };
 }
 
 function incomingIsNewerThanDeletedRecord(conversation = {}, record = {}) {
   const normalized = normalizeDeletedConversationRecord(record);
   if (!normalized) return false;
+  if (normalized.permanent) return false;
   const { seq, time } = conversationSeqTime(conversation);
   if (seq > 0 && seq > normalized.lastSeq) return true;
   if (normalized.lastSeq >= Number.MAX_SAFE_INTEGER && seq <= 0) return false;
@@ -119,6 +121,22 @@ export function shouldSuppressDeletedConversation(conversation = {}, deletedReco
 
 export function filterDeletedConversations(conversations = [], deletedRecords = {}) {
   return conversations.filter((conversation) => !shouldSuppressDeletedConversation(conversation, deletedRecords));
+}
+
+export function groupToConversationIdentity(group = {}) {
+  const normalized = normalizeNativeGroup(group);
+  if (!normalized.id) return {};
+  return {
+    channelId: normalized.id,
+    channelType: 2,
+    type: 'group',
+    lastSeq: group.lastSeq || group.last_msg_seq || group.lastMsgSeq || 0,
+    lastTime: normalized.lastTime || normalized.createTime || group.lastTime || group.last_msg_time || 0
+  };
+}
+
+export function filterDeletedGroups(groups = [], deletedRecords = {}) {
+  return groups.filter((group) => !shouldSuppressDeletedConversation(groupToConversationIdentity(group), deletedRecords));
 }
 
 export function resolveGroupPageId(routeOptions = {}, state = {}) {
@@ -319,7 +337,7 @@ export function normalizeNativeGroupMember(input = {}) {
   };
 }
 
-export function upsertGroupConversation(conversations = [], group = {}) {
+export function upsertGroupConversation(conversations = [], group = {}, options = {}) {
   const normalized = normalizeNativeGroup(group);
   if (!normalized.id) return conversations;
   const nextConversation = {
@@ -345,6 +363,7 @@ export function upsertGroupConversation(conversations = [], group = {}) {
     ...(normalized.binding ? { binding: normalized.binding } : {}),
     ...(normalized.source ? { source: normalized.source } : {})
   };
+  if (shouldSuppressDeletedConversation(nextConversation, options.deletedRecords || {})) return conversations;
 
   const index = conversations.findIndex((conversation) => {
     const identity = conversationIdentity(conversation);

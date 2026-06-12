@@ -457,7 +457,9 @@ export const useConversationStore = defineStore('conversation', {
       const conversation = this.conversations.find((c) => c.id === id || c.channelId === id);
       const identity = this.getConversationIdentity(conversation || id);
       const conversationId = conversation?.id || identity.conversationId || id;
-      this.markConversationDeleted(conversation || identity);
+      this.markConversationDeleted(conversation || identity, {
+        permanent: options.permanent === true || channelTypeFromConversation(conversation || identity) === 2
+      });
       this.conversations = this.conversations.filter((c) => c.id !== conversationId && c.channelId !== identity.channelId);
       this.isHidden = this.isHidden.filter((x) => x !== conversationId && x !== identity.channelId);
       if (this.activeId === conversationId || this.activeId === identity.channelId) this.activeId = '';
@@ -725,7 +727,13 @@ export const useConversationStore = defineStore('conversation', {
       return this.conversations.find((item) => item.id === normalized.id) || null;
     },
     upsertGroupConversation(group) {
-      this.conversations = upsertGroupConversation(this.conversations, group);
+      this.deletedRecords = {
+        ...readDeletedConversationCache(),
+        ...this.deletedRecords
+      };
+      this.conversations = upsertGroupConversation(this.conversations, group, {
+        deletedRecords: this.deletedRecords
+      });
       return this.conversations.find((item) => item.id === (group.id || group.groupNo || group.group_no)) || null;
     },
     upsertAgentConversation(agent) {
@@ -751,8 +759,14 @@ export const useConversationStore = defineStore('conversation', {
       this.conversations = sortConversations(this.conversations);
     },
     applyNativeGroups(groups = []) {
+      this.deletedRecords = {
+        ...readDeletedConversationCache(),
+        ...this.deletedRecords
+      };
       groups.forEach((group) => {
-        this.conversations = upsertGroupConversation(this.conversations, group);
+        this.conversations = upsertGroupConversation(this.conversations, group, {
+          deletedRecords: this.deletedRecords
+        });
       });
       this.conversations = sortConversations(this.conversations);
     },

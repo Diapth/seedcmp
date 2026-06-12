@@ -17,6 +17,7 @@ import {
   conversationDeleteKey,
   conversationDisplayUnread,
   filterDeletedConversations,
+  filterDeletedGroups,
   mergeRemoteDrafts,
   mergeNativeConversationTimeline,
   normalizeNativeGroup,
@@ -3018,6 +3019,64 @@ test('agent delete permanent tombstone ignores the previous direct conversation 
     }),
     true
   );
+});
+
+test('permanent conversation tombstone suppresses newer sync entries', () => {
+  const record = createDeletedConversationRecord({
+    channelId: 'left-group',
+    channelType: 2,
+    lastSeq: 12,
+    lastTime: 1781065600000
+  }, 1781065700000, { permanent: true });
+
+  assert.equal(
+    shouldSuppressDeletedConversation({
+      channelId: 'left-group',
+      channelType: 2,
+      lastSeq: 13,
+      lastTime: 1781069900000
+    }, {
+      [conversationDeleteKey('left-group', 2)]: record
+    }),
+    true
+  );
+});
+
+test('group upsert respects deleted conversation tombstones from leave group', () => {
+  const record = createDeletedConversationRecord({
+    channelId: 'left-group',
+    channelType: 2,
+    lastSeq: 0,
+    lastTime: 1781065600000
+  }, 1781065700000, { permanent: true });
+
+  const conversations = upsertGroupConversation([], {
+    groupNo: 'left-group',
+    name: '已退出的群',
+    last_msg_time: 1781069900
+  }, {
+    deletedRecords: {
+      [conversationDeleteKey('left-group', 2)]: record
+    }
+  });
+
+  assert.deepEqual(conversations, []);
+});
+
+test('deleted group tombstones suppress group-store shaped records', () => {
+  const record = createDeletedConversationRecord({
+    channelId: 'left-group',
+    channelType: 2
+  }, 1781065700000, { permanent: true });
+
+  const groups = filterDeletedGroups([
+    { id: 'left-group', name: '已退出的群', memberCount: 2 },
+    { id: 'active-group', name: '仍在的群', memberCount: 3 }
+  ], {
+    [conversationDeleteKey('left-group', 2)]: record
+  });
+
+  assert.deepEqual(groups.map((group) => group.id), ['active-group']);
 });
 
 test('group creation candidates include existing agents and split native contacts from agents', () => {

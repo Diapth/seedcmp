@@ -1,6 +1,7 @@
 import { defineStore } from 'pinia';
 import { nativeImService } from '@/services/native-im/service';
 import { mergeGroupMembersWithAgentMembers } from '@/services/native-im/agent-state';
+import { filterDeletedGroups, shouldSuppressDeletedConversation, groupToConversationIdentity } from '@/services/native-im/conversation-state';
 import { useConversationStore } from '@/stores/conversation';
 
 export const useGroupStore = defineStore('group', {
@@ -36,6 +37,8 @@ export const useGroupStore = defineStore('group', {
     addGroup(group) {
       const id = group.id || group.groupNo || group.group_no;
       if (!id) return;
+      const convStore = useConversationStore();
+      if (shouldSuppressDeletedConversation(groupToConversationIdentity({ ...group, id }), convStore.deletedRecords)) return;
       const existing = this.groups.find((item) => item.id === id);
       if (existing) {
         Object.assign(existing, { ...group, id });
@@ -52,9 +55,7 @@ export const useGroupStore = defineStore('group', {
       if (g) Object.assign(g, patch);
     },
     exitGroup(id) {
-      // 单聊意义上"退出"会清空成员,这里仅从当前用户视角上隐藏
-      const g = this.groups.find((x) => x.id === id);
-      if (g && g.memberCount > 1) g.memberCount -= 1;
+      this.removeGroup(id);
     },
     disbandGroup(id) {
       this.removeGroup(id);
@@ -64,10 +65,13 @@ export const useGroupStore = defineStore('group', {
       this.syncError = '';
       try {
         const groups = await nativeImService.syncMyGroups();
-        groups.forEach((group) => this.addGroup(group));
-        useConversationStore().applyNativeGroups(groups);
+        const convStore = useConversationStore();
+        const activeGroups = filterDeletedGroups(groups, convStore.deletedRecords);
+        this.groups = filterDeletedGroups(this.groups, convStore.deletedRecords);
+        activeGroups.forEach((group) => this.addGroup(group));
+        convStore.applyNativeGroups(activeGroups);
         this.syncState = 'success';
-        return groups;
+        return activeGroups;
       } catch (error) {
         this.syncState = 'failed';
         this.syncError = error?.msg || error?.message || '群聊同步失败';
