@@ -246,6 +246,35 @@ describe('GET /api/callbacks/permission-status', () => {
     assert.equal(res.statusCode, 403, 'same cat+thread but different invocation must be rejected');
   });
 
+  test('allows same cat/thread recovery polling after the request is approved', async () => {
+    const app = await createApp();
+    const invocA = await registry.create('user-1', 'codex', 'thread-1');
+    const createRes = await app.inject({
+      method: 'POST',
+      url: '/api/callbacks/request-permission',
+      headers: { 'x-invocation-id': invocA.invocationId, 'x-callback-token': invocA.callbackToken },
+      payload: {
+        action: 'git_commit',
+        reason: 'fix',
+      },
+    });
+    const { requestId } = JSON.parse(createRes.body);
+    const updated = await authManager.respond(requestId, true, 'once', 'user-1');
+    assert.equal(updated?.status, 'granted');
+
+    const invocB = await registry.create('user-1', 'codex', 'thread-1');
+    const res = await app.inject({
+      method: 'GET',
+      url: `/api/callbacks/permission-status?requestId=${requestId}`,
+      headers: { 'x-invocation-id': invocB.invocationId, 'x-callback-token': invocB.callbackToken },
+    });
+
+    assert.equal(res.statusCode, 200);
+    const body = JSON.parse(res.body);
+    assert.equal(body.requestId, requestId);
+    assert.equal(body.status, 'granted');
+  });
+
   test('returns 404 for nonexistent request', async () => {
     const app = await createApp();
     const { invocationId, callbackToken } = await registry.create('user-1', 'codex', 'thread-1');

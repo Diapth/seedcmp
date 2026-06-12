@@ -75,12 +75,12 @@ export const callbackAuthRoutes: FastifyPluginAsync<CallbackAuthRoutesOptions> =
       return { error: 'Permission request not found' };
     }
 
-    // P2 fix: 校验 requestId 严格归属当前 invocation
-    if (
-      status.invocationId !== record.invocationId ||
-      status.catId !== record.catId ||
-      status.threadId !== record.threadId
-    ) {
+    const sameCatThread = status.catId === record.catId && status.threadId === record.threadId;
+    const sameInvocation = status.invocationId === record.invocationId;
+    // Waiting requests are still bound to the originating invocation. Resolved
+    // requests may be polled by a recovered same-cat same-thread invocation so
+    // late user approval can be observed instead of turning into a permanent 403.
+    if (!sameCatThread || (status.status === 'waiting' && !sameInvocation)) {
       reply.status(403);
       return { error: 'Permission request belongs to a different invocation' };
     }
