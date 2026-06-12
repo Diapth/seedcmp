@@ -98,6 +98,22 @@ describe('OutboundDeliveryHook', () => {
     assert.equal(imWebMock.sent[0].externalChatId, '2:project-group-1');
   });
 
+  it('keeps coordinator aggregate replies in the IM Web PM direct binding', async () => {
+    const imWebMock = mockAdapter('im-web');
+    hook = new OutboundDeliveryHook({
+      bindingStore,
+      adapters: new Map([['im-web', imWebMock.adapter]]),
+      log: noopLog(),
+    });
+    bindingStore.bind('im-web', '1:user-1@clowder_cat:coordinator', 'thread-project', 'user-1');
+    bindingStore.bind('im-web', '2:project-group-1', 'thread-project', 'user-1');
+
+    await hook.deliver('thread-project', 'aggregate summary for the user', 'coordinator');
+
+    assert.equal(imWebMock.sent.length, 1);
+    assert.equal(imWebMock.sent[0].externalChatId, '1:user-1@clowder_cat:coordinator');
+  });
+
   it('does not throw when adapter.sendReply fails', async () => {
     const failAdapter = {
       connectorId: 'feishu',

@@ -92,12 +92,52 @@ describe('im-web outbound adapter', () => {
     assert.deepEqual(JSON.parse(request.rawBody), {
       connectorId: 'im-web',
       externalChatId: '2:group-clowder',
+      catId: 'codex',
+      catDisplayName: '缅因猫',
       content: 'Clowder **reply**',
       format: 'markdown',
       metadata: {
         threadId: 'thread-1',
         invocationId: 'invoke-1',
         catId: 'codex',
+      },
+    });
+  });
+
+  it('delivers formatted replies with Clowder cat identity at TangSeng payload top level', async () => {
+    const server = await createCallbackServer();
+    servers.push(server);
+    const adapter = new ImWebAdapter(noopLog(), {
+      outboundCallbackUrl: server.url,
+      connectorSecret: IM_WEB_TEST_SECRET,
+      requestTimeoutMs: 1000,
+      now: () => 1780000002500,
+    });
+
+    await adapter.sendFormattedReply(
+      '2:project-group',
+      {
+        header: 'Codex',
+        body: 'worker result',
+        cardActions: [],
+      },
+      {
+        catId: 'codex',
+        catDisplayName: 'Codex',
+      },
+    );
+
+    assert.equal(server.requests.length, 1);
+    assert.deepEqual(JSON.parse(server.requests[0].rawBody), {
+      connectorId: 'im-web',
+      externalChatId: '2:project-group',
+      catId: 'codex',
+      catDisplayName: 'Codex',
+      content: 'worker result',
+      format: 'markdown',
+      metadata: {
+        catId: 'codex',
+        catDisplayName: 'Codex',
       },
     });
   });

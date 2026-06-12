@@ -124,7 +124,7 @@ export class StreamingOutboundHook {
     senderHint?: { id: string; name?: string },
   ): Promise<void> {
     const key = this.scopeKey(threadId, invocationId);
-    const bindings = selectDeliveryBindings(await this.opts.bindingStore.getByThread(threadId));
+    const bindings = selectDeliveryBindings(await this.opts.bindingStore.getByThread(threadId), { catId });
     const sessions: StreamingSession[] = [];
 
     for (const binding of bindings) {
@@ -284,8 +284,8 @@ export class StreamingOutboundHook {
   }
 
   /** F151: Notify adapters that an invocation's delivery batch is complete. */
-  async notifyDeliveryBatchDone(threadId: string, chainDone: boolean): Promise<void> {
-    const bindings = selectDeliveryBindings(await this.opts.bindingStore.getByThread(threadId));
+  async notifyDeliveryBatchDone(threadId: string, chainDone: boolean, catId?: CatId): Promise<void> {
+    const bindings = selectDeliveryBindings(await this.opts.bindingStore.getByThread(threadId), { catId });
     for (const binding of bindings) {
       const adapter = this.opts.adapters.get(binding.connectorId);
       if (!adapter?.onDeliveryBatchDone) continue;

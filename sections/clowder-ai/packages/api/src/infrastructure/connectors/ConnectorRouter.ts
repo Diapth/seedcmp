@@ -697,7 +697,7 @@ export class ConnectorRouter {
   ): CatId {
     if (explicitTargetCatIds.length > 0) return explicitTargetCatIds[0]!;
     if (mentionResult.matched) return mentionResult.targetCatId;
-    if (connectorId === 'im-web' && catRegistry.has(COORDINATOR_CAT_ID)) return COORDINATOR_CAT_ID;
+    if (connectorId === 'im-web') return COORDINATOR_CAT_ID;
     return mentionResult.targetCatId;
   }
 

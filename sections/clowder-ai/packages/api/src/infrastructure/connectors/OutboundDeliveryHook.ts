@@ -200,7 +200,7 @@ export class OutboundDeliveryHook {
       { threadId, catId, contentLen: content.length, hasRichBlocks: !!(richBlocks && richBlocks.length) },
       '[OutboundDeliveryHook] deliver() called',
     );
-    const { bindings, deliveryThreadId, fallbackFromThreadId } = await this.resolveDeliveryBindings(threadId);
+    const { bindings, deliveryThreadId, fallbackFromThreadId } = await this.resolveDeliveryBindings(threadId, catId);
     if (bindings.length === 0) {
       this.opts.log.warn(
         { threadId },
@@ -286,6 +286,14 @@ export class OutboundDeliveryHook {
             !!adapter.sendMedia &&
             textFileDeliveries.length > 0 &&
             hasOnlyNativeFileRichBlocks;
+          const deliveryMeta =
+            adapter.connectorId === 'im-web' && (catId || catDisplayName)
+              ? {
+                  ...(outMeta ?? {}),
+                  ...(catId ? { catId } : {}),
+                  ...(catDisplayName ? { catDisplayName } : {}),
+                }
+              : outMeta;
 
           // Phase E: Always prefer sendFormattedReply (interactive card) when adapter supports it.
           // This ensures each cat's reply is a distinct card with identity header,
@@ -312,14 +320,14 @@ export class OutboundDeliveryHook {
                   body: content,
                   origin,
                 });
-            await adapter.sendFormattedReply(binding.externalChatId, envelope, outMeta);
+            await adapter.sendFormattedReply(binding.externalChatId, envelope, deliveryMeta);
           } else if (hasRichBlocks && adapter.sendRichMessage) {
             await adapter.sendRichMessage(
               binding.externalChatId,
               content,
               finalBlocks,
               catDisplayName || 'Cat',
-              outMeta,
+              deliveryMeta,
             );
           } else if (
             hasRichBlocks &&
@@ -335,15 +343,15 @@ export class OutboundDeliveryHook {
             const blockText = nonMediaBlocks.length > 0 ? renderAllRichBlocksPlaintext(nonMediaBlocks) : '';
             const textToSend = blockText ? `${finalContent}\n\n${blockText}` : finalContent;
             if (textToSend) {
-              await adapter.sendReply(binding.externalChatId, textToSend, outMeta);
+              await adapter.sendReply(binding.externalChatId, textToSend, deliveryMeta);
             }
             // Media blocks sent below in Phase 5/6/J
           } else if (hasRichBlocks) {
             // Fallback for adapters without sendMedia: render blocks as plaintext
             const blockText = renderAllRichBlocksPlaintext(finalBlocks);
-            await adapter.sendReply(binding.externalChatId, `${finalContent}\n\n${blockText}`, outMeta);
+            await adapter.sendReply(binding.externalChatId, `${finalContent}\n\n${blockText}`, deliveryMeta);
           } else {
-            await adapter.sendReply(binding.externalChatId, finalContent, outMeta);
+            await adapter.sendReply(binding.externalChatId, finalContent, deliveryMeta);
           }
 
           // Phase 6: Send audio blocks with url as media messages
@@ -577,12 +585,12 @@ export class OutboundDeliveryHook {
     await this.registerDeliveredArtifacts(threadId, catId, bindings, textFileDeliveries, finalBlocks, content);
   }
 
-  private async resolveDeliveryBindings(threadId: string): Promise<{
+  private async resolveDeliveryBindings(threadId: string, catId?: CatId): Promise<{
     bindings: Awaited<ReturnType<IConnectorThreadBindingStore['getByThread']>>;
     deliveryThreadId: string;
     fallbackFromThreadId?: string;
   }> {
-    const direct = selectDeliveryBindings(await this.opts.bindingStore.getByThread(threadId));
+    const direct = selectDeliveryBindings(await this.opts.bindingStore.getByThread(threadId), { catId });
     if (direct.length > 0) return { bindings: direct, deliveryThreadId: threadId };
 
     if (!this.opts.threadLookup) return { bindings: direct, deliveryThreadId: threadId };
@@ -598,7 +606,7 @@ export class OutboundDeliveryHook {
       (id): id is string => typeof id === 'string' && id.length > 0 && id !== threadId,
     );
     for (const fallbackId of fallbackIds) {
-      const fallbackBindings = selectDeliveryBindings(await this.opts.bindingStore.getByThread(fallbackId));
+      const fallbackBindings = selectDeliveryBindings(await this.opts.bindingStore.getByThread(fallbackId), { catId });
       if (fallbackBindings.length > 0) {
         return {
           bindings: fallbackBindings,

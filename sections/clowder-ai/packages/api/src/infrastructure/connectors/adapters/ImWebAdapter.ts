@@ -1,5 +1,5 @@
 import crypto from 'node:crypto';
-import type { RichBlock } from '@cat-cafe/shared';
+import { catRegistry, type RichBlock } from '@cat-cafe/shared';
 import type { FastifyBaseLogger } from 'fastify';
 import type { MessageEnvelope } from '../ConnectorMessageFormatter.js';
 import type { IStreamableOutboundAdapter } from '../OutboundDeliveryHook.js';
@@ -61,9 +61,11 @@ export class ImWebAdapter implements IStreamableOutboundAdapter {
 
   async sendReply(externalChatId: string, content: string, metadata?: Record<string, unknown>): Promise<void> {
     const inlinePlatformMessageId = this.consumeInlinePlaceholder(externalChatId);
+    const identity = resolveCatIdentity(metadata);
     await this.deliver({
       connectorId: this.connectorId,
       externalChatId,
+      ...identity,
       content,
       format: 'markdown',
       ...(inlinePlatformMessageId
@@ -81,13 +83,14 @@ export class ImWebAdapter implements IStreamableOutboundAdapter {
     metadata?: Record<string, unknown>,
   ): Promise<void> {
     const inlinePlatformMessageId = this.consumeInlinePlaceholder(externalChatId);
+    const identity = resolveCatIdentity(metadata, { catDisplayName });
     await this.deliver({
       connectorId: this.connectorId,
       externalChatId,
+      ...identity,
       content: textContent,
       format: 'markdown',
       richBlocks: blocks,
-      catDisplayName,
       ...(inlinePlatformMessageId
         ? { stream: { state: 'final' as const, platformMessageId: inlinePlatformMessageId } }
         : {}),
@@ -101,9 +104,11 @@ export class ImWebAdapter implements IStreamableOutboundAdapter {
     metadata?: Record<string, unknown>,
   ): Promise<void> {
     const inlinePlatformMessageId = this.consumeInlinePlaceholder(externalChatId);
+    const identity = resolveCatIdentity(metadata);
     await this.deliver({
       connectorId: this.connectorId,
       externalChatId,
+      ...identity,
       content: envelope.body,
       format: 'markdown',
       ...(inlinePlatformMessageId
@@ -280,4 +285,30 @@ function emojiFromType(emojiType: string): string {
     THINKING: '🤔',
   };
   return map[normalized] ?? emojiType;
+}
+
+function resolveCatIdentity(
+  metadata?: Record<string, unknown>,
+  fallback: { catId?: string; catDisplayName?: string } = {},
+): { catId?: string; catDisplayName?: string } {
+  const catId = firstString(metadata?.catId, metadata?.cat_id, fallback.catId);
+  const catDisplayName = firstString(
+    metadata?.catDisplayName,
+    metadata?.cat_display_name,
+    fallback.catDisplayName,
+    catId ? catRegistry.tryGet(catId)?.config.displayName : undefined,
+  );
+  return {
+    ...(catId ? { catId } : {}),
+    ...(catDisplayName ? { catDisplayName } : {}),
+  };
+}
+
+function firstString(...values: unknown[]): string | undefined {
+  for (const value of values) {
+    if (typeof value !== 'string') continue;
+    const trimmed = value.trim();
+    if (trimmed) return trimmed;
+  }
+  return undefined;
 }
