@@ -645,8 +645,14 @@ export const useMessageStore = defineStore('message', {
           pullMode: options.pullMode
         })).map((message) => defaultMsg(enrichNativeMessageSender(message, conversation, currentUser)));
         const preservedContextMessages = readPromptContext(identity.conversationId, currentUser, routeContext);
+        const isPartialSync = !options.replaceAll && Number(options.startSeq || 0) === 0 && Number(options.endSeq || 0) === 0;
         this.messages[identity.conversationId] = synced.length
-          ? mergeSyncedMessagesPreservingLocalContext(this.messages[identity.conversationId] || [], synced, { currentUser, conversation: routeContext, preservedContextMessages })
+          ? mergeSyncedMessagesPreservingLocalContext(this.messages[identity.conversationId] || [], synced, {
+            currentUser,
+            conversation: routeContext,
+            preservedContextMessages,
+            partialSync: isPartialSync
+          })
           : this.messages[identity.conversationId] || [];
         this.applyManualContextPinMarks(routeContext);
         const latest = (this.messages[identity.conversationId] || []).filter(isVisibleChatMessage).at(-1);

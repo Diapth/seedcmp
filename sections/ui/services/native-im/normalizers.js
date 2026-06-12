@@ -98,6 +98,35 @@ function parsePayload(payload) {
   }
 }
 
+function isStructuredPayloadText(value) {
+  if (typeof value !== 'string') return false;
+  const text = value.trim();
+  if (!text || !/^[{[]/.test(text)) return false;
+  try {
+    const parsed = JSON.parse(text);
+    if (!parsed || typeof parsed !== 'object') return false;
+    const source = Array.isArray(parsed) ? parsed[0] : parsed;
+    if (!source || typeof source !== 'object') return false;
+    return [
+      'type',
+      'contentType',
+      'content_type',
+      'content',
+      'text',
+      'title',
+      'payload',
+      'contentObj',
+      'markdown',
+      'format',
+      'delta',
+      'contentDelta',
+      'content_delta'
+    ].some((key) => Object.prototype.hasOwnProperty.call(source, key));
+  } catch {
+    return false;
+  }
+}
+
 function normalizeEventName(value) {
   return clean(value)
     .replace(/([a-z0-9])([A-Z])/g, '$1_$2')
@@ -423,15 +452,23 @@ export function normalizeContent(payload) {
   const envelope = payload && typeof payload === 'object' ? payload : {};
   const rawSource = envelope.payload ?? envelope.contentObj ?? envelope.content ?? payload;
   const parsed = parsePayload(rawSource);
+  const parsedContentIsStructured = isStructuredPayloadText(parsed.content);
+  const parsedTextIsStructured = isStructuredPayloadText(parsed.text);
   const nestedSource = parsed.contentObj
     ?? parsed.payload
-    ?? (parsed.content && typeof parsed.content === 'object' ? parsed.content : undefined);
+    ?? (parsed.content && typeof parsed.content === 'object' ? parsed.content : undefined)
+    ?? (parsedContentIsStructured ? parsed.content : undefined)
+    ?? (parsedTextIsStructured ? parsed.text : undefined);
   const nested = nestedSource ? parsePayload(nestedSource) : {};
   const content = { ...envelope, ...parsed, ...nested };
+  const nestedPayloadIsPrimary = parsedContentIsStructured || parsedTextIsStructured;
   const type = toNumber(
     envelope.type
       ?? envelope.contentType
       ?? envelope.content_type
+      ?? (nestedPayloadIsPrimary ? nested.type : undefined)
+      ?? (nestedPayloadIsPrimary ? nested.contentType : undefined)
+      ?? (nestedPayloadIsPrimary ? nested.content_type : undefined)
       ?? parsed.type
       ?? parsed.contentType
       ?? parsed.content_type
@@ -441,8 +478,8 @@ export function normalizeContent(payload) {
     1
   );
   const contentText = firstText(
-    parsed.content,
-    parsed.text,
+    parsedContentIsStructured ? undefined : parsed.content,
+    parsedTextIsStructured ? undefined : parsed.text,
     parsed.title,
     nested.content,
     nested.text,

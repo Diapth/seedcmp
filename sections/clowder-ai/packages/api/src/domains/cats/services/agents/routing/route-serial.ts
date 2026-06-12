@@ -150,14 +150,28 @@ function collectCallbackPostResultCandidates(content: string): string[] {
 function callbackPostResultFromPayload(parsed: {
   status?: unknown;
   messageId?: unknown;
+  message_id?: unknown;
   threadId?: unknown;
+  thread_id?: unknown;
 }): CallbackPostResult | null {
-  const confirmed = parsed.status === 'ok' || parsed.status === 'duplicate';
+  const confirmed =
+    parsed.status === 'ok' ||
+    parsed.status === 'duplicate' ||
+    parsed.status === 'success' ||
+    parsed.status === 'succeeded';
   if (!confirmed && parsed.status === undefined) return null;
   return {
     confirmed,
-    ...(typeof parsed.messageId === 'string' && parsed.messageId.length > 0 ? { messageId: parsed.messageId } : {}),
-    ...(typeof parsed.threadId === 'string' && parsed.threadId.length > 0 ? { threadId: parsed.threadId } : {}),
+    ...(typeof parsed.messageId === 'string' && parsed.messageId.length > 0
+      ? { messageId: parsed.messageId }
+      : typeof parsed.message_id === 'string' && parsed.message_id.length > 0
+        ? { messageId: parsed.message_id }
+        : {}),
+    ...(typeof parsed.threadId === 'string' && parsed.threadId.length > 0
+      ? { threadId: parsed.threadId }
+      : typeof parsed.thread_id === 'string' && parsed.thread_id.length > 0
+        ? { threadId: parsed.thread_id }
+        : {}),
   };
 }
 
@@ -178,7 +192,7 @@ function parseCallbackPostResult(content: string | undefined): {
   }
 
   return {
-    confirmed: /"status"\s*:\s*"(ok|duplicate)"/.test(content),
+    confirmed: /"status"\s*:\s*"(ok|duplicate|success|succeeded)"/.test(content),
   };
 }
 

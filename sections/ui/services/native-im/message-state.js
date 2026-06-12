@@ -16,6 +16,54 @@ function firstNonEmpty(...values) {
   return '';
 }
 
+function firstRawText(...values) {
+  for (const value of values) {
+    if (value === undefined || value === null) continue;
+    if (typeof value === 'object') continue;
+    const text = String(value);
+    if (text) return text;
+  }
+  return '';
+}
+
+function looksLikeStructuredPayloadText(value) {
+  if (typeof value !== 'string') return false;
+  const text = value.trim();
+  if (!text || !/^[{[]/.test(text)) return false;
+  try {
+    const parsed = JSON.parse(text);
+    if (!parsed || typeof parsed !== 'object') return false;
+    const source = Array.isArray(parsed) ? parsed[0] : parsed;
+    if (!source || typeof source !== 'object') return false;
+    return [
+      'type',
+      'contentType',
+      'content_type',
+      'content',
+      'text',
+      'payload',
+      'contentObj',
+      'markdown',
+      'format',
+      'delta',
+      'contentDelta',
+      'content_delta'
+    ].some((key) => Object.prototype.hasOwnProperty.call(source, key));
+  } catch {
+    return false;
+  }
+}
+
+function firstPlainRawText(...values) {
+  for (const value of values) {
+    if (value === undefined || value === null) continue;
+    if (typeof value === 'object') continue;
+    const text = String(value);
+    if (text && !looksLikeStructuredPayloadText(text)) return text;
+  }
+  return '';
+}
+
 export function toConversationPreview(value, maxLength = 80) {
   const source = clean(value);
   if (!source) return '';
@@ -65,6 +113,32 @@ function comparableTextContent(message = {}) {
     .trim();
 }
 
+function markdownFenceCount(text = '') {
+  return (String(text || '').match(/```/g) || []).length;
+}
+
+function hasOddMarkerCount(text = '', marker = '**') {
+  const escaped = marker.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+  return ((String(text || '').match(new RegExp(escaped, 'g')) || []).length % 2) === 1;
+}
+
+function isLikelyMarkdownReplyFragment(message = {}) {
+  const content = String(message.content || '');
+  const text = content.trim();
+  if (!text) return false;
+  if (text.length > 180) return false;
+  if (message.fragmentedClowderReply) return true;
+  if (message.renderMode !== 'markdown' && message.isMarkdown !== true) return false;
+  if (markdownFenceCount(text) % 2 === 1) return true;
+  if (hasOddMarkerCount(text, '**') || hasOddMarkerCount(text, '`')) return true;
+  if (/^\s*(?:[-*+]|\d+\.)\s*(?:\*\*)?\s*$/u.test(content)) return true;
+  if (/^\s*(?:[-*+]|\d+\.)\s+/u.test(content) && text.length <= 80 && !/[。.!?！？）)\]】]$/.test(text)) return true;
+  if (/^[)\]】）]+[*）)]*$/u.test(text)) return true;
+  if (/[\[（(【]$/.test(text)) return true;
+  if (/^[^\s].{0,60}$/u.test(text) && !/[。.!?！？]$/.test(text) && /[_*`()[\]（）【】]/.test(text)) return true;
+  return false;
+}
+
 function isLikelyClowderPartialReplyDuplicate(candidate = {}, incoming = {}) {
   const candidateContent = comparableTextContent(candidate);
   const incomingContent = comparableTextContent(incoming);
@@ -78,6 +152,20 @@ function isLikelyClowderPartialReplyDuplicate(candidate = {}, incoming = {}) {
 
   const coverage = shorter.length / Math.max(longer.length, 1);
   return coverage >= 0.35;
+}
+
+function isLikelyClowderFragmentContinuation(candidate = {}, incoming = {}) {
+  if (!candidate || !incoming) return false;
+  if (candidate.type && candidate.type !== 'text') return false;
+  if (incoming.type && incoming.type !== 'text') return false;
+  if (!isClowderReplySender(candidate) || !isClowderReplySender(incoming)) return false;
+  if (normalizedSenderKey(candidate) !== normalizedSenderKey(incoming)) return false;
+  if (incoming.streamKey || candidate.streamKey) return false;
+  const incomingContent = clean(incoming.content);
+  const candidateContent = clean(candidate.content);
+  if (!incomingContent || !candidateContent) return false;
+  if (candidate.fragmentedClowderReply && incomingContent.length <= 240) return true;
+  return isLikelyMarkdownReplyFragment(candidate) || isLikelyMarkdownReplyFragment(incoming);
 }
 
 function messageDigest(message = {}) {
@@ -1184,12 +1272,50 @@ function findEquivalentClowderReplyIndex(messages = [], incoming = {}, currentUs
     if (!isClowderReplySender(candidate)) continue;
     if (isSelfSender(candidate.senderId || candidate.from_uid || candidate.fromUID, currentUser)) continue;
     if (normalizedSenderKey(candidate) !== incomingSender) continue;
-    if (contentKey(candidate) !== incomingContent && !isLikelyClowderPartialReplyDuplicate(candidate, incoming)) continue;
+    if (
+      contentKey(candidate) !== incomingContent
+      && !isLikelyClowderPartialReplyDuplicate(candidate, incoming)
+      && !isLikelyClowderFragmentContinuation(candidate, incoming)
+    ) continue;
     const candidateTime = safeNumber(candidate.time, 0);
     if (incomingTime && candidateTime && Math.abs(incomingTime - candidateTime) > timeWindowMs) continue;
     return index;
   }
   return -1;
+}
+
+function mergeClowderReplyContent(existing = {}, incoming = {}) {
+  const existingContent = String(existing.content || '');
+  const incomingContent = String(incoming.content || '');
+  if (!existingContent) return incomingContent;
+  if (!incomingContent) return existingContent;
+  if (existingContent === incomingContent) return existingContent;
+  const existingComparable = comparableTextContent(existing);
+  const incomingComparable = comparableTextContent(incoming);
+  if (existingComparable && incomingComparable && existingComparable === incomingComparable) {
+    return existingContent.length >= incomingContent.length ? existingContent : incomingContent;
+  }
+  if (incomingComparable && existingComparable && incomingComparable.startsWith(existingComparable)) {
+    return incomingContent;
+  }
+  if (existingComparable && incomingComparable && existingComparable.startsWith(incomingComparable)) {
+    return existingContent;
+  }
+  if (isLikelyClowderFragmentContinuation(existing, incoming)) {
+    const incomingFragment = firstPlainRawText(incoming.raw?.content, incoming.raw?.text)
+      || firstRawText(incoming.content, incoming.text);
+    return `${existingContent}${incomingFragment}`;
+  }
+  return incomingContent;
+}
+
+function collectMergedMessageIds(...messages) {
+  return [...new Set(messages.flatMap((message = {}) => [
+    ...(Array.isArray(message.mergedMessageIds) ? message.mergedMessageIds : []),
+    message.id,
+    message.messageId,
+    message.clientMsgNo
+  ]).map(clean).filter(Boolean))];
 }
 
 export function mergeNativeMessageIntoList(messages = [], incoming = {}, options = {}) {
@@ -1276,15 +1402,20 @@ export function mergeNativeMessageIntoList(messages = [], incoming = {}, options
 
   const duplicateReplyIndex = findEquivalentClowderReplyIndex(next, enrichedIncoming, currentUser, options);
   if (duplicateReplyIndex >= 0) {
+    const existing = next[duplicateReplyIndex];
+    const content = mergeClowderReplyContent(existing, enrichedIncoming);
     const mergedMessage = {
-      ...next[duplicateReplyIndex],
+      ...existing,
       ...enrichedIncoming,
       id: firstNonEmpty(enrichedIncoming.id, next[duplicateReplyIndex].id),
+      content,
       status: enrichedIncoming.status || next[duplicateReplyIndex].status || 'success',
       streaming: enrichedIncoming.streaming === undefined ? false : enrichedIncoming.streaming,
       reactions: next[duplicateReplyIndex].reactions || enrichedIncoming.reactions || [],
       replyRef: next[duplicateReplyIndex].replyRef || enrichedIncoming.replyRef || null,
-      mentions: next[duplicateReplyIndex].mentions || enrichedIncoming.mentions || []
+      mentions: next[duplicateReplyIndex].mentions || enrichedIncoming.mentions || [],
+      ...(content !== enrichedIncoming.content ? { fragmentedClowderReply: true } : {}),
+      mergedMessageIds: collectMergedMessageIds(existing, enrichedIncoming)
     };
     next[duplicateReplyIndex] = mergedMessage;
     return sortMessages(appendRichFileBlockMessages(next, mergedMessage));
@@ -1350,6 +1481,20 @@ function shouldPreserveLocalUiStateMessage(message = {}, incoming = [], options 
   return true;
 }
 
+function shouldPreservePartialSyncHistoryMessage(message = {}, incoming = [], options = {}) {
+  if (!options.partialSync) return false;
+  const conversation = options.conversation || {};
+  if (!isClowderConversation(conversation)) return false;
+  if (!isVisibleChatMessage(message)) return false;
+  if (hasEquivalentIncomingMessage(message, incoming, options.currentUser || {}, options)) return false;
+  if (!incoming.length) return true;
+  const incomingTimes = incoming.map((item) => safeNumber(item.time, 0)).filter(Boolean);
+  const earliestIncomingTime = incomingTimes.length ? Math.min(...incomingTimes) : 0;
+  const messageTime = safeNumber(message.time, 0);
+  if (!earliestIncomingTime || !messageTime) return true;
+  return messageTime < earliestIncomingTime;
+}
+
 export function mergeSyncedMessagesPreservingLocalContext(current = [], incoming = [], options = {}) {
   const contextMessages = firstArray(options.preservedContextMessages, options.localContextMessages)
     .filter((message) => shouldPreserveLocalContextMessage(message, incoming, options));
@@ -1358,6 +1503,7 @@ export function mergeSyncedMessagesPreservingLocalContext(current = [], incoming
     ...current.filter((message) => (
       shouldPreserveLocalContextMessage(message, incoming, options)
       || shouldPreserveLocalUiStateMessage(message, incoming, options)
+      || shouldPreservePartialSyncHistoryMessage(message, incoming, options)
     ))
   ];
   return mergeNativeMessageLists(preserved, incoming, options);

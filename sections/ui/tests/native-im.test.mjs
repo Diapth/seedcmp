@@ -4251,6 +4251,168 @@ test('native clowder final durable reply replaces partial streamed bubble', () =
   assert.equal(merged[0].streaming, false);
 });
 
+test('native clowder short durable markdown fragments collapse into one reply bubble', () => {
+  const conversation = { id: 'clowder_cat:pm', type: 'robot', source: 'clowder' };
+  const fragments = [
+    ['wk-frag-1', '1. **'],
+    ['wk-frag-2', '其他执行猫** 已完成需求分析。'],
+    ['wk-frag-3', '\n2. **'],
+    ['wk-frag-4', '等待蓝蓝 spec_lock'],
+    ['wk-frag-5', ' lock**)'],
+    ['wk-frag-6', '\n3. **验收** 输出已聚合。']
+  ].map(([messageId, content], index) => normalizeMessage({
+    message_id: messageId,
+    client_msg_no: `frag-client-${index + 1}`,
+    from_uid: 'clowder_cat:pm',
+    from_name: 'PM',
+    timestamp: 1781067800 + index,
+    payload: JSON.stringify({
+      type: 1,
+      content,
+      format: 'markdown',
+      markdown: true
+    })
+  }));
+
+  const merged = fragments.reduce(
+    (list, message) => messageState.mergeNativeMessageIntoList(list, message, { conversation }),
+    []
+  );
+
+  assert.equal(merged.length, 1);
+  assert.equal(
+    merged[0].content,
+    '1. **其他执行猫** 已完成需求分析。\n2. **等待蓝蓝 spec_lock lock**)\n3. **验收** 输出已聚合。'
+  );
+  assert.equal(merged[0].senderId, 'clowder_cat:pm');
+  assert.equal(merged[0].streaming, false);
+});
+
+test('native text payload unwraps nested JSON content strings before rendering', () => {
+  const nested = normalizeMessage({
+    message_id: 'wk-nested-json-text',
+    client_msg_no: 'nested-json-client',
+    from_uid: 'clowder_cat:pm',
+    from_name: 'PM',
+    timestamp: 1781067900,
+    payload: JSON.stringify({
+      type: 1,
+      content: JSON.stringify({
+        type: 1,
+        content: 'PM 已完成聚合，不应把 JSON 外壳显示成乱码。',
+        format: 'markdown',
+        markdown: true
+      })
+    })
+  });
+
+  assert.equal(nested.content, 'PM 已完成聚合，不应把 JSON 外壳显示成乱码。');
+  assert.equal(nested.renderMode, 'markdown');
+  assert.equal(nested.isMarkdown, true);
+});
+
+test('native clowder fragment merge appends normalized text instead of structured raw payload', () => {
+  const conversation = { id: 'clowder_cat:pm', type: 'robot', source: 'clowder' };
+  const first = normalizeMessage({
+    message_id: 'wk-frag-json-1',
+    client_msg_no: 'frag-json-client-1',
+    from_uid: 'clowder_cat:pm',
+    from_name: 'PM',
+    timestamp: 1781068000,
+    payload: JSON.stringify({
+      type: 1,
+      content: '1. **',
+      format: 'markdown',
+      markdown: true
+    })
+  });
+  const second = {
+    ...normalizeMessage({
+      message_id: 'wk-frag-json-2',
+      client_msg_no: 'frag-json-client-2',
+      from_uid: 'clowder_cat:pm',
+      from_name: 'PM',
+      timestamp: 1781068001,
+      payload: JSON.stringify({
+        type: 1,
+        content: '聚合结论** 已发送给用户。',
+        format: 'markdown',
+        markdown: true
+      })
+    }),
+    raw: {
+      type: 1,
+      content: JSON.stringify({
+        type: 1,
+        content: '聚合结论** 已发送给用户。'
+      })
+    }
+  };
+
+  const merged = messageState.mergeNativeMessageIntoList(
+    messageState.mergeNativeMessageIntoList([], first, { conversation }),
+    second,
+    { conversation }
+  );
+
+  assert.equal(merged.length, 1);
+  assert.equal(merged[0].content, '1. **聚合结论** 已发送给用户。');
+  assert.equal(merged[0].content.includes('"type"'), false);
+});
+
+test('synced native history keeps older local messages when latest page is partial', () => {
+  const conversation = { id: 'clowder_cat:pm', type: 'robot', source: 'clowder' };
+  const olderUser = {
+    id: 'old-user-1',
+    messageId: 'old-user-1',
+    clientMsgNo: 'old-user-client-1',
+    senderId: 'u1',
+    senderName: '我',
+    content: '这条较早的本地历史不应因为只拉最新页而消失',
+    type: 'text',
+    status: 'success',
+    source: 'clowder',
+    time: 1000,
+    reactions: []
+  };
+  const olderCat = {
+    id: 'old-cat-1',
+    messageId: 'old-cat-1',
+    senderId: 'clowder_cat:pm',
+    senderName: 'PM',
+    content: '这条较早的智能体回复也应保留',
+    type: 'text',
+    status: 'success',
+    source: 'clowder',
+    time: 1100,
+    reactions: []
+  };
+  const latestRemote = {
+    id: 'latest-remote-1',
+    messageId: 'latest-remote-1',
+    senderId: 'clowder_cat:pm',
+    senderName: 'PM',
+    content: '最新同步页里的回复',
+    type: 'text',
+    status: 'success',
+    source: 'clowder',
+    time: 2000,
+    reactions: []
+  };
+
+  const merged = messageState.mergeSyncedMessagesPreservingLocalContext(
+    [olderUser, olderCat],
+    [latestRemote],
+    {
+      currentUser: { id: 'u1' },
+      conversation,
+      partialSync: true
+    }
+  );
+
+  assert.deepEqual(merged.map((message) => message.id), ['old-user-1', 'old-cat-1', 'latest-remote-1']);
+});
+
 test('native clowder generated workspace files resolve through clowder workspace raw proxy', () => {
   const normalized = messageState.normalizeAgentReplyEvent({
     streamKey: 'ppt-artifact-stream',

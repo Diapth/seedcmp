@@ -98,6 +98,28 @@ function createServiceWithPrefixedPostMessageResult(catId) {
   };
 }
 
+function createServiceWithSnakeCaseSuccessPostMessageResult(catId) {
+  return {
+    async *invoke() {
+      yield {
+        type: 'system_info',
+        catId,
+        content: JSON.stringify({ type: 'invocation_created', invocationId: 'inner-inv-snake-success' }),
+        timestamp: Date.now(),
+      };
+      yield { type: 'text', catId, content: 'Posting through callback with native success shape.', timestamp: Date.now() };
+      yield { type: 'tool_use', catId, toolName: 'cat_cafe_post_message', toolInput: '{}', timestamp: Date.now() };
+      yield {
+        type: 'tool_result',
+        catId,
+        content: JSON.stringify({ status: 'success', thread_id: 'thread1', message_id: 'callback-msg-snake' }),
+        timestamp: Date.now(),
+      };
+      yield { type: 'done', catId, timestamp: Date.now() };
+    },
+  };
+}
+
 function createServiceWithoutPostMessage(catId) {
   return {
     async *invoke() {
@@ -244,6 +266,28 @@ describe('#573: stream store dedup when cat_cafe_post_message used', () => {
       turnInvocationId: 'inv-1',
     });
     assert.deepEqual(patch.extra.rich.blocks, [bufferedBlock]);
+  });
+
+  it('skips stream append for success status with snake_case callback ids', async () => {
+    const { routeSerial } = await import('../dist/domains/cats/services/agents/routing/route-serial.js');
+    const appendCalls = [];
+    const augmentCalls = [];
+    const deps = createMockDeps(
+      { opus: createServiceWithSnakeCaseSuccessPostMessageResult('opus') },
+      appendCalls,
+      augmentCalls,
+    );
+
+    for await (const msg of routeSerial(deps, ['opus'], 'hello', 'user1', 'thread1', {
+      parentInvocationId: 'parent-inv-snake-success',
+    })) {
+      // drain
+    }
+
+    const streamAppends = appendCalls.filter((m) => m.origin === 'stream' && m.catId === 'opus');
+    assert.equal(streamAppends.length, 0, 'success + snake_case callback result should not create a duplicate stream bubble');
+    assert.equal(augmentCalls.length, 1, 'success + snake_case callback result should still augment callback message');
+    assert.equal(augmentCalls[0].id, 'callback-msg-snake');
   });
 
   it('skips stream append for namespaced cat_cafe_post_message tool names', async () => {
