@@ -20,6 +20,7 @@
           @open-members="openMembers"
           @open-qrcode="openQrcode"
           @open-board="openBoard"
+          @open-files="openFiles"
           @preview-file="openFilePreview"
           @select-member="openMemberProfile"
           @member-contextmenu="handleMemberLongPress"
@@ -39,6 +40,7 @@ import { useConversationStore } from '@/stores/conversation';
 import { useGroupStore } from '@/stores/group';
 import { useContactStore } from '@/stores/contact';
 import { useNavigationStore } from '@/stores/navigation';
+import { useAgentStore } from '@/stores/agent';
 import { buildGroupScopedRoute } from '@/services/native-im/conversation-state';
 import AppShell from '@/components/layout/AppShell.vue';
 import MobilePageHeader from '@/components/layout/MobilePageHeader.vue';
@@ -49,6 +51,7 @@ const convStore = useConversationStore();
 const groupStore = useGroupStore();
 const contactStore = useContactStore();
 const navStore = useNavigationStore();
+const agentStore = useAgentStore();
 const routeOptions = ref({});
 const memberTapGuard = ref({ memberId: '', until: 0 });
 
@@ -85,6 +88,7 @@ onMounted(() => {
   if (groupId.value) {
     convStore.setActiveId(groupId.value);
     groupStore.setActiveGroupId(groupId.value);
+    agentStore.syncProjectBoardForGroup(groupId.value, { silent: true });
   }
   navStore.setActiveModule('chat');
 });
@@ -115,6 +119,10 @@ function openQrcode() {
 
 function openBoard() {
   uni.navigateTo({ url: `/pages/agents/board?groupId=${encodeURIComponent(groupId.value)}` });
+}
+
+function openFiles() {
+  uni.navigateTo({ url: '/pages/files/index' });
 }
 
 function openFilePreview(file) {

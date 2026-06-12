@@ -239,6 +239,67 @@ export function mergeSharedFilesWithBoardDocuments(messageFiles = [], board = {}
   return next;
 }
 
+export function projectTaskStatusText(status = '') {
+  const map = {
+    doing: '进行中',
+    review: '待验收',
+    blocked: '需修改',
+    done: '已完成'
+  };
+  return map[normalizeTaskStatus(status)] || '进行中';
+}
+
+function agentLookupValue(agent = {}) {
+  return firstText(agent.id, agent.uid, agent.catId, agent.cat_id, agent.agentId, agent.agent_id);
+}
+
+function agentDisplayName(agent = {}, fallback = '') {
+  return firstText(agent.name, agent.nickname, agent.displayName, agent.alias, fallback, '智能体');
+}
+
+function agentAlias(agent = {}, fallback = '') {
+  const alias = firstText(agent.alias, agent.mention, agent.mentionName, agent.mention_name);
+  if (alias) return alias.startsWith('@') ? alias : `@${alias}`;
+  return fallback ? `@${fallback}` : '@agent';
+}
+
+export function deriveProjectGroupInfoOverview({ board = null, agents = [], messageFiles = [] } = {}) {
+  const tasks = firstArray(board?.tasks);
+  const agentsById = new Map(
+    firstArray(agents)
+      .map((agent) => [agentLookupValue(agent), agent])
+      .filter(([id]) => Boolean(id))
+  );
+  const memberStatuses = tasks.map((task) => {
+    const agentId = firstText(task.agentId, task.agent_id, task.catId, task.cat_id, task.assigneeCatId, task.assignee_cat_id);
+    const agent = agentsById.get(agentId) || {};
+    const documents = firstArray(task.documents);
+    const status = normalizeTaskStatus(task.status || task.state);
+    return {
+      id: firstText(task.id, `${agentId || 'agent'}-${task.task || task.title || 'task'}`),
+      agentId,
+      agentName: agentDisplayName(agent, agentId),
+      agentAlias: agentAlias(agent, agentId),
+      agentAvatar: firstText(agent.avatar, agent.logo),
+      taskTitle: firstText(task.task, task.title, task.name, '协作任务'),
+      status,
+      statusText: projectTaskStatusText(status),
+      progress: normalizeProgress(task),
+      documentCount: documents.length,
+      documents
+    };
+  });
+  const files = mergeSharedFilesWithBoardDocuments(messageFiles, board || {});
+  return {
+    board,
+    taskCount: tasks.length,
+    completedCount: memberStatuses.filter((item) => item.status === 'done').length,
+    documentCount: collectProjectBoardDocuments(board || {}).length,
+    memberStatuses,
+    files
+  };
+}
+
 export function resolveProjectBoardThreadIds(binding = {}, group = {}) {
   return uniqueTexts([
     binding.projectThreadId,

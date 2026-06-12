@@ -37,6 +37,68 @@
       </view>
     </view>
 
+    <view v-if="projectOverview.taskCount" class="info-card project-section flex-column">
+      <view class="section-title-row flex-row align-center justify-between">
+        <text class="section-title">成员状态</text>
+        <text class="section-link" @click="$emit('open-board', agentBoard)">查看看板</text>
+      </view>
+      <view class="project-stats">
+        <view class="project-stat flex-column">
+          <text class="project-stat-value">{{ projectOverview.taskCount }}</text>
+          <text class="project-stat-label">任务</text>
+        </view>
+        <view class="project-stat flex-column">
+          <text class="project-stat-value">{{ projectOverview.completedCount }}</text>
+          <text class="project-stat-label">完成</text>
+        </view>
+        <view class="project-stat flex-column">
+          <text class="project-stat-value">{{ projectOverview.documentCount }}</text>
+          <text class="project-stat-label">产出</text>
+        </view>
+      </view>
+      <view class="status-list flex-column">
+        <view
+          v-for="item in projectOverview.memberStatuses.slice(0, 4)"
+          :key="item.id"
+          class="status-row flex-row align-center"
+        >
+          <AppAvatar :src="item.agentAvatar" :text="item.agentName" :size="34" :is-circle="false" />
+          <view class="status-main flex-column flex-1">
+            <view class="status-title-row flex-row align-center">
+              <text class="status-agent">{{ item.agentName }}</text>
+              <text class="status-task flex-1">{{ item.taskTitle }}</text>
+            </view>
+            <view class="status-progress">
+              <view class="status-progress-fill" :class="item.status" :style="{ width: item.progress + '%' }" />
+            </view>
+          </view>
+          <view class="status-pill" :class="item.status">{{ item.statusText }}</view>
+        </view>
+      </view>
+    </view>
+
+    <view v-if="projectFiles.length" class="info-card project-section flex-column">
+      <view class="section-title-row flex-row align-center justify-between">
+        <text class="section-title">产出文件</text>
+        <text class="section-link" @click="handleSharedFilesClick">查看全部 ({{ sharedFiles.length }})</text>
+      </view>
+      <view class="artifact-list flex-column">
+        <view
+          v-for="file in projectFiles"
+          :key="file.id || file.workspacePath || file.name"
+          class="artifact-row flex-row align-center"
+          @click="handleFilePreview(file)"
+        >
+          <view class="artifact-type">{{ fileTypeLabel(file) }}</view>
+          <view class="artifact-main flex-column flex-1">
+            <text class="artifact-name">{{ file.fileName || file.name || file.content }}</text>
+            <text class="artifact-summary">{{ file.summary || file.workspacePath || file.size || file.fileSize || 'Clowder 任务产物' }}</text>
+          </view>
+          <AppIcon name="right" :size="14" color="var(--color-text-muted)" />
+        </view>
+      </view>
+    </view>
+
     <view class="info-card action-section flex-column">
       <button v-if="agentBoard" class="action-row board-action" @click="$emit('open-board', agentBoard)">
         <AppIcon name="briefcase" :size="18" color="var(--color-primary)" />
@@ -92,7 +154,7 @@ import { useAgentStore } from '@/stores/agent';
 import { useAppStore } from '@/stores/app';
 import { useConfirm } from '@/composables/useConfirm';
 import { resolveSelfId } from '@/services/native-im/message-state';
-import { mergeSharedFilesWithBoardDocuments } from '@/services/native-im/project-board';
+import { deriveProjectGroupInfoOverview } from '@/services/native-im/project-board';
 import AppAvatar from '../common/AppAvatar.vue';
 import AppIcon from '../common/AppIcon.vue';
 import GroupAnnouncement from './GroupAnnouncement.vue';
@@ -127,13 +189,25 @@ const announcementText = computed(() => {
   return convStore.announcements[props.group.id]?.text || props.group.announcement || '';
 });
 
-const sharedFiles = computed(() => {
+const messageFiles = computed(() => {
   const msgs = messageStore.messages[props.group.id] || [];
-  return mergeSharedFilesWithBoardDocuments(
-    msgs.filter((m) => m.type === 'file'),
-    agentBoard.value
-  ).slice(0, 4);
+  return msgs.flatMap((message) => {
+    const files = Array.isArray(message.files) ? message.files : [];
+    return message.type === 'file' ? [message, ...files] : files;
+  });
 });
+
+const projectOverview = computed(() => deriveProjectGroupInfoOverview({
+  board: agentBoard.value,
+  agents: agentStore.agents,
+  messageFiles: messageFiles.value
+}));
+
+const sharedFiles = computed(() => {
+  return projectOverview.value.files;
+});
+
+const projectFiles = computed(() => sharedFiles.value.slice(0, 4));
 
 function handleMemberSelect(member) {
   emit('select-member', member);
@@ -176,6 +250,15 @@ async function handleAnnouncementUpdate(text) {
 
 function handleSharedFilesClick() {
   emit('open-files');
+}
+
+function handleFilePreview(file) {
+  emit('preview-file', file);
+}
+
+function fileTypeLabel(file) {
+  const type = String(file?.fileType || file?.type || file?.ext || 'FILE').toUpperCase();
+  return type.length > 5 ? type.slice(0, 5) : type;
 }
 
 function handleExit() {
@@ -330,6 +413,196 @@ function handleDisband() {
   margin-left: auto;
   color: var(--color-text-secondary);
   background-color: var(--color-bg-muted);
+}
+
+.project-section {
+  gap: 12px;
+}
+
+.project-stats {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 8px;
+}
+
+.project-stat {
+  min-width: 0;
+  gap: 2px;
+  padding: 10px 8px;
+  border-radius: 8px;
+  background-color: var(--color-bg-muted);
+  text-align: center;
+}
+
+.project-stat-value {
+  font-size: 17px;
+  line-height: 22px;
+  font-weight: 800;
+  color: var(--color-text-primary);
+}
+
+.project-stat-label {
+  font-size: 11px;
+  line-height: 16px;
+  color: var(--color-text-secondary);
+}
+
+.status-list,
+.artifact-list {
+  gap: 8px;
+}
+
+.status-row {
+  min-height: 50px;
+  gap: 10px;
+  padding: 8px;
+  border-radius: 8px;
+  background-color: var(--color-bg-base);
+  box-sizing: border-box;
+}
+
+.status-main {
+  min-width: 0;
+  gap: 6px;
+}
+
+.status-title-row {
+  min-width: 0;
+  gap: 6px;
+}
+
+.status-agent {
+  max-width: 88px;
+  flex-shrink: 0;
+  font-size: 12px;
+  line-height: 16px;
+  font-weight: 700;
+  color: var(--color-text-primary);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.status-task {
+  min-width: 0;
+  font-size: 12px;
+  line-height: 16px;
+  color: var(--color-text-secondary);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.status-progress {
+  width: 100%;
+  height: 5px;
+  border-radius: 999px;
+  overflow: hidden;
+  background-color: var(--color-border);
+}
+
+.status-progress-fill {
+  height: 100%;
+  min-width: 4px;
+  border-radius: inherit;
+  background-color: var(--color-primary);
+}
+
+.status-progress-fill.done {
+  background-color: var(--color-success);
+}
+
+.status-progress-fill.blocked {
+  background-color: var(--color-error);
+}
+
+.status-progress-fill.review {
+  background-color: var(--color-warning);
+}
+
+.status-pill {
+  flex-shrink: 0;
+  min-width: 48px;
+  min-height: 24px;
+  padding: 0 8px;
+  border-radius: 999px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 11px;
+  font-weight: 700;
+  color: var(--color-primary);
+  background-color: var(--color-primary-light);
+}
+
+.status-pill.done {
+  color: var(--color-success);
+  background-color: rgba(34, 197, 94, 0.12);
+}
+
+.status-pill.blocked {
+  color: var(--color-error);
+  background-color: rgba(239, 68, 68, 0.1);
+}
+
+.status-pill.review {
+  color: var(--color-warning);
+  background-color: rgba(245, 158, 11, 0.13);
+}
+
+.artifact-row {
+  min-height: 54px;
+  gap: 10px;
+  padding: 8px;
+  border-radius: 8px;
+  cursor: pointer;
+  background-color: var(--color-bg-base);
+  box-sizing: border-box;
+}
+
+.artifact-row:hover,
+.artifact-row:active {
+  background-color: var(--color-bg-hover);
+}
+
+.artifact-type {
+  width: 42px;
+  height: 32px;
+  border-radius: 8px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  font-size: 10px;
+  font-weight: 800;
+  color: var(--color-primary);
+  background-color: var(--color-primary-light);
+}
+
+.artifact-main {
+  min-width: 0;
+  gap: 2px;
+}
+
+.artifact-name,
+.artifact-summary {
+  min-width: 0;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.artifact-name {
+  font-size: 13px;
+  line-height: 18px;
+  font-weight: 700;
+  color: var(--color-text-primary);
+}
+
+.artifact-summary {
+  font-size: 11px;
+  line-height: 16px;
+  color: var(--color-text-secondary);
 }
 
 .action-section,

@@ -46,6 +46,7 @@ import {
 } from '../utils/formatMessage.js';
 import {
   collectProjectBoardDocuments,
+  deriveProjectGroupInfoOverview,
   mergeSharedFilesWithBoardDocuments,
   normalizeClowderProjectBoard,
   resolveProjectBoardThreadIds,
@@ -2146,6 +2147,63 @@ test('project shared files include board documents before local/mock message fil
   assert.equal(files[0].workspacePath, 'source-pack.md');
   assert.equal(files[0].worktreeId, 'thread-riverwatch');
   assert.equal(files[1].name, 'test.md');
+});
+
+test('project group info overview exposes member status and produced files', () => {
+  const board = normalizeClowderProjectBoard({
+    binding: {
+      id: 'binding-overview',
+      projectGroupNo: 'overview-group',
+      projectName: 'Overview 项目群'
+    },
+    tasks: [
+      {
+        id: 'task-design',
+        assigneeCatId: 'designer',
+        title: '分镜设计',
+        status: 'completed',
+        progress: 100,
+        documents: [{
+          id: 'storyboard-doc',
+          name: 'storyboard.md',
+          workspacePath: 'docs/storyboard.md',
+          worktreeId: 'thread-overview',
+          description: '分镜产出'
+        }]
+      },
+      {
+        id: 'task-review',
+        assigneeCatId: 'reviewer',
+        title: '复杂度校验',
+        status: 'blocked',
+        progress: 35
+      }
+    ]
+  });
+
+  const overview = deriveProjectGroupInfoOverview({
+    board,
+    agents: [
+      { id: 'designer', name: '土耳其安哥拉猫', alias: '@分镜' },
+      { id: 'reviewer', name: '短短', alias: '@校验' }
+    ],
+    messageFiles: [{ id: 'local-file', type: 'file', name: 'local-note.md', source: 'local' }]
+  });
+
+  assert.equal(overview.taskCount, 2);
+  assert.equal(overview.completedCount, 1);
+  assert.equal(overview.documentCount, 1);
+  assert.deepEqual(
+    overview.memberStatuses.map((item) => [item.agentName, item.taskTitle, item.statusText, item.documentCount]),
+    [
+      ['土耳其安哥拉猫', '分镜设计', '已完成', 1],
+      ['短短', '复杂度校验', '需修改', 0]
+    ]
+  );
+  assert.equal(overview.files[0].name, 'storyboard.md');
+  assert.equal(overview.files[0].workspacePath, 'docs/storyboard.md');
+  assert.equal(overview.files[0].worktreeId, 'thread-overview');
+  assert.equal(overview.files[1].name, 'local-note.md');
 });
 
 test('project board thread ids resolve from group raw binding shapes', () => {
